@@ -5,6 +5,25 @@ import Z3.Monad
 
 type Cond = BExp
 
+data HTrip = HTrip
+  { hPre :: Cond
+  , hProg :: Prog
+  , hPost :: Cond
+  } deriving (Show)
+
+data HETrip = HETrip
+  { hePre :: Cond
+  , heProg :: Prog
+  , hePost :: Cond
+  } deriving (Show)
+
+data RHLETrip = RHLETrip
+  { rhlePre :: Cond
+  , rhleProgA :: Prog
+  , rhleProgE :: Prog
+  , rhlePost :: Cond
+  } deriving (Show)
+
 condToZ3 :: Cond -> Z3 AST
 condToZ3 cond =
   case cond of
@@ -35,20 +54,41 @@ aexpBinopToZ3 f aexp1 aexp2 = do
   rhs <- aexpToZ3 aexp2
   f [lhs, rhs]
 
-hleVcs :: Cond -> Prog -> Cond -> Cond
-hleVcs pre prog post = impl pre (hleWp prog post)
+hVcs :: HTrip -> Cond
+hVcs trip = impl pre (hWp prog post)
+  where
+    pre = hPre trip
+    prog = hProg trip
+    post = hPost trip
 
-hleWp :: Stmt -> Cond -> Cond
-hleWp stmt post =
+heVcs :: HETrip -> Cond
+heVcs trip = impl pre (heWp prog post)
+  where
+    pre = hePre trip
+    prog = heProg trip
+    post = hePost trip
+
+hWp :: Stmt -> Cond -> Cond
+hWp stmt post =
   case stmt of
     Skip        -> post
     Seq []      -> post
-    Seq (s:ss)  -> hleWp s (hleWp (Seq ss) post)
+    Seq (s:ss)  -> hWp s (hWp (Seq ss) post)
     Call func   -> BAnd (impl (postCond func) post)
                         (preCond func)
     var := aexp -> bsubst post var aexp
-    If c s1 s2  -> BAnd (impl c (hleWp s1 post))
-                        (impl (BNot c) (hleWp s2 post))
+    If c s1 s2  -> BAnd (impl c (hWp s1 post))
+                        (impl (BNot c) (hWp s2 post))
+
+heWp :: Stmt -> Cond -> Cond
+heWp stmt post =
+  case stmt of
+  Call func -> BAnd (impl post (postCond func))
+                    (preCond func)
+  -- TODO: The following corresponds to the ELift rule,
+  -- which also says the program must have at least one
+  -- terminating state.
+  _ -> hWp stmt post
 
 rhleVerify :: Cond -> Prog -> Prog -> Cond -> Cond
 rhleVerify pre uprog eprog post = BTrue
@@ -61,4 +101,12 @@ func1 = UFunc "f1" ((V "x") :=: (I 0)) ((V "z") :=: (I 3))
 func2 = UFunc "f2" BTrue ((V "z") :=: ((V "x") :+: (I 3)))
 funcRand = UFunc "rand" BTrue BTrue
 prog1 = Seq ["x" := (I 0), "y" := (I 0), Call func2]
+prog2 = Seq ["x" := (I 0), "y" := (I 0), Call funcRand]
 cond1 = (V "z") :=: (I 3)
+htrip1 = HTrip BTrue prog1 cond1
+htrip2 = HTrip BTrue prog2 cond1
+hetrip1 = HETrip BTrue prog1 cond1
+hetrip2 = HETrip BTrue prog2 cond1
+
+printZ3 :: Cond -> IO String
+printZ3 cond = evalZ3 (condToZ3 cond >>= astToString)

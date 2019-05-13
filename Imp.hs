@@ -35,11 +35,11 @@ bsimpl (BNot bexp) = BNot (bsimpl bexp)
 bsimpl (BAnd bexp1 bexp2) = BAnd (bsimpl bexp1) (bsimpl bexp2)
 bsimpl bexp = bexp
 
-data UFunc = UFunc {
-  fName :: String,
-  preCond :: BExp,
-  postCond :: BExp
-} deriving (Show)
+data UFunc = UFunc
+  { fName :: String
+  , preCond :: BExp
+  , postCond :: BExp
+  } deriving (Show)
 
 data Stmt
   = Skip
