@@ -24,6 +24,37 @@ data RHLETrip = RHLETrip
   , rhlePost :: Cond
   } deriving (Show)
 
+hVcs :: HTrip -> Cond
+hVcs (HTrip pre prog post) = impl pre (hWp prog post)
+
+heVcs :: HETrip -> Cond
+heVcs (HETrip pre prog post) = impl pre (heWp prog post)
+
+rhleVcs :: RHLETrip -> Cond
+rhleVcs (RHLETrip pre progA progE post) = BTrue
+
+hWp :: Stmt -> Cond -> Cond
+hWp stmt post =
+  case stmt of
+    Skip        -> post
+    Seq []      -> post
+    Seq (s:ss)  -> hWp s (hWp (Seq ss) post)
+    Call func   -> BAnd (impl (postCond func) post)
+                        (preCond func)
+    var := aexp -> bsubst post var aexp
+    If c s1 s2  -> BAnd (impl c (hWp s1 post))
+                        (impl (BNot c) (hWp s2 post))
+
+heWp :: Stmt -> Cond -> Cond
+heWp stmt post =
+  case stmt of
+  Call func -> BAnd (impl post (postCond func))
+                    (preCond func)
+  -- TODO: The following corresponds to the ELift rule,
+  -- which also says the program must have at least one
+  -- terminating state.
+  _ -> hWp stmt post
+
 condToZ3 :: Cond -> Z3 AST
 condToZ3 cond =
   case cond of
@@ -53,46 +84,6 @@ aexpBinopToZ3 f aexp1 aexp2 = do
   lhs <- aexpToZ3 aexp1
   rhs <- aexpToZ3 aexp2
   f [lhs, rhs]
-
-hVcs :: HTrip -> Cond
-hVcs trip = impl pre (hWp prog post)
-  where
-    pre = hPre trip
-    prog = hProg trip
-    post = hPost trip
-
-heVcs :: HETrip -> Cond
-heVcs trip = impl pre (heWp prog post)
-  where
-    pre = hePre trip
-    prog = heProg trip
-    post = hePost trip
-
-hWp :: Stmt -> Cond -> Cond
-hWp stmt post =
-  case stmt of
-    Skip        -> post
-    Seq []      -> post
-    Seq (s:ss)  -> hWp s (hWp (Seq ss) post)
-    Call func   -> BAnd (impl (postCond func) post)
-                        (preCond func)
-    var := aexp -> bsubst post var aexp
-    If c s1 s2  -> BAnd (impl c (hWp s1 post))
-                        (impl (BNot c) (hWp s2 post))
-
-heWp :: Stmt -> Cond -> Cond
-heWp stmt post =
-  case stmt of
-  Call func -> BAnd (impl post (postCond func))
-                    (preCond func)
-  -- TODO: The following corresponds to the ELift rule,
-  -- which also says the program must have at least one
-  -- terminating state.
-  _ -> hWp stmt post
-
-rhleVerify :: Cond -> Prog -> Prog -> Cond -> Cond
-rhleVerify pre uprog eprog post = BTrue
-
 
 -------------------------------------
 -- Useful for REPL experimentation --
