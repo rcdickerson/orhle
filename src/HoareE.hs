@@ -15,26 +15,12 @@ hleWP stmt post =
   case stmt of
     Call func -> CAnd (CImp post (bexpToCond $ postCond func))
                       (bexpToCond $ preCond func)
-    -- TODO: The following corresponds to the ELift rule,
-    -- which also says the program must have at least one
-    -- terminating state.
+    -- The following corresponds to the ELift rule, which also
+    -- says the program must have at least one terminating state.
+    -- In our current IMP definition, all programs terminate, but
+    -- if that ever changes we will need to add some sort of
+    -- termination condition here.
     _ -> hlWP stmt post
-
-{-
-hleSP :: Cond -> Stmt -> Cond
-hleSP pre stmt =
-  case stmt of
-    -- TODO: Unclear if the following is actually correct.
-    Call (UFunc name params fPre fPost) -> CImp
-        (CAnd (CImp pre (bexpToCond fPre))
-              (CImp abd (bexpToCond fPost)))
-        abd
-      where abd = CAbducible name params
-    -- TODO: The following corresponds to the ELift rule,
-    -- which also says the program must have at least one
-    -- terminating state.
-    _ -> hlSP pre stmt
--}
 
 hleVC :: HLETrip -> Cond
 hleVC (HLETrip pre prog post) = CImp pre (hleWP prog post)

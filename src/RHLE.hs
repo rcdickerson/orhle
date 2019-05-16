@@ -43,7 +43,7 @@ stepR (RHLETrip pre progA progE post) =
     var := aexp   -> rhleVCs $ RHLETrip (hlSP pre (var := aexp)) progA Skip post
     Seq []        -> [CImp pre post] -- Assumes progA is SKIP
     Seq ((Call (UFunc fName fParams fPre fPost)):ss)
-                  -> (CImp pre (bexpToCond fPre))
+                  -> (CAnd pre (bexpToCond fPre))
                    : (CImp abd (bexpToCond fPost))
                    : (rhleVCs $ RHLETrip abd progA (Seq ss) post)
                      where abd = CAbducible fName fParams

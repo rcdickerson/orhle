@@ -34,10 +34,8 @@ condToZ3 cond =
     CAssignPost var aexp cond -> do
       freshVar <- mkFreshIntVar var
       freshVarStr <- astToString freshVar
-      body <- condToZ3 $ CAnd (CEq (V freshVarStr) (aexp))
-                              (csubst cond var (V freshVarStr))
-      const <- toApp freshVar
-      mkExistsConst [] [const] body
+      condToZ3 $ CAnd (CEq (V var) (asubst aexp var (V freshVarStr)))
+                      (csubst cond var (V freshVarStr))
     CAbducible fName args -> do
       argSorts <- mapM (\x -> mkIntSort) args
       args <- mapM (aexpToZ3.V) args
@@ -56,11 +54,18 @@ csubst cond var repl =
     CAnd c1 c2 -> CAnd (csubst c1 var repl) (csubst c2 var repl)
     COr c1 c2 -> COr (csubst c1 var repl) (csubst c2 var repl)
     CImp c1 c2 -> CImp (csubst c1 var repl) (csubst c2 var repl)
-    CAssignPost v a c -> CAssignPost
-        v -- TODO: replace here?
-        (asubst a var repl)
-        (csubst c var repl)
-    CAbducible name params -> CAbducible name params
+    asgn@(CAssignPost v a c) ->
+      case repl of
+        V replVar -> CAssignPost
+            (if v == var then replVar else v)
+            (asubst a var repl)
+            (csubst c var repl)
+        _ -> asgn
+    abd@(CAbducible name params) ->
+      case repl of
+        V replVar -> CAbducible name
+            $ map (\x -> (if x == var then replVar else x)) params
+        _ -> abd
 
 bexpToCond :: BExp -> Cond
 bexpToCond bexp =
