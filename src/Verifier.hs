@@ -37,5 +37,5 @@ progE = Seq [ Call (randOdd (V "x2"))
 rhleTrip = RHLETrip CTrue progA progE (CEq (V "y1") (V "y2"))
 -------
 
-printZ3 :: Cond -> IO String
-printZ3 cond = evalZ3 (condToZ3 cond >>= astToString)
+printZ3 :: [Cond] -> IO String
+printZ3 conds = evalZ3 $ astToString =<< (simplify =<< condToZ3 (foldl CAnd CTrue (conds)))

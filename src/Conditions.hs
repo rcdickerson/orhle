@@ -32,17 +32,18 @@ condToZ3 cond =
       q <- condToZ3 cexp2
       mkImplies p q
     CAssignPost var aexp cond -> do
-      unsubstBody <- condToZ3 $ CAnd (CEq (V var) (aexp)) cond
       freshVar <- mkFreshIntVar var
-      z3Var <- aexpToZ3 $ V var
-      body <- substituteVars unsubstBody [z3Var, freshVar]
+      freshVarStr <- astToString freshVar
+      body <- condToZ3 $ CAnd (CEq (V freshVarStr) (aexp))
+                              (csubst cond var (V freshVarStr))
       const <- toApp freshVar
       mkExistsConst [] [const] body
     CAbducible fName args -> do
       argSorts <- mapM (\x -> mkIntSort) args
       args <- mapM (aexpToZ3.V) args
       retSort <- mkBoolSort
-      abducible <- mkFreshFuncDecl fName argSorts retSort
+      abdName <- mkStringSymbol fName
+      abducible <- mkFuncDecl abdName argSorts retSort
       mkApp abducible args
 
 csubst :: Cond -> Var -> AExp -> Cond
