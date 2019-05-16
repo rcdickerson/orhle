@@ -20,6 +20,7 @@ hleWP stmt post =
     -- terminating state.
     _ -> hlWP stmt post
 
+{-
 hleSP :: Cond -> Stmt -> Cond
 hleSP pre stmt =
   case stmt of
@@ -33,6 +34,7 @@ hleSP pre stmt =
     -- which also says the program must have at least one
     -- terminating state.
     _ -> hlSP pre stmt
+-}
 
 hleVC :: HLETrip -> Cond
 hleVC (HLETrip pre prog post) = CImp pre (hleWP prog post)

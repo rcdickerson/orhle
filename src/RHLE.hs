@@ -1,5 +1,6 @@
 module RHLE where
 
+import Abduction
 import Conditions
 import Hoare
 import HoareE
@@ -28,16 +29,33 @@ stepL (RHLETrip pre progA progE post) =
     If bexp s1 s2 -> (rhleVCs $ RHLETrip (CAnd pre c) s1 progE post)
                   ++ (rhleVCs $ RHLETrip (CAnd pre (CNot c)) s2 progE post)
                      where c = bexpToCond bexp
-    Call func     -> rhleVCs $ RHLETrip (hlSP pre (Call func)) Skip progE post
+    Call (UFunc fName fParams fPre fPost)
+                  -> [ CImp pre (bexpToCond fPre)
+                     , CImp (bexpToCond fPost) post]
 
+-- Note: This method assumes progA is SKIP.
+-- If this assumption changes, this method will need to be updated.
+-- All lines that make this assumption are explicitly noted.
 stepR :: RHLETrip -> [Cond]
 stepR (RHLETrip pre progA progE post) =
   case progE of
-    Skip          -> [CImp pre post]
-    Seq []        -> [CImp pre post]
-    Seq (s:ss)    -> rhleVCs $ RHLETrip (hleSP pre s) progA (Seq ss) post
-    var := aexp   -> rhleVCs $ RHLETrip (hleSP pre (var := aexp)) progA Skip post
+    Skip          -> [CImp pre post] -- Assumes progA is SKIP
+    var := aexp   -> rhleVCs $ RHLETrip (hlSP pre (var := aexp)) progA Skip post
+    Seq []        -> [CImp pre post] -- Assumes progA is SKIP
+    Seq ((Call (UFunc fName fParams fPre fPost)):ss)
+                  -> (CImp pre (bexpToCond fPre))
+                   : (CImp abd (bexpToCond fPost))
+                   : (rhleVCs $ RHLETrip abd progA (Seq ss) post)
+                     where abd = CAbducible fName fParams
+    Seq (s:ss)    -> rhleVCs $ RHLETrip (hlSP pre s) progA (Seq ss) post
     If bexp s1 s2 -> (rhleVCs $ RHLETrip (CAnd pre c) progA s1 post)
                   ++ (rhleVCs $ RHLETrip (CAnd pre (CNot c)) progA s2 post)
                      where c = bexpToCond bexp
-    Call func     -> rhleVCs $ RHLETrip (hlSP pre (Call func)) progA Skip post
+    Call (UFunc fName fParams fPre fPost)
+                  -- Assumes progA is SKIP, and so the VC (by the Skip RHLE rule) is:
+                  --   (phi -> pre) & (a -> post) & a  =>  (a -> psi)
+                  -- which is equivalent to:
+                  --   (phi -> pre) & post & a  =>  psi
+                  -> [abduce (CAnd (CImp pre fPreC) fPostC) post]
+                     where fPreC = bexpToCond fPre
+                           fPostC = bexpToCond fPost

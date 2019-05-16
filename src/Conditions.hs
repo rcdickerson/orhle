@@ -60,8 +60,7 @@ csubst cond var repl =
         v -- TODO: replace here?
         (asubst a var repl)
         (csubst c var repl)
-    -- TODO: replace over args?
-    CAbducible fName args -> CAbducible fName args
+    CAbducible name params -> CAbducible name params
 
 bexpToCond :: BExp -> Cond
 bexpToCond bexp =
