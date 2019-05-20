@@ -28,22 +28,22 @@ parseImpOrError str = case (parseImp str) of
 randOdd x = UFunc "randOdd" [x] BTrue (AMod (V x) (I 2) :=: (I 1))
 
 progA = parseImpOrError "\
-\  x1 := 5;   \
-\  if x1 == 5 \
-\  then       \
-\    y1 := 3  \
-\  else       \
+\  x1 := 5;              \
+\  if x1 == 5            \
+\  then                  \
+\    y1 := 3             \
+\  else                  \
 \    y1 := 300"
 
 progE = parseImpOrError "\
-\  func randOdd(x2)\
-\    pre true   \
-\    post x2 % 2 == 1; \
-\  if x2 == 5   \
-\  then         \
-\    y2 := 3    \
-\  else         \
-\    y2 := 300"
+\  func randOdd(x2)      \
+\    pre true            \
+\    post x2 % 2 == 1;   \
+\  if x2 == 5            \
+\  then                  \
+\    y2 := 3             \
+\  else                  \
+\    y2 := 300           "
 
 rhleTrip = RHLETrip CTrue progA progE (CEq (V "y1") (V "y2"))
 -------------------------------------
