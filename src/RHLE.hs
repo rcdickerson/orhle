@@ -33,11 +33,11 @@ stepL (RHLETrip pre progA progE post) =
                   -> [ CImp pre (bexpToCond fPre)
                      , CImp (bexpToCond fPost) post]
 
--- Note: This method assumes progA is SKIP.
+-- Note: This function assumes progA is SKIP.
 -- If this assumption changes, this method will need to be updated.
 -- All lines that make this assumption are explicitly noted.
 stepR :: RHLETrip -> [Cond]
-stepR (RHLETrip pre progA progE post) =
+stepR (RHLETrip pre progA@Skip progE post) =
   case progE of
     Skip          -> [CImp pre post] -- Assumes progA is SKIP
     var := aexp   -> rhleVCs $ RHLETrip (hlSP pre (var := aexp)) progA Skip post
@@ -59,3 +59,4 @@ stepR (RHLETrip pre progA progE post) =
                   -> [abduce (CAnd (CImp pre fPreC) fPostC) post]
                      where fPreC = bexpToCond fPre
                            fPostC = bexpToCond fPost
+stepR _ = error "stepR currently requires that progA be SKIP"
