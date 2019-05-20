@@ -1,0 +1,47 @@
+name:                rhle-verifier
+version:             0.1.0.0
+github:              "rcdickerson/rhle-verifier"
+author:              "Rob Dickerson"
+maintainer:          "rc.dickerson@gmail.com"
+copyright:           "Rob Dickerson"
+
+extra-source-files:
+- README.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/rcdickerson/rhle-verifier#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- z3
+
+library:
+  source-dirs: src
+
+executables:
+  rhle-verifier-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - rhle-verifier
+
+tests:
+  rhle-verifier-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - rhle-verifier

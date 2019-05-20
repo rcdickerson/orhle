@@ -1,8 +1,13 @@
 # RHLE Verifier
 
-A proof-of-concept implementation of an existential relational hoare logic verification algorithm. 
+A proof-of-concept implementation of an existential relational hoare logic verification algorithm.
 This project is still in an extremely nascent state.
 
-### Dependencies
+### Building
 
-Haskell Z3 bindings: https://hackage.haskell.org/package/z3
+Build and run using [Stack](https://docs.haskellstack.org/en/stable/README)
+
+```bash
+stack build
+stack ghci
+```
