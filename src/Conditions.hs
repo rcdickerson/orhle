@@ -75,3 +75,4 @@ bexpToCond bexp =
     (:=:) lhs rhs -> CEq lhs rhs
     BNot b -> CNot $ bexpToCond b
     BAnd b1 b2 -> CAnd (bexpToCond b1) (bexpToCond b2)
+    BOr b1 b2 -> COr (bexpToCond b1) (bexpToCond b2)

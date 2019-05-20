@@ -14,7 +14,7 @@ type Var = String
 ----------------------------
 
 data AExp
-  = I Int
+  = I Integer
   | V Var
   | AExp :+: AExp
   | AExp :-: AExp
@@ -56,13 +56,11 @@ data BExp
   | AExp :=: AExp
   | BNot BExp
   | BAnd BExp BExp
+  | BOr BExp BExp
   deriving (Show)
 
-bor :: BExp -> BExp -> BExp
-bor bexp1 bexp2 = bsimpl $ BNot $ BAnd (BNot bexp1) (BNot bexp2)
-
 impl :: BExp -> BExp -> BExp
-impl bexp1 bexp2 = bsimpl $ bor (BNot bexp1) bexp2
+impl bexp1 bexp2 = bsimpl $ BOr (BNot bexp1) bexp2
 
 bsimpl :: BExp -> BExp
 bsimpl (BNot (BNot bexp)) = bexp
@@ -78,6 +76,7 @@ bsubst bexp var aexp =
     lhs :=: rhs -> (asubst lhs var aexp) :=: (asubst rhs var aexp)
     BNot b -> BNot (bsubst b var aexp)
     BAnd b1 b2 -> BAnd (bsubst b1 var aexp) (bsubst b2 var aexp)
+    BOr b1 b2 -> BOr (bsubst b1 var aexp) (bsubst b2 var aexp)
 
 
 -----------------------------
