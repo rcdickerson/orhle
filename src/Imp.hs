@@ -1,4 +1,15 @@
-module Imp where
+module Imp
+    ( AExp(..)
+    , aexpToZ3
+    , asubst
+    , BExp(..)
+    , bsubst
+    , Prog
+    , State
+    , Stmt(..)
+    , UFunc(..)
+    , Var
+    ) where
 
 import Z3.Monad
 

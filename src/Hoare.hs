@@ -1,4 +1,9 @@
-module Hoare where
+module Hoare
+    ( hlSP
+    , HLTrip(..)
+    , hlVC
+    , hlWP
+    ) where
 
 import Conditions
 import Imp

@@ -1,4 +1,6 @@
-module Verifier where
+module Verifier
+    ( verify
+    ) where
 
 import Conditions
 import Hoare

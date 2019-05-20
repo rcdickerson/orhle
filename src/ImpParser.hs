@@ -1,7 +1,9 @@
 -- A simple Imp parser (with specified uninterpreted functions).
 -- Based on https://wiki.haskell.org/Parsing_a_simple_imperative_language
 
-module ImpParser(impParser) where
+module ImpParser
+    ( impParser
+    ) where
 
 import Control.Monad
 import Imp

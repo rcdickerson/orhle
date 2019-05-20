@@ -1,4 +1,7 @@
-module RHLE where
+module RHLE
+  ( rhleVCs
+  , RHLETrip(..)
+  ) where
 
 import Abduction
 import Conditions

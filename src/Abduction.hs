@@ -1,4 +1,6 @@
-module Abduction where
+module Abduction
+    ( abduce
+    ) where
 
 import Conditions
 import Imp

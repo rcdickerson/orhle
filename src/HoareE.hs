@@ -1,4 +1,8 @@
-module HoareE where
+module HoareE
+    ( HLETrip(..)
+    , hleVC
+    , hleWP
+    ) where
 
 import Conditions
 import Hoare
