@@ -36,7 +36,7 @@ progA = parseImpOrError "\
 \    y1 := 300"
 
 progE = parseImpOrError "\
-\  func randOdd \
+\  func randOdd(x2)\
 \    pre true   \
 \    post x2 % 2 == 1; \
 \  if x2 == 5   \

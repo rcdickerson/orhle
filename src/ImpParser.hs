@@ -36,6 +36,7 @@ reserved   = Token.reserved   lexer
 reservedOp = Token.reservedOp lexer
 parens     = Token.parens     lexer
 integer    = Token.integer    lexer
+comma      = Token.comma      lexer
 semi       = Token.semi       lexer
 whiteSpace = Token.whiteSpace lexer
 
@@ -77,11 +78,12 @@ funcStmt :: Parser Stmt
 funcStmt = do
   reserved "func"
   funcName <- identifier
+  params <- parens $ sepBy1 identifier comma
   reserved "pre"
   pre <- bExpression
   reserved "post"
   post <- bExpression
-  return $ Call (UFunc funcName [] pre post)
+  return $ Call (UFunc funcName params pre post)
 
 skipStmt :: Parser Stmt
 skipStmt = reserved "skip" >> return Skip
