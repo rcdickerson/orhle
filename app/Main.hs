@@ -7,7 +7,7 @@ main :: IO ()
 main = do
   putStrLn $ "Universal Program:\n" ++ (show progA)
   putStrLn $ "Existential Program:\n" ++ (show progE)
-  vcs <- printZ3Simp $ rhleVCs rhleTrip
+  vcs <- printZ3 $ rhleVCs rhleTrip
   putStrLn $ "Verification Conditions:\n" ++ vcs
 
 printZ3 :: [Cond] -> IO String
