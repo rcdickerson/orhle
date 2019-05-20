@@ -5,7 +5,7 @@ This project is still in an extremely nascent state.
 
 ### Building
 
-Build and run using [Stack](https://docs.haskellstack.org/en/stable/README)
+Build and run using [Stack](https://docs.haskellstack.org/en/stable/README).
 
 ```bash
 stack build
