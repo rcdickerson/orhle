@@ -8,7 +8,7 @@ main = do
   putStrLn $ "Universal Program:\n" ++ (show progA)
   putStrLn $ "Existential Program:\n" ++ (show progE)
   vcs <- printZ3Simpl $ rhleEncode rhleTrip
-  putStrLn $ "Verification Conditions:\n" ++ vcs
+  putStrLn $ "Encoding (Pre-Abduction):\n" ++ vcs
 
 printZ3 :: [Cond] -> IO String
 printZ3 conds = evalZ3 $ astToString =<<
