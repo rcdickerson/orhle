@@ -1,5 +1,5 @@
 module RHLE
-  ( rhleVCs
+  ( rhleEncode
   , RHLETrip(..)
   ) where
 
@@ -16,50 +16,38 @@ data RHLETrip = RHLETrip
   , rhlePost :: Cond
   } deriving (Show)
 
-rhleVCs :: RHLETrip -> [Cond]
-rhleVCs trip =
-  case (rhleProgA trip) of
+-- The given triple is valid iff the conjunction of the returned
+-- conditions is unsatisfiable.
+rhleEncode :: RHLETrip -> [Cond]
+rhleEncode trip@(RHLETrip pre progA progE post) =
+  pre : (CNot post) : (stepThrough trip)
+
+stepThrough :: RHLETrip -> [Cond]
+stepThrough trip@(RHLETrip pre progA progE post) =
+  case progA of
     Skip -> stepR trip
     _    -> stepL trip
 
 stepL :: RHLETrip -> [Cond]
-stepL (RHLETrip pre progA progE post) =
+stepL trip@(RHLETrip pre progA progE post) =
   case progA of
-    Skip          -> rhleVCs $ RHLETrip pre Skip progE post
-    Seq []        -> rhleVCs $ RHLETrip pre Skip progE post
-    Seq (s:ss)    -> rhleVCs $ RHLETrip (hlSP pre s) (Seq ss) progE post
-    var := aexp   -> rhleVCs $ RHLETrip (hlSP pre (var := aexp)) Skip progE post
-    If bexp s1 s2 -> (rhleVCs $ RHLETrip (CAnd pre c) s1 progE post)
-                  ++ (rhleVCs $ RHLETrip (CAnd pre (CNot c)) s2 progE post)
-                     where c = bexpToCond bexp
-    Call (UFunc fName fParams fPre fPost)
-                  -> [ CImp pre (bexpToCond fPre)
-                     , CImp (bexpToCond fPost) post]
+    Skip        -> [hlSP pre Skip]
+    Seq []      -> stepThrough $ RHLETrip pre Skip progE post
+    Seq (s:ss)  -> stepThrough $ RHLETrip (hlSP pre s) (Seq ss) progE post
+    var := aexp -> [hlSP pre (var := aexp)]
+    If b s1 s2  -> (stepThrough $ RHLETrip (CAnd pre c) s1 progE post)
+                ++ (stepThrough $ RHLETrip (CAnd pre (CNot c)) s2 progE post)
+                   where c = bexpToCond b
+    call@(Call _) -> [hlSP pre call]
 
--- Note: This function assumes progA is SKIP.
--- If this assumption changes, this method will need to be updated.
--- All lines that make this assumption are explicitly noted.
 stepR :: RHLETrip -> [Cond]
-stepR (RHLETrip pre progA@Skip progE post) =
+stepR trip@(RHLETrip pre progA progE post) =
   case progE of
-    Skip          -> [CImp pre post] -- Assumes progA is SKIP
-    var := aexp   -> rhleVCs $ RHLETrip (hlSP pre (var := aexp)) progA Skip post
-    Seq []        -> [CImp pre post] -- Assumes progA is SKIP
-    Seq ((Call (UFunc fName fParams fPre fPost)):ss)
-                  -> (CAnd pre (bexpToCond fPre))
-                   : (CImp abd (bexpToCond fPost))
-                   : (rhleVCs $ RHLETrip abd progA (Seq ss) post)
-                     where abd = CAbducible fName fParams
-    Seq (s:ss)    -> rhleVCs $ RHLETrip (hlSP pre s) progA (Seq ss) post
-    If bexp s1 s2 -> (rhleVCs $ RHLETrip (CAnd pre c) progA s1 post)
-                  ++ (rhleVCs $ RHLETrip (CAnd pre (CNot c)) progA s2 post)
-                     where c = bexpToCond bexp
-    Call (UFunc fName fParams fPre fPost)
-                  -- Assumes progA is SKIP, and so the VC (by the Skip RHLE rule) is:
-                  --   (phi -> pre) & (a -> post) & a  =>  (a -> psi)
-                  -- which is equivalent to:
-                  --   (phi -> pre) & post & a  =>  psi
-                  -> [abduce (CAnd (CImp pre fPreC) fPostC) post]
-                     where fPreC = bexpToCond fPre
-                           fPostC = bexpToCond fPost
-stepR _ = error "stepR currently requires that progA be SKIP"
+    Skip        -> [hleSP pre Skip]
+    Seq[]       -> stepThrough $ RHLETrip pre progA Skip post
+    Seq (s:ss)  -> stepThrough $ RHLETrip (hleSP pre s) progA (Seq ss) post
+    var := aexp -> [hleSP pre (var := aexp)]
+    If b s1 s2  -> (stepThrough $ RHLETrip (CAnd pre c) progA s1 post)
+                ++ (stepThrough $ RHLETrip (CAnd pre (CNot c)) progA s2 post)
+                   where c = bexpToCond b
+    call@(Call _) -> [hleSP pre call]

@@ -7,14 +7,16 @@ main :: IO ()
 main = do
   putStrLn $ "Universal Program:\n" ++ (show progA)
   putStrLn $ "Existential Program:\n" ++ (show progE)
-  vcs <- printZ3 $ rhleVCs rhleTrip
+  vcs <- printZ3 $ rhleEncode rhleTrip
   putStrLn $ "Verification Conditions:\n" ++ vcs
 
 printZ3 :: [Cond] -> IO String
-printZ3 conds = evalZ3 $ astToString =<< condToZ3 (foldl CAnd CTrue (conds))
+printZ3 conds = evalZ3 $ astToString =<<
+    condToZ3 (foldl CAnd CTrue (conds))
 
-printZ3Simp :: [Cond] -> IO String
-printZ3Simp conds = evalZ3 $ astToString =<< (simplify =<< condToZ3 (foldl CAnd CTrue (conds)))
+printZ3Simpl :: [Cond] -> IO String
+printZ3Simpl conds = evalZ3 $ astToString =<<
+    (simplify =<< condToZ3 (foldl CAnd CTrue (conds)))
 
 parseImpOrError :: String -> Stmt
 parseImpOrError str = case (parseImp str) of
@@ -25,17 +27,15 @@ parseImpOrError str = case (parseImp str) of
 -------------------------------------
 -- Useful for REPL experimentation --
 -------------------------------------
-randOdd x = UFunc "randOdd" [x] BTrue (AMod (V x) (I 2) :=: (I 1))
-
 progA = parseImpOrError "\
 \  x1 := 5;              \
 \  if x1 == 5 then       \
 \    y1 := 3             \
 \  else                  \
-\    y1 := 300"
+\    y1 := 300           "
 
 progE = parseImpOrError "\
-\  func randOdd(x2)      \
+\  call randOdd(x2)      \
 \    pre true            \
 \    post x2 % 2 == 1;   \
 \  if x2 == 5 then       \

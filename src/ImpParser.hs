@@ -15,7 +15,7 @@ import qualified Text.ParserCombinators.Parsec.Token as Token
 languageDef = emptyDef { Token.identStart      = letter
                        , Token.identLetter     = alphaNum
                        , Token.reservedNames   = [ "if", "then", "else"
-                                                 , "func", "pre", "post"
+                                                 , "call", "pre", "post"
                                                  , "skip"
                                                  , "true"
                                                  , "false"
@@ -78,7 +78,7 @@ assignStmt = do
 
 funcStmt :: Parser Stmt
 funcStmt = do
-  reserved "func"
+  reserved "call"
   funcName <- identifier
   params <- parens $ sepBy1 identifier comma
   reserved "pre"

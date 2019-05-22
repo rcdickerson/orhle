@@ -1,8 +1,9 @@
 module HoareE
-    ( HLETrip(..)
-    , hleVC
-    , hleWP
-    ) where
+  ( HLETrip(..)
+  , hleSP
+  , hleVC
+  , hleWP
+  ) where
 
 import Conditions
 import Hoare
@@ -15,16 +16,16 @@ data HLETrip = HLETrip
   } deriving (Show)
 
 hleWP :: Stmt -> Cond -> Cond
-hleWP stmt post =
-  case stmt of
-    Call func -> CAnd (CImp post (bexpToCond $ postCond func))
-                      (bexpToCond $ preCond func)
-    -- The following corresponds to the ELift rule, which also
-    -- says the program must have at least one terminating state.
-    -- In our current IMP definition, all programs terminate, but
-    -- if that ever changes we will need to add some sort of
-    -- termination condition here.
-    _ -> hlWP stmt post
+hleWP (Call func) post =
+  CAnd (CImp post (bexpToCond $ postCond func))
+       (bexpToCond $ preCond func)
+hleWP stmt post = hlWP stmt post
+
+hleSP :: Cond -> Stmt -> Cond
+hleSP pre (Call (UFunc fName fParams fPre fPost)) =
+  CAnd pre (CImp (bexpToCond fPre) (bexpToCond fPost))
+hleSP pre stmt = hlSP pre stmt
 
 hleVC :: HLETrip -> Cond
-hleVC (HLETrip pre prog post) = CImp pre (hleWP prog post)
+hleVC (HLETrip pre prog post) =
+  CImp pre (hleWP prog post)

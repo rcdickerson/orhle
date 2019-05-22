@@ -8,7 +8,7 @@ module Lib
     , impParser
     , parseImp
     , RHLETrip(..)
-    , rhleVCs
+    , rhleEncode
     , Stmt(..)
     , UFunc(..)
     ) where
