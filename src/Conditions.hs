@@ -17,7 +17,7 @@ data Cond
   | COr Cond Cond
   | CImp Cond Cond
   | CAssignPost Var AExp Cond
-  | CAbducible String [Var]
+  | CAbducible Cond UFunc
   deriving (Show)
 
 condToZ3 :: Cond -> Z3 AST
@@ -41,9 +41,9 @@ condToZ3 cond =
       freshVarStr <- astToString freshVar
       condToZ3 $ CAnd (CEq (V var) (asubst aexp var (V freshVarStr)))
                       (csubst cond var (V freshVarStr))
-    CAbducible fName args -> do
-      argSorts <- mapM (\x -> mkIntSort) args
-      args <- mapM (aexpToZ3.V) args
+    CAbducible pre (UFunc fName fParams fPre fPost) -> do
+      argSorts <- mapM (\_ -> mkIntSort) fParams
+      args <- mapM (aexpToZ3.V) fParams
       retSort <- mkBoolSort
       abdName <- mkStringSymbol fName
       abducible <- mkFuncDecl abdName argSorts retSort
@@ -66,10 +66,11 @@ csubst cond var repl =
             (asubst a var repl)
             (csubst c var repl)
         _ -> asgn
-    abd@(CAbducible name params) ->
+    abd@(CAbducible pre (UFunc name params fPre fPost)) ->
       case repl of
-        V replVar -> CAbducible name
-            $ map (\x -> (if x == var then replVar else x)) params
+        V replVar -> CAbducible (csubst pre var repl)
+          (UFunc name subParams fPre fPost)
+          where subParams = map (\x -> (if x == var then replVar else x)) params
         _ -> abd
 
 bexpToCond :: BExp -> Cond

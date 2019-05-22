@@ -22,8 +22,7 @@ hleWP (Call func) post =
 hleWP stmt post = hlWP stmt post
 
 hleSP :: Cond -> Stmt -> Cond
-hleSP pre (Call (UFunc fName fParams fPre fPost)) =
-  CAnd pre (CImp (bexpToCond fPre) (bexpToCond fPost))
+hleSP pre (Call func) = CAbducible pre func
 hleSP pre stmt = hlSP pre stmt
 
 hleVC :: HLETrip -> Cond

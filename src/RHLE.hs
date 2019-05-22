@@ -33,7 +33,8 @@ stepL (RHLETrip pre progA progE post) =
   case progA of
     Skip          -> [hlSP pre Skip]
     Seq []        -> stepThrough $ RHLETrip pre Skip progE post
-    Seq (s:ss)    -> stepThrough $ RHLETrip (hlSP pre s) (Seq ss) progE post
+    Seq (s:ss)    -> (hlSP pre s)
+                   : (stepThrough $ RHLETrip (hlSP pre s) (Seq ss) progE post)
     var := aexp   -> [hlSP pre (var := aexp)]
     If b s1 s2    -> (stepThrough $ RHLETrip (CAnd pre c) s1 progE post)
                   ++ (stepThrough $ RHLETrip (CAnd pre (CNot c)) s2 progE post)
@@ -45,7 +46,8 @@ stepR (RHLETrip pre progA progE post) =
   case progE of
     Skip          -> [hleSP pre Skip]
     Seq[]         -> stepThrough $ RHLETrip pre progA Skip post
-    Seq (s:ss)    -> stepThrough $ RHLETrip (hleSP pre s) progA (Seq ss) post
+    Seq (s:ss)    -> (hleSP pre s)
+                   : (stepThrough $ RHLETrip (hleSP pre s) progA (Seq ss) post)
     var := aexp   -> [hleSP pre (var := aexp)]
     If b s1 s2    -> (stepThrough $ RHLETrip (CAnd pre c) progA s1 post)
                   ++ (stepThrough $ RHLETrip (CAnd pre (CNot c)) progA s2 post)
