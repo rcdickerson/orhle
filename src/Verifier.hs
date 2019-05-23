@@ -6,19 +6,14 @@ module Verifier
 import Abduction
 import Conditions
 import Hoare
-import HoareE
 import Imp
 import RHLE
 import Z3.Monad
 
--- TODO
 verify :: RHLETrip -> Z3 Bool
 verify trip = do
   push
-  let abduction@(_, conds, post) = setupAbduction trip
---  assert =<< condToZ3 (conjoin conds)
-  assert =<< abduce abduction
---  assert =<< condToZ3 (CNot post)
+  assert =<< abduce (setupAbduction trip)
   result <- check
   pop 1
   case result of
@@ -32,7 +27,7 @@ setupAbduction trip = (ducs, conds, rhlePost trip)
 type AbductionLHS = ([Abducible], [Cond])
 
 step :: RHLETrip -> AbductionLHS -> AbductionLHS
-step trip@(RHLETrip pre progA progE post) abd@(ducs, conds) =
+step trip@(RHLETrip _ progA progE _) abd =
   case progA of
     Skip -> case progE of
               Skip -> abd
