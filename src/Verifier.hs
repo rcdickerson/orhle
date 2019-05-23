@@ -1,5 +1,7 @@
 module Verifier
-    ( setupAbduction
+    ( Abducible(..)
+    , Abduction
+    , setupAbduction
     , verify
     ) where
 

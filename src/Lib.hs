@@ -1,5 +1,7 @@
 module Lib
-    ( AExp(..)
+    ( Abducible(..)
+    , Abduction
+    , AExp(..)
     , BExp(..)
     , Cond(..)
     , condToZ3
@@ -8,7 +10,7 @@ module Lib
     , impParser
     , parseImp
     , RHLETrip(..)
-    , rhleEncode
+    , setupAbduction
     , Stmt(..)
     , UFunc(..)
     ) where
@@ -20,6 +22,7 @@ import Imp
 import ImpParser
 import RHLE
 import Text.ParserCombinators.Parsec
+import Verifier
 
 parseImp :: String -> Either String Stmt
 parseImp str = case parse impParser "" str of

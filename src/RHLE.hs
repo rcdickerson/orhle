@@ -1,12 +1,8 @@
 module RHLE
-  ( rhleEncode
-  , RHLETrip(..)
+  ( RHLETrip(..)
   ) where
 
-import Abduction
 import Conditions
-import Hoare
-import HoareE
 import Imp
 
 data RHLETrip = RHLETrip
