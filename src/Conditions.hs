@@ -20,7 +20,6 @@ data Cond
   | COr Cond Cond
   | CImp Cond Cond
   | CAssignPost Var AExp Cond
-  | CAbducible Cond UFunc
   deriving (Show)
 
 condToZ3 :: Cond -> Z3 AST
@@ -44,13 +43,6 @@ condToZ3 cond =
       freshVarStr <- astToString freshVar
       condToZ3 $ CAnd (CEq (V var) (asubst aexp var (V freshVarStr)))
                       (csubst cond var (V freshVarStr))
-    CAbducible pre (UFunc fName fParams fPre fPost) -> do
-      argSorts <- mapM (\_ -> mkIntSort) fParams
-      args <- mapM (aexpToZ3.V) fParams
-      retSort <- mkBoolSort
-      abdName <- mkStringSymbol fName
-      abducible <- mkFuncDecl abdName argSorts retSort
-      mkApp abducible args
 
 csubst :: Cond -> Var -> AExp -> Cond
 csubst cond var repl =
@@ -69,12 +61,6 @@ csubst cond var repl =
             (asubst a var repl)
             (csubst c var repl)
         _ -> asgn
-    abd@(CAbducible pre (UFunc name params fPre fPost)) ->
-      case repl of
-        V replVar -> CAbducible (csubst pre var repl)
-          (UFunc name subParams fPre fPost)
-          where subParams = map (\x -> (if x == var then replVar else x)) params
-        _ -> abd
 
 bexpToCond :: BExp -> Cond
 bexpToCond bexp =
@@ -105,4 +91,3 @@ cvars' cond =
     COr c1 c2 -> (cvars' c1) `union` (cvars' c2)
     CImp c1 c2 -> fromList $ (cvars c1) ++ (cvars c2)
     CAssignPost v a c -> fromList $ v : (avars a) ++ (cvars c)
-    CAbducible pre _ -> cvars' pre

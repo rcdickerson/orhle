@@ -1,6 +1,5 @@
 module HoareE
   ( HLETrip(..)
-  , hleSP
   , hleVC
   , hleWP
   ) where
@@ -20,10 +19,6 @@ hleWP (Call func) post =
   CAnd (CImp post (bexpToCond $ postCond func))
        (bexpToCond $ preCond func)
 hleWP stmt post = hlWP stmt post
-
-hleSP :: Cond -> Stmt -> Cond
-hleSP pre (Call func) = CAbducible pre func
-hleSP pre stmt = hlSP pre stmt
 
 hleVC :: HLETrip -> Cond
 hleVC (HLETrip pre prog post) =

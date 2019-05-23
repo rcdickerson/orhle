@@ -11,7 +11,7 @@ main = do
   putStrLn $ "Existential Program:\n" ++ (show progE)
   putStrLn "------------------------------------------------"
   let setup@(ducs, lhs, post) = setupAbduction rhleTrip
-  lhsStr <- printZ3 (conjoin lhs)
+  lhsStr <- printZ3Simpl (conjoin lhs)
   postStr <- printZ3 post
   putStrLn $ "Abducibles:" ++ (show ducs)
   putStrLn $ "Abduction LHS:\n" ++ lhsStr
