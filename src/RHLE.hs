@@ -45,7 +45,7 @@ stepR :: RHLETrip -> [Cond]
 stepR (RHLETrip pre progA progE post) =
   case progE of
     Skip          -> [hleSP pre Skip]
-    Seq[]         -> stepThrough $ RHLETrip pre progA Skip post
+    Seq []        -> stepThrough $ RHLETrip pre progA Skip post
     Seq (s:ss)    -> (hleSP pre s)
                    : (stepThrough $ RHLETrip (hleSP pre s) progA (Seq ss) post)
     var := aexp   -> [hleSP pre (var := aexp)]
