@@ -12,8 +12,18 @@ import RHLE
 import Z3.Monad
 
 -- TODO
-verify :: RHLETrip -> Bool
-verify trip@(RHLETrip pre progA progE post) = True
+verify :: RHLETrip -> Z3 Bool
+verify trip = do
+  push
+  let abduction@(_, conds, post) = setupAbduction trip
+--  assert =<< condToZ3 (conjoin conds)
+  assert =<< abduce abduction
+--  assert =<< condToZ3 (CNot post)
+  result <- check
+  pop 1
+  case result of
+    Sat -> return True
+    _   -> return False
 
 setupAbduction :: RHLETrip -> Abduction
 setupAbduction trip = (ducs, conds, rhlePost trip)

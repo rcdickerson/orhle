@@ -11,14 +11,17 @@ main = do
   putStrLn $ "Existential Program:\n" ++ (show progE)
   putStrLn "------------------------------------------------"
   let setup@(ducs, lhs, post) = setupAbduction rhleTrip
-  lhsStr <- printZ3Simpl (conjoin lhs)
+  lhsStr <- printZ3 (conjoin lhs)
   postStr <- printZ3 post
   putStrLn $ "Abducibles:" ++ (show ducs)
   putStrLn $ "Abduction LHS:\n" ++ lhsStr
   putStrLn $ "Abduction Post: " ++ postStr
   putStrLn "------------------------------------------------"
-  abdResult <- evalZ3 $ astToString =<< (simplify =<< (abduce setup))
+  abdResult <- evalZ3 $ astToString =<< (abduce setup)
   putStrLn $ "Abduction Result:\n" ++ abdResult
+  putStrLn "------------------------------------------------"
+  result <- evalZ3 $ verify rhleTrip
+  putStrLn $ "Verifies: " ++ (show result)
   putStrLn "------------------------------------------------"
 
 printZ3 :: Cond -> IO String
@@ -38,8 +41,8 @@ parseImpOrError str = case (parseImp str) of
 -- Useful for REPL experimentation --
 -------------------------------------
 progA = parseImpOrError "\
-\  x1 := 5;              \
-\  if x1 == 5 then       \
+\  x1 := 3;              \
+\  if x1 == 3 then       \
 \    y1 := 3             \
 \  else                  \
 \    y1 := 300           "

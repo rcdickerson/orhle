@@ -15,6 +15,7 @@ module Lib
     , setupAbduction
     , Stmt(..)
     , UFunc(..)
+    , verify
     ) where
 
 import Abduction
