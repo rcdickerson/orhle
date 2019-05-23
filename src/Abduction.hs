@@ -15,7 +15,6 @@ abduce _ = error "Multi-abduction is currently unsupported!"
 
 singleAbduction :: Abducible -> Cond -> Cond -> Z3 AST
 singleAbduction duc conds post = do
---  let imp  = CImp (CAnd conds (bexpToCond.postCond.func $ duc)) post
   let imp  = CImp conds (CAnd (bexpToCond.postCond.func $ duc) post)
   let vars = cvars imp
   let vbar = filter (\v -> not $ elem v (fParams.func $ duc)) vars

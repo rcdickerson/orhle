@@ -13,7 +13,7 @@ main = do
   let setup@(ducs, lhs, post) = setupAbduction rhleTrip
   lhsStr <- printZ3 (conjoin lhs)
   postStr <- printZ3 post
-  putStrLn $ "Abducibles:" ++ (show ducs)
+  putStrLn $ "Abducibles: " ++ (show ducs)
   putStrLn $ "Abduction LHS:\n" ++ lhsStr
   putStrLn $ "Abduction Post: " ++ postStr
   putStrLn "------------------------------------------------"
