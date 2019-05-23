@@ -1,10 +1,12 @@
 module Lib
-    ( Abducible(..)
+    ( abduce
+    , Abducible(..)
     , Abduction
     , AExp(..)
     , BExp(..)
     , Cond(..)
     , condToZ3
+    , conjoin
     , HLTrip(..)
     , HLETrip(..)
     , impParser
@@ -15,6 +17,7 @@ module Lib
     , UFunc(..)
     ) where
 
+import Abduction
 import Conditions
 import Hoare
 import HoareE

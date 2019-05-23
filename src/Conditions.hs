@@ -2,9 +2,12 @@ module Conditions
     ( bexpToCond
     , Cond(..)
     , condToZ3
+    , conjoin
     , csubst
+    , cvars
     ) where
 
+import Data.Set (Set, empty, toList, fromList, union)
 import Imp
 import Z3.Monad
 
@@ -82,3 +85,24 @@ bexpToCond bexp =
     BNot b -> CNot $ bexpToCond b
     BAnd b1 b2 -> CAnd (bexpToCond b1) (bexpToCond b2)
     BOr b1 b2 -> COr (bexpToCond b1) (bexpToCond b2)
+
+conjoin :: [Cond] -> Cond
+conjoin []     = CTrue
+conjoin (c:[]) = c
+conjoin (c:cs) = CAnd c (conjoin cs)
+
+cvars :: Cond -> [Var]
+cvars = toList.cvars'
+
+cvars' :: Cond -> Set Var
+cvars' cond =
+  case cond of
+    CTrue -> empty
+    CFalse -> empty
+    CEq lhs rhs -> fromList $ (avars lhs) ++ (avars rhs)
+    CNot c -> cvars' c
+    CAnd c1 c2 -> (cvars' c1) `union` (cvars' c2)
+    COr c1 c2 -> (cvars' c1) `union` (cvars' c2)
+    CImp c1 c2 -> fromList $ (cvars c1) ++ (cvars c2)
+    CAssignPost v a c -> fromList $ v : (avars a) ++ (cvars c)
+    CAbducible pre _ -> cvars' pre

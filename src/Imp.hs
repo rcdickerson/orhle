@@ -2,8 +2,10 @@ module Imp
     ( AExp(..)
     , aexpToZ3
     , asubst
+    , avars
     , BExp(..)
     , bsubst
+    , bvars
     , Prog
     , State
     , Stmt(..)
@@ -42,6 +44,16 @@ asubst aexp var repl =
     lhs :-: rhs -> (asubst lhs var repl) :-: (asubst rhs var repl)
     lhs :*: rhs -> (asubst lhs var repl) :*: (asubst rhs var repl)
     AMod lhs rhs -> AMod (asubst lhs var repl) (asubst rhs var repl)
+
+avars :: AExp -> [Var]
+avars aexp =
+  case aexp of
+    I i -> []
+    V v -> [v]
+    lhs :+: rhs -> (avars lhs) ++ (avars rhs)
+    lhs :-: rhs -> (avars lhs) ++ (avars rhs)
+    lhs :*: rhs  -> (avars lhs) ++ (avars rhs)
+    AMod lhs rhs -> (avars lhs) ++ (avars rhs)
 
 aexpToZ3 :: AExp -> Z3 AST
 aexpToZ3 aexp =
@@ -89,6 +101,15 @@ bsubst bexp var aexp =
     BAnd b1 b2 -> BAnd (bsubst b1 var aexp) (bsubst b2 var aexp)
     BOr b1 b2 -> BOr (bsubst b1 var aexp) (bsubst b2 var aexp)
 
+bvars :: BExp -> [Var]
+bvars bexp =
+  case bexp of
+    BTrue -> []
+    BFalse -> []
+    lhs :=: rhs -> (avars lhs) ++ (avars rhs)
+    BNot b -> bvars b
+    BAnd b1 b2 -> (bvars b1) ++ (bvars b2)
+    BOr b1 b2 -> (bvars b1) ++ (bvars b2)
 
 -----------------------------
 -- Uninterpreted Functions --

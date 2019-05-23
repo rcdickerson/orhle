@@ -1,10 +1,9 @@
 module Verifier
-    ( Abducible(..)
-    , Abduction
-    , setupAbduction
+    ( setupAbduction
     , verify
     ) where
 
+import Abduction
 import Conditions
 import Hoare
 import HoareE
@@ -17,9 +16,12 @@ verify :: RHLETrip -> Bool
 verify trip@(RHLETrip pre progA progE post) = True
 
 setupAbduction :: RHLETrip -> Abduction
-setupAbduction trip = step trip ([], [])
+setupAbduction trip = (ducs, conds, rhlePost trip)
+  where (ducs, conds) = step trip ([], [])
 
-step :: RHLETrip -> Abduction -> Abduction
+type AbductionLHS = ([Abducible], [Cond])
+
+step :: RHLETrip -> AbductionLHS -> AbductionLHS
 step trip@(RHLETrip pre progA progE post) abd@(ducs, conds) =
   case progA of
     Skip -> case progE of
@@ -27,7 +29,7 @@ step trip@(RHLETrip pre progA progE post) abd@(ducs, conds) =
               _    -> stepE trip abd
     _    -> stepA trip abd
 
-stepA :: RHLETrip -> Abduction -> Abduction
+stepA :: RHLETrip -> AbductionLHS -> AbductionLHS
 stepA (RHLETrip pre progA progE post) abd@(ducs, conds) =
   case progA of
     Skip -> abd
@@ -41,7 +43,7 @@ stepA (RHLETrip pre progA progE post) abd@(ducs, conds) =
                     c = bexpToCond b
     call@(Call _) -> (ducs, (hlSP pre call) : conds)
 
-stepE :: RHLETrip -> Abduction -> Abduction
+stepE :: RHLETrip -> AbductionLHS -> AbductionLHS
 stepE (RHLETrip pre progA progE post) abd@(ducs, conds) =
   case progE of
     Skip -> abd
@@ -60,8 +62,3 @@ stepE (RHLETrip pre progA progE post) abd@(ducs, conds) =
 
 erase :: Cond -> [Var] -> Cond
 erase cond vars = cond -- TODO
-
-data Abducible = Abducible
-  { func :: UFunc } deriving (Show)
-
-type Abduction = ([Abducible], [Cond])

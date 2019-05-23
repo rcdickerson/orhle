@@ -5,18 +5,28 @@ import Z3.Monad
 
 main :: IO ()
 main = do
+  putStrLn "------------------------------------------------"
   putStrLn $ "Universal Program:\n" ++ (show progA)
+  putStrLn "------------------------------------------------"
   putStrLn $ "Existential Program:\n" ++ (show progE)
-  abd <- printZ3 $ (snd.setupAbduction) rhleTrip
-  putStrLn $ "Abduction Postcondition:\n" ++ abd
+  putStrLn "------------------------------------------------"
+  let setup@(ducs, lhs, post) = setupAbduction rhleTrip
+  lhsStr <- printZ3 (conjoin lhs)
+  postStr <- printZ3 post
+  putStrLn $ "Abducibles:" ++ (show ducs)
+  putStrLn $ "Abduction LHS:\n" ++ lhsStr
+  putStrLn $ "Abduction Post: " ++ postStr
+  putStrLn "------------------------------------------------"
+  abdResult <- evalZ3 $ astToString =<< (simplify =<< (abduce setup))
+  putStrLn $ "Abduction Result:\n" ++ abdResult
+  putStrLn "------------------------------------------------"
 
-printZ3 :: [Cond] -> IO String
-printZ3 conds = evalZ3 $ astToString =<<
-    condToZ3 (foldl CAnd CTrue (conds))
+printZ3 :: Cond -> IO String
+printZ3 cond = evalZ3 $ astToString =<< condToZ3 cond
 
-printZ3Simpl :: [Cond] -> IO String
-printZ3Simpl conds = evalZ3 $ astToString =<<
-    (simplify =<< condToZ3 (foldl CAnd CTrue (conds)))
+printZ3Simpl :: Cond -> IO String
+printZ3Simpl cond = evalZ3 $ astToString =<<
+    (simplify =<< condToZ3 (cond))
 
 parseImpOrError :: String -> Stmt
 parseImpOrError str = case (parseImp str) of
