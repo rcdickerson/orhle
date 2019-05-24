@@ -4,6 +4,46 @@ import Lib
 import Test.HUnit
 import Z3.Monad
 
+deterministicValid = do
+  result <- evalZ3 $ verify trip
+  (assertEqual "valid" result True)
+  where
+    pre   = CTrue
+    progA = parseImpOrError "\
+    \  x1 := 3;              \
+    \  if x1 == 3 then       \
+    \    y1 := 3             \
+    \  else                  \
+    \    y1 := 300           "
+    progE = parseImpOrError "\
+    \  x2 := 4;              \
+    \  if x2 == 3 then       \
+    \    y2 := 300           \
+    \  else                  \
+    \    y2 := 3             "
+    post = (CEq (V "y1") (V "y2"))
+    trip = RHLETrip pre progA progE post
+
+deterministicInvalid = do
+  result <- evalZ3 $ verify trip
+  (assertEqual "valid" result False)
+  where
+    pre   = CTrue
+    progA = parseImpOrError "\
+    \  x1 := 3;              \
+    \  if x1 == 3 then       \
+    \    y1 := 3             \
+    \  else                  \
+    \    y1 := 300           "
+    progE = parseImpOrError "\
+    \  x2 := 3;              \
+    \  if x2 == 3 then       \
+    \    y2 := 300           \
+    \  else                  \
+    \    y2 := 3             "
+    post = (CEq (V "y1") (V "y2"))
+    trip = RHLETrip pre progA progE post
+
 simpleValid = do
   result <- evalZ3 $ verify trip
   (assertEqual "valid" result True)
@@ -82,7 +122,7 @@ simpleInvalid2 = do
     \  else                  \
     \    y1 := 300           "
     progE = parseImpOrError "\
-    \  call randEven(x2)      \
+    \  call randEven(x2)     \
     \    pre true            \
     \    post x2 % 2 == 0;   \
     \  if x2 == 3 then       \
@@ -94,8 +134,10 @@ simpleInvalid2 = do
 
 main :: IO Counts
 main = runTestTT $ TestList
-       [ TestLabel "simpleValid"    $ TestCase simpleValid
-       , TestLabel "simpleValid2"   $ TestCase simpleValid2
-       , TestLabel "simpleInvalid"  $ TestCase simpleInvalid
-       , TestLabel "simpleInvalid2" $ TestCase simpleInvalid2
+       [ TestLabel "deterministicValid"   $ TestCase deterministicValid
+       , TestLabel "deterministicInvalid" $ TestCase deterministicInvalid
+       , TestLabel "simpleValid"          $ TestCase simpleValid
+       , TestLabel "simpleValid2"         $ TestCase simpleValid2
+       , TestLabel "simpleInvalid"        $ TestCase simpleInvalid
+       , TestLabel "simpleInvalid2"       $ TestCase simpleInvalid2
        ]

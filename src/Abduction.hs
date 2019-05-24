@@ -9,9 +9,15 @@ import Imp
 import Z3.Monad
 
 abduce :: Abduction -> Z3 AST
-abduce ([], _, _) = mkTrue -- TODO: probably incorrect
+abduce ([], conds, post) = noAbduction (conjoin conds) post
 abduce (duc : [], conds, post) = singleAbduction duc (conjoin conds) post
 abduce _ = error "Multi-abduction is currently unsupported!"
+
+noAbduction :: Cond -> Cond -> Z3 AST
+noAbduction conds post = do
+  let imp = CImp conds post
+  let vars = cvars imp
+  condToZ3 imp >>= performQe vars
 
 singleAbduction :: Abducible -> Cond -> Cond -> Z3 AST
 singleAbduction duc conds post = do
