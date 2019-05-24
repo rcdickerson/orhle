@@ -5,7 +5,7 @@ This project is still in an extremely nascent state.
 
 ### Building
 
-Build and run using [Stack](https://docs.haskellstack.org/en/stable/README):
+Build, test, and run using [Stack](https://docs.haskellstack.org/en/stable/README):
 
 ```bash
 stack build
@@ -18,3 +18,12 @@ edit `Main.hs` or experiment in ghci by saying:
 ```bash
 stack ghci
 ```
+
+There is also a (currently somewhat minimal) test suite in the `test` directory. Tests
+may be run with stack:
+
+```bash
+stack test
+```
+
+The test suite is also a good source for basic examples of valid and invalid triples.
