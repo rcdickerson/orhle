@@ -11,6 +11,7 @@ module Lib
     , HLETrip(..)
     , impParser
     , parseImp
+    , parseImpOrError
     , RHLETrip(..)
     , setupAbduction
     , Stmt(..)
@@ -32,3 +33,8 @@ parseImp :: String -> Either String Stmt
 parseImp str = case parse impParser "" str of
     Left e  -> Left $ show e
     Right r -> Right r
+
+parseImpOrError :: String -> Stmt
+parseImpOrError str = case (parseImp str) of
+  Left e -> error e
+  Right stmt -> stmt

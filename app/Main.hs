@@ -31,11 +31,6 @@ printZ3Simpl :: Cond -> IO String
 printZ3Simpl cond = evalZ3 $ astToString =<<
     (simplify =<< condToZ3 (cond))
 
-parseImpOrError :: String -> Stmt
-parseImpOrError str = case (parseImp str) of
-  Left e -> error e
-  Right stmt -> stmt
-
 
 -------------------------------------
 -- Useful for REPL experimentation --

@@ -39,7 +39,7 @@ executables:
 
 tests:
   rhle-verifier-test:
-    main:                Spec.hs
+    main:                VerifierTests.hs
     source-dirs:         test
     ghc-options:
     - -threaded
@@ -47,3 +47,4 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - rhle-verifier
+    - HUnit
