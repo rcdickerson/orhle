@@ -7,16 +7,16 @@ module Lib
     , Cond(..)
     , condToZ3
     , conjoin
+    , encodeImp
     , HLTrip(..)
     , HLETrip(..)
     , impParser
     , parseImp
     , parseImpOrError
     , RHLETrip(..)
-    , setupAbduction
     , Stmt(..)
     , UFunc(..)
-    , verify
+    , verify1
     ) where
 
 import Abduction
@@ -27,7 +27,7 @@ import Imp
 import ImpParser
 import RHLE
 import Text.ParserCombinators.Parsec
-import Verifier
+import Verifier1
 
 parseImp :: String -> Either String Stmt
 parseImp str = case parse impParser "" str of

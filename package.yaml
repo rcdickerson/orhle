@@ -39,7 +39,7 @@ executables:
 
 tests:
   rhle-verifier-test:
-    main:                VerifierTests.hs
+    main:                Verifier1Tests.hs
     source-dirs:         test
     ghc-options:
     - -threaded

@@ -10,19 +10,20 @@ main = do
   putStrLn "------------------------------------------------"
   putStrLn $ "Existential Program:\n" ++ (show progE)
   putStrLn "------------------------------------------------"
-  let setup@(ducs, lhs, post) = setupAbduction rhleTrip
-  lhsStr <- printZ3 (conjoin lhs)
-  postStr <- printZ3 post
-  putStrLn $ "Abducibles: " ++ (show ducs)
-  putStrLn $ "Abduction LHS:\n" ++ lhsStr
-  putStrLn $ "Abduction Post: " ++ postStr
+  let (cA, aA) = encodeImp progA
+  let (cE, aE) = encodeImp progE
+  cAStr <- printZ3 cA
+  cEStr <- printZ3 cE
+  putStrLn $ "A Abducibles: " ++ (show aA)
+  putStrLn $ "A Encoding:\n" ++ cAStr
   putStrLn "------------------------------------------------"
-  abdResult <- evalZ3 $ astToString =<< (abduce setup)
-  putStrLn $ "Abduction Result:\n" ++ abdResult
+  putStrLn $ "E Abducibles: " ++ (show aE)
+  putStrLn $ "E Encoding:\n" ++ cEStr
   putStrLn "------------------------------------------------"
-  result <- evalZ3 $ verify rhleTrip
+  result <- evalZ3 $ verify1 rhleTrip
   putStrLn $ "Verifies: " ++ (show result)
   putStrLn "------------------------------------------------"
+
 
 printZ3 :: Cond -> IO String
 printZ3 cond = evalZ3 $ astToString =<< condToZ3 cond
