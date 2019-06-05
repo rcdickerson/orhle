@@ -23,8 +23,7 @@ hlWP stmt post =
     Seq (s:ss)  -> hlWP s (hlWP (Seq ss) post)
     If c s1 s2  -> CAnd (CImp (bexpToCond c) (hlWP s1 post))
                         (CImp (CNot $ bexpToCond c) (hlWP s2 post))
-    Call func   -> CAnd (bexpToCond $ preCond func)
-                        (CImp (bexpToCond $ postCond func) post)
+    Call _ f    -> CAnd (fPreCond f) (CImp (fPostCond f) post)
 
 hlSP :: Cond -> Stmt -> Cond
 hlSP pre stmt =
@@ -35,8 +34,7 @@ hlSP pre stmt =
     Seq (s:ss)  -> hlSP (hlSP pre s) (Seq ss)
     If c s1 s2  -> CAnd (CImp (bexpToCond c) (hlSP pre s1))
                         (CImp (CNot $ bexpToCond c) (hlSP pre s2))
-    Call func   -> CImp (CImp pre (bexpToCond $ preCond func))
-                        (bexpToCond $ postCond func)
+    Call _ f    -> CAnd (CImp pre (fPreCond f)) (fPostCond f)
 
 hlVC :: HLTrip -> Cond
 hlVC (HLTrip pre prog post) = CImp pre (hlWP prog post)

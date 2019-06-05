@@ -9,24 +9,20 @@ import Imp
 import RHLE
 import Z3.Monad
 
-verify1 :: RHLETrip -> Z3 Bool
+verify1 :: RHLETrip -> Z3 InterpResult
 verify1 (RHLETrip pre progA progE post) = do
   let (cA, aA) = encodeImp progA
   let (cE, aE) = encodeImp progE
-  let fPosts = conjoin $ map (bexpToCond.postCond.func) (aA ++ aE) -- TODO: This is not quite right
-  push
-  assert =<< abduce (aA ++ aE, [pre, cA, cE], CAnd post fPosts)
-  result <- check
-  pop 1
-  case result of
-    Sat -> return True
-    _   -> return False
+  let fPosts = conjoin $ map (fPostCond.func) (aA ++ aE)
+  preConds  <- mapM condToZ3 [pre, cA, cE]
+  postConds <- mapM condToZ3 [post, fPosts]
+  abduce (aA ++ aE, preConds, postConds)
 
 encodeImp :: Stmt -> (Cond, [Abducible])
 encodeImp stmt =
   case stmt of
-    Skip -> (CTrue, [])
-    Seq [] -> (CTrue, [])
+    Skip       -> (CTrue, [])
+    Seq []     -> encodeImp Skip
     Seq (s:ss) -> (CAnd c1 c2, a1 ++ a2)
                   where (c1, a1) = encodeImp(s)
                         (c2, a2) = encodeImp(Seq ss)
@@ -35,4 +31,4 @@ encodeImp stmt =
                   where (c1, a1) = encodeImp(s1)
                         (c2, a2) = encodeImp(s2)
                         c = bexpToCond b
-    Call func  -> (CTrue, [Abducible func])
+    Call var f -> (CTrue, [Abducible f var])

@@ -4,13 +4,18 @@ module Lib
     , Abduction
     , AExp(..)
     , BExp(..)
+    , bexpToCond
     , Cond(..)
     , condToZ3
     , conjoin
     , encodeImp
+    , fPostCond
+    , fPreCond
     , HLTrip(..)
     , HLETrip(..)
     , impParser
+    , InterpMap(..)
+    , InterpResult(..)
     , parseImp
     , parseImpOrError
     , RHLETrip(..)

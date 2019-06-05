@@ -7,7 +7,6 @@ module Imp
     , bsubst
     , bvars
     , Prog
-    , State
     , Stmt(..)
     , UFunc(..)
     , Var
@@ -33,7 +32,7 @@ data AExp
   | AExp :-: AExp
   | AExp :*: AExp
   | AMod AExp AExp
-  deriving (Show)
+  deriving (Eq, Ord, Show)
 
 asubst :: AExp -> Var -> AExp -> AExp
 asubst aexp var repl =
@@ -80,7 +79,7 @@ data BExp
   | BNot BExp
   | BAnd BExp BExp
   | BOr BExp BExp
-  deriving (Show)
+  deriving (Eq, Ord, Show)
 
 impl :: BExp -> BExp -> BExp
 impl bexp1 bexp2 = bsimpl $ BOr (BNot bexp1) bexp2
@@ -111,16 +110,17 @@ bvars bexp =
     BAnd b1 b2 -> (bvars b1) ++ (bvars b2)
     BOr b1 b2 -> (bvars b1) ++ (bvars b2)
 
+
 -----------------------------
 -- Uninterpreted Functions --
 -----------------------------
 
 data UFunc = UFunc
-  { fName :: String
-  , fParams :: [Var]
-  , preCond :: BExp
-  , postCond :: BExp
-  } deriving (Show)
+  { fName     :: String
+  , fParams   :: [Var]
+  , fPreBexp  :: BExp
+  , fPostBexp :: BExp
+  } deriving (Eq, Ord, Show)
 
 
 ---------------------------
@@ -132,9 +132,7 @@ data Stmt
   | Var := AExp
   | Seq [Stmt]
   | If BExp Stmt Stmt
-  | Call UFunc
-  deriving (Show)
+  | Call Var UFunc
+  deriving (Eq, Ord, Show)
 
 type Prog = Stmt
-
-type State = [(Var, Int)]

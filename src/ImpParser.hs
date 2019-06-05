@@ -79,13 +79,15 @@ assignStmt = do
 funcStmt :: Parser Stmt
 funcStmt = do
   reserved "call"
+  assignee <- identifier
+  reservedOp ":="
   funcName <- identifier
-  params <- parens $ sepBy1 identifier comma
+  params <- parens $ sepBy identifier comma
   reserved "pre"
   pre <- bExpression
   reserved "post"
   post <- bExpression
-  return $ Call (UFunc funcName params pre post)
+  return $ Call assignee (UFunc funcName params pre post)
 
 skipStmt :: Parser Stmt
 skipStmt = reserved "skip" >> return Skip

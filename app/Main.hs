@@ -1,17 +1,21 @@
 module Main where
 
 import Lib
+import qualified Data.Map as Map
 import Z3.Monad
 
 main :: IO ()
-main = do
+main = useVerifier1
+
+useVerifier1 :: IO ()
+useVerifier1 = do
   putStrLn "------------------------------------------------"
   putStrLn $ "Universal Program:\n" ++ (show progA)
   putStrLn "------------------------------------------------"
   putStrLn $ "Existential Program:\n" ++ (show progE)
   putStrLn "------------------------------------------------"
-  let (cA, aA) = encodeImp progA
-  let (cE, aE) = encodeImp progE
+  let (cA, aA) = encodeImp (rhleProgA rhleTrip)
+  let (cE, aE) = encodeImp (rhleProgE rhleTrip)
   cAStr <- printZ3 cA
   cEStr <- printZ3 cE
   putStrLn $ "A Abducibles: " ++ (show aA)
@@ -20,8 +24,27 @@ main = do
   putStrLn $ "E Abducibles: " ++ (show aE)
   putStrLn $ "E Encoding:\n" ++ cEStr
   putStrLn "------------------------------------------------"
+{-
+  let (cA, aA) = encodeImp (rhleProgA rhleTrip)
+  let (cE, aE) = encodeImp (rhleProgE rhleTrip)
+  let fPosts = conjoin $ map (fPostCond.func) (aA ++ aE)
+  preConds  <- evalZ3 $ mapM condToZ3 [rhlePre rhleTrip, cA, cE]
+  postConds <- evalZ3 $ mapM condToZ3 [rhlePost rhleTrip, fPosts]
+  result <- evalZ3 $ abduce (aA ++ aE, preConds, postConds)
+  putStrLn $ "Abduction result: " ++ (show result)
+  putStrLn "------------------------------------------------"
+-}
   result <- evalZ3 $ verify1 rhleTrip
-  putStrLn $ "Verifies: " ++ (show result)
+  case result of
+    IRSat interp -> do
+      putStrLn "SUCCESS"
+      let putInterpLine = \(duc, ast) -> do
+            let ducName = fName.func $ duc
+            interp <- evalZ3 $ astToString ast
+            putStrLn $ "  " ++ ducName ++ ": " ++ interp
+      mapM_ putInterpLine (Map.toList interp)
+    IRUnsat ->
+      putStrLn "FAILURE"
   putStrLn "------------------------------------------------"
 
 
@@ -39,18 +62,29 @@ printZ3Simpl cond = evalZ3 $ astToString =<<
 progA = parseImpOrError "\
 \  x1 := 3;              \
 \  if x1 == 3 then       \
-\    y1 := 3             \
+\    y1 := 5             \
 \  else                  \
-\    y1 := 300           "
+\    y1 := 500           "
 
 progE = parseImpOrError "\
-\  call randOdd(x2)      \
+\  call x2 := randOddX() \
 \    pre true            \
 \    post x2 % 2 == 1;   \
-\  if x2 == 5 then       \
-\    y2 := 3             \
+\  if x2 == 3 then       \
+\    y2 := 5             \
 \  else                  \
-\    y2 := 300           "
+\    y2 := 500           "
+
+progE2 = parseImpOrError "\
+\  call x2 := randOddX()  \
+\    pre true             \
+\    post x2 % 2 == 1;    \
+\  if x2 == 3 then        \
+\    call y2 := randOddY()\
+\      pre true           \
+\      post y2 % 2 == 1   \
+\  else                   \
+\    y2 := 500            "
 
 rhleTrip = RHLETrip CTrue progA progE (CEq (V "y1") (V "y2"))
 -------------------------------------

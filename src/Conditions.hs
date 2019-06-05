@@ -5,6 +5,8 @@ module Conditions
     , conjoin
     , csubst
     , cvars
+    , fPreCond
+    , fPostCond
     ) where
 
 import Data.Set (Set, empty, toList, fromList, union)
@@ -20,6 +22,7 @@ data Cond
   | COr Cond Cond
   | CImp Cond Cond
   | CAssignPost Var AExp Cond
+  | CFuncPost Var Cond Cond
   deriving (Show)
 
 condToZ3 :: Cond -> Z3 AST
@@ -38,11 +41,15 @@ condToZ3 cond =
       p <- condToZ3 cexp1
       q <- condToZ3 cexp2
       mkImplies p q
-    CAssignPost var aexp cond -> do
+    CAssignPost var aexp p -> do
       freshVar <- mkFreshIntVar var
       freshVarStr <- astToString freshVar
       condToZ3 $ CAnd (CEq (V var) (asubst aexp var (V freshVarStr)))
-                      (csubst cond var (V freshVarStr))
+                      (csubst p var (V freshVarStr))
+    CFuncPost var pre post -> do
+      freshVar <- mkFreshIntVar var
+      freshVarStr <- astToString freshVar
+      condToZ3 $ CAnd (csubst pre var (V freshVarStr)) post
 
 csubst :: Cond -> Var -> AExp -> Cond
 csubst cond var repl =
@@ -61,6 +68,13 @@ csubst cond var repl =
             (asubst a var repl)
             (csubst c var repl)
         _ -> asgn
+    fpost@(CFuncPost v pre post) ->
+      case repl of
+        V replVar -> CFuncPost
+            (if v == var then replVar else v)
+            (csubst pre var repl)
+            (csubst post var repl)
+        _ -> fpost
 
 bexpToCond :: BExp -> Cond
 bexpToCond bexp =
@@ -71,6 +85,12 @@ bexpToCond bexp =
     BNot b -> CNot $ bexpToCond b
     BAnd b1 b2 -> CAnd (bexpToCond b1) (bexpToCond b2)
     BOr b1 b2 -> COr (bexpToCond b1) (bexpToCond b2)
+
+fPreCond :: UFunc -> Cond
+fPreCond = bexpToCond . fPreBexp
+
+fPostCond :: UFunc -> Cond
+fPostCond = bexpToCond . fPostBexp
 
 conjoin :: [Cond] -> Cond
 conjoin []     = CTrue
@@ -91,3 +111,4 @@ cvars' cond =
     COr c1 c2 -> (cvars' c1) `union` (cvars' c2)
     CImp c1 c2 -> fromList $ (cvars c1) ++ (cvars c2)
     CAssignPost v a c -> fromList $ v : (avars a) ++ (cvars c)
+    CFuncPost v pre post -> fromList $ v : (cvars pre) ++ (cvars post)
