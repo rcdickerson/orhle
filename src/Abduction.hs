@@ -8,6 +8,7 @@ module Abduction
     , imapUnion
     , InterpMap(..)
     , InterpResult(..)
+    , putInterpMap
     , singletonIMap
     ) where
 
@@ -15,7 +16,6 @@ import Conditions
 import Imp
 import qualified Data.Map as Map
 import Z3.Monad
-
 
 data Abducible = Abducible
   { func     :: UFunc
@@ -30,6 +30,13 @@ data Abducible = Abducible
 type InterpMap = Map.Map Abducible AST
 emptyIMap = Map.empty
 singletonIMap var duc = Map.singleton var duc
+
+putInterpMap :: InterpMap -> IO ()
+putInterpMap imap = mapM_ putInterpLine (Map.toList imap)
+  where putInterpLine = \(duc, ast) -> do
+          let ducName = fName.func $ duc
+          interp <- evalZ3 $ astToString ast
+          putStrLn $ "  " ++ ducName ++ ": " ++ interp
 
 data InterpResult = IRSat InterpMap
                   | IRUnsat
@@ -50,9 +57,10 @@ imapInit prog =
                      second <- imapInit s2
                      return $ Map.union first second
     Call var f    -> do
+                     initPostCond <- condToZ3.fPostCond $ f
+                     -- TODO: Need to make the name unique for callsite...
                      callsiteFun <- mkFreshFuncDecl (fName f) [] =<< mkIntSort
-                     callsiteDuc <- mkApp callsiteFun []
-                     return $ Map.insert (Abducible f var) callsiteDuc emptyIMap
+                     return $ Map.insert (Abducible f var) initPostCond emptyIMap
 
 imapUnion :: InterpMap -> InterpMap -> Z3 InterpMap
 imapUnion imap1 imap2 = do return $ Map.union imap1 imap2 -- TODO: Need actual abduced union
@@ -83,7 +91,7 @@ abduce (duc : [], pres, posts) = do
 abduce _ = error "Multi-abduction is currently unsupported!"
 
 astVars :: AST -> Z3 [Symbol]
-astVars ast = do
+astVars ast = do -- TODO: Clean this up, use Set to avoid duplicates
   isFuncApp <- isApp ast
   if not isFuncApp
     then return []
@@ -92,12 +100,34 @@ astVars ast = do
       numArgs <- getAppNumArgs app
       if numArgs == 0
         then do
-          declName <- getDeclName =<< getAppDecl app
-          return [declName]
+          validVar <- isVar ast
+          if not validVar
+            then return []
+            else do
+              declName <- getDeclName =<< getAppDecl app
+              return [declName]
         else do
           args <- getAppArgs app
           vars <- mapM astVars args
           return $ concat vars
+
+isVar :: AST -> Z3 Bool
+isVar ast = do
+  name <- astToString ast
+  kind <- getAstKind ast
+  let nameOk = hasVarishName name
+  case kind of
+    Z3_APP_AST       -> return nameOk
+    Z3_FUNC_DECL_AST -> return nameOk
+    Z3_VAR_AST       -> return nameOk
+    _                -> return False
+
+-- This is super hacky, but I don't see another way to
+-- distinguish actual variables in Z3.
+hasVarishName :: String -> Bool
+hasVarishName "true" = False
+hasVarishName "false" = False
+hasVarishName _ = True
 
 abducibleVars :: Abducible -> [Var]
 abducibleVars (Abducible func assignee) = assignee:(fParams func)

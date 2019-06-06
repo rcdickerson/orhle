@@ -5,14 +5,14 @@ import qualified Data.Map as Map
 import Z3.Monad
 
 main :: IO ()
-main = useVerifier1
+main = useVerifier2
 
 useVerifier1 :: IO ()
 useVerifier1 = do
   putStrLn "------------------------------------------------"
-  putStrLn $ "Universal Program:\n" ++ (show progA)
+  putStrLn $ "Universal Program:\n" ++ (show.rhleProgA $ rhleTrip)
   putStrLn "------------------------------------------------"
-  putStrLn $ "Existential Program:\n" ++ (show progE)
+  putStrLn $ "Existential Program:\n" ++ (show.rhleProgE $ rhleTrip)
   putStrLn "------------------------------------------------"
   let (cA, aA) = encodeImp (rhleProgA rhleTrip)
   let (cE, aE) = encodeImp (rhleProgE rhleTrip)
@@ -24,29 +24,30 @@ useVerifier1 = do
   putStrLn $ "E Abducibles: " ++ (show aE)
   putStrLn $ "E Encoding:\n" ++ cEStr
   putStrLn "------------------------------------------------"
-{-
-  let (cA, aA) = encodeImp (rhleProgA rhleTrip)
-  let (cE, aE) = encodeImp (rhleProgE rhleTrip)
-  let fPosts = conjoin $ map (fPostCond.func) (aA ++ aE)
-  preConds  <- evalZ3 $ mapM condToZ3 [rhlePre rhleTrip, cA, cE]
-  postConds <- evalZ3 $ mapM condToZ3 [rhlePost rhleTrip, fPosts]
-  result <- evalZ3 $ abduce (aA ++ aE, preConds, postConds)
-  putStrLn $ "Abduction result: " ++ (show result)
-  putStrLn "------------------------------------------------"
--}
   result <- evalZ3 $ verify1 rhleTrip
   case result of
     IRSat interp -> do
       putStrLn "SUCCESS"
-      let putInterpLine = \(duc, ast) -> do
-            let ducName = fName.func $ duc
-            interp <- evalZ3 $ astToString ast
-            putStrLn $ "  " ++ ducName ++ ": " ++ interp
-      mapM_ putInterpLine (Map.toList interp)
+      putInterpMap interp
     IRUnsat ->
       putStrLn "FAILURE"
   putStrLn "------------------------------------------------"
 
+useVerifier2 :: IO ()
+useVerifier2 = do
+  putStrLn "------------------------------------------------"
+  putStrLn $ "Universal Program:\n" ++ (show.rhleProgA $ rhleTrip)
+  putStrLn "------------------------------------------------"
+  putStrLn $ "Existential Program:\n" ++ (show.rhleProgE $ rhleTrip)
+  putStrLn "------------------------------------------------"
+  result <- evalZ3 $ verify2 rhleTrip
+  case result of
+    Valid interp -> do
+      putStrLn "SUCCESS"
+      putInterpMap interp
+    Invalid reason ->
+      putStrLn $ "FAILURE: " ++ reason
+  putStrLn "------------------------------------------------"
 
 printZ3 :: Cond -> IO String
 printZ3 cond = evalZ3 $ astToString =<< condToZ3 cond
