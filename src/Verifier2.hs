@@ -84,9 +84,9 @@ verifyEIf c s1 s2 (HLETrip pre progE post) imap = do
 checkBool :: Cond -> Z3 Bool
 checkBool cond = do
   push
-  assert =<< condToZ3 cond
+  assert =<< mkNot =<< condToZ3 cond
   result <- check
   pop 1
   case result of
-    Sat -> return True
-    _   -> return False
+    Unsat -> return True
+    _     -> return False
