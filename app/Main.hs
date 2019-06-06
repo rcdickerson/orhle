@@ -43,10 +43,10 @@ useVerifier2 = do
   result <- evalZ3 $ verify2 rhleTrip
   case result of
     Valid interp -> do
-      putStrLn "SUCCESS"
+      putStrLn "VALID iff the following executions are possible:"
       putInterpMap interp
     Invalid reason ->
-      putStrLn $ "FAILURE: " ++ reason
+      putStrLn $ "INVALID: " ++ reason
   putStrLn "------------------------------------------------"
 
 printZ3 :: Cond -> IO String
