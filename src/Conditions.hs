@@ -22,7 +22,7 @@ data Cond
   | COr Cond Cond
   | CImp Cond Cond
   | CAssignPost Var AExp Cond
-  | CFuncPost Var Cond Cond
+  | CFuncPost Var Cond
   deriving (Show)
 
 condToZ3 :: Cond -> Z3 AST
@@ -46,10 +46,10 @@ condToZ3 cond =
       freshVarStr <- astToString freshVar
       condToZ3 $ CAnd (CEq (V var) (asubst aexp var (V freshVarStr)))
                       (csubst p var (V freshVarStr))
-    CFuncPost var pre post -> do
+    CFuncPost var pre -> do
       freshVar <- mkFreshIntVar var
       freshVarStr <- astToString freshVar
-      condToZ3 $ csubst (CAnd pre post) var (V freshVarStr)
+      condToZ3 $ csubst pre var (V freshVarStr)
 
 csubst :: Cond -> Var -> AExp -> Cond
 csubst cond var repl =
@@ -68,12 +68,11 @@ csubst cond var repl =
             (asubst a var repl)
             (csubst c var repl)
         _ -> asgn
-    fpost@(CFuncPost v pre post) ->
+    fpost@(CFuncPost v pre) ->
       case repl of
         V replVar -> CFuncPost
             (if v == var then replVar else v)
             (csubst pre var repl)
-            (csubst post var repl)
         _ -> fpost
 
 bexpToCond :: BExp -> Cond
@@ -111,4 +110,4 @@ cvars' cond =
     COr c1 c2 -> (cvars' c1) `union` (cvars' c2)
     CImp c1 c2 -> fromList $ (cvars c1) ++ (cvars c2)
     CAssignPost v a c -> fromList $ v : (avars a) ++ (cvars c)
-    CFuncPost v pre post -> fromList $ v : (cvars pre) ++ (cvars post)
+    CFuncPost v pre -> fromList $ v : (cvars pre)

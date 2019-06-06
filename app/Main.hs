@@ -60,6 +60,7 @@ printZ3Simpl cond = evalZ3 $ astToString =<<
 -------------------------------------
 -- Useful for REPL experimentation --
 -------------------------------------
+
 progA = parseImpOrError "\
 \  x1 := 3;              \
 \  if x1 == 3 then       \

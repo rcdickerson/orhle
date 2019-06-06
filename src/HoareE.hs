@@ -21,4 +21,4 @@ hleSP pre stmt =
     Seq (s:ss)  -> hleSP (hleSP pre s) (Seq ss)
     If c s1 s2  -> CAnd (CImp (bexpToCond c) (hleSP pre s1))
                         (CImp (CNot $ bexpToCond c) (hleSP pre s2))
-    Call var f  -> CFuncPost var pre (fPostCond f)
+    Call var f  -> CFuncPost var pre

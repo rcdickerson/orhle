@@ -64,8 +64,9 @@ verifyECall asg f (HLETrip pre progE post) imap = do
   precondSat <- checkBool $ CImp pre $ fPreCond f
   case precondSat of
     False -> return $ Invalid ("Precondition not satisfied for " ++ (fName f))
-    True  -> verifyE (HLETrip pre' progE post) imap
-             where pre' = (CFuncPost asg pre $ fPostCond f)
+    True  -> verifyE (HLETrip pre' progE post') imap
+             where pre'  = CFuncPost asg pre
+                   post' = CAnd post $ fPostCond f
 
 verifyEIf :: Cond -> Prog -> Prog -> HLETrip -> InterpMap -> Z3 VResult
 verifyEIf c s1 s2 (HLETrip pre progE post) imap = do
