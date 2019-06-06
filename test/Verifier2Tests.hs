@@ -1,19 +1,19 @@
-module Verifier1Tests where
+module Verifier2Tests where
 
 import Lib
 import Test.HUnit
 import Z3.Monad
 
-assertValid :: InterpResult -> Assertion
-assertValid (IRSat _) = return ()
-assertValid IRUnsat   = assertFailure "Expected VALID but was INVALID"
+assertValid :: VResult -> Assertion
+assertValid (Valid _)   = return ()
+assertValid (Invalid _) = assertFailure "Expected VALID but was INVALID"
 
-assertInvalid :: InterpResult -> Assertion
-assertInvalid (IRSat _) = assertFailure "Expected INVALID but was VALID"
-assertInvalid IRUnsat   = return ()
+assertInvalid :: VResult -> Assertion
+assertInvalid (Valid _)   = assertFailure "Expected INVALID but was VALID"
+assertInvalid (Invalid _) = return ()
 
 deterministicValid = do
-  result <- evalZ3 $ verify1 trip
+  result <- evalZ3 $ verify2 trip
   assertValid result
   where
     pre   = CTrue
@@ -33,7 +33,7 @@ deterministicValid = do
     trip = RHLETrip pre progA progE post
 
 deterministicInvalid = do
-  result <- evalZ3 $ verify1 trip
+  result <- evalZ3 $ verify2 trip
   assertInvalid result
   where
     pre   = CTrue
@@ -53,7 +53,7 @@ deterministicInvalid = do
     trip = RHLETrip pre progA progE post
 
 simpleValid = do
-  result <- evalZ3 $ verify1 trip
+  result <- evalZ3 $ verify2 trip
   assertValid result
   where
     pre   = CTrue
@@ -75,7 +75,7 @@ simpleValid = do
     trip = RHLETrip pre progA progE post
 
 simpleValid2 = do
-  result <- evalZ3 $ verify1 trip
+  result <- evalZ3 $ verify2 trip
   assertValid result
   where
     pre   = CTrue
@@ -97,7 +97,7 @@ simpleValid2 = do
     trip = RHLETrip pre progA progE post
 
 simpleInvalid = do
-  result <- evalZ3 $ verify1 trip
+  result <- evalZ3 $ verify2 trip
   assertInvalid result
   where
     pre   = CTrue
@@ -119,7 +119,7 @@ simpleInvalid = do
     trip = RHLETrip pre progA progE post
 
 simpleInvalid2 = do
-  result <- evalZ3 $ verify1 trip
+  result <- evalZ3 $ verify2 trip
   assertInvalid result
   where
     pre   = CTrue
@@ -140,9 +140,8 @@ simpleInvalid2 = do
     post = (CEq (V "y1") (V "y2"))
     trip = RHLETrip pre progA progE post
 
-
-verifier1Tests :: Test
-verifier1Tests = TestList
+verifier2Tests :: Test
+verifier2Tests = TestList
        [ TestLabel "deterministicValid"   $ TestCase deterministicValid
        , TestLabel "deterministicInvalid" $ TestCase deterministicInvalid
        , TestLabel "simpleValid"          $ TestCase simpleValid
