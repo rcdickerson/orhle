@@ -49,7 +49,7 @@ condToZ3 cond =
     CFuncPost var pre post -> do
       freshVar <- mkFreshIntVar var
       freshVarStr <- astToString freshVar
-      condToZ3 $ CAnd (csubst pre var (V freshVarStr)) post
+      condToZ3 $ csubst (CAnd pre post) var (V freshVarStr)
 
 csubst :: Cond -> Var -> AExp -> Cond
 csubst cond var repl =
