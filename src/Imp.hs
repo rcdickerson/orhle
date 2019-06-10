@@ -6,6 +6,7 @@ module Imp
     , BExp(..)
     , bsubst
     , bvars
+    , fsubst
     , Prog
     , Stmt(..)
     , UFunc(..)
@@ -121,6 +122,12 @@ data UFunc = UFunc
   , fPreBexp  :: BExp
   , fPostBexp :: BExp
   } deriving (Eq, Ord, Show)
+
+fsubst :: UFunc -> Var -> Var -> UFunc
+fsubst (UFunc name params pre post) var repl =
+  UFunc name params' pre post
+  where
+    params' = map (\p -> if p == var then repl else p) params
 
 
 ---------------------------

@@ -46,7 +46,7 @@ verifyE (HLETrip pre progE post) imap = do
     Seq []     -> verifyE (HLETrip pre Skip post) imap
     Seq ((Call var f):ss)
                -> verifyECall var f (HLETrip pre (Seq ss) post) imap
-    Seq (s:ss) -> verifyE (HLETrip (hlSP pre s) (Seq ss) post) imap
+    Seq (s:ss) -> verifyE (HLETrip (hleSP pre s) (Seq ss) post) imap
     s@(_ := _) -> verifyE (HLETrip (hlSP pre s) Skip post) imap
     If b s1 s2 -> verifyEIf (bexpToCond b) s1 s2 (HLETrip pre Skip post) imap
     Call var f -> verifyECall var f (HLETrip pre Skip post) imap
@@ -64,9 +64,8 @@ verifyECall asg f (HLETrip pre progE post) imap = do
   precondSat <- checkBool $ CImp pre $ fPreCond f
   case precondSat of
     False -> return $ Invalid ("Precondition not satisfied for " ++ (fName f))
-    True  -> verifyE (HLETrip pre' progE post') imap
-             where pre'  = CFuncPost asg pre
-                   post' = CAnd post $ fPostCond f
+    True  -> verifyE (HLETrip pre' progE post) imap
+             where pre'  = CFuncPost asg f pre
 
 verifyEIf :: Cond -> Prog -> Prog -> HLETrip -> InterpMap -> Z3 VResult
 verifyEIf c s1 s2 (HLETrip pre progE post) imap = do
