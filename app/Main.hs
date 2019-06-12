@@ -42,10 +42,12 @@ useVerifier2 = do
   putStrLn "------------------------------------------------"
   result <- evalZ3 $ verify2 rhleTrip
   case result of
-    Valid interp -> do
+    Valid trace interp -> do
+      putStrLn $ ppVTrace trace
       putStrLn "VALID iff the following executions are possible:"
       putInterpMap interp
-    Invalid reason ->
+    Invalid trace reason -> do
+      putStrLn $ ppVTrace trace
       putStrLn $ "INVALID: " ++ reason
   putStrLn "------------------------------------------------"
 
@@ -68,11 +70,18 @@ progA = parseImpOrError "\
 \  else                  \
 \    y1 := 500           "
 
+progE0 = parseImpOrError "\
+\  x2 := 3;              \
+\  if x2 == 3 then       \
+\    y2 := 5             \
+\  else                  \
+\    y2 := 500           "
+
 progE = parseImpOrError "\
 \  call x2 := randOddX() \
 \    pre true            \
 \    post x2 % 2 == 1;   \
-\  if x2 == 3 then       \
+\  if x2 == 4 then       \
 \    y2 := 5             \
 \  else                  \
 \    y2 := 500           "

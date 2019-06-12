@@ -8,6 +8,7 @@ module Abduction
     , imapUnion
     , InterpMap
     , InterpResult(..)
+    , ppInterpMap
     , putInterpMap
     , singletonIMap
     ) where
@@ -37,6 +38,13 @@ putInterpMap imap = mapM_ putInterpLine (Map.toList imap)
           let ducName = fName.func $ duc
           interp <- evalZ3 $ astToString ast
           putStrLn $ "  " ++ ducName ++ ": " ++ interp
+
+ppInterpMap :: InterpMap -> Z3 String
+ppInterpMap imap = concat <$> mapM line (Map.toList imap)
+  where line = \(duc, ast) -> do
+          let ducName = fName.func $ duc
+          interp <- astToString ast
+          return $ "  " ++ ducName ++ ": " ++ interp
 
 data InterpResult = IRSat InterpMap
                   | IRUnsat
@@ -141,24 +149,32 @@ filterVars symbols vars = do
 
 noAbduction :: AST -> AST -> Z3 InterpResult
 noAbduction conds post = do
-  imp <- mkImplies conds post
-  vars <- astVars imp
-  sat <- satisfiable =<< performQe vars imp
-  if sat
-    then return $ IRSat emptyIMap
-    else return IRUnsat
+  consistencyCheck <- satisfiable conds
+  if not consistencyCheck
+    then return IRUnsat
+    else do
+      imp <- mkImplies conds post
+      vars <- astVars imp
+      sat <- satisfiable =<< performQe vars imp
+      if sat
+        then return $ IRSat emptyIMap
+        else return IRUnsat
 
 singleAbduction :: Abducible -> AST -> AST -> Z3 InterpResult
 singleAbduction duc conds post = do
-  fPost <- condToZ3.fPostCond.func $ duc
-  imp   <- mkImplies conds =<< mkAnd [fPost, post]
-  vars  <- astVars imp
-  vbar  <- filterVars vars (abducibleVars duc)
-  qeRes <- performQe vbar imp
-  sat   <- satisfiable qeRes
-  if sat
-    then return $ IRSat $ Map.insert duc qeRes emptyIMap
-    else return IRUnsat
+  consistencyCheck <- satisfiable conds
+  if not consistencyCheck
+    then return IRUnsat
+    else do
+      fPost <- condToZ3.fPostCond.func $ duc
+      imp   <- mkImplies conds =<< mkAnd [fPost, post]
+      vars  <- astVars imp
+      vbar  <- filterVars vars (abducibleVars duc)
+      qeRes <- performQe vbar imp
+      sat   <- satisfiable qeRes
+      if sat
+        then return $ IRSat $ Map.insert duc qeRes emptyIMap
+        else return IRUnsat
 
 performQe :: [Symbol] -> AST -> Z3 AST
 performQe vars formula = do

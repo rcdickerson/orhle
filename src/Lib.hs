@@ -14,10 +14,11 @@ module Lib
     , HLTrip(..)
     , HLETrip(..)
     , impParser
-    , InterpMap(..)
+    , InterpMap
     , InterpResult(..)
     , parseImp
     , parseImpOrError
+    , ppVTrace
     , putInterpMap
     , RHLETrip(..)
     , Stmt(..)
@@ -25,6 +26,7 @@ module Lib
     , verify1
     , verify2
     , VResult(..)
+    , VTrace
     ) where
 
 import Abduction
