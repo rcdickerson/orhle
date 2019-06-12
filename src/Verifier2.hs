@@ -26,7 +26,7 @@ verifyA (RHLETrip pre progA progE post) imap = do
     Seq (s:ss) -> verifyA (RHLETrip (hlSP pre s) (Seq ss) progE post) imap
     s@(_ := _) -> verifyE (HLETrip (hlSP pre s) progE post) imap
     If b s1 s2 -> verifyAIf (bexpToCond b) s1 s2 (HLETrip pre progE post) imap
-    Call var f -> verifyECall var f (HLETrip pre progE post) imap
+    Call var f -> error "Function calls in universal execution currently unsupported"
 
 verifyAIf :: Cond -> Prog -> Prog -> HLETrip -> InterpMap -> Z3 VResult
 verifyAIf c s1 s2 (HLETrip pre progE post) imap = do

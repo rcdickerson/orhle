@@ -6,7 +6,7 @@ module Abduction
     , imapInit
     , imapStrengthen
     , imapUnion
-    , InterpMap(..)
+    , InterpMap
     , InterpResult(..)
     , putInterpMap
     , singletonIMap
@@ -70,7 +70,7 @@ imapStrengthen pre imap post = do
   let keys  = Map.keys imap
   preZ3 <- condToZ3 pre
   postZ3 <- condToZ3 post
-  abduce (keys, [preZ3], postZ3:(Map.elems imap))
+  abduce (keys, [preZ3], [postZ3]) -- :(Map.elems imap))
 
 
 ---------------

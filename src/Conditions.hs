@@ -47,11 +47,11 @@ condToZ3 cond =
       condToZ3 $ CAnd (CEq (V var) (asubst aexp var (V freshVarStr)))
                       (csubst p var (V freshVarStr))
     CFuncPost var f pre -> do
-      freshVar <- mkFreshIntVar var
+      freshVar    <- mkFreshIntVar var
       freshVarStr <- astToString freshVar
-      let fPreSubst = csubst (fPreCond f) var (V freshVarStr)
+      let fPreSubst  = csubst (fPreCond f)  var (V freshVarStr)
       let fPostSubst = csubst (fPostCond f) var (V freshVarStr)
-      let preSubst = csubst pre var (V freshVarStr)
+      let preSubst   = csubst pre           var (V freshVarStr)
       condToZ3 $ CAnd (CAnd fPreSubst fPostSubst) preSubst
 
 csubst :: Cond -> Var -> AExp -> Cond
