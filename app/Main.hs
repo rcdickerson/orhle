@@ -82,7 +82,7 @@ progE = parseImpOrError "\
 \  call x2 := randOddX() \
 \    pre true            \
 \    post x2 % 2 == 1;   \
-\  if x2 == 4 then       \
+\  if x2 == 3 then       \
 \    y2 := 5             \
 \  else                  \
 \    y2 := 500           "
