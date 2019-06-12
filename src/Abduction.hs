@@ -39,12 +39,12 @@ putInterpMap imap = mapM_ putInterpLine (Map.toList imap)
           interp <- evalZ3 $ astToString ast
           putStrLn $ "  " ++ ducName ++ ": " ++ interp
 
-ppInterpMap :: InterpMap -> Z3 String
-ppInterpMap imap = concat <$> mapM line (Map.toList imap)
+ppInterpMap :: InterpMap -> Z3 [String]
+ppInterpMap imap = mapM line (Map.toList imap)
   where line = \(duc, ast) -> do
           let ducName = fName.func $ duc
           interp <- astToString ast
-          return $ "  " ++ ducName ++ ": " ++ interp
+          return $ ducName ++ ": " ++ interp
 
 data InterpResult = IRSat InterpMap
                   | IRUnsat

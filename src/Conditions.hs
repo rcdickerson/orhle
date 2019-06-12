@@ -42,17 +42,19 @@ condToZ3 cond =
       q <- condToZ3 cexp2
       mkImplies p q
     CAssignPost var aexp p -> do
-      freshVar <- mkFreshIntVar var
-      freshVarStr <- astToString freshVar
-      condToZ3 $ CAnd (CEq (V var) (asubst aexp var (V freshVarStr)))
-                      (csubst p var (V freshVarStr))
+      --freshVar <- mkFreshIntVar var
+      --freshVarStr <- astToString freshVar
+      --condToZ3 $ CAnd (CEq (V var) (asubst aexp var (V freshVarStr)))
+      --                (csubst p var (V freshVarStr))
+      condToZ3 $ CAnd (CEq (V var) aexp) p
     CFuncPost var f pre -> do
-      freshVar    <- mkFreshIntVar var
-      freshVarStr <- astToString freshVar
-      let fPreSubst  = csubst (fPreCond f)  var (V freshVarStr)
-      let fPostSubst = csubst (fPostCond f) var (V freshVarStr)
-      let preSubst   = csubst pre           var (V freshVarStr)
-      condToZ3 $ CAnd (CAnd fPreSubst fPostSubst) preSubst
+      --freshVar    <- mkFreshIntVar var
+      --freshVarStr <- astToString freshVar
+      --let fPreSubst  = csubst (fPreCond f)  var (V freshVarStr)
+      --let fPostSubst = csubst (fPostCond f) var (V freshVarStr)
+      --let preSubst   = csubst pre           var (V freshVarStr)
+      --condToZ3 $ CAnd (CAnd fPreSubst fPostSubst) preSubst
+      condToZ3 $ CAnd pre (fPostCond f)
 
 csubst :: Cond -> Var -> AExp -> Cond
 csubst cond var repl =

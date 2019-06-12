@@ -40,14 +40,15 @@ useVerifier2 = do
   putStrLn "------------------------------------------------"
   putStrLn $ "Existential Program:\n" ++ (show.rhleProgE $ rhleTrip)
   putStrLn "------------------------------------------------"
-  result <- evalZ3 $ verify2 rhleTrip
+  (result, trace) <- evalZ3 $ verify2 rhleTrip
+  traceStr <- evalZ3 $ ppVTrace trace
+  putStrLn $ "Verification Trace:\n" ++ traceStr
+  putStrLn "------------------------------------------------"
   case result of
-    Valid trace interp -> do
-      putStrLn $ ppVTrace trace
+    Valid interp -> do
       putStrLn "VALID iff the following executions are possible:"
       putInterpMap interp
-    Invalid trace reason -> do
-      putStrLn $ ppVTrace trace
+    Invalid reason -> do
       putStrLn $ "INVALID: " ++ reason
   putStrLn "------------------------------------------------"
 
