@@ -54,30 +54,21 @@ verifyAIf c s1 s2 rest (HLETrip pre progE post) imap = do
     (True , False) -> do
       condStr <- lift $ condZ3String (CNot c)
       logMsgA $ "Skipping inconsistent else branch: " ++ condStr
-      logBranchStart c
-      res <- verifyA (RHLETrip (CAnd pre c) s1 progE post) imap
-      logBranchEnd
-      return res
+      inBranchLog c $ verifyA (RHLETrip (CAnd pre c) s1 progE post) imap
     (False, True ) -> do
       condStr <- lift $ condZ3String c
       logMsgA $ "Skipping inconsistent then branch: " ++ condStr
-      logBranchStart (CNot c)
-      res <- verifyA (RHLETrip (CAnd pre (CNot c)) s2 progE post) imap
-      logBranchEnd
-      return res
+      inBranchLog (CNot c) $ verifyA (RHLETrip (CAnd pre (CNot c)) s2 progE post) imap
     (False, False) -> return $ Invalid "Neither if-branch is consistent"
 
 verifyAIf' :: Cond -> Prog -> Prog -> [Stmt] -> HLETrip -> InterpMap -> VTracedResult
 verifyAIf' c s1 s2 rest (HLETrip pre progE post) imap = do
-  logBranchStart c
-  res1 <- verifyA (RHLETrip (CAnd pre c) (Seq $ s1:rest) progE post) imap
-  logBranchEnd
+  res1 <- inBranchLog c $ verifyA (RHLETrip (CAnd pre c) (Seq $ s1:rest) progE post) imap
   case res1 of
     Invalid reason -> return $ Invalid reason
     Valid   imap1  -> do
-      logBranchStart (CNot c)
-      res2 <- verifyA (RHLETrip (CAnd pre (CNot c)) (Seq $ s2:rest) progE post) imap
-      logBranchEnd
+      res2 <- inBranchLog (CNot c)
+          $ verifyA (RHLETrip (CAnd pre (CNot c)) (Seq $ s2:rest) progE post) imap
       case res2 of
         Invalid reason -> return $ Invalid reason
         Valid   imap2  -> lift $ imapUnion imap1 imap2 >>= return.Valid
@@ -136,28 +127,18 @@ verifyEIf c s1 s2 pre rest post imap = do
     (True , False) -> do
       condStr <- lift $ condZ3String (CNot c)
       logMsgE $ "Skipping unenterable if-branch: " ++ condStr
-      logBranchStart c
-      res <- verifyE (HLETrip (CAnd pre c) (Seq $ s1:rest) post) imap1
-      logBranchEnd
-      return res
+      inBranchLog c $ verifyE (HLETrip (CAnd pre c) (Seq $ s1:rest) post) imap1
     (False, True ) -> do
       condStr <- lift $ condZ3String c
       logMsgE $ "Skipping unenterable if-branch: " ++ condStr
-      logBranchStart (CNot c)
-      res <- verifyE (HLETrip (CAnd pre (CNot c)) (Seq $ s2:rest) post) imap2
-      logBranchEnd
-      return res
+      inBranchLog (CNot c) $ verifyE (HLETrip (CAnd pre (CNot c)) (Seq $ s2:rest) post) imap2
     (True , True ) -> do
       mapLines1 <- lift $ ppInterpMap imap1
       mapLines2 <- lift $ ppInterpMap imap2
       logAbductionSuccess mapLines1 pre c
-      logBranchStart c
-      res1 <- verifyE (HLETrip (CAnd pre c) (Seq $ s1:rest) post) imap1
-      logBranchEnd
+      res1 <- inBranchLog c $ verifyE (HLETrip (CAnd pre c) (Seq $ s1:rest) post) imap1
       logAbductionSuccess mapLines2 pre (CNot c)
-      logBranchStart (CNot c)
-      res2 <- verifyE (HLETrip (CAnd pre (CNot c)) (Seq $ s2:rest) post) imap2
-      logBranchEnd
+      res2 <- inBranchLog c $ verifyE (HLETrip (CAnd pre (CNot c)) (Seq $ s2:rest) post) imap2
       case (res1, res2) of
         (Valid imap1', Valid imap2') -> lift $ imapUnion imap1' imap2' >>= return.Valid
         (Valid imap1', Invalid _   ) -> return $ Valid imap1'
@@ -171,6 +152,13 @@ tryStrengthening pre imap branchCond = do
   case res of
     IRSat imap' -> return (True, imap')
     IRUnsat     -> return (False, emptyIMap)
+
+inBranchLog :: Cond -> VTracedResult -> VTracedResult
+inBranchLog cond branch = do
+  logBranchStart cond
+  result <- branch
+  logBranchEnd
+  return result
 
 checkValid :: Cond -> Z3 Bool
 checkValid cond = do
