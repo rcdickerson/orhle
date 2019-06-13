@@ -125,9 +125,11 @@ data UFunc = UFunc
 
 fsubst :: UFunc -> Var -> Var -> UFunc
 fsubst (UFunc name params pre post) var repl =
-  UFunc name params' pre post
+  UFunc name params' pre' post'
   where
     params' = map (\p -> if p == var then repl else p) params
+    pre'    = bsubst pre var (V repl)
+    post'   = bsubst post var (V repl)
 
 
 ---------------------------

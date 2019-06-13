@@ -60,21 +60,21 @@ verifyAIf c s1 s2 rest (HLETrip pre progE post) imap = do
   consistent1 <- lift $ checkSat (CAnd pre c)
   consistent2 <- lift $ checkSat (CAnd pre (CNot c))
   case (consistent1, consistent2) of
-    (True, True)   -> verifyAIf' c s1 s2 rest (HLETrip pre progE post) imap
-    (True, False)  -> do
-                      condStr <- lift $ ppCond (CNot c)
-                      tell [VTAMessage $ "Skipping inconsistent else branch: " ++ condStr]
-                      tell [VTStartBranch c]
-                      res <- verifyA (RHLETrip (CAnd pre c) s1 progE post) imap
-                      tell [VTEndBranch]
-                      return res
-    (False, True)  -> do
-                      condStr <- lift $ ppCond c
-                      tell [VTAMessage $ "Skipping inconsistent then branch: " ++ condStr]
-                      tell [VTStartBranch (CNot c)]
-                      res <- verifyA (RHLETrip (CAnd pre (CNot c)) s2 progE post) imap
-                      tell [VTEndBranch]
-                      return res
+    (True , True ) -> verifyAIf' c s1 s2 rest (HLETrip pre progE post) imap
+    (True , False) -> do
+      condStr <- lift $ ppCond (CNot c)
+      tell [VTAMessage $ "Skipping inconsistent else branch: " ++ condStr]
+      tell [VTStartBranch c]
+      res <- verifyA (RHLETrip (CAnd pre c) s1 progE post) imap
+      tell [VTEndBranch]
+      return res
+    (False, True ) -> do
+      condStr <- lift $ ppCond c
+      tell [VTAMessage $ "Skipping inconsistent then branch: " ++ condStr]
+      tell [VTStartBranch (CNot c)]
+      res <- verifyA (RHLETrip (CAnd pre (CNot c)) s2 progE post) imap
+      tell [VTEndBranch]
+      return res
     (False, False) -> return $ Invalid "Neither if-branch is consistent"
 
 verifyAIf' :: Cond -> Prog -> Prog -> [Stmt] -> HLETrip -> InterpMap -> VTracedResult
@@ -117,12 +117,12 @@ verifyFinalImpl pre imap post = do
   result <- lift $ imapStrengthen pre imap post
   case result of
     IRSat imap' -> do
-                   interpLines <- lift $ ppInterpMap imap'
-                   tell [VTAbduction True interpLines pre post]
-                   return $ Valid imap'
-    IRUnsat     -> do
-                   tell [VTAbduction False [] pre post]
-                   return $ Invalid "No satisfying interpretation found"
+      interpLines <- lift $ ppInterpMap imap'
+      tell [VTAbduction True interpLines pre post]
+      return $ Valid imap'
+    IRUnsat -> do
+      tell [VTAbduction False [] pre post]
+      return $ Invalid "No satisfying interpretation found"
 
 verifyECall :: Var -> UFunc -> HLETrip -> InterpMap -> VTracedResult
 verifyECall asg f (HLETrip pre progE post) imap = do
@@ -139,19 +139,48 @@ verifyEIf :: Cond -> Prog -> Prog
           -> InterpMap
           -> VTracedResult
 verifyEIf c s1 s2 pre rest post imap = do
-  tell [VTStartBranch c]
-  res1 <- verifyE (HLETrip (CAnd pre c)        (Seq $ s1:rest) post) imap
-  tell [VTEndBranch, VTStartBranch (CNot c)]
-  res2 <- verifyE (HLETrip (CAnd pre (CNot c)) (Seq $ s2:rest) post) imap
-  tell [VTEndBranch]
-  case res1 of
-    Valid   imap1 -> case res2 of
-                       Valid   imap2  -> lift $ imapUnion imap1 imap2 >>= return.Valid
-                       Invalid reason -> return $ Valid imap1
-    Invalid msg1  -> case res2 of
-                       Valid   imap2 -> return $ Valid imap2
-                       Invalid msg2  -> return $ Invalid
-                                        $ "Neither existential if-branch verifies"
+  (canEnter1, imap1) <- lift $ tryStrengthening pre imap c
+  (canEnter2, imap2) <- lift $ tryStrengthening pre imap (CNot c)
+  case (canEnter1, canEnter2) of
+    (False, False) -> return $ Invalid "Neither existential if-branch is enterable"
+    (True , False) -> do
+      condStr <- lift $ ppCond (CNot c)
+      tell [VTEMessage $ "Skipping unenterable if-branch: " ++ condStr]
+      tell [VTStartBranch c]
+      res <- verifyE (HLETrip (CAnd pre c) (Seq $ s1:rest) post) imap1
+      tell [VTEndBranch]
+      return res
+    (False, True ) -> do
+      condStr <- lift $ ppCond c
+      tell [VTEMessage $ "Skipping unenterable if-branch: " ++ condStr]
+      tell [VTStartBranch (CNot c)]
+      res <- verifyE (HLETrip (CAnd pre (CNot c)) (Seq $ s2:rest) post) imap2
+      tell [VTEndBranch]
+      return res
+    (True , True ) -> do
+      mapLines1 <- lift $ ppInterpMap imap1
+      mapLines2 <- lift $ ppInterpMap imap2
+      tell [VTAbduction True mapLines1 pre c]
+      tell [VTStartBranch c]
+      res1 <- verifyE (HLETrip (CAnd pre c) (Seq $ s1:rest) post) imap1
+      tell [VTEndBranch]
+      tell [VTAbduction True mapLines2 pre (CNot c)]
+      tell [VTStartBranch (CNot c)]
+      res2 <- verifyE (HLETrip (CAnd pre (CNot c)) (Seq $ s2:rest) post) imap2
+      tell [VTEndBranch]
+      case (res1, res2) of
+        (Valid imap1', Valid imap2') -> lift $ imapUnion imap1' imap2' >>= return.Valid
+        (Valid imap1', Invalid _   ) -> return $ Valid imap1'
+        (Invalid _   , Valid imap2') -> return $ Valid imap2'
+        (Invalid _   , Invalid _   ) -> return $ Invalid
+          "Both existential if-branches are enterable, but neither verifies"
+
+tryStrengthening :: Cond -> InterpMap -> Cond -> Z3 (Bool, InterpMap)
+tryStrengthening pre imap branchCond = do
+  res <- imapStrengthen pre imap branchCond
+  case res of
+    IRSat imap' -> return (True, imap')
+    IRUnsat     -> return (False, emptyIMap)
 
 checkValid :: Cond -> Z3 Bool
 checkValid cond = do
@@ -216,8 +245,9 @@ ppVTrace' indent (t:ts) =
       condStr <- ppCond cond
       rest <- ppVTrace' (indent + 1) ts
       return $ start ++ "+ Branch: " ++ condStr ++ "\n" ++ rest
-    VTEndBranch ->
-      ppVTrace' (indent - 1) ts
+    VTEndBranch -> do
+      rest <- ppVTrace' (indent - 1) ts
+      return $ (concat $ replicate (indent - 1) "| ") ++ "-\n" ++ rest
     VTAMessage msg -> do
       rest <- ppVTrace' indent ts
       return $ start ++ "A :: " ++ msg ++ "\n" ++ rest

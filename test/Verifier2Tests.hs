@@ -4,17 +4,26 @@ import Lib
 import Test.HUnit
 import Z3.Monad
 
-assertValid :: VResult -> Assertion
-assertValid (Valid _)   = return ()
-assertValid (Invalid _) = assertFailure "Expected VALID but was INVALID"
+assertValid :: RHLETrip -> Assertion
+assertValid trip = do
+  (result, tr) <- evalZ3 $ verify2 trip
+  trace <- evalZ3 $ ppVTrace tr
+  case result of
+    Valid   _ -> return ()
+    Invalid r -> assertFailure
+      $ "Expected VALID but was INVALID: " ++ r ++ "\n" ++ trace
 
-assertInvalid :: VResult -> Assertion
-assertInvalid (Valid _)   = assertFailure "Expected INVALID but was VALID"
-assertInvalid (Invalid _) = return ()
+assertInvalid :: RHLETrip -> Assertion
+assertInvalid trip = do
+  (result, tr) <- evalZ3 $ verify2 trip
+  trace <- evalZ3 $ ppVTrace tr
+  case result of
+    Invalid _ -> return ()
+    Valid   _ -> assertFailure
+      $ "Expected INVALID but was VALID\n" ++ trace
 
 deterministicValid = do
-  result <- evalZ3 $ verify2 trip
-  assertValid result
+  assertValid trip
   where
     pre   = CTrue
     progA = parseImpOrError "\
@@ -33,8 +42,7 @@ deterministicValid = do
     trip = RHLETrip pre progA progE post
 
 deterministicInvalid = do
-  result <- evalZ3 $ verify2 trip
-  assertInvalid result
+  assertInvalid trip
   where
     pre   = CTrue
     progA = parseImpOrError "\
@@ -53,8 +61,7 @@ deterministicInvalid = do
     trip = RHLETrip pre progA progE post
 
 simpleValid = do
-  result <- evalZ3 $ verify2 trip
-  assertValid result
+  assertValid trip
   where
     pre   = CTrue
     progA = parseImpOrError "\
@@ -75,8 +82,7 @@ simpleValid = do
     trip = RHLETrip pre progA progE post
 
 simpleValid2 = do
-  result <- evalZ3 $ verify2 trip
-  assertValid result
+  assertValid trip
   where
     pre   = CTrue
     progA = parseImpOrError "\
@@ -97,8 +103,7 @@ simpleValid2 = do
     trip = RHLETrip pre progA progE post
 
 simpleInvalid = do
-  result <- evalZ3 $ verify2 trip
-  assertInvalid result
+  assertInvalid trip
   where
     pre   = CTrue
     progA = parseImpOrError "\
@@ -119,8 +124,7 @@ simpleInvalid = do
     trip = RHLETrip pre progA progE post
 
 simpleInvalid2 = do
-  result <- evalZ3 $ verify2 trip
-  assertInvalid result
+  assertInvalid trip
   where
     pre   = CTrue
     progA = parseImpOrError "\

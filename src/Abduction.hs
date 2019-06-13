@@ -13,6 +13,7 @@ module Abduction
     , singletonIMap
     ) where
 
+import Control.Monad
 import Conditions
 import Imp
 import qualified Data.Map as Map
@@ -75,10 +76,13 @@ imapUnion imap1 imap2 = do return $ Map.union imap1 imap2 -- TODO: Need actual a
 
 imapStrengthen :: Cond -> InterpMap -> Cond -> Z3 InterpResult
 imapStrengthen pre imap post = do
-  let keys  = Map.keys imap
-  preZ3 <- condToZ3 pre
+  let keys = Map.keys imap
+  let assignees = map assignee keys
+  freshVars <- mapM (\v -> mkFreshIntVar v >>= astToString >>= \f -> return (v, f)) assignees
+  let subFresh = \pre' (v, f) -> csubst pre' v (V f)
+  preZ3 <- condToZ3 $ foldl subFresh pre freshVars
   postZ3 <- condToZ3 post
-  abduce (keys, [preZ3], [postZ3]) -- :(Map.elems imap))
+  abduce (keys, [preZ3], postZ3:(Map.elems imap))
 
 
 ---------------

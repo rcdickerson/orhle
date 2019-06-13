@@ -64,6 +64,8 @@ printZ3Simpl cond = evalZ3 $ astToString =<<
 -- Useful for REPL experimentation --
 -------------------------------------
 
+p = evalZ3 . astToString
+
 progA = parseImpOrError "\
 \  x1 := 3;              \
 \  if x1 == 3 then       \
@@ -73,10 +75,10 @@ progA = parseImpOrError "\
 
 progE0 = parseImpOrError "\
 \  x2 := 3;              \
-\  if x2 == 3 then       \
-\    y2 := 5             \
+\  if x2 == 4 then       \
+\    y2 := 500           \
 \  else                  \
-\    y2 := 500           "
+\    y2 := 5             "
 
 progE = parseImpOrError "\
 \  call x2 := randOddX() \
