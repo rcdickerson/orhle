@@ -2,6 +2,7 @@ module Conditions
     ( bexpToCond
     , Cond(..)
     , condToZ3
+    , condZ3String
     , conjoin
     , csubst
     , cvars
@@ -117,3 +118,6 @@ cvars' cond =
     CImp c1 c2 -> fromList $ (cvars c1) ++ (cvars c2)
     CAssignPost v a c -> fromList $ v : (avars a) ++ (cvars c)
     CFuncPost v f pre -> fromList $ v : (cvars pre) ++ (fParams f)
+
+condZ3String :: Cond -> Z3 String
+condZ3String cond = astToString =<< simplify =<< condToZ3 cond

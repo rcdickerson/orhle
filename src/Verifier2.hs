@@ -9,25 +9,15 @@ import Abduction
 import Conditions
 import Control.Monad.Trans
 import Control.Monad.Writer
-import Data.List
 import Hoare
 import HoareE
 import Imp
 import RHLE
+import VTrace
 import Z3.Monad
 
 data VResult = Valid   InterpMap
              | Invalid String
-
-data VTrace = VTRhle RHLETrip
-            | VTHle  HLETrip
-            | VTAbduction Bool [String] Cond Cond
-            | VTACall Cond Cond
-            | VTECall Cond Cond
-            | VTStartBranch Cond
-            | VTEndBranch
-            | VTAMessage String
-            | VTEMessage String
 
 type VTracedResult = WriterT [VTrace] Z3 VResult
 
@@ -38,7 +28,7 @@ verify2 trip = do
 
 verifyA :: RHLETrip -> InterpMap -> VTracedResult
 verifyA trip@(RHLETrip pre progA progE post) imap = do
-  tell [VTRhle trip]
+  logRhle trip
   case progA of
     Skip       -> verifyE (HLETrip pre progE post) imap
     Seq ss     -> verifyASeq pre ss progE post imap
@@ -62,39 +52,39 @@ verifyAIf c s1 s2 rest (HLETrip pre progE post) imap = do
   case (consistent1, consistent2) of
     (True , True ) -> verifyAIf' c s1 s2 rest (HLETrip pre progE post) imap
     (True , False) -> do
-      condStr <- lift $ ppCond (CNot c)
-      tell [VTAMessage $ "Skipping inconsistent else branch: " ++ condStr]
-      tell [VTStartBranch c]
+      condStr <- lift $ condZ3String (CNot c)
+      logMsgA $ "Skipping inconsistent else branch: " ++ condStr
+      logBranchStart c
       res <- verifyA (RHLETrip (CAnd pre c) s1 progE post) imap
-      tell [VTEndBranch]
+      logBranchEnd
       return res
     (False, True ) -> do
-      condStr <- lift $ ppCond c
-      tell [VTAMessage $ "Skipping inconsistent then branch: " ++ condStr]
-      tell [VTStartBranch (CNot c)]
+      condStr <- lift $ condZ3String c
+      logMsgA $ "Skipping inconsistent then branch: " ++ condStr
+      logBranchStart (CNot c)
       res <- verifyA (RHLETrip (CAnd pre (CNot c)) s2 progE post) imap
-      tell [VTEndBranch]
+      logBranchEnd
       return res
     (False, False) -> return $ Invalid "Neither if-branch is consistent"
 
 verifyAIf' :: Cond -> Prog -> Prog -> [Stmt] -> HLETrip -> InterpMap -> VTracedResult
 verifyAIf' c s1 s2 rest (HLETrip pre progE post) imap = do
-  tell [VTStartBranch c]
+  logBranchStart c
   res1 <- verifyA (RHLETrip (CAnd pre c) (Seq $ s1:rest) progE post) imap
-  tell [VTEndBranch]
+  logBranchEnd
   case res1 of
     Invalid reason -> return $ Invalid reason
     Valid   imap1  -> do
-      tell [VTStartBranch (CNot c)]
+      logBranchStart (CNot c)
       res2 <- verifyA (RHLETrip (CAnd pre (CNot c)) (Seq $ s2:rest) progE post) imap
-      tell [VTEndBranch]
+      logBranchEnd
       case res2 of
         Invalid reason -> return $ Invalid reason
         Valid   imap2  -> lift $ imapUnion imap1 imap2 >>= return.Valid
 
 verifyE :: HLETrip -> InterpMap -> VTracedResult
 verifyE trip@(HLETrip pre progE post) imap = do
-  tell [VTHle trip]
+  logHle trip
   case progE of
     Skip       -> verifyFinalImpl pre imap post
     Seq ss     -> verifyESeq pre ss post imap
@@ -118,15 +108,15 @@ verifyFinalImpl pre imap post = do
   case result of
     IRSat imap' -> do
       interpLines <- lift $ ppInterpMap imap'
-      tell [VTAbduction True interpLines pre post]
+      logAbductionSuccess interpLines pre post
       return $ Valid imap'
     IRUnsat -> do
-      tell [VTAbduction False [] pre post]
+      logAbductionFailure pre post
       return $ Invalid "No satisfying interpretation found"
 
 verifyECall :: Var -> UFunc -> HLETrip -> InterpMap -> VTracedResult
 verifyECall asg f (HLETrip pre progE post) imap = do
-  tell [VTECall pre $ fPreCond f]
+  logCallE pre $ fPreCond f
   precondSat <- lift $ checkValid $ CImp pre $ fPreCond f
   case precondSat of
     False -> return $ Invalid $
@@ -144,30 +134,30 @@ verifyEIf c s1 s2 pre rest post imap = do
   case (canEnter1, canEnter2) of
     (False, False) -> return $ Invalid "Neither existential if-branch is enterable"
     (True , False) -> do
-      condStr <- lift $ ppCond (CNot c)
-      tell [VTEMessage $ "Skipping unenterable if-branch: " ++ condStr]
-      tell [VTStartBranch c]
+      condStr <- lift $ condZ3String (CNot c)
+      logMsgE $ "Skipping unenterable if-branch: " ++ condStr
+      logBranchStart c
       res <- verifyE (HLETrip (CAnd pre c) (Seq $ s1:rest) post) imap1
-      tell [VTEndBranch]
+      logBranchEnd
       return res
     (False, True ) -> do
-      condStr <- lift $ ppCond c
-      tell [VTEMessage $ "Skipping unenterable if-branch: " ++ condStr]
-      tell [VTStartBranch (CNot c)]
+      condStr <- lift $ condZ3String c
+      logMsgE $ "Skipping unenterable if-branch: " ++ condStr
+      logBranchStart (CNot c)
       res <- verifyE (HLETrip (CAnd pre (CNot c)) (Seq $ s2:rest) post) imap2
-      tell [VTEndBranch]
+      logBranchEnd
       return res
     (True , True ) -> do
       mapLines1 <- lift $ ppInterpMap imap1
       mapLines2 <- lift $ ppInterpMap imap2
-      tell [VTAbduction True mapLines1 pre c]
-      tell [VTStartBranch c]
+      logAbductionSuccess mapLines1 pre c
+      logBranchStart c
       res1 <- verifyE (HLETrip (CAnd pre c) (Seq $ s1:rest) post) imap1
-      tell [VTEndBranch]
-      tell [VTAbduction True mapLines2 pre (CNot c)]
-      tell [VTStartBranch (CNot c)]
+      logBranchEnd
+      logAbductionSuccess mapLines2 pre (CNot c)
+      logBranchStart (CNot c)
       res2 <- verifyE (HLETrip (CAnd pre (CNot c)) (Seq $ s2:rest) post) imap2
-      tell [VTEndBranch]
+      logBranchEnd
       case (res1, res2) of
         (Valid imap1', Valid imap2') -> lift $ imapUnion imap1' imap2' >>= return.Valid
         (Valid imap1', Invalid _   ) -> return $ Valid imap1'
@@ -201,81 +191,3 @@ checkSat cond = do
   case result of
     Sat -> return True
     _   -> return False
-
-ppVTrace :: [VTrace] -> Z3 String
-ppVTrace = ppVTrace' 0
-
-ppVTrace' :: Int -> [VTrace] -> Z3 String
-ppVTrace' _ [] = return ""
-ppVTrace' indent (t:ts) =
-  case t of
-    VTRhle (RHLETrip pre progA progE post) -> do
-      preStr <- ppCond pre
-      progStr <- ppStmtStart progA
-      rest   <- ppVTrace' indent ts
-      return $ start ++ "A " ++ preStr ++ " :: " ++ progStr ++ "\n" ++ rest
-    VTHle  (HLETrip  pre progE post) -> do
-      preStr  <- ppCond pre
-      progStr <- ppStmtStart progE
-      rest    <- ppVTrace' indent ts
-      return $ start ++ "E " ++ preStr ++ " :: " ++ progStr ++ "\n" ++ rest
-    VTAbduction sat interpLines pre post -> do
-      preStr  <- ppCond pre
-      postStr <- ppCond post
-      rest    <- ppVTrace' indent ts
-      return $ start ++ (if sat then "O " else "X ")
-        ++ "<Abduction> " ++ preStr ++ " -> " ++ postStr
-        ++ (concat $ map (\line -> "\n" ++ start ++ "  :" ++ line) interpLines)
-        ++ "\n" ++ rest
-    VTACall pre fpre -> do
-      preStr  <- ppCond pre
-      fPreStr <- ppCond fpre
-      rest    <- ppVTrace' indent ts
-      return $ start ++ "A :: Precondition Check: "
-        ++ preStr ++ " -> " ++ fPreStr
-        ++ "\n" ++ rest
-    VTECall pre fpre -> do
-      preStr  <- ppCond pre
-      fPreStr <- ppCond fpre
-      rest    <- ppVTrace' indent ts
-      return $ start ++ "E :: Precondition Check: "
-        ++ preStr ++ " -> " ++ fPreStr
-        ++ "\n" ++ rest
-    VTStartBranch cond -> do
-      condStr <- ppCond cond
-      rest <- ppVTrace' (indent + 1) ts
-      return $ start ++ "+ Branch: " ++ condStr ++ "\n" ++ rest
-    VTEndBranch -> do
-      rest <- ppVTrace' (indent - 1) ts
-      return $ (concat $ replicate (indent - 1) "| ") ++ "-\n" ++ rest
-    VTAMessage msg -> do
-      rest <- ppVTrace' indent ts
-      return $ start ++ "A :: " ++ msg ++ "\n" ++ rest
-    VTEMessage msg -> do
-      rest <- ppVTrace' indent ts
-      return $ start ++ "E :: " ++ msg ++ "\n" ++ rest
-  where
-    start = (concat $ replicate indent "| ")
-
-ppStmtStart :: Stmt -> Z3 String
-ppStmtStart stmt =
-  case stmt of
-    Skip -> return "Skip"
-    v := aexp -> do
-      aexpStr <- astToString =<< aexpToZ3 aexp
-      return $ v ++ " := " ++ aexpStr
-    Seq [] -> return "Seq []"
-    Seq (s:[]) -> ppStmtStart s
-    Seq (s:ss) -> do
-      first <- ppStmtStart s
-      return $ first ++ "..."
-    If b s1 s2 -> do
-      condStr <- ppCond $ bexpToCond b
-      thenStr <- ppStmtStart s1
-      elseStr <- ppStmtStart s2
-      return $ "if " ++ condStr ++ " then " ++ thenStr ++ " else " ++ elseStr
-    Call v (UFunc name params pre post) -> do
-      return $ v ++ " := " ++ name ++ "(" ++ (intercalate ", " params) ++ ")"
-
-ppCond :: Cond -> Z3 String
-ppCond cond = astToString =<< simplify =<< condToZ3 cond
