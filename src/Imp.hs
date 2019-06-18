@@ -48,7 +48,7 @@ asubst aexp var repl =
 avars :: AExp -> [Var]
 avars aexp =
   case aexp of
-    I i -> []
+    I _ -> []
     V v -> [v]
     lhs :+: rhs -> (avars lhs) ++ (avars rhs)
     lhs :-: rhs -> (avars lhs) ++ (avars rhs)

@@ -63,15 +63,16 @@ verifyAIf c s1 s2 rest (HLETrip pre progE post) imap = do
 
 verifyAIf' :: Cond -> Prog -> Prog -> [Stmt] -> HLETrip -> InterpMap -> VTracedResult
 verifyAIf' c s1 s2 rest (HLETrip pre progE post) imap = do
+  let notC = CNot c
   res1 <- inBranchLog c $ verifyA (RHLETrip (CAnd pre c) (Seq $ s1:rest) progE post) imap
   case res1 of
     Invalid reason -> return $ Invalid reason
     Valid   imap1  -> do
-      res2 <- inBranchLog (CNot c)
-          $ verifyA (RHLETrip (CAnd pre (CNot c)) (Seq $ s2:rest) progE post) imap
+      res2 <- inBranchLog notC
+          $ verifyA (RHLETrip (CAnd pre notC) (Seq $ s2:rest) progE post) imap
       case res2 of
         Invalid reason -> return $ Invalid reason
-        Valid   imap2  -> lift $ imapUnion imap1 imap2 >>= return.Valid
+        Valid   imap2  -> lift $ imapCondUnion (c, imap1) (notC, imap2) >>= return.Valid
 
 verifyE :: HLETrip -> InterpMap -> VTracedResult
 verifyE trip@(HLETrip pre progE post) imap = do
@@ -120,27 +121,29 @@ verifyEIf :: Cond -> Prog -> Prog
           -> InterpMap
           -> VTracedResult
 verifyEIf c s1 s2 pre rest post imap = do
+  let notC = CNot c
   (canEnter1, imap1) <- lift $ tryStrengthening pre imap c
-  (canEnter2, imap2) <- lift $ tryStrengthening pre imap (CNot c)
+  (canEnter2, imap2) <- lift $ tryStrengthening pre imap notC
   case (canEnter1, canEnter2) of
     (False, False) -> return $ Invalid "Neither existential if-branch is enterable"
     (True , False) -> do
-      condStr <- lift $ condZ3String (CNot c)
+      condStr <- lift $ condZ3String notC
       logMsgE $ "Skipping unenterable if-branch: " ++ condStr
       inBranchLog c $ verifyE (HLETrip (CAnd pre c) (Seq $ s1:rest) post) imap1
     (False, True ) -> do
       condStr <- lift $ condZ3String c
       logMsgE $ "Skipping unenterable if-branch: " ++ condStr
-      inBranchLog (CNot c) $ verifyE (HLETrip (CAnd pre (CNot c)) (Seq $ s2:rest) post) imap2
+      inBranchLog (CNot c) $ verifyE (HLETrip (CAnd pre notC) (Seq $ s2:rest) post) imap2
     (True , True ) -> do
       mapLines1 <- lift $ ppInterpMap imap1
       mapLines2 <- lift $ ppInterpMap imap2
       logAbductionSuccess mapLines1 pre c
       res1 <- inBranchLog c $ verifyE (HLETrip (CAnd pre c) (Seq $ s1:rest) post) imap1
-      logAbductionSuccess mapLines2 pre (CNot c)
-      res2 <- inBranchLog c $ verifyE (HLETrip (CAnd pre (CNot c)) (Seq $ s2:rest) post) imap2
+      logAbductionSuccess mapLines2 pre notC
+      res2 <- inBranchLog notC $ verifyE (HLETrip (CAnd pre notC) (Seq $ s2:rest) post) imap2
       case (res1, res2) of
-        (Valid imap1', Valid imap2') -> lift $ imapUnion imap1' imap2' >>= return.Valid
+        (Valid imap1', Valid imap2') -> lift
+          $ imapCondUnion (c, imap1') (notC, imap2') >>= return.Valid
         (Valid imap1', Invalid _   ) -> return $ Valid imap1'
         (Invalid _   , Valid imap2') -> return $ Valid imap2'
         (Invalid _   , Invalid _   ) -> return $ Invalid

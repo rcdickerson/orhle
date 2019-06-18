@@ -1,6 +1,5 @@
 module Lib
     ( abduce
-    , Abducible(..)
     , Abduction
     , AExp(..)
     , BExp(..)

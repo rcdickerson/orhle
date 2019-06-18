@@ -65,6 +65,7 @@ printZ3Simpl cond = evalZ3 $ astToString =<<
 -------------------------------------
 
 p = evalZ3 . astToString
+ps symbolList = mapM evalZ3 $ map getSymbolString symbolList
 
 progA = parseImpOrError "\
 \  x1 := 3;              \
@@ -81,13 +82,22 @@ progE0 = parseImpOrError "\
 \    y2 := 5             "
 
 progE = parseImpOrError "\
-\  call x2 := randOddX() \
+\  call x2 := rand()     \
 \    pre true            \
 \    post x2 % 2 == 1;   \
 \  if x2 == 3 then       \
 \    y2 := 5             \
 \  else                  \
 \    y2 := 500           "
+
+progE' = parseImpOrError "\
+\  call x2 := rand()     \
+\    pre true            \
+\    post x2 % 2 == 1;   \
+\  if x2 == 3 then       \
+\    y2 := x2 + 2        \
+\  else                  \
+\    y2 := x2            "
 
 progE2 = parseImpOrError "\
 \  call x2 := randOddX()  \
@@ -100,5 +110,5 @@ progE2 = parseImpOrError "\
 \  else                   \
 \    y2 := 500            "
 
-rhleTrip = RHLETrip CTrue progA progE (CEq (V "y1") (V "y2"))
+rhleTrip = RHLETrip CTrue progA progE' (CEq (V "y1") (V "y2"))
 -------------------------------------
