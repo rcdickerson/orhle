@@ -21,4 +21,16 @@ Notation "P [ X |-> a ]" := (assn_sub X a P)
 Definition bassn b : Assertion :=
   fun st => (beval st b = true).
 
+Lemma bassn_eval_true : forall b st,
+  beval st b = true <-> bassn b st.
+Proof.
+  firstorder.
+Qed.
+
+Lemma bassn_eval_false : forall b st,
+  beval st b = false <-> ~ bassn b st.
+Proof.
+  intros. destruct (beval st b) eqn:?; firstorder congruence.
+Qed.
+
 Open Scope hoare_spec_scope.
