@@ -88,16 +88,7 @@ progE = parseImpOrError "\
 \  if x2 == 3 then       \
 \    y2 := 5             \
 \  else                  \
-\    y2 := 500           "
-
-progE' = parseImpOrError "\
-\  call x2 := rand()     \
-\    pre true            \
-\    post x2 % 2 == 1;   \
-\  if x2 == 3 then       \
-\    y2 := x2 + 2        \
-\  else                  \
-\    y2 := x2            "
+\    y2 := 5           "
 
 progE2 = parseImpOrError "\
 \  call x2 := randOddX()  \
@@ -110,5 +101,5 @@ progE2 = parseImpOrError "\
 \  else                   \
 \    y2 := 500            "
 
-rhleTrip = RHLETrip CTrue progA progE' (CEq (V "y1") (V "y2"))
+rhleTrip = RHLETrip CTrue progA progE (CEq (V "y1") (V "y2"))
 -------------------------------------

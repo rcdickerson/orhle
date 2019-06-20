@@ -53,13 +53,13 @@ verifyAIf c s1 s2 rest (HLETrip pre progE post) imap = do
     (True , True ) -> verifyAIf' c s1 s2 rest (HLETrip pre progE post) imap
     (True , False) -> do
       condStr <- lift $ condZ3String (CNot c)
-      logMsgA $ "Skipping inconsistent else branch: " ++ condStr
+      logMsgA $ "(A) Skipping inconsistent else branch: " ++ condStr
       inBranchLog c $ verifyA (RHLETrip (CAnd pre c) s1 progE post) imap
     (False, True ) -> do
       condStr <- lift $ condZ3String c
-      logMsgA $ "Skipping inconsistent then branch: " ++ condStr
+      logMsgA $ "(A) Skipping inconsistent then branch: " ++ condStr
       inBranchLog (CNot c) $ verifyA (RHLETrip (CAnd pre (CNot c)) s2 progE post) imap
-    (False, False) -> return $ Invalid "Neither if-branch is consistent"
+    (False, False) -> return $ Invalid "(A) Neither if-branch is consistent"
 
 verifyAIf' :: Cond -> Prog -> Prog -> [Stmt] -> HLETrip -> InterpMap -> VTracedResult
 verifyAIf' c s1 s2 rest (HLETrip pre progE post) imap = do
@@ -112,7 +112,7 @@ verifyECall asg f (HLETrip pre progE post) imap = do
   precondSat <- lift $ checkValid $ CImp pre $ fPreCond f
   case precondSat of
     False -> return $ Invalid $
-             "Precondition not satisfied for " ++ (fName f)
+             "(E) Precondition not satisfied for " ++ (fName f)
     True  -> verifyE (HLETrip pre' progE post) imap
              where pre'  = CFuncPost asg f pre
 
@@ -125,7 +125,7 @@ verifyEIf c s1 s2 pre rest post imap = do
   (canEnter1, imap1) <- lift $ tryStrengthening pre imap c
   (canEnter2, imap2) <- lift $ tryStrengthening pre imap notC
   case (canEnter1, canEnter2) of
-    (False, False) -> return $ Invalid "Neither existential if-branch is enterable"
+    (False, False) -> return $ Invalid "(E) Neither if-branch is enterable"
     (True , False) -> do
       condStr <- lift $ condZ3String notC
       logMsgE $ "Skipping unenterable if-branch: " ++ condStr
@@ -147,7 +147,7 @@ verifyEIf c s1 s2 pre rest post imap = do
         (Valid imap1', Invalid _   ) -> return $ Valid imap1'
         (Invalid _   , Valid imap2') -> return $ Valid imap2'
         (Invalid _   , Invalid _   ) -> return $ Invalid
-          "Both existential if-branches are enterable, but neither verifies"
+          "(E) Both if-branches are enterable, but neither verifies"
 
 tryStrengthening :: Cond -> InterpMap -> Cond -> Z3 (Bool, InterpMap)
 tryStrengthening pre imap branchCond = do

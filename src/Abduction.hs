@@ -163,11 +163,11 @@ noAbduction conds post = do
 
 singleAbduction :: Var -> AST -> AST -> Z3 InterpResult
 singleAbduction var conds post = do
-  imp     <- mkImplies conds post
-  astVars <- astVars imp
-  vbar    <- filterVars astVars [var]
-  qeRes   <- performQe vbar imp
-  sat     <- satisfiable qeRes
+  imp   <- mkImplies conds post
+  vars  <- astVars imp
+  vbar  <- filterVars vars [var]
+  qeRes <- performQe vbar imp
+  sat   <- satisfiable qeRes
   case sat of
     False -> return IRUnsat
     True  -> return $ IRSat $ Map.insert var qeRes emptyIMap
@@ -182,8 +182,8 @@ multiAbduction vars conds post = do
 
 cartDecomp :: [Var] -> AST -> AST -> Z3 InterpMap
 cartDecomp vars conds combinedResult = do
-  init <- initSolution vars conds combinedResult
-  foldlM replaceWithDecomp init vars
+  initMap <- initSolution vars conds combinedResult
+  foldlM replaceWithDecomp initMap vars
   where
     replaceWithDecomp :: InterpMap -> Var -> Z3 InterpMap
     replaceWithDecomp imap var = do
@@ -210,8 +210,8 @@ initSolution vars conds post = do
       case interp of
         Nothing -> error $ "Unable to model value for " ++ var
         Just v  -> do
-          interp <- mkEq v =<< aexpToZ3 (V $ var)
-          return $ Map.insert var interp imap
+          eqv <- mkEq v =<< aexpToZ3 (V $ var)
+          return $ Map.insert var eqv imap
 
 
 performQe :: [Symbol] -> AST -> Z3 AST
