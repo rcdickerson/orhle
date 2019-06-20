@@ -1,6 +1,7 @@
 (* Adapted from the Software Foundations series:
    https://softwarefoundations.cis.upenn.edu/ *)
 
+Require Import Coq.Bool.Bool.
 Require Import Maps Imp.
 
 Definition Assertion := state -> Prop.
@@ -21,16 +22,22 @@ Notation "P [ X |-> a ]" := (assn_sub X a P)
 Definition bassn b : Assertion :=
   fun st => (beval st b = true).
 
+Lemma bevalP : forall b st,
+    reflect (bassn b st) (beval st b).
+Proof.
+  intros. destruct beval eqn:?; constructor; firstorder congruence.
+Qed.
+
 Lemma bassn_eval_true : forall b st,
   beval st b = true <-> bassn b st.
 Proof.
-  firstorder.
+  intros. destruct (bevalP b st); easy.
 Qed.
 
 Lemma bassn_eval_false : forall b st,
   beval st b = false <-> ~ bassn b st.
 Proof.
-  intros. destruct (beval st b) eqn:?; firstorder congruence.
+  intros. destruct (bevalP b st); easy.
 Qed.
 
 Open Scope hoare_spec_scope.
