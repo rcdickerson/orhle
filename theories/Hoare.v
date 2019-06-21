@@ -46,8 +46,12 @@ Inductive hoare_proof : Assertion -> com -> Assertion -> Type :=
   | H_Skip : forall P,
       |- {{P}} SKIP {{P}}
   | H_Asgn : forall Q V a,
-      |- {{assn_sub V a Q}} V ::= a {{Q}}
-  (* TODO: H_Spec *)
+      |- {{Q[V |-> a]}} V ::= a {{Q}}
+  | H_Spec : forall Q y f xs,
+      |- {{fun st =>
+            (funsig f).(pre) (aseval st xs) ->
+            forall v, (funsig f).(post) v (aseval st xs) ->
+                 Q[y |-> v] st}} y :::= f $ xs {{Q}}
   | H_Seq  : forall P c Q d R,
       |- {{P}} c {{Q}} -> |- {{Q}} d {{R}} ->
       |- {{P}} c;;d {{R}}
@@ -73,14 +77,43 @@ Hint Constructors hoare_proof : hoare.
 Hint Unfold hoare_triple wp.
 Hint Constructors ceval.
 
+Lemma hoare_while : forall P b c,
+    {{fun st => P st /\ bassn b st}} c {{P}} ->
+    {{P}} WHILE b DO c END {{fun st => P st /\ ~ (bassn b st)}}.
+Proof.
+  unfold hoare_triple.
+  intros ? ? ? ? ? ? HE ?. remember (WHILE b DO c END)%imp eqn:Heq.
+  induction HE; try inversion Heq; subst.
+  - firstorder with hoare.
+  - eauto.
+Qed.
+
 Theorem hoare_proof_sound : forall P c Q,
     |- {{P}} c {{Q}} -> {{P}} c {{Q}}.
 Proof.
-Admitted.
+  unfold hoare_triple.
+  intros ? ? ? pf. induction pf; intros st st' HE HP.
+  - (* SKIP *)
+    inversion HE; subst. eauto.
+  - (* ::= *)
+    inversion HE; subst. eauto.
+  - (* :::= *)
+    inversion HE; subst. firstorder.
+  - (* ;; *)
+    inversion HE; subst. eauto.
+  - (* TEST *)
+    inversion HE; subst. eauto.
+    firstorder with hoare.
+  - (* WHILE *)
+    eapply hoare_while; eauto.
+  - (* Conseq *)
+    eauto.
+Qed.
 
 Theorem hoare_proof_complete: forall P c Q,
     {{P}} c {{Q}} -> |- {{P}} c {{Q}}.
 Proof.
+  unfold hoare_triple.
   intros P c. revert dependent P.
   induction c; intros P Q HT.
   - (* SKIP *)
@@ -89,7 +122,8 @@ Proof.
     eapply H_Consequence; eauto with hoare.
     intros; eapply HT; eauto.
   - (* :::= *)
-    admit.
+    eapply H_Consequence; eauto with hoare.
+    simpl. intros. eapply HT; eauto.
   - (* ;; *)
     apply H_Seq with (wp c2 Q); firstorder eauto.
   - (* IFB *)
@@ -101,6 +135,6 @@ Proof.
     + constructor. firstorder eauto.
     + eauto.
     + firstorder with hoare.
-Admitted.
+Qed.
 
 End Hoare.
