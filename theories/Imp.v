@@ -128,7 +128,7 @@ Class Env : Type :=
 Reserved Notation "st '=[' c ']=>' st'"
                   (at level 40).
 
-Inductive ceval {env : Env} : com -> state -> state -> Prop :=
+Inductive ceval {env : Env} : com -> state -> state -> Type :=
   | E_Skip : forall st,
       st =[ SKIP ]=> st
   | E_Ass  : forall st a1 n x,
