@@ -88,9 +88,6 @@ imapStrengthen pre imap post = do
   postZ3 <- condToZ3 post
   abduce (vars, [preZ3], postZ3:(Map.elems imap))
 
-imapConjoin :: InterpMap -> Z3 AST
-imapConjoin imap = mkAnd $ map snd $ Map.toList imap
-
 
 ---------------
 -- Abduction --
@@ -165,8 +162,8 @@ noAbduction conds post = do
 singleAbduction :: String -> [Var] -> AST -> AST -> Z3 InterpResult
 singleAbduction name vars conds post = do
   imp     <- mkImplies conds post
-  astVars <- astVars imp
-  vbar    <- filterVars astVars vars
+  impVars <- astVars imp
+  vbar    <- filterVars impVars vars
   qeRes   <- performQe vbar imp
   sat     <- checkSat qeRes
   case sat of
