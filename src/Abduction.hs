@@ -105,9 +105,9 @@ abduce (vars, pres, posts) = do
     else do
       postConds <- mkAnd posts
       case vars of
-        []     -> noAbduction          preConds postConds
-        var:[] -> singleAbduction var  preConds postConds
-        _      -> multiAbduction  vars preConds postConds
+        []     -> noAbduction               preConds postConds
+        var:[] -> singleAbduction var [var] preConds postConds
+        _      -> multiAbduction  vars      preConds postConds
 
 astVars :: AST -> Z3 [Symbol]
 astVars ast = do
@@ -162,23 +162,23 @@ noAbduction conds post = do
     then return $ IRSat emptyIMap
     else return IRUnsat
 
-singleAbduction :: Var -> AST -> AST -> Z3 InterpResult
-singleAbduction var conds post = do
-  imp   <- mkImplies conds post
-  vars  <- astVars imp
-  vbar  <- filterVars vars [var]
-  qeRes <- performQe vbar imp
-  sat   <- checkSat qeRes
+singleAbduction :: String -> [Var] -> AST -> AST -> Z3 InterpResult
+singleAbduction name vars conds post = do
+  imp     <- mkImplies conds post
+  astVars <- astVars imp
+  vbar    <- filterVars astVars vars
+  qeRes   <- performQe vbar imp
+  sat     <- checkSat qeRes
   case sat of
     False -> return IRUnsat
     True  -> do
       qeResSimpl <- simplifyWrt conds qeRes
-      return $ IRSat $ Map.insert var qeResSimpl emptyIMap
+      return $ IRSat $ Map.insert name qeResSimpl emptyIMap
 
 multiAbduction :: [Var] -> AST -> AST -> Z3 InterpResult
 multiAbduction vars conds post = do
   let combinedDuc = "_combined"
-  combinedResult <- singleAbduction combinedDuc conds post
+  combinedResult <- singleAbduction combinedDuc vars conds post
   case combinedResult of
     IRUnsat    -> return IRUnsat
     IRSat imap -> return.IRSat =<< cartDecomp vars conds (imap Map.! combinedDuc)
@@ -186,16 +186,16 @@ multiAbduction vars conds post = do
 cartDecomp :: [Var] -> AST -> AST -> Z3 InterpMap
 cartDecomp vars conds combinedResult = do
   initMap <- initSolution vars conds combinedResult
-  foldlM replaceWithDecomp initMap vars
+  foldlM (replaceWithDecomp combinedResult) initMap vars
   where
-    replaceWithDecomp :: InterpMap -> Var -> Z3 InterpMap
-    replaceWithDecomp imap var = do
-      dec <- decompose var imap
+    replaceWithDecomp :: AST -> InterpMap -> Var -> Z3 InterpMap
+    replaceWithDecomp post imap var = do
+      dec <- (decompose post) var imap
       return $ Map.union dec imap
-    decompose :: Var -> InterpMap -> Z3 InterpMap
-    decompose var imap = do
-      post <- imapConjoin $ Map.restrictKeys imap $ Set.singleton var
-      ires <- abduce ([var], [conds], [post])
+    decompose :: AST -> Var -> InterpMap -> Z3 InterpMap
+    decompose post var imap = do
+      let complement = Map.withoutKeys imap $ Set.singleton var
+      ires <- abduce ([var], map snd $ Map.toList complement, [post])
       case ires of
         IRUnsat     -> error $ "Unable to decompose " ++ (show combinedResult)
         IRSat imap' -> return imap'

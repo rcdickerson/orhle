@@ -101,5 +101,5 @@ progE2 = parseImpOrError "\
 \  else                   \
 \    y2 := 500            "
 
-rhleTrip = RHLETrip CTrue progA progE (CEq (V "y1") (V "y2"))
+rhleTrip = RHLETrip CTrue progA progE2 (CEq (V "y1") (V "y2"))
 -------------------------------------

@@ -14,7 +14,7 @@ simplifyWrt :: AST -> AST -> Z3 AST
 simplifyWrt wrt expr = do
   wrt'  <- nnf wrt
   expr' <- nnf expr
-  ddaSimplify wrt' expr'
+  simplify =<< ddaSimplify wrt' expr'
 
 ddaSimplify :: AST -> AST -> Z3 AST
 ddaSimplify expr subexpr = do
@@ -30,6 +30,7 @@ ddaSimplify expr subexpr = do
     NTAnd -> mkAnd =<< calcC' return expr children
     NTOr  -> mkOr  =<< calcC' mkNot  expr children
 
+-- TODO: need to repeat this until fixpoint
 calcC' :: (AST -> Z3 AST) -> AST -> [AST] -> Z3 [AST]
 calcC' star expr asts = distList $ mapCompList calcCi' asts
   where
