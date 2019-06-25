@@ -15,6 +15,7 @@ import Imp
 import RHLE
 import VTrace
 import Z3.Monad
+import Z3Util
 
 data VResult = Valid   InterpMap
              | Invalid String
@@ -47,8 +48,8 @@ verifyASeq pre (s:ss) progE post imap =
 
 verifyAIf :: Cond -> Prog -> Prog -> [Stmt] -> HLETrip -> InterpMap -> VTracedResult
 verifyAIf c s1 s2 rest (HLETrip pre progE post) imap = do
-  consistent1 <- lift $ checkSat (CAnd pre c)
-  consistent2 <- lift $ checkSat (CAnd pre (CNot c))
+  consistent1 <- lift $ checkCSat (CAnd pre c)
+  consistent2 <- lift $ checkCSat (CAnd pre (CNot c))
   case (consistent1, consistent2) of
     (True , True ) -> verifyAIf' c s1 s2 rest (HLETrip pre progE post) imap
     (True , False) -> do
@@ -109,7 +110,7 @@ verifyFinalImpl pre imap post = do
 verifyECall :: Var -> UFunc -> HLETrip -> InterpMap -> VTracedResult
 verifyECall asg f (HLETrip pre progE post) imap = do
   logCallE pre $ fPreCond f
-  precondSat <- lift $ checkValid $ CImp pre $ fPreCond f
+  precondSat <- lift $ checkCValid $ CImp pre $ fPreCond f
   case precondSat of
     False -> return $ Invalid $
              "(E) Precondition not satisfied for " ++ (fName f)
@@ -162,23 +163,3 @@ inBranchLog cond branch = do
   result <- branch
   logBranchEnd
   return result
-
-checkValid :: Cond -> Z3 Bool
-checkValid cond = do
-  push
-  assert =<< mkNot =<< condToZ3 cond
-  result <- check
-  pop 1
-  case result of
-    Unsat -> return True
-    _     -> return False
-
-checkSat :: Cond -> Z3 Bool
-checkSat cond = do
-  push
-  assert =<< condToZ3 cond
-  result <- check
-  pop 1
-  case result of
-    Sat -> return True
-    _   -> return False

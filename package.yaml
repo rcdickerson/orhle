@@ -22,7 +22,7 @@ dependencies:
 - containers
 - mtl
 - parsec
-- z3
+- z3 >= 408.0 && < 409
 
 library:
   source-dirs: src

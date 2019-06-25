@@ -12,13 +12,14 @@ module Abduction
     , singletonIMap
     ) where
 
-import Control.Monad
 import Conditions
 import Data.Foldable
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Imp
+import Simplify
 import Z3.Monad
+import Z3Util
 
 type Abduction = ([Var], [AST], [AST])
 
@@ -98,7 +99,7 @@ imapConjoin imap = mkAnd $ map snd $ Map.toList imap
 abduce :: Abduction -> Z3 InterpResult
 abduce (vars, pres, posts) = do
   preConds  <- mkAnd pres
-  consistencyCheck <- satisfiable preConds
+  consistencyCheck <- checkSat preConds
   if not consistencyCheck
     then return IRUnsat
     else do
@@ -156,7 +157,7 @@ noAbduction :: AST -> AST -> Z3 InterpResult
 noAbduction conds post = do
   imp <- mkImplies conds post
   vars <- astVars imp
-  sat <- satisfiable =<< performQe vars imp
+  sat <- checkSat =<< performQe vars imp
   if sat
     then return $ IRSat emptyIMap
     else return IRUnsat
@@ -167,10 +168,12 @@ singleAbduction var conds post = do
   vars  <- astVars imp
   vbar  <- filterVars vars [var]
   qeRes <- performQe vbar imp
-  sat   <- satisfiable qeRes
+  sat   <- checkSat qeRes
   case sat of
     False -> return IRUnsat
-    True  -> return $ IRSat $ Map.insert var qeRes emptyIMap
+    True  -> do
+      qeResSimpl <- simplifyWrt conds qeRes
+      return $ IRSat $ Map.insert var qeResSimpl emptyIMap
 
 multiAbduction :: [Var] -> AST -> AST -> Z3 InterpResult
 multiAbduction vars conds post = do
@@ -216,6 +219,7 @@ initSolution vars conds post = do
 
 performQe :: [Symbol] -> AST -> Z3 AST
 performQe vars formula = do
+  push
   intVars <- mapM mkIntVar vars
   appVars <- mapM toApp intVars
   qf <- mkForallConst [] appVars formula
@@ -225,23 +229,15 @@ performQe vars formula = do
   qeResult <- applyTactic qe goal
   subgoals <- getApplyResultSubgoals qeResult
   formulas <- mapM getGoalFormulas subgoals
-  mkAnd $ concat formulas
-
-satisfiable :: AST -> Z3 Bool
-satisfiable ast = do
-  push
-  assert ast
-  result <- check
   pop 1
-  case result of
-    Sat -> return True
-    _   -> return False
+  mkAnd $ concat formulas
 
 modelOrError :: AST -> Z3 Model
 modelOrError ast = do
   push
   assert ast
   res <- getModel
+  pop 1
   case res of
     (Sat, Just model) -> return model
     _ -> do
