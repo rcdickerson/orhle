@@ -1,5 +1,6 @@
 module Main where
 
+import Imp
 import Lib
 import qualified Data.Map as Map
 import Z3.Monad
@@ -35,10 +36,12 @@ useVerifier1 = do
 
 useVerifier2 :: IO ()
 useVerifier2 = do
+  let progA = rhleProgA rhleTrip
+  let progE = rhleProgE rhleTrip
   putStrLn "------------------------------------------------"
-  putStrLn $ "Universal Program:\n" ++ (show.rhleProgA $ rhleTrip)
+  putStrLn $ "Universal Program:\n" ++ (show progA)
   putStrLn "------------------------------------------------"
-  putStrLn $ "Existential Program:\n" ++ (show.rhleProgE $ rhleTrip)
+  putStrLn $ "Existential Program:\n" ++ (show progE)
   putStrLn "------------------------------------------------"
   (result, trace) <- evalZ3 $ verify2 rhleTrip
   traceStr <- evalZ3 $ ppVTrace trace
@@ -47,10 +50,20 @@ useVerifier2 = do
   case result of
     Valid interp -> do
       putStrLn "VALID iff the following executions are possible:"
-      putInterpMap interp
+      let funNames = assigneeToFuncNames (Seq [progA, progE])
+      putInterpMap $ Map.mapKeys (\v -> Map.findWithDefault v v funNames) interp
     Invalid reason -> do
       putStrLn $ "INVALID: " ++ reason
   putStrLn "------------------------------------------------"
+
+assigneeToFuncNames :: Prog -> Map.Map Var String
+assigneeToFuncNames prog =
+  case prog of
+    Seq s      -> Map.unions $ map assigneeToFuncNames s
+    If _ s1 s2 -> Map.unions $ map assigneeToFuncNames [s1, s2]
+    Call v (UFunc name _ _ _)
+               -> Map.singleton v name
+    _          -> Map.empty
 
 printZ3 :: Cond -> IO String
 printZ3 cond = evalZ3 $ astToString =<< condToZ3 cond
