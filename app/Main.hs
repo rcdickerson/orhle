@@ -1,7 +1,6 @@
 module Main where
 
-import Imp
-import Lib
+import RHLEVerifier
 import qualified Data.Map as Map
 import Z3.Monad
 
