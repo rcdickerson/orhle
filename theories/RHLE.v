@@ -50,7 +50,7 @@ where "|- {{ P }}  c1 ~# c2  {[ Q ]}" := (rhle_proof P c1 c2 Q) : hoare_spec_sco
 
 Hint Resolve bassn_eval_true bassn_eval_false : hoare.
 Hint Constructors rhle_proof : hoare.
-Hint Unfold rhle_triple.
+Hint Unfold rhle_triple hoare_triple ehoare_triple.
 Hint Constructors ceval.
 
 Ltac inv_ceval :=
@@ -85,10 +85,21 @@ Proof.
     edestruct IHpf as [st2' [? ?]]; eauto.
 Qed.
 
+Definition rwp c (Q : Assertion2) : Assertion2 :=
+  fun st1 st2 => exists st2' (exe : st2 =[ c ]=> st2'), Q st1 st2'.
+
 Theorem rhle_proof_complete : forall P c1 c2 Q,
     {{P}} c1 ~# c2 {[Q]} -> |- {{P}} c1 ~# c2 {[Q]}.
 Proof.
-Admitted.
+  unfold rhle_triple.
+  intros P c1 c2 Q H.
+  apply RHE_SkipIntroL. apply RHE_StepL with (rwp c2 Q).
+  intros st2. apply hoare_proof_complete.
+  firstorder.
+  apply RHE_SkipIntroR. eapply RHE_StepR. 2: constructor.
+  intros st1. apply ehoare_proof_complete.
+  firstorder.
+Qed.
 
 End RHLE.
 
