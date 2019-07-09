@@ -138,3 +138,11 @@ Proof.
 Qed.
 
 End Hoare.
+
+Notation "{{ P }}  c  {{ Q }}" :=
+  (hoare_triple P c Q) (at level 90, c at next level)
+  : hoare_spec_scope.
+
+Notation "|- {{ P }}  c  {{ Q }}" :=
+  (hoare_proof P c Q) (at level 90, c at next level)
+  : hoare_spec_scope.

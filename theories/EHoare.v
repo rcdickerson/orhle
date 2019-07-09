@@ -207,3 +207,11 @@ Proof.
 Qed.
 
 End EHoare.
+
+Notation "{[ P ]}  c  {[ Q ]}#" :=
+  (ehoare_triple P c Q) (at level 90, c at next level)
+  : hoare_spec_scope.
+
+Notation "|- {[ P ]}  c  {[ Q ]}#" :=
+  (ehoare_proof P c Q) (at level 90, c at next level)
+  : hoare_spec_scope.
