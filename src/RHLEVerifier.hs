@@ -1,4 +1,4 @@
-module Lib
+module RHLEVerifier
     ( abduce
     , Abduction
     , AExp(..)
@@ -18,10 +18,12 @@ module Lib
     , parseImp
     , parseImpOrError
     , ppVTrace
+    , Prog
     , putInterpMap
     , RHLETrip(..)
     , Stmt(..)
     , UFunc(..)
+    , Var
     , verify1
     , verify2
     , VResult(..)
