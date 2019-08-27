@@ -1,35 +1,46 @@
--- A simple Imp parser (with specified uninterpreted functions).
+-- A simple Imp parser with specified uninterpreted functions.
 -- Based on https://wiki.haskell.org/Parsing_a_simple_imperative_language
 
 module ImpParser
-    ( impParser
+    ( parseImp
+    , parseImpOrError
     ) where
 
 import Control.Monad
+import Control.Monad.Trans
 import Imp
-import Text.ParserCombinators.Parsec
-import Text.ParserCombinators.Parsec.Expr
-import Text.ParserCombinators.Parsec.Language
-import qualified Text.ParserCombinators.Parsec.Token as Token
+import Text.Parsec
+import Text.Parsec.Expr
+import Text.Parsec.Language
+import qualified Text.Parsec.Token as Token
 
-languageDef = emptyDef { Token.identStart      = letter
-                       , Token.identLetter     = alphaNum
-                       , Token.reservedNames   = [ "if", "then", "else"
-                                                 , "call", "pre", "post"
-                                                 , "skip"
-                                                 , "true"
-                                                 , "false"
-                                                 , "not"
-                                                 , "and"
-                                                 , "or"
-                                                 ]
-                       , Token.reservedOpNames = [ "+", "-", "*"
-                                                 , ":="
-                                                 , "=="
-                                                 , "%"
-                                                 , "not", "and", "or"
-                                                 ]
-                       }
+languageDef :: LanguageDef ()
+languageDef = Token.LanguageDef
+  { Token.caseSensitive   = True
+  , Token.commentStart    = "/*"
+  , Token.commentEnd      = "*/"
+  , Token.commentLine     = "//"
+  , Token.identStart      = letter
+  , Token.identLetter     = alphaNum
+  , Token.nestedComments  = True
+  , Token.opStart         = Token.opLetter languageDef
+  , Token.opLetter        = oneOf ":!#$%&*+./<=>?@\\^|-~"
+  , Token.reservedNames   = [ "if", "then", "else"
+                            , "call", "pre", "post"
+                            , "skip"
+                            , "true"
+                            , "false"
+                            , "not"
+                            , "and"
+                            , "or"
+                            ]
+  , Token.reservedOpNames = [ "+", "-", "*"
+                            , ":="
+                            , "=="
+                            , "%"
+                            , "not", "and", "or"
+                            ]
+  }
 
 lexer = Token.makeTokenParser languageDef
 
@@ -42,24 +53,37 @@ comma      = Token.comma      lexer
 semi       = Token.semi       lexer
 whiteSpace = Token.whiteSpace lexer
 
-impParser :: Parser Stmt
+type ImpParser a = Parsec String () a
+
+parseImp :: String -> Either ParseError Prog
+parseImp str = runParser impParser () "" str
+
+parseImpOrError :: String -> Prog
+parseImpOrError str =
+  case parseImp str of
+    Left  err  -> error $ "Parse error: " ++ (show err)
+    Right stmt -> stmt
+
+impParser :: ImpParser Prog
 impParser = whiteSpace >> statement
 
-statement :: Parser Stmt
+statement :: ImpParser Stmt
 statement = parens statement <|> sequenceOfStmt
 
-sequenceOfStmt :: Parser Stmt
+sequenceOfStmt :: ImpParser Stmt
 sequenceOfStmt = do
   list <- sepBy1 statement' semi
-  return $ if length list == 1 then head list else Seq list
+  case length list of
+    1 -> return $ head list
+    _ -> return $ Seq list
 
-statement' :: Parser Stmt
+statement' :: ImpParser Stmt
 statement' =   ifStmt
            <|> skipStmt
            <|> assignStmt
            <|> funcStmt
 
-ifStmt :: Parser Stmt
+ifStmt :: ImpParser Stmt
 ifStmt = do
   reserved "if"
   cond  <- bExpression
@@ -69,14 +93,14 @@ ifStmt = do
   stmt2 <- statement
   return $ If cond stmt1 stmt2
 
-assignStmt :: Parser Stmt
+assignStmt :: ImpParser Stmt
 assignStmt = do
   var  <- identifier
   reservedOp ":="
   expr <- aExpression
   return $ var := expr
 
-funcStmt :: Parser Stmt
+funcStmt :: ImpParser Stmt
 funcStmt = do
   reserved "call"
   assignee <- identifier
@@ -84,18 +108,20 @@ funcStmt = do
   funcName <- identifier
   params <- parens $ sepBy identifier comma
   reserved "pre"
-  pre <- bExpression
+  pre <- between (char '{') (char '}') (many $ noneOf "{}")
+  whiteSpace
   reserved "post"
-  post <- bExpression
+  post <- between (char '{') (char '}') (many $ noneOf "{}")
+  whiteSpace
   return $ Call assignee (UFunc funcName params pre post)
 
-skipStmt :: Parser Stmt
+skipStmt :: ImpParser Stmt
 skipStmt = reserved "skip" >> return Skip
 
-aExpression :: Parser AExp
+aExpression :: ImpParser AExp
 aExpression = buildExpressionParser aOperators aTerm
 
-bExpression :: Parser BExp
+bExpression :: ImpParser BExp
 bExpression = buildExpressionParser bOperators bTerm
 
 aOperators = [ [Infix  (reservedOp "*" >> return (:*: )) AssocLeft,

@@ -1,31 +1,30 @@
 module Verifier2Tests where
 
-import Lib
+import RHLEVerifier
 import Test.HUnit
 import Z3.Monad
 
-assertValid :: RHLETrip -> Assertion
-assertValid trip = do
-  (result, tr) <- evalZ3 $ verify2 trip
+assertValid :: String -> Prog -> Prog -> String -> Assertion
+assertValid pre progA progE post = do
+  (result, tr) <- evalZ3 $ verify2 =<< mkRHLETrip pre progA progE post
   trace <- evalZ3 $ ppVTrace tr
   case result of
-    Valid   _ -> return ()
-    Invalid r -> assertFailure
+    Right _ -> return ()
+    Left r  -> assertFailure
       $ "Expected VALID but was INVALID: " ++ r ++ "\n" ++ trace
 
-assertInvalid :: RHLETrip -> Assertion
-assertInvalid trip = do
-  (result, tr) <- evalZ3 $ verify2 trip
+assertInvalid :: String -> Prog -> Prog -> String -> Assertion
+assertInvalid pre progA progE post = do
+  (result, tr) <- evalZ3 $ verify2 =<< mkRHLETrip pre progA progE post
   trace <- evalZ3 $ ppVTrace tr
   case result of
-    Invalid _ -> return ()
-    Valid   _ -> assertFailure
+    Left  _ -> return ()
+    Right _ -> assertFailure
       $ "Expected INVALID but was VALID\n" ++ trace
 
 deterministicValid = do
-  assertValid trip
+  assertValid "true" progA progE "(= y1 y2)"
   where
-    pre   = CTrue
     progA = parseImpOrError "\
     \  x1 := 3;              \
     \  if x1 == 3 then       \
@@ -38,13 +37,10 @@ deterministicValid = do
     \    y2 := 300           \
     \  else                  \
     \    y2 := 3             "
-    post = (CEq (V "y1") (V "y2"))
-    trip = RHLETrip pre progA progE post
 
 deterministicInvalid = do
-  assertInvalid trip
+  assertInvalid "true" progA progE "(= y1 y2)"
   where
-    pre   = CTrue
     progA = parseImpOrError "\
     \  x1 := 3;              \
     \  if x1 == 3 then       \
@@ -57,13 +53,10 @@ deterministicInvalid = do
     \    y2 := 300           \
     \  else                  \
     \    y2 := 3             "
-    post = (CEq (V "y1") (V "y2"))
-    trip = RHLETrip pre progA progE post
 
 simpleValid = do
-  assertValid trip
+  assertValid "true" progA progE "(= y1 y2)"
   where
-    pre   = CTrue
     progA = parseImpOrError "\
     \  x1 := 3;              \
     \  if x1 == 3 then       \
@@ -78,13 +71,10 @@ simpleValid = do
     \    y2 := 3             \
     \  else                  \
     \    y2 := 300           "
-    post = (CEq (V "y1") (V "y2"))
-    trip = RHLETrip pre progA progE post
 
 simpleValid2 = do
-  assertValid trip
+  assertValid "true" progA progE "(= y1 y2)"
   where
-    pre   = CTrue
     progA = parseImpOrError "\
     \  x1 := 3;              \
     \  if x1 == 4 then       \
@@ -99,13 +89,10 @@ simpleValid2 = do
     \    y2 := 3             \
     \  else                  \
     \    y2 := 300           "
-    post = (CEq (V "y1") (V "y2"))
-    trip = RHLETrip pre progA progE post
 
 simpleInvalid = do
-  assertInvalid trip
+  assertInvalid "true" progA progE "(= y1 y2)"
   where
-    pre   = CTrue
     progA = parseImpOrError "\
     \  x1 := 3;              \
     \  if x1 == 3 then       \
@@ -120,13 +107,10 @@ simpleInvalid = do
     \    y2 := 3             \
     \  else                  \
     \    y2 := 300           "
-    post = (CEq (V "y1") (V "y2"))
-    trip = RHLETrip pre progA progE post
 
 simpleInvalid2 = do
-  assertInvalid trip
+  assertInvalid "true" progA progE "(= y1 y2)"
   where
-    pre   = CTrue
     progA = parseImpOrError "\
     \  x1 := 3;              \
     \  if x1 == 3 then       \
@@ -141,8 +125,6 @@ simpleInvalid2 = do
     \    y2 := 3             \
     \  else                  \
     \    y2 := 300           "
-    post = (CEq (V "y1") (V "y2"))
-    trip = RHLETrip pre progA progE post
 
 verifier2Tests :: Test
 verifier2Tests = TestList

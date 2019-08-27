@@ -1,110 +1,42 @@
 module Abduction
-    ( abduce
-    , Abduction
-    , emptyIMap
-    , imapInit
+    ( AbductionProblem
+    , AbductionResult
+    , abduce
     , imapStrengthen
-    , imapCondUnion
-    , InterpMap
-    , InterpResult(..)
-    , ppInterpMap
-    , putInterpMap
-    , singletonIMap
     ) where
 
-import Conditions
+import Control.Monad (foldM)
 import Data.Foldable
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Imp
+import InterpMap
 import Simplify
 import Z3.Monad
 import Z3Util
 
-type Abduction = ([Var], [AST], [AST])
+type AbductionProblem = ([Var], [AST], [AST])
+type AbductionResult  = Either String InterpMap
 
-type InterpMap = Map.Map Var AST
-
-data InterpResult = IRSat InterpMap
-                  | IRUnsat
-                  deriving(Show)
-
--------------------------
--- Interpretation Maps --
-------------------------
-
-emptyIMap = Map.empty
-singletonIMap var duc = Map.singleton var duc
-
-putInterpMap :: InterpMap -> IO ()
-putInterpMap imap = mapM_ putInterpLine (Map.toList imap)
-  where putInterpLine = \(var, ast) -> do
-          interp <- evalZ3 $ astToString =<< simplify ast
-          putStrLn $ "  " ++ var ++ ": " ++ interp
-
-ppInterpMap :: InterpMap -> Z3 [String]
-ppInterpMap imap = mapM line (Map.toList imap)
-  where line = \(var, ast) -> do
-          interp <- astToString =<< simplify ast
-          return $ var ++ ": " ++ interp
-
-imapInit :: Prog -> Z3 InterpMap
-imapInit prog =
-  case prog of
-    Skip          -> return $ emptyIMap
-    Seq []        -> imapInit Skip
-    Seq (s:ss)    -> do
-                     first <- imapInit s
-                     rest  <- imapInit $ Seq ss
-                     return $ Map.union first rest
-    (:=) _ _      -> return $ emptyIMap
-    If _ s1 s2    -> do
-                     first  <- imapInit s1
-                     second <- imapInit s2
-                     return $ Map.union first second
-    Call var f    -> do
-                     initPostCond <- condToZ3.fPostCond $ f
-                     -- TODO: Need to make the name unique for callsite...
-                     callsiteFun <- mkFreshFuncDecl (fName f) [] =<< mkIntSort
-                     return $ Map.insert var initPostCond emptyIMap
-
-imapCondUnion :: (Cond, InterpMap) -> (Cond, InterpMap) -> Z3 InterpMap
-imapCondUnion (cond1, imap1) (cond2, imap2) =  Map.traverseWithKey (condUnionWith imap1) imap2
-    where
-      condUnionWith imap abd interp1 = do
-        impl1 <- (flip mkImplies) interp1 =<< condToZ3 cond1
-        case (Map.lookup abd imap) of
-          Nothing      -> return impl1
-          Just interp2 -> do
-            impl2 <- (flip mkImplies) interp2 =<< condToZ3 cond2
-            mkAnd [impl1, impl2]
-
-imapStrengthen :: Cond -> InterpMap -> Cond -> Z3 InterpResult
+imapStrengthen :: AST -> InterpMap -> AST -> Z3 AbductionResult
 imapStrengthen pre imap post = do
-  let vars = Map.keys imap
-  freshVars <- mapM (\v -> mkFreshIntVar v >>= astToString >>= \f -> return (v, f)) vars
-  let subFresh = \pre' (v, f) -> csubst pre' v (V f)
-  preZ3  <- condToZ3 $ foldl subFresh pre freshVars
-  postZ3 <- condToZ3 post
-  abduce (vars, [preZ3], postZ3:(Map.elems imap))
+  let vars      = Map.keys imap
+  let freshen v = mkFreshIntVar v >>= astToString >>= \f -> return (v, f)
+  let subFresh  = \pre' (v, f) -> subVar pre' v f
+  freshVars     <- mapM freshen vars
+  preZ3         <- foldM subFresh pre freshVars
+  abduce (vars, [preZ3], post:(Map.elems imap))
 
-
----------------
--- Abduction --
----------------
-
-abduce :: Abduction -> Z3 InterpResult
+abduce :: AbductionProblem -> Z3 AbductionResult
 abduce (vars, pres, posts) = do
-  preConds  <- mkAnd pres
-  consistencyCheck <- checkSat preConds
+  consistencyCheck <- checkSat =<< mkAnd pres
   if not consistencyCheck
-    then return IRUnsat
+    then return.Left $ "Preconditions are not consistent."
     else do
-      postConds <- mkAnd posts
       case vars of
-        []     -> noAbduction               preConds postConds
-        var:[] -> singleAbduction var [var] preConds postConds
-        _      -> multiAbduction  vars      preConds postConds
+        []     -> noAbduction               pres posts
+        var:[] -> singleAbduction var [var] pres posts
+        _      -> multiAbduction  vars      pres posts
 
 astVars :: AST -> Z3 [Symbol]
 astVars ast = do
@@ -150,93 +82,106 @@ filterVars symbols vars = do
   let filteredStrs = filter notInVars symbolStrs
   mapM mkStringSymbol filteredStrs
 
-noAbduction :: AST -> AST -> Z3 InterpResult
-noAbduction conds post = do
-  imp <- mkImplies conds post
-  vars <- astVars imp
-  sat <- checkSat =<< performQe vars imp
+noAbduction :: [AST] -> [AST] -> Z3 AbductionResult
+noAbduction conds posts = do
+  condAST <- mkAnd conds
+  postAST <- mkAnd posts
+  imp     <- mkImplies condAST postAST
+  vars    <- astVars imp
+  sat     <- checkSat =<< performQe vars imp
   if sat
-    then return $ IRSat emptyIMap
-    else return IRUnsat
+    then return.Right $ emptyIMap
+    else return.Left  $ "Preconditions do not imply postconditions."
 
-singleAbduction :: String -> [Var] -> AST -> AST -> Z3 InterpResult
-singleAbduction name vars conds post = do
-  imp     <- mkImplies conds post
+singleAbduction :: String -> [Var] -> [AST] -> [AST]
+                -> Z3 AbductionResult
+singleAbduction name vars conds posts = do
+  condAST <- mkAnd conds
+  postAST <- mkAnd posts
+  imp     <- mkImplies condAST postAST
   impVars <- astVars imp
   vbar    <- filterVars impVars vars
   qeRes   <- performQe vbar imp
   sat     <- checkSat qeRes
   case sat of
-    False -> return IRUnsat
+    False -> return.Left $ "No satisfying abduction found."
     True  -> do
-      qeResSimpl <- simplifyWrt conds qeRes
-      return $ IRSat $ Map.insert name qeResSimpl emptyIMap
+      qeResSimpl <- simplifyWrt condAST qeRes
+      return.Right $ Map.insert name qeResSimpl emptyIMap
 
-multiAbduction :: [Var] -> AST -> AST -> Z3 InterpResult
-multiAbduction vars conds post = do
+multiAbduction :: [Var] -> [AST] -> [AST] -> Z3 AbductionResult
+multiAbduction vars conds posts = do
   let combinedDuc = "_combined"
-  combinedResult <- singleAbduction combinedDuc vars conds post
+  combinedResult <- singleAbduction combinedDuc vars conds posts
   case combinedResult of
-    IRUnsat    -> return IRUnsat
-    IRSat imap -> return.IRSat =<< cartDecomp vars conds (imap Map.! combinedDuc)
+    Left  err  -> return.Left $ err
+    Right imap -> cartDecomp vars conds (imap Map.! combinedDuc)
 
-cartDecomp :: [Var] -> AST -> AST -> Z3 InterpMap
+cartDecomp :: [Var] -> [AST] -> AST -> Z3 AbductionResult
 cartDecomp vars conds combinedResult = do
   initMap <- initSolution vars conds combinedResult
   foldlM (replaceWithDecomp combinedResult) initMap vars
   where
-    replaceWithDecomp :: AST -> InterpMap -> Var -> Z3 InterpMap
-    replaceWithDecomp post imap var = do
-      dec <- (decompose post) var imap
-      return $ Map.union dec imap
-    decompose :: AST -> Var -> InterpMap -> Z3 InterpMap
+    replaceWithDecomp :: AST -> AbductionResult -> Var -> Z3 AbductionResult
+    replaceWithDecomp _    (Left err)   _   = return.Left $ err
+    replaceWithDecomp post (Right imap) var = do
+      decResult <- (decompose post) var imap
+      case decResult of
+        Left  err -> return.Left  $ err
+        Right dec -> return.Right $ Map.union dec imap
+    decompose :: AST -> Var -> InterpMap -> Z3 AbductionResult
     decompose post var imap = do
       let complement = Map.withoutKeys imap $ Set.singleton var
       ires <- abduce ([var], map snd $ Map.toList complement, [post])
       case ires of
-        IRUnsat     -> error $ "Unable to decompose " ++ (show combinedResult)
-        IRSat imap' -> return imap'
+        Left  err   -> return.Left $ "Unable to decompose " ++ (show combinedResult)
+                       ++ ": " ++ err
+        Right imap' -> return.Right $ imap'
 
-initSolution :: [Var] -> AST -> AST -> Z3 InterpMap
-initSolution vars conds post = do
-  model <- modelOrError =<< mkAnd [conds, post]
-  foldlM (getInterpOrError model) (Map.empty) vars
+initSolution :: [Var] -> [AST] -> AST -> Z3 AbductionResult
+initSolution vars conds combinedResult = do
+  condAST  <- mkAnd conds
+  modelRes <- modelAST =<< mkAnd [condAST, combinedResult]
+  case modelRes of
+    Left  err   -> return.Left $ err
+    Right model -> foldlM (getInterp model) (Right Map.empty) vars
   where
-    getInterpOrError :: Model -> InterpMap -> Var -> Z3 InterpMap
-    getInterpOrError model imap var = do
+    getInterp :: Model -> AbductionResult -> Var -> Z3 AbductionResult
+    getInterp _     (Left  err)  _   = return.Left $ err
+    getInterp model (Right imap) var = do
       varSymb <- mkStringSymbol $ var
       varDecl <- mkFuncDecl varSymb [] =<< mkIntSort
       interp  <- getConstInterp model varDecl
       case interp of
-        Nothing -> error $ "Unable to model value for " ++ var
+        Nothing -> return.Left $ "Unable to model value for " ++ var
         Just v  -> do
           eqv <- mkEq v =<< aexpToZ3 (V $ var)
-          return $ Map.insert var eqv imap
+          return.Right $ Map.insert var eqv imap
 
 
 performQe :: [Symbol] -> AST -> Z3 AST
 performQe vars formula = do
   push
-  intVars <- mapM mkIntVar vars
-  appVars <- mapM toApp intVars
-  qf <- mkForallConst [] appVars formula
-  goal <- mkGoal False False False
+  intVars  <- mapM mkIntVar vars
+  appVars  <- mapM toApp intVars
+  qf       <- mkForallConst [] appVars formula
+  goal     <- mkGoal False False False
   goalAssert goal qf
-  qe <- mkTactic "qe"
+  qe       <- mkTactic "qe"
   qeResult <- applyTactic qe goal
   subgoals <- getApplyResultSubgoals qeResult
   formulas <- mapM getGoalFormulas subgoals
   pop 1
   mkAnd $ concat formulas
 
-modelOrError :: AST -> Z3 Model
-modelOrError ast = do
+modelAST :: AST -> Z3 (Either String Model)
+modelAST ast = do
   push
   assert ast
   res <- getModel
   pop 1
   case res of
-    (Sat, Just model) -> return model
+    (Sat, Just model) -> return.Right $ model
     _ -> do
       astStr <- astToString ast
-      error $ "Unable to model " ++ astStr
+      return.Left $ "Unable to model " ++ astStr

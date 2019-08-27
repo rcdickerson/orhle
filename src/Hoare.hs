@@ -3,38 +3,65 @@ module Hoare
     , HLTrip(..)
     , hlVC
     , hlWP
+    , mkHLTrip
     ) where
 
-import Conditions
 import Imp
+import Z3.Monad
+import Z3Util
 
 data HLTrip = HLTrip
-  { hPre :: Cond
-  , hProg :: Prog
-  , hPost :: Cond
+  { hlPre  :: AST
+  , hlProg :: Prog
+  , hlPost :: AST
   } deriving (Show)
 
-hlWP :: Stmt -> Cond -> Cond
+mkHLTrip :: String -> Prog -> String -> Z3 HLTrip
+mkHLTrip pre prog post = do
+  preAST  <- parseSMT pre
+  postAST <- parseSMT post
+  return $ HLTrip preAST prog postAST
+
+hlWP :: Stmt -> AST -> Z3 AST
 hlWP stmt post =
   case stmt of
-    Skip        -> post
-    var := aexp -> csubst post var aexp
-    Seq []      -> post
-    Seq (s:ss)  -> hlWP s (hlWP (Seq ss) post)
-    If c s1 s2  -> CAnd (CImp (bexpToCond c) (hlWP s1 post))
-                        (CImp (CNot $ bexpToCond c) (hlWP s2 post))
-    Call _ f    -> CAnd (fPreCond f) (CImp (fPostCond f) post)
+    Skip        -> return post
+    var := aexp -> subAexp post (V var) aexp
+    Seq []      -> return post
+    Seq (s:ss)  -> do
+      wpRest <- hlWP (Seq ss) post
+      hlWP s wpRest
+    If b s1 s2  -> do
+      c    <- bexpToZ3 b
+      notC <- mkNot c
+      imp1 <- mkImplies c    =<< hlWP s1 post
+      imp2 <- mkImplies notC =<< hlWP s2 post
+      mkAnd [imp1, imp2]
+    Call _ f    -> do
+      fPre    <- fPreCond f
+      fPost   <- fPostCond f
+      postImp <- mkImplies fPost post
+      mkAnd [fPre, postImp]
 
-hlSP :: Cond -> Stmt -> Cond
-hlSP pre stmt =
+hlSP :: Stmt -> AST -> Z3 AST
+hlSP stmt pre =
   case stmt of
-    Skip        -> pre
-    var := aexp -> CAssignPost var aexp pre
-    Seq []      -> pre
-    Seq (s:ss)  -> hlSP (hlSP pre s) (Seq ss)
-    If c s1 s2  -> CAnd (CImp (bexpToCond c) (hlSP pre s1))
-                        (CImp (CNot $ bexpToCond c) (hlSP pre s2))
-    Call _ f    -> CAnd (CImp pre (fPreCond f)) (fPostCond f)
+    Skip        -> return pre
+    var := aexp -> assignPost var aexp pre
+    Seq []      -> return pre
+    Seq (s:ss)  -> hlSP (Seq ss) =<< hlSP s pre
+    If b s1 s2  -> do
+      c    <- bexpToZ3 b
+      notC <- mkNot c
+      imp1 <- mkImplies c    =<< hlSP s1 pre
+      imp2 <- mkImplies notC =<< hlSP s2 pre
+      mkAnd [imp1, imp2]
+    Call _ f    -> do
+      fPre    <- fPreCond f
+      fPost   <- fPostCond f
+      preImp   <- mkImplies pre fPre
+      mkAnd [preImp, fPost]
 
-hlVC :: HLTrip -> Cond
-hlVC (HLTrip pre prog post) = CImp pre (hlWP prog post)
+hlVC :: HLTrip -> Z3 AST
+hlVC (HLTrip pre prog post) = do
+  mkImplies pre =<< hlWP prog post

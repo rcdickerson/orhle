@@ -1,11 +1,12 @@
 module Z3Util
-  ( checkCSat
-  , checkSat
-  , checkCValid
+  ( checkSat
   , checkValid
+  , distList
+  , parseSMT
+  , smtString
   ) where
 
-import Conditions
+import Control.Monad (liftM2)
 import Z3.Monad
 
 checkValid :: AST -> Z3 Bool
@@ -28,8 +29,13 @@ checkSat ast = do
     Sat -> return True
     _   -> return False
 
-checkCValid :: Cond -> Z3 Bool
-checkCValid cond = condToZ3 cond >>= checkSat
+parseSMT :: String -> Z3 AST
+parseSMT str = parseSMTLib2String str [] [] [] []
 
-checkCSat :: Cond -> Z3 Bool
-checkCSat cond = condToZ3 cond >>= checkSat
+smtString :: AST -> Z3 String
+smtString = astToString
+
+-- Useful for turning [Z3 Foo] into Z3 [Foo].
+distList :: Monad m => [m a] -> m [a]
+distList [] = return []
+distList (x:xs) = (liftM2 (:)) x (distList xs)

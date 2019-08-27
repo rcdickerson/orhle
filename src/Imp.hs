@@ -1,12 +1,19 @@
 module Imp
     ( AExp(..)
     , aexpToZ3
+    , assignPost
     , asubst
     , avars
     , BExp(..)
+    , bexpToZ3
     , bsubst
     , bvars
+    , fPostCond
+    , fPreCond
     , fsubst
+    , funSP
+    , subAexp
+    , subVar
     , Prog
     , Stmt(..)
     , UFunc(..)
@@ -14,6 +21,7 @@ module Imp
     ) where
 
 import Z3.Monad
+import Z3Util
 
 infix 1 :=
 infix 2 :=:
@@ -48,10 +56,10 @@ asubst aexp var repl =
 avars :: AExp -> [Var]
 avars aexp =
   case aexp of
-    I _ -> []
-    V v -> [v]
-    lhs :+: rhs -> (avars lhs) ++ (avars rhs)
-    lhs :-: rhs -> (avars lhs) ++ (avars rhs)
+    I _          -> []
+    V v          -> [v]
+    lhs :+: rhs  -> (avars lhs) ++ (avars rhs)
+    lhs :-: rhs  -> (avars lhs) ++ (avars rhs)
     lhs :*: rhs  -> (avars lhs) ++ (avars rhs)
     AMod lhs rhs -> (avars lhs) ++ (avars rhs)
 
@@ -65,8 +73,27 @@ aexpToZ3 aexp =
     aexp1 :*: aexp2 -> mkMul =<< mapM aexpToZ3 [aexp1, aexp2]
     AMod aexp1 aexp2 -> do
       dividend <- aexpToZ3 aexp1
-      divisor <- aexpToZ3 aexp2
+      divisor  <- aexpToZ3 aexp2
       mkMod dividend divisor
+
+subVar :: AST -> Var -> Var -> Z3 AST
+subVar ast var repl = do
+  z3Var  <- aexpToZ3 $ V var
+  z3Repl <- aexpToZ3 $ V repl
+  substituteVars ast [z3Var, z3Repl]
+
+subAexp :: AST -> AExp -> AExp -> Z3 AST
+subAexp ast lhs rhs = do
+  z3Lhs <- aexpToZ3 $ lhs
+  z3Rhs <- aexpToZ3 $ rhs
+  substituteVars ast [z3Lhs, z3Rhs]
+
+assignPost :: Var -> AExp -> AST -> Z3 AST
+assignPost var aexp post = do
+  z3Var   <- aexpToZ3 $ V var
+  z3Aexp  <- aexpToZ3 aexp
+  eq      <- mkEq z3Var z3Aexp
+  mkAnd [eq, post]
 
 
 -------------------------
@@ -81,15 +108,6 @@ data BExp
   | BAnd BExp BExp
   | BOr BExp BExp
   deriving (Eq, Ord, Show)
-
-impl :: BExp -> BExp -> BExp
-impl bexp1 bexp2 = bsimpl $ BOr (BNot bexp1) bexp2
-
-bsimpl :: BExp -> BExp
-bsimpl (BNot (BNot bexp)) = bexp
-bsimpl (BNot bexp) = BNot (bsimpl bexp)
-bsimpl (BAnd bexp1 bexp2) = BAnd (bsimpl bexp1) (bsimpl bexp2)
-bsimpl bexp = bexp
 
 bsubst :: BExp -> Var -> AExp -> BExp
 bsubst bexp var aexp =
@@ -111,6 +129,19 @@ bvars bexp =
     BAnd b1 b2 -> (bvars b1) ++ (bvars b2)
     BOr b1 b2 -> (bvars b1) ++ (bvars b2)
 
+bexpToZ3 :: BExp -> Z3 AST
+bexpToZ3 bexp =
+  case bexp of
+    BTrue -> mkTrue
+    BFalse -> mkFalse
+    lhs :=: rhs -> do
+      lhsAST <- aexpToZ3 lhs
+      rhsAST <- aexpToZ3 rhs
+      mkEq lhsAST rhsAST
+    BNot b -> mkNot =<< bexpToZ3 b
+    BAnd b1 b2 -> mkAnd =<< mapM bexpToZ3 [b1, b2]
+    BOr  b1 b2 -> mkOr  =<< mapM bexpToZ3 [b1, b2]
+
 
 -----------------------------
 -- Uninterpreted Functions --
@@ -119,17 +150,29 @@ bvars bexp =
 data UFunc = UFunc
   { fName     :: String
   , fParams   :: [Var]
-  , fPreBexp  :: BExp
-  , fPostBexp :: BExp
+  , fPreSMT  :: String
+  , fPostSMT :: String
   } deriving (Eq, Ord, Show)
 
-fsubst :: UFunc -> Var -> Var -> UFunc
-fsubst (UFunc name params pre post) var repl =
-  UFunc name params' pre' post'
+fsubst :: UFunc -> Var -> Var -> Z3 UFunc
+fsubst f@(UFunc name params _ _) var repl = do
+  pre'  <- smtString =<< subAST =<< fPreCond f
+  post' <- smtString =<< subAST =<< fPostCond f
+  let params' = map (\p -> if p == var then repl else p) params
+  return $ UFunc name params' pre' post'
   where
-    params' = map (\p -> if p == var then repl else p) params
-    pre'    = bsubst pre var (V repl)
-    post'   = bsubst post var (V repl)
+    subAST ast = subVar ast var repl
+
+fPreCond :: UFunc -> Z3 AST
+fPreCond = parseSMT.fPreSMT
+
+fPostCond :: UFunc -> Z3 AST
+fPostCond = parseSMT.fPostSMT
+
+funSP :: UFunc -> AST -> Z3 AST
+funSP f pre = do
+  post <- fPostCond f
+  mkAnd [pre, post]
 
 
 ---------------------------

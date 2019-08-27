@@ -4,31 +4,43 @@ module Verifier1
     ) where
 
 import Abduction
-import Conditions
 import Imp
 import RHLE
 import Z3.Monad
 
-verify1 :: RHLETrip -> Z3 InterpResult
+verify1 :: RHLETrip -> Z3 AbductionResult
 verify1 (RHLETrip pre progA progE post) = do
-  let (cA, aA) = encodeImp progA
-  let (cE, aE) = encodeImp progE
-  let fPosts = conjoin $ map (fPostCond.snd) (aA ++ aE)
-  preConds  <- mapM condToZ3 [pre, cA, cE]
-  postConds <- mapM condToZ3 [post, fPosts]
-  abduce (fst.unzip $ aA ++ aE, preConds, postConds)
+  (cA, aA)  <- encodeImp progA
+  (cE, aE)  <- encodeImp progE
+  fPosts <- mapM (fPostCond.snd) (aA ++ aE)
+  abduce (fst.unzip $ aA ++ aE, [pre, cA, cE], post:fPosts)
 
-encodeImp :: Stmt -> (Cond, [(Var, UFunc)])
+encodeImp :: Stmt -> Z3 (AST, [(Var, UFunc)])
 encodeImp stmt =
   case stmt of
-    Skip       -> (CTrue, [])
+    Skip -> do
+      t <- mkTrue
+      return $ (t, [])
     Seq []     -> encodeImp Skip
-    Seq (s:ss) -> (CAnd c1 c2, a1 ++ a2)
-                  where (c1, a1) = encodeImp(s)
-                        (c2, a2) = encodeImp(Seq ss)
-    lhs := rhs -> (CEq (V lhs) rhs, [])
-    If b s1 s2 -> (CAnd (CImp c c1) (CImp (CNot c) c2), a1 ++ a2)
-                  where (c1, a1) = encodeImp(s1)
-                        (c2, a2) = encodeImp(s2)
-                        c = bexpToCond b
-    Call var f -> (CTrue, [(var, f)])
+    Seq (s:ss) -> do
+      (c1, a1) <- encodeImp s
+      (c2, a2) <- encodeImp (Seq ss)
+      conj     <- mkAnd [c1, c2]
+      return (conj, a1 ++ a2)
+    lhs := rhs -> do
+      lhsAST <- aexpToZ3 (V lhs)
+      rhsAST <- aexpToZ3 rhs
+      eq <- mkEq lhsAST rhsAST
+      return (eq, [])
+    If b s1 s2 -> do
+      c        <- bexpToZ3 b
+      notC     <- mkNot c
+      (c1, a1) <- encodeImp s1
+      (c2, a2) <- encodeImp s2
+      imp1     <- mkImplies c c1
+      imp2     <- mkImplies notC c2
+      conj     <- mkAnd [imp1, imp2]
+      return (conj, a1 ++ a2)
+    Call var f -> do
+      t <- mkTrue
+      return (t, [(var, f)])

@@ -1,24 +1,36 @@
 module HoareE
-  ( HLETrip(..)
+  ( mkHLETrip
+  , HLETrip(..)
   , hleSP
   ) where
 
-import Conditions
 import Imp
+import Z3.Monad
+import Z3Util
 
 data HLETrip = HLETrip
-  { hePre :: Cond
-  , heProg :: Prog
-  , hePost :: Cond
+  { hlePre  :: AST
+  , hleProg :: Prog
+  , hlePost :: AST
   } deriving (Show)
 
-hleSP :: Cond -> Stmt -> Cond
-hleSP pre stmt =
+mkHLETrip :: String -> Prog -> String -> Z3 HLETrip
+mkHLETrip pre prog post = do
+  preAST  <- parseSMT pre
+  postAST <- parseSMT post
+  return $ HLETrip preAST prog postAST
+
+hleSP :: Stmt -> AST -> Z3 AST
+hleSP stmt pre = do
   case stmt of
-    Skip        -> pre
-    var := aexp -> CAssignPost var aexp pre
-    Seq []      -> pre
-    Seq (s:ss)  -> hleSP (hleSP pre s) (Seq ss)
-    If c s1 s2  -> CAnd (CImp (bexpToCond c) (hleSP pre s1))
-                        (CImp (CNot $ bexpToCond c) (hleSP pre s2))
-    Call var f  -> CFuncPost var f pre
+    Skip        -> return pre
+    var := aexp -> assignPost var aexp pre
+    Seq []      -> return pre
+    Seq (s:ss)  -> hleSP (Seq ss) =<< hleSP s pre
+    If b s1 s2  -> do
+      c    <- bexpToZ3 b
+      notC <- mkNot c
+      imp1 <- mkImplies c    =<< hleSP s1 pre
+      imp2 <- mkImplies notC =<< hleSP s2 pre
+      mkAnd [imp1, imp2]
+    Call _ f    -> funSP f pre

@@ -1,22 +1,21 @@
 module Verifier1Tests where
 
-import Lib
+import RHLEVerifier
 import Test.HUnit
 import Z3.Monad
 
-assertValid :: InterpResult -> Assertion
-assertValid (IRSat _) = return ()
-assertValid IRUnsat   = assertFailure "Expected VALID but was INVALID"
+assertValid :: AbductionResult -> Assertion
+assertValid (Left _)  = assertFailure "Expected VALID but was INVALID"
+assertValid (Right _) = return ()
 
-assertInvalid :: InterpResult -> Assertion
-assertInvalid (IRSat _) = assertFailure "Expected INVALID but was VALID"
-assertInvalid IRUnsat   = return ()
+assertInvalid :: AbductionResult -> Assertion
+assertInvalid (Left _)  = return ()
+assertInvalid (Right _) = assertFailure "Expected INVALID but was VALID"
 
 deterministicValid = do
-  result <- evalZ3 $ verify1 trip
+  result <- evalZ3 $ verify1 =<< mkRHLETrip "true" progA progE "(= y1 y2)"
   assertValid result
   where
-    pre   = CTrue
     progA = parseImpOrError "\
     \  x1 := 3;              \
     \  if x1 == 3 then       \
@@ -29,14 +28,11 @@ deterministicValid = do
     \    y2 := 300           \
     \  else                  \
     \    y2 := 3             "
-    post = (CEq (V "y1") (V "y2"))
-    trip = RHLETrip pre progA progE post
 
 deterministicInvalid = do
-  result <- evalZ3 $ verify1 trip
+  result <- evalZ3 $ verify1 =<< mkRHLETrip "true" progA progE "(= y1 y2)"
   assertInvalid result
   where
-    pre   = CTrue
     progA = parseImpOrError "\
     \  x1 := 3;              \
     \  if x1 == 3 then       \
@@ -49,14 +45,11 @@ deterministicInvalid = do
     \    y2 := 300           \
     \  else                  \
     \    y2 := 3             "
-    post = (CEq (V "y1") (V "y2"))
-    trip = RHLETrip pre progA progE post
 
 simpleValid = do
-  result <- evalZ3 $ verify1 trip
+  result <- evalZ3 $ verify1 =<< mkRHLETrip "true" progA progE "(= y1 y2)"
   assertValid result
   where
-    pre   = CTrue
     progA = parseImpOrError "\
     \  x1 := 3;              \
     \  if x1 == 3 then       \
@@ -71,14 +64,11 @@ simpleValid = do
     \    y2 := 3             \
     \  else                  \
     \    y2 := 300           "
-    post = (CEq (V "y1") (V "y2"))
-    trip = RHLETrip pre progA progE post
 
 simpleValid2 = do
-  result <- evalZ3 $ verify1 trip
+  result <- evalZ3 $ verify1 =<< mkRHLETrip "true" progA progE "(= y1 y2)"
   assertValid result
   where
-    pre   = CTrue
     progA = parseImpOrError "\
     \  x1 := 3;              \
     \  if x1 == 4 then       \
@@ -93,14 +83,11 @@ simpleValid2 = do
     \    y2 := 3             \
     \  else                  \
     \    y2 := 300           "
-    post = (CEq (V "y1") (V "y2"))
-    trip = RHLETrip pre progA progE post
 
 simpleInvalid = do
-  result <- evalZ3 $ verify1 trip
+  result <- evalZ3 $ verify1 =<< mkRHLETrip "true" progA progE "(= y1 y2)"
   assertInvalid result
   where
-    pre   = CTrue
     progA = parseImpOrError "\
     \  x1 := 3;              \
     \  if x1 == 3 then       \
@@ -115,14 +102,11 @@ simpleInvalid = do
     \    y2 := 3             \
     \  else                  \
     \    y2 := 300           "
-    post = (CEq (V "y1") (V "y2"))
-    trip = RHLETrip pre progA progE post
 
 simpleInvalid2 = do
-  result <- evalZ3 $ verify1 trip
+  result <- evalZ3 $ verify1 =<< mkRHLETrip "true" progA progE "(= y1 y2)"
   assertInvalid result
   where
-    pre   = CTrue
     progA = parseImpOrError "\
     \  x1 := 3;              \
     \  if x1 == 3 then       \
@@ -137,8 +121,6 @@ simpleInvalid2 = do
     \    y2 := 3             \
     \  else                  \
     \    y2 := 300           "
-    post = (CEq (V "y1") (V "y2"))
-    trip = RHLETrip pre progA progE post
 
 
 verifier1Tests :: Test

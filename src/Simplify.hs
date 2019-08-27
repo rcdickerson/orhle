@@ -3,7 +3,6 @@ module Simplify
   )
 where
 
-import Control.Monad
 import Data.List
 import Z3.Monad
 import Z3Util
@@ -48,10 +47,6 @@ mapCompList f lst@(_:xs) = snd $ foldl' f' (([], xs), []) lst
       where result' = (f x left) : result
     f' ((left, right@(_:rs)), result) x = ((x:left, rs), result')
       where result' = (f x $ left ++ right) : result
-
-distList :: Monad m => [m a] -> m [a]
-distList [] = return []
-distList (x:xs) = (liftM2 (:)) x (distList xs)
 
 inspect :: AST -> Z3 (NodeType, [AST])
 inspect ast = do
