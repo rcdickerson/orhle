@@ -5,6 +5,7 @@
 
 Require Import
         Coq.Strings.String
+        Coq.Lists.List
         Coq.Logic.FunctionalExtensionality.
 
 (* ################################################################# *)
@@ -24,6 +25,9 @@ Notation "'_' '!->' v" := (t_empty v)
 
 Notation "x '!->' v ';' m" := (t_update m x v)
                               (at level 100, v at next level, right associativity).
+
+Definition build_total_map {A} (xs : list string) (l : list A) (a : A) : total_map A :=
+  fold_left (fun m xa => t_update m (fst xa) (snd xa)) (combine xs l) (t_empty a).
 
 Lemma t_apply_empty : forall (A : Type) (x : string) (v : A),
     (_ !-> v) x = v.

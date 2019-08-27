@@ -119,11 +119,19 @@ Notation "'TEST' c1 'THEN' c2 'ELSE' c3 'FI'" :=
 (* ----------------------------------------------------------------- *)
 (** *** Operational Semantics *)
 
-Structure funspec : Type :=
+Structure funSpec : Type :=
   { pre : list nat -> Prop; post : nat -> list nat -> Prop }.
 
+Structure funDef : Type :=
+  { funArgs : list string;
+    funBody : com;
+    funRet : aexp
+  }.
+
 Class Env : Type :=
-  { funsig : total_map funspec }.
+  { funSpecs : total_map funSpec;
+    funDefs : partial_map funDef
+  }.
 
 Reserved Notation "st '=[' c ']=>' st'"
                   (at level 40).
@@ -134,10 +142,6 @@ Inductive ceval {env : Env} : com -> state -> state -> Type :=
   | E_Ass  : forall st a1 n x,
       aeval st a1 = n ->
       st =[ x ::= a1 ]=> (x !-> n ; st)
-  | E_Spec : forall st args n x f,
-      (funsig f).(pre) (aseval st args) ->
-      (funsig f).(post) n (aseval st args) ->
-      st =[ x :::= f $ args ]=> (x !-> n ; st)
   | E_Seq : forall c1 c2 st st' st'',
       st  =[ c1 ]=> st'  ->
       st' =[ c2 ]=> st'' ->
@@ -159,4 +163,82 @@ Inductive ceval {env : Env} : com -> state -> state -> Type :=
       st' =[ WHILE b DO c END ]=> st'' ->
       st  =[ WHILE b DO c END ]=> st''
 
+  (* Evaluation of Function Calls *)
+  | E_CallSpec : forall st args n x f,
+      funDefs f = None ->
+      (funSpecs f).(pre) (aseval st args) ->
+      (funSpecs f).(post) n (aseval st args) ->
+      st =[ x :::= f $ args ]=> (x !-> n ; st)
+
+  | E_CallImpl : forall st st' args fd x f,
+      funDefs f = Some fd ->
+      build_total_map (funArgs fd) (aseval st args) 0 =[ funBody fd ]=> st' ->
+      st =[ x :::= f $ args ]=> (x !-> aeval st' (funRet fd); st)
+
   where "st =[ c ]=> st'" := (ceval c st st').
+
+(* A safe program is one that is guaranteed not to crash / get stuck *)
+CoInductive Safe {env : Env} : com -> state -> Type :=
+    | Safe_Skip : forall st,
+      Safe SKIP st
+  | Safe_Ass  : forall st x a,
+      Safe (x ::= a) st
+  | Safe_Seq : forall c1 c2 st,
+      Safe c1 st ->
+      (forall st', st  =[ c1 ]=> st' -> Safe c2 st') ->
+      Safe (c1 ;; c2) st
+  | Safe_IfTrue : forall st b c1 c2,
+      beval st b = true ->
+      Safe c1 st ->
+      Safe (TEST b THEN c1 ELSE c2 FI) st
+  | Safe_IfFalse : forall st b c1 c2,
+      beval st b = false ->
+      Safe c2 st ->
+      Safe (TEST b THEN c1 ELSE c2 FI) st
+  | Safe_WhileFalse : forall b st c,
+      beval st b = false ->
+      Safe (WHILE b DO c END) st
+  | Safe_WhileTrue : forall st b c,
+      beval st b = true ->
+      Safe c st ->
+      (forall st', st =[ c ]=> st' -> Safe (WHILE b DO c END) st') ->
+      Safe (WHILE b DO c END) st
+  | Safe_CallDef :
+      forall st args x f fd,
+        funDefs f = Some fd ->
+        Safe (x :::= f $ args) (build_total_map (funArgs fd) (aseval st args) 0)->
+        Safe (x :::= f $ args) st
+  | Safe_CallSpec : forall st args x f,
+      funDefs f = None ->
+      (funSpecs f).(pre) (aseval st args) ->
+      Safe (x :::= f $ args) st.
+
+Definition valid_funDef (sigma : Env) (fs : funSpec) (fd : funDef) : Prop :=
+  forall (args : list nat) st',
+    (pre fs) args ->
+    build_total_map (funArgs fd) args 0 =[ funBody fd ]=> st' ->
+    (post fs) (aeval st' (funRet fd)) args.
+
+Definition valid_Env (sigma : Env) : Prop :=
+  forall f fd,
+    funDefs f = Some fd ->
+    valid_funDef sigma (funSpecs f) fd.
+
+Theorem valid_Env_refine {sigma : Env} :
+  forall (c : com) (st st' : state),
+    valid_Env sigma ->
+    @Safe {| funSpecs := @funSpecs sigma; funDefs := empty |} c st ->
+    st =[ c ]=> st' ->
+    @ceval {| funSpecs := @funSpecs sigma; funDefs := empty |} c st st'.
+Proof.
+  induction 3; intros; try (solve [econstructor; eauto]).
+  - inversion X; subst; try congruence; econstructor; eauto.
+  - inversion X; subst; try congruence; econstructor; eauto.
+  - inversion X; subst; eapply E_IfFalse; eauto; congruence.
+  - inversion X; subst; try congruence; econstructor; eauto.
+  - inversion X; subst; try congruence.
+    + simpl in *; rewrite apply_empty in H4; discriminate.
+    + eapply (E_CallSpec (env := {| funSpecs := @funSpecs sigma; funDefs := empty |}));
+        simpl in *; eauto.
+      eapply H; eauto.
+Qed.
