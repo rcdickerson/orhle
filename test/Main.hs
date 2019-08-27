@@ -1,6 +1,6 @@
 module Main where
 
-import Lib
+import RHLEVerifier
 import Test.HUnit
 import Z3.Monad
 

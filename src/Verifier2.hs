@@ -24,10 +24,10 @@ type VTracedResult = WriterT [VTrace] Z3 VResult
 
 runVerifier2 :: RHLETrip -> IO String
 runVerifier2 rhleTrip = do
-  (_, result) <- runWriterT $ runVerifier2' rhleTrip
+  (_, result) <- evalZ3 $ runWriterT $ runVerifier2' rhleTrip
   return result
 
-runVerifier2' :: RHLETrip -> WriterT String IO ()
+runVerifier2' :: RHLETrip -> WriterT String Z3 ()
 runVerifier2' rhleTrip = do
   let progA = rhleProgA rhleTrip
   let progE = rhleProgE rhleTrip
@@ -36,8 +36,8 @@ runVerifier2' rhleTrip = do
   tell "------------------------------------------------\n"
   tell $ "Existential Program:\n" ++ (show progE) ++ "\n"
   tell "------------------------------------------------\n"
-  (result, trace) <- lift $ evalZ3 $ verify2 rhleTrip
-  traceStr <- lift $ evalZ3 $ ppVTrace trace
+  (result, trace) <- lift $ verify2 rhleTrip
+  traceStr <- lift $ ppVTrace trace
   tell $ "Verification Trace:\n" ++ traceStr ++ "\n"
   tell "------------------------------------------------\n"
   case result of
@@ -45,7 +45,7 @@ runVerifier2' rhleTrip = do
       tell "VALID iff the following executions are possible:\n"
       let funNames = assigneeToFuncNames (Seq [progA, progE])
       let funMap   = Map.mapKeys (\v -> Map.findWithDefault v v funNames) interp
-      mapLines <- lift $ evalZ3 $ ppInterpMap funMap
+      mapLines <- lift $ ppInterpMap funMap
       tell $ intercalate "\n" mapLines
       tell $ "\n"
     Left reason -> do
