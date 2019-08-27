@@ -1,9 +1,9 @@
 module Verifier2
-  ( ppVTrace
+  ( VResult
+  , VTrace
+  , ppVTrace
   , runVerifier2
   , verify2
-  , VResult
-  , VTrace
   ) where
 
 import Abduction
@@ -14,6 +14,7 @@ import qualified Data.Map as Map
 import Hoare
 import HoareE
 import Imp
+import InterpMap
 import RHLE
 import VTrace
 import Z3.Monad
@@ -22,21 +23,20 @@ import Z3Util
 type VResult       = Either String InterpMap
 type VTracedResult = WriterT [VTrace] Z3 VResult
 
-runVerifier2 :: RHLETrip -> IO String
-runVerifier2 rhleTrip = do
-  (_, result) <- evalZ3 $ runWriterT $ runVerifier2' rhleTrip
+runVerifier2 :: String -> Prog -> Prog -> String -> IO String
+runVerifier2 pre progA progE post = do
+  (_, result) <- evalZ3 $ runWriterT $ runVerifier2' pre progA progE post
   return result
 
-runVerifier2' :: RHLETrip -> WriterT String Z3 ()
-runVerifier2' rhleTrip = do
-  let progA = rhleProgA rhleTrip
-  let progE = rhleProgE rhleTrip
+runVerifier2' :: String -> Prog -> Prog -> String -> WriterT String Z3 ()
+runVerifier2' pre progA progE post = do
   tell "------------------------------------------------\n"
   tell $ "Universal Program:\n" ++ (show progA) ++ "\n"
   tell "------------------------------------------------\n"
   tell $ "Existential Program:\n" ++ (show progE) ++ "\n"
   tell "------------------------------------------------\n"
-  (result, trace) <- lift $ verify2 rhleTrip
+  trip <- lift $ mkRHLETrip pre progA progE post
+  (result, trace) <- lift $ verify2 trip
   traceStr <- lift $ ppVTrace trace
   tell $ "Verification Trace:\n" ++ traceStr ++ "\n"
   tell "------------------------------------------------\n"
@@ -76,29 +76,26 @@ verifyA trip@(RHLETrip pre progA progE post) imap = do
       pre'  <- lift $ hlSP s pre
       verifyE (HLETrip pre' progE post) imap
     If b s1 s2 -> do
-      cond <- lift $ smtString =<< bexpToZ3 b
+      cond <- lift $ bexpToZ3 b
       verifyAIf cond s1 s2 [] (HLETrip pre progE post) imap
     Call var f -> return.Left $
         "Function calls in universal execution currently unsupported"
 
-verifyASeq :: String -> [Stmt] -> Prog -> String -> InterpMap -> VTracedResult
+verifyASeq :: AST -> [Stmt] -> Prog -> AST -> InterpMap -> VTracedResult
 verifyASeq pre [] progE post imap =
   verifyA (RHLETrip pre Skip progE post) imap
 verifyASeq pre ((If b s1 s2):ss) progE post imap = do
-  cond <- lift $ smtString =<< bexpToZ3 b
+  cond <- lift $ bexpToZ3 b
   verifyAIf cond s1 s2 ss (HLETrip pre progE post) imap
 verifyASeq pre (s:ss) progE post imap = do
   pre'  <- lift $ hlSP s pre
   verifyA (RHLETrip pre' (Seq ss) progE post) imap
 
-verifyAIf :: SMTString -> Prog -> Prog -> [Stmt] -> HLETrip -> InterpMap -> VTracedResult
-verifyAIf c s1 s2 rest trip@(HLETrip pre progE post) imap = do
-  cAST    <- lift $ parseSMT c
-  notC    <- lift $ mkNot cAST
-  preAST  <- lift $ hlePreAST trip
-  postAST <- lift $ hlePostAST trip
-  cond1   <- lift $ mkAnd [preAST, cAST]
-  cond2   <- lift $ mkAnd [preAST, notC]
+verifyAIf :: AST -> Prog -> Prog -> [Stmt] -> HLETrip -> InterpMap -> VTracedResult
+verifyAIf c s1 s2 rest (HLETrip pre progE post) imap = do
+  notC    <- lift $ mkNot c
+  cond1   <- lift $ mkAnd [pre, c]
+  cond2   <- lift $ mkAnd [pre, notC]
   consistent1 <- lift $ checkSat cond1
   consistent2 <- lift $ checkSat cond2
   case (consistent1, consistent2) of
@@ -106,35 +103,26 @@ verifyAIf c s1 s2 rest trip@(HLETrip pre progE post) imap = do
     (True , False) -> do
       condStr <- lift $ smtString notC
       logMsgA $ "(A) Skipping inconsistent else branch: " ++ condStr
-      trip'   <- lift $ mkRHLETripFromASTs cond1 s1 progE postAST
-      inBranchLog c $ verifyA trip' imap
+      inBranchLog c $ verifyA (RHLETrip cond1 s1 progE post) imap
     (False, True ) -> do
-      logMsgA $ "(A) Skipping inconsistent then branch: " ++ c
-      trip'   <- lift $ mkRHLETripFromASTs cond2 s2 progE postAST
-      notCStr <- lift $ smtString notC
-      inBranchLog notCStr $ verifyA trip' imap
+      condStr <- lift $ smtString c
+      logMsgA $ "(A) Skipping inconsistent then branch: " ++ condStr
+      inBranchLog notC $ verifyA (RHLETrip cond2 s2 progE post) imap
     (False, False) -> return.Left $ "(A) Neither if-branch is consistent"
 
-verifyAIf' :: SMTString -> Prog -> Prog -> [Stmt] -> HLETrip -> InterpMap -> VTracedResult
-verifyAIf' c s1 s2 rest trip@(HLETrip pre progE post) imap = do
-  cAST    <- lift $ parseSMT c
-  notC    <- lift $ mkNot cAST
-  preAST  <- lift $ hlePreAST trip
-  postAST <- lift $ hlePostAST trip
-  cond1   <- lift $ mkAnd [preAST, cAST]
-  cond2   <- lift $ mkAnd [preAST, notC]
-  trip'   <- lift $ mkRHLETripFromASTs cond1 (Seq $ s1:rest) progE postAST
-  res1    <- inBranchLog c $ verifyA trip' imap
+verifyAIf' :: AST -> Prog -> Prog -> [Stmt] -> HLETrip -> InterpMap -> VTracedResult
+verifyAIf' c s1 s2 rest (HLETrip pre progE post) imap = do
+  notC    <- lift $ mkNot c
+  cond1   <- lift $ mkAnd [pre, c]
+  cond2   <- lift $ mkAnd [pre, notC]
+  res1    <- inBranchLog c $ verifyA (RHLETrip cond1 (Seq $ s1:rest) progE post) imap
   case res1 of
     Left  err   -> return.Left $ err
     Right imap1 -> do
-      trip'' <- lift $ mkRHLETripFromASTs cond2 (Seq $ s2:rest) progE postAST
-      res2   <- inZ3BranchLog notC $ verifyA trip'' imap
+      res2 <- inBranchLog notC $ verifyA (RHLETrip cond2 (Seq $ s2:rest) progE post) imap
       case res2 of
         Left  err   -> return.Left $ err
-        Right imap2 -> do
-          notCStr <- lift $ smtString notC
-          lift $ imapCondUnion (c, imap1) (notCStr, imap2) >>= return.Right
+        Right imap2 -> lift $ imapCondUnion (c, imap1) (notC, imap2) >>= return.Right
 
 verifyE :: HLETrip -> InterpMap -> VTracedResult
 verifyE trip@(HLETrip pre progE post) imap = do
@@ -146,15 +134,15 @@ verifyE trip@(HLETrip pre progE post) imap = do
       pre' <- lift $ hlSP s pre
       verifyE (HLETrip pre' Skip post) imap
     If b s1 s2 -> do
-      cond <- lift $ smtString =<< bexpToZ3 b
+      cond <- lift $ bexpToZ3 b
       verifyEIf cond s1 s2 pre [] post imap
     Call var f -> verifyECall var f (HLETrip pre Skip post) imap
 
-verifyESeq :: SMTString -> [Stmt] -> SMTString -> InterpMap -> VTracedResult
+verifyESeq :: AST -> [Stmt] -> AST -> InterpMap -> VTracedResult
 verifyESeq pre [] post imap =
   verifyE (HLETrip pre Skip post) imap
 verifyESeq pre ((If b s1 s2):ss) post imap = do
-  cond <- lift $ smtString =<< bexpToZ3 b
+  cond <- lift $ bexpToZ3 b
   verifyEIf cond s1 s2 pre ss post imap
 verifyESeq pre ((Call var f):ss) post imap =
   verifyECall var f (HLETrip pre (Seq ss) post) imap
@@ -162,24 +150,26 @@ verifyESeq pre (s:ss) post imap = do
   pre' <- lift $ hlSP s pre
   verifyE (HLETrip pre' (Seq ss) post) imap
 
-verifyFinalImpl :: String -> InterpMap -> String -> VTracedResult
+verifyFinalImpl :: AST -> InterpMap -> AST -> VTracedResult
 verifyFinalImpl pre imap post = do
-  result <- lift $ imapStrengthen pre imap post
+  preStr  <- lift $ smtString pre
+  postStr <- lift $ smtString post
+  result  <- lift $ imapStrengthen pre imap post
   case result of
     Right imap' -> do
       interpLines <- lift $ ppInterpMap imap'
-      logAbductionSuccess interpLines pre post
+      logAbductionSuccess interpLines preStr postStr
       return.Right $ imap'
     Left err -> do
-      logAbductionFailure pre post
+      logAbductionFailure preStr postStr
       return.Left $ err
 
 verifyECall :: Var -> UFunc -> HLETrip -> InterpMap -> VTracedResult
 verifyECall asg f (HLETrip pre progE post) imap = do
-  logCallE pre $ fPreCond f
-  preAST  <- lift $ parseSMT pre
-  fPreAST <- lift $ fPreCondAST f
-  preCondImp <- lift $ mkImplies preAST fPreAST
+  preStr <- lift $ smtString pre
+  logCallE preStr (fPreSMT f)
+  fPre <- lift $ fPreCond f
+  preCondImp <- lift $ mkImplies pre fPre
   preCondSat <- lift $ checkValid preCondImp
   case preCondSat of
     False -> return.Left $
@@ -188,58 +178,55 @@ verifyECall asg f (HLETrip pre progE post) imap = do
       pre' <- lift $ funSP f pre
       verifyE (HLETrip pre' progE post) imap
 
-verifyEIf :: SMTString -> Prog -> Prog
-          -> SMTString -> [Stmt] -> SMTString
+verifyEIf :: AST -> Prog -> Prog
+          -> AST -> [Stmt] -> AST
           -> InterpMap
           -> VTracedResult
 verifyEIf c s1 s2 pre rest post imap = do
-  preAST <- lift $ parseSMT pre
-  cAST   <- lift $ parseSMT c
-  notC   <- lift $ mkNot cAST
-  cond1  <- lift $ smtString =<< mkAnd [preAST, cAST]
-  cond2  <- lift $ smtString =<< mkAnd [preAST, notC]
+  notC   <- lift $ mkNot c
+  cond1  <- lift $ mkAnd [pre, c]
+  cond2  <- lift $ mkAnd [pre, notC]
   (canEnter1, imap1) <- lift $ tryStrengthening pre imap c
-  (canEnter2, imap2) <- lift $ tryStrengthening pre imap =<< smtString notC
+  (canEnter2, imap2) <- lift $ tryStrengthening pre imap notC
   case (canEnter1, canEnter2) of
     (False, False) -> return.Left $ "(E) Neither if-branch is enterable"
     (True , False) -> do
-      condStr <- lift $ astToString notC
+      condStr <- lift $ smtString notC
       logMsgE $ "Skipping unenterable if-branch: " ++ condStr
       inBranchLog c $ verifyE (HLETrip cond1 (Seq $ s1:rest) post) imap1
     (False, True ) -> do
-      logMsgE $ "Skipping unenterable if-branch: " ++ c
-      inZ3BranchLog notC $ verifyE (HLETrip cond2 (Seq $ s2:rest) post) imap2
+      condStr <- lift $ smtString c
+      logMsgE $ "Skipping unenterable if-branch: " ++ condStr
+      inBranchLog notC $ verifyE (HLETrip cond2 (Seq $ s2:rest) post) imap2
     (True , True ) -> do
       mapLines1 <- lift $ ppInterpMap imap1
       mapLines2 <- lift $ ppInterpMap imap2
-      logAbductionSuccess mapLines1 pre c
+      preStr    <- lift $ smtString pre
+      cStr      <- lift $ smtString c
+      logAbductionSuccess mapLines1 preStr cStr
       res1 <- inBranchLog c $ verifyE (HLETrip cond1 (Seq $ s1:rest) post) imap1
       notCStr <- lift $ smtString notC
-      logAbductionSuccess mapLines2 pre notCStr
-      res2 <- inZ3BranchLog notC $ verifyE (HLETrip cond2 (Seq $ s2:rest) post) imap2
+      logAbductionSuccess mapLines2 preStr notCStr
+      res2 <- inBranchLog notC $ verifyE (HLETrip cond2 (Seq $ s2:rest) post) imap2
       case (res1, res2) of
         (Right imap1', Right imap2') -> lift $ return.Right
-                                        =<< imapCondUnion (c, imap1') (notCStr, imap2')
+                                        =<< imapCondUnion (c, imap1') (notC, imap2')
         (Right imap1', Left _      ) -> return.Right $ imap1'
         (Left _      , Right imap2') -> return.Right $ imap2'
         (Left _      , Left _      ) -> return.Left  $
           "(E) Both if-branches are enterable, but neither verifies"
 
-tryStrengthening :: SMTString -> InterpMap -> SMTString -> Z3 (Bool, InterpMap)
+tryStrengthening :: AST -> InterpMap -> AST -> Z3 (Bool, InterpMap)
 tryStrengthening pre imap branchAST = do
   res <- imapStrengthen pre imap branchAST
   case res of
     Left  _     -> return (False, emptyIMap)
     Right imap' -> return (True,  imap')
 
-inZ3BranchLog :: AST -> VTracedResult -> VTracedResult
-inZ3BranchLog cond branch = do
-  condStr <- lift $ smtString cond
-  inBranchLog condStr branch
-
-inBranchLog :: SMTString -> VTracedResult -> VTracedResult
+inBranchLog :: AST -> VTracedResult -> VTracedResult
 inBranchLog cond branch = do
-  logBranchStart cond
+  condStr <- lift $ smtString cond
+  logBranchStart condStr
   result <- branch
   logBranchEnd
   return result

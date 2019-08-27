@@ -1,11 +1,9 @@
 module Hoare
-    ( hlPreAST
-    , hlPostAST
-     , hlSP
+    ( hlSP
     , HLTrip(..)
     , hlVC
     , hlWP
-    , mkHLTripFromASTs
+    , mkHLTrip
     ) where
 
 import Imp
@@ -13,24 +11,18 @@ import Z3.Monad
 import Z3Util
 
 data HLTrip = HLTrip
-  { hlPre  :: SMTString
+  { hlPre  :: AST
   , hlProg :: Prog
-  , hlPost :: SMTString
+  , hlPost :: AST
   } deriving (Show)
 
-hlPreAST :: HLTrip -> Z3 AST
-hlPreAST trip = parseSMTLib2String (hlPre trip) [] [] [] []
+mkHLTrip :: String -> Prog -> String -> Z3 HLTrip
+mkHLTrip pre prog post = do
+  preAST  <- parseSMT pre
+  postAST <- parseSMT post
+  return $ HLTrip preAST prog postAST
 
-hlPostAST :: HLTrip -> Z3 AST
-hlPostAST trip = parseSMTLib2String (hlPost trip) [] [] [] []
-
-mkHLTripFromASTs :: AST -> Prog -> AST -> Z3 HLTrip
-mkHLTripFromASTs pre prog post = do
-  preString  <- astToString pre
-  postString <- astToString post
-  return $ HLTrip preString prog postString
-
-hlWP :: Stmt -> SMTString -> Z3 SMTString
+hlWP :: Stmt -> AST -> Z3 AST
 hlWP stmt post =
   case stmt of
     Skip        -> return post
@@ -42,16 +34,16 @@ hlWP stmt post =
     If b s1 s2  -> do
       c    <- bexpToZ3 b
       notC <- mkNot c
-      imp1 <- mkImplies c    =<< parseSMT =<< hlWP s1 post
-      imp2 <- mkImplies notC =<< parseSMT =<< hlWP s2 post
-      smtString =<< mkAnd [imp1, imp2]
+      imp1 <- mkImplies c    =<< hlWP s1 post
+      imp2 <- mkImplies notC =<< hlWP s2 post
+      mkAnd [imp1, imp2]
     Call _ f    -> do
-      fPreAST  <- fPreCondAST f
-      fPostAST <- fPostCondAST f
-      postImp  <- mkImplies fPostAST =<< parseSMT post
-      smtString =<< mkAnd [fPreAST, postImp]
+      fPre    <- fPreCond f
+      fPost   <- fPostCond f
+      postImp <- mkImplies fPost post
+      mkAnd [fPre, postImp]
 
-hlSP :: Stmt -> SMTString -> Z3 SMTString
+hlSP :: Stmt -> AST -> Z3 AST
 hlSP stmt pre =
   case stmt of
     Skip        -> return pre
@@ -61,16 +53,15 @@ hlSP stmt pre =
     If b s1 s2  -> do
       c    <- bexpToZ3 b
       notC <- mkNot c
-      imp1 <- mkImplies c    =<< parseSMT =<< hlSP s1 pre
-      imp2 <- mkImplies notC =<< parseSMT =<< hlSP s2 pre
-      smtString =<< mkAnd [imp1, imp2]
+      imp1 <- mkImplies c    =<< hlSP s1 pre
+      imp2 <- mkImplies notC =<< hlSP s2 pre
+      mkAnd [imp1, imp2]
     Call _ f    -> do
-      preAST   <- parseSMT pre
-      preImp   <- mkImplies preAST =<< fPreCondAST f
-      fPostAST <- fPostCondAST f
-      smtString =<< mkAnd [preImp, fPostAST]
+      fPre    <- fPreCond f
+      fPost   <- fPostCond f
+      preImp   <- mkImplies pre fPre
+      mkAnd [preImp, fPost]
 
-hlVC :: HLTrip -> Z3 SMTString
+hlVC :: HLTrip -> Z3 AST
 hlVC (HLTrip pre prog post) = do
-  preAST <- parseSMT pre
-  smtString =<< mkImplies preAST =<< parseSMT =<< hlWP prog post
+  mkImplies pre =<< hlWP prog post

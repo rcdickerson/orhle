@@ -3,23 +3,11 @@ module Z3Util
   , checkValid
   , distList
   , parseSMT
-  , SMTString
   , smtString
   ) where
 
 import Control.Monad (liftM2)
 import Z3.Monad
-
--- Keeping long-lived AST objects around seems to lead to random segfaults and
--- nonsensical Z3 errors. I suspect memory management bugs in the binding layer,
--- but have not investigated deeply.
---
--- Until I can figure out why keeping Z3 objects around for a long time is
--- leading to more crashes, the strategy is to keep SMT expressions as Strings
--- as much as possible and convert to ASTs right before an SMT query. This isn't
--- great because of the constant translation between String and AST, but is
--- better than lots of arbitrary segfaulting.
-type SMTString = String
 
 checkValid :: AST -> Z3 Bool
 checkValid ast = do
@@ -41,7 +29,7 @@ checkSat ast = do
     Sat -> return True
     _   -> return False
 
-parseSMT :: SMTString -> Z3 AST
+parseSMT :: String -> Z3 AST
 parseSMT str = parseSMTLib2String str [] [] [] []
 
 smtString :: AST -> Z3 String

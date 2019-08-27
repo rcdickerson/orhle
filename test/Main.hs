@@ -9,6 +9,6 @@ import Verifier2Tests
 
 main :: IO Counts
 main = runTestTT $ TestList
-  [ verifier1Tests
-  , verifier2Tests
+  [ --verifier1Tests
+  verifier2Tests
   ]

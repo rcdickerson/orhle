@@ -8,8 +8,8 @@ module Imp
     , bexpToZ3
     , bsubst
     , bvars
-    , fPostCondAST
-    , fPreCondAST
+    , fPostCond
+    , fPreCond
     , fsubst
     , funSP
     , subAexp
@@ -76,27 +76,24 @@ aexpToZ3 aexp =
       divisor  <- aexpToZ3 aexp2
       mkMod dividend divisor
 
-subVar :: SMTString -> Var -> Var -> Z3 SMTString
-subVar smt var repl = do
-  ast    <- parseSMT smt
+subVar :: AST -> Var -> Var -> Z3 AST
+subVar ast var repl = do
   z3Var  <- aexpToZ3 $ V var
   z3Repl <- aexpToZ3 $ V repl
-  smtString =<< substituteVars ast [z3Var, z3Repl]
+  substituteVars ast [z3Var, z3Repl]
 
-subAexp :: SMTString -> AExp -> AExp -> Z3 SMTString
-subAexp smt lhs rhs = do
-  ast   <- parseSMT smt
+subAexp :: AST -> AExp -> AExp -> Z3 AST
+subAexp ast lhs rhs = do
   z3Lhs <- aexpToZ3 $ lhs
   z3Rhs <- aexpToZ3 $ rhs
-  smtString =<< substituteVars ast [z3Lhs, z3Rhs]
+  substituteVars ast [z3Lhs, z3Rhs]
 
-assignPost :: Var -> AExp -> SMTString -> Z3 SMTString
+assignPost :: Var -> AExp -> AST -> Z3 AST
 assignPost var aexp post = do
   z3Var   <- aexpToZ3 $ V var
   z3Aexp  <- aexpToZ3 aexp
   eq      <- mkEq z3Var z3Aexp
-  postAST <- parseSMT post
-  smtString =<< mkAnd [eq, postAST]
+  mkAnd [eq, post]
 
 
 -------------------------
@@ -153,30 +150,29 @@ bexpToZ3 bexp =
 data UFunc = UFunc
   { fName     :: String
   , fParams   :: [Var]
-  , fPreCond  :: String
-  , fPostCond :: String
+  , fPreSMT  :: String
+  , fPostSMT :: String
   } deriving (Eq, Ord, Show)
 
 fsubst :: UFunc -> Var -> Var -> Z3 UFunc
 fsubst f@(UFunc name params _ _) var repl = do
-  pre'  <- subAST $ fPreCond  f
-  post' <- subAST $ fPostCond f
+  pre'  <- smtString =<< subAST =<< fPreCond f
+  post' <- smtString =<< subAST =<< fPostCond f
   let params' = map (\p -> if p == var then repl else p) params
   return $ UFunc name params' pre' post'
   where
     subAST ast = subVar ast var repl
 
-fPreCondAST :: UFunc -> Z3 AST
-fPreCondAST = parseSMT.fPreCond
+fPreCond :: UFunc -> Z3 AST
+fPreCond = parseSMT.fPreSMT
 
-fPostCondAST :: UFunc -> Z3 AST
-fPostCondAST = parseSMT.fPostCond
+fPostCond :: UFunc -> Z3 AST
+fPostCond = parseSMT.fPostSMT
 
-funSP :: UFunc -> SMTString -> Z3 SMTString
+funSP :: UFunc -> AST -> Z3 AST
 funSP f pre = do
-  preAST  <- parseSMT pre
-  postAST <- fPostCondAST f
-  smtString =<< mkAnd [preAST, postAST]
+  post <- fPostCond f
+  mkAnd [pre, post]
 
 
 ---------------------------

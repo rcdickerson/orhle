@@ -1,7 +1,5 @@
 module RHLE
-  ( mkRHLETripFromASTs
-  , rhlePreAST
-  , rhlePostAST
+  ( mkRHLETrip
   , RHLETrip(..)
   ) where
 
@@ -10,20 +8,14 @@ import Z3.Monad
 import Z3Util
 
 data RHLETrip = RHLETrip
-  { rhlePre   :: SMTString
+  { rhlePre   :: AST
   , rhleProgA :: Prog
   , rhleProgE :: Prog
-  , rhlePost  :: SMTString
+  , rhlePost  :: AST
   } deriving (Show)
 
-rhlePreAST :: RHLETrip -> Z3 AST
-rhlePreAST trip = parseSMTLib2String (rhlePre trip) [] [] [] []
-
-rhlePostAST :: RHLETrip -> Z3 AST
-rhlePostAST trip = parseSMTLib2String (rhlePost trip) [] [] [] []
-
-mkRHLETripFromASTs :: AST -> Prog -> Prog -> AST -> Z3 RHLETrip
-mkRHLETripFromASTs pre progA progE post = do
-  preString  <- astToString pre
-  postString <- astToString post
-  return $ RHLETrip preString progA progE postString
+mkRHLETrip :: String -> Prog -> Prog -> String -> Z3 RHLETrip
+mkRHLETrip pre progA progE post = do
+  preAST  <- parseSMT pre
+  postAST <- parseSMT post
+  return $ RHLETrip preAST progA progE postAST

@@ -4,16 +4,16 @@ import RHLEVerifier
 import Test.HUnit
 import Z3.Monad
 
-assertValid :: InterpResult -> Assertion
+assertValid :: AbductionResult -> Assertion
 assertValid (Left _)  = assertFailure "Expected VALID but was INVALID"
 assertValid (Right _) = return ()
 
-assertInvalid :: InterpResult -> Assertion
+assertInvalid :: AbductionResult -> Assertion
 assertInvalid (Left _)  = return ()
 assertInvalid (Right _) = assertFailure "Expected INVALID but was VALID"
 
 deterministicValid = do
-  result <- evalZ3 $ verify1 trip
+  result <- evalZ3 $ verify1 =<< mkRHLETrip "true" progA progE "(= y1 y2)"
   assertValid result
   where
     progA = parseImpOrError "\
@@ -28,10 +28,9 @@ deterministicValid = do
     \    y2 := 300           \
     \  else                  \
     \    y2 := 3             "
-    trip = RHLETrip "true" progA progE "y1 = y2"
 
 deterministicInvalid = do
-  result <- evalZ3 $ verify1 trip
+  result <- evalZ3 $ verify1 =<< mkRHLETrip "true" progA progE "(= y1 y2)"
   assertInvalid result
   where
     progA = parseImpOrError "\
@@ -46,10 +45,9 @@ deterministicInvalid = do
     \    y2 := 300           \
     \  else                  \
     \    y2 := 3             "
-    trip = RHLETrip "true" progA progE "y1 = y2"
 
 simpleValid = do
-  result <- evalZ3 $ verify1 trip
+  result <- evalZ3 $ verify1 =<< mkRHLETrip "true" progA progE "(= y1 y2)"
   assertValid result
   where
     progA = parseImpOrError "\
@@ -66,10 +64,9 @@ simpleValid = do
     \    y2 := 3             \
     \  else                  \
     \    y2 := 300           "
-    trip = RHLETrip "true" progA progE "y1 = y2"
 
 simpleValid2 = do
-  result <- evalZ3 $ verify1 trip
+  result <- evalZ3 $ verify1 =<< mkRHLETrip "true" progA progE "(= y1 y2)"
   assertValid result
   where
     progA = parseImpOrError "\
@@ -86,10 +83,9 @@ simpleValid2 = do
     \    y2 := 3             \
     \  else                  \
     \    y2 := 300           "
-    trip = RHLETrip "true" progA progE "y1 = y2"
 
 simpleInvalid = do
-  result <- evalZ3 $ verify1 trip
+  result <- evalZ3 $ verify1 =<< mkRHLETrip "true" progA progE "(= y1 y2)"
   assertInvalid result
   where
     progA = parseImpOrError "\
@@ -106,10 +102,9 @@ simpleInvalid = do
     \    y2 := 3             \
     \  else                  \
     \    y2 := 300           "
-    trip = RHLETrip "true" progA progE "y1 = y2"
 
 simpleInvalid2 = do
-  result <- evalZ3 $ verify1 trip
+  result <- evalZ3 $ verify1 =<< mkRHLETrip "true" progA progE "(= y1 y2)"
   assertInvalid result
   where
     progA = parseImpOrError "\
@@ -126,7 +121,6 @@ simpleInvalid2 = do
     \    y2 := 3             \
     \  else                  \
     \    y2 := 300           "
-    trip = RHLETrip "true" progA progE "y1 = y2"
 
 
 verifier1Tests :: Test

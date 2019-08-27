@@ -6,6 +6,7 @@ import Z3.Monad
 main :: IO ()
 main = useVerifier2
 
+{-
 useVerifier1 :: IO ()
 useVerifier1 = do
   putStrLn "------------------------------------------------"
@@ -13,8 +14,8 @@ useVerifier1 = do
   putStrLn "------------------------------------------------"
   putStrLn $ "Existential Program:\n" ++ (show.rhleProgE $ rhleTrip)
   putStrLn "------------------------------------------------"
-  (cA, aA) <- evalZ3 . encodeImp $ rhleProgA rhleTrip
-  (cE, aE) <- evalZ3 . encodeImp $ rhleProgE rhleTrip
+  (cA, aA) <- evalZ3 . encodeImp $ rhleProgA =<< rhleTrip
+  (cE, aE) <- evalZ3 . encodeImp $ rhleProgE =<< rhleTrip
   putStrLn $ "A Abducibles: " ++ (show aA)
   putStrLn $ "A Encoding:\n" ++ cA
   putStrLn "------------------------------------------------"
@@ -28,10 +29,11 @@ useVerifier1 = do
       putStrLn "SUCCESS"
       putInterpMap interp
   putStrLn "------------------------------------------------"
+-}
 
 useVerifier2 :: IO ()
 useVerifier2 = do
-  putStrLn =<< runVerifier2 rhleTrip
+  putStrLn =<< runVerifier2 "true" progA1 progE1 "(= y1 y2)"
 
 printZ3 :: AST -> IO String
 printZ3 = evalZ3.astToString
@@ -46,8 +48,6 @@ printZ3Simpl ast = evalZ3 $ astToString =<< simplify ast
 
 p = printZ3
 ps symbolList = mapM evalZ3 $ map getSymbolString symbolList
-
-rhleTrip = RHLETrip "true" progA1 progA1 "(= y1 y2)"
 
 progA1 = parseImpOrError "\
 \  x1 := 3;              \

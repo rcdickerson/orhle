@@ -1,7 +1,5 @@
 module HoareE
-  ( mkHLETripFromASTs
-  , hlePreAST
-  , hlePostAST
+  ( mkHLETrip
   , HLETrip(..)
   , hleSP
   ) where
@@ -11,24 +9,18 @@ import Z3.Monad
 import Z3Util
 
 data HLETrip = HLETrip
-  { hlePre  :: SMTString
+  { hlePre  :: AST
   , hleProg :: Prog
-  , hlePost :: SMTString
+  , hlePost :: AST
   } deriving (Show)
 
-hlePreAST :: HLETrip -> Z3 AST
-hlePreAST = parseSMT.hlePre
+mkHLETrip :: String -> Prog -> String -> Z3 HLETrip
+mkHLETrip pre prog post = do
+  preAST  <- parseSMT pre
+  postAST <- parseSMT post
+  return $ HLETrip preAST prog postAST
 
-hlePostAST :: HLETrip -> Z3 AST
-hlePostAST = parseSMT.hlePost
-
-mkHLETripFromASTs :: AST -> Prog -> AST -> Z3 HLETrip
-mkHLETripFromASTs pre prog post = do
-  preString  <- astToString pre
-  postString <- astToString post
-  return $ HLETrip preString prog postString
-
-hleSP :: Stmt -> SMTString -> Z3 SMTString
+hleSP :: Stmt -> AST -> Z3 AST
 hleSP stmt pre = do
   case stmt of
     Skip        -> return pre
@@ -38,7 +30,7 @@ hleSP stmt pre = do
     If b s1 s2  -> do
       c    <- bexpToZ3 b
       notC <- mkNot c
-      imp1 <- mkImplies c    =<< parseSMT =<< hleSP s1 pre
-      imp2 <- mkImplies notC =<< parseSMT =<< hleSP s2 pre
-      smtString =<< mkAnd [imp1, imp2]
+      imp1 <- mkImplies c    =<< hleSP s1 pre
+      imp2 <- mkImplies notC =<< hleSP s2 pre
+      mkAnd [imp1, imp2]
     Call _ f    -> funSP f pre

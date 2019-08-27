@@ -1,28 +1,29 @@
 module RHLEVerifier
-    ( abduce
-    , aexpToZ3
-    , Abduction
+    ( AbductionProblem
+    , AbductionResult
     , AExp(..)
     , BExp(..)
-    , encodeImp
     , HLTrip(..)
     , HLETrip(..)
     , InterpMap
-    , InterpResult
-    , parseImp
-    , parseImpOrError
-    , ppVTrace
     , Prog
-    , putInterpMap
     , RHLETrip(..)
-    , runVerifier2
     , Stmt(..)
     , UFunc(..)
     , Var
-    , verify1
-    , verify2
     , VResult
     , VTrace
+    , abduce
+    , aexpToZ3
+    , encodeImp
+    , mkRHLETrip
+    , parseImp
+    , parseImpOrError
+    , ppVTrace
+    , putInterpMap
+    , runVerifier2
+    , verify1
+    , verify2
     ) where
 
 import Abduction
@@ -30,6 +31,7 @@ import Hoare
 import HoareE
 import Imp
 import ImpParser
+import InterpMap
 import RHLE
 import Verifier1
 import Verifier2
