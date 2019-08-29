@@ -9,7 +9,7 @@ Require Import Maps Imp HoareCommon.
 Section EHoare.
 
   Reserved Notation "Sigma |- {[ P ]}  c  {[ Q ]}#"
-           (at level 90, c at next level).
+           (at level 40, c at next level).
 
   Inductive ehoare_proof (Sigma : total_map funSpec)
     : Assertion -> com -> Assertion -> Prop :=
@@ -45,16 +45,16 @@ Section EHoare.
   where "Sigma |- {[ P ]}  c  {[ Q ]}#" := (ehoare_proof Sigma P c Q) : hoare_spec_scope.
 
   Definition ehoare_triple
-             {env : Env}
+             (Sigma : Env)
              (P : Assertion)
              (c : com)
              (Q : Assertion) : Prop :=
     forall st,
       P st ->
-      exists st' (exe : st =[ c ]=> st'), Q st'.
+      exists st' (exe : Sigma |- st =[ c ]=> st'), Q st'.
 
-  Notation "{[ P ]}  c  {[ Q ]}#" :=
-    (ehoare_triple P c Q) (at level 90, c at next level)
+  Notation "Sigma |= {[ P ]}  c  {[ Q ]}#" :=
+    (ehoare_triple Sigma P c Q) (at level 90, c at next level)
     : hoare_spec_scope.
 
   Hint Resolve bassn_eval_true bassn_eval_false : hoare.
@@ -62,10 +62,10 @@ Section EHoare.
   Hint Constructors ceval.
 
 
-  Lemma ehoare_while {env : Env}  : forall P M b c,
+  Lemma ehoare_while (Sigma : Env)  : forall P M b c,
       (forall n : nat,
-          {[fun st => P st /\ bassn b st /\ M n st]} c {[fun st => P st /\ exists n', M n' st /\ n' < n]}#) ->
-      {[fun st => P st /\ exists n, M n st]} WHILE b DO c END {[fun st => P st /\ ~ (bassn b st)]}#.
+          Sigma |= {[fun st => P st /\ bassn b st /\ M n st]} c {[fun st => P st /\ exists n', M n' st /\ n' < n]}#) ->
+      Sigma |= {[fun st => P st /\ exists n, M n st]} WHILE b DO c END {[fun st => P st /\ ~ (bassn b st)]}#.
   Proof.
     unfold ehoare_triple.
     intros P M b c Hc st [HP H]. destruct H as [n HM]. revert dependent st.
@@ -77,9 +77,9 @@ Section EHoare.
     - repeat econstructor; eauto. firstorder with hoare.
   Qed.
 
-  Theorem ehoare_proof_sound Sigma : forall P c Q,
+  Theorem ehoare_proof_sound Sigs Sigma : forall P c Q,
       Sigma |- {[P]} c {[Q]}# ->
-      @ehoare_triple {| funSpecs := Sigma; funDefs := empty |} P c Q.
+      {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |} |= {[P]} c {[Q]}#.
   Proof.
     unfold ehoare_triple.
     intros ? ? ? pf. induction pf; intros st HP.
@@ -103,17 +103,17 @@ Section EHoare.
       repeat econstructor; eauto.
   Qed.
 
-  Definition ewp {env : Env} (c:com) (Q:Assertion) : Assertion :=
-    fun st => exists st' (exe : st =[ c ]=> st'), Q st'.
+  Definition ewp (Sigma : Env) (c:com) (Q:Assertion) : Assertion :=
+    fun st => exists st' (exe : Sigma |- st =[ c ]=> st'), Q st'.
 
-  Lemma ewp_is_precondition {env : Env}: forall c Q,
-      {[ewp c Q]} c {[Q]}#.
+  Lemma ewp_is_precondition {Sigma : Env}: forall c Q,
+      Sigma |= {[ewp Sigma c Q]} c {[Q]}#.
   Proof.
     firstorder.
   Qed.
 
-  Lemma ewp_is_weakest {env : Env}: forall c Q P,
-      {[P]} c {[Q]}# -> P ->> ewp c Q.
+  Lemma ewp_is_weakest (Sigma : Env) : forall c Q P,
+      Sigma |= {[P]} c {[Q]}# -> P ->> ewp Sigma c Q.
   Proof.
     firstorder.
   Qed.
@@ -121,19 +121,19 @@ Section EHoare.
   Hint Resolve ewp_is_precondition ewp_is_weakest : hoare.
   Hint Unfold ehoare_triple ewp.
 
-  Fixpoint loop_size {Sigma : Env} {st c st'} (exe : st =[ c ]=> st') : nat :=
+  Fixpoint loop_size {Sigma : Env} {st c st'} (exe : Sigma |- st =[ c ]=> st') : nat :=
     match exe with
-    | E_WhileTrue _ _ _ _ _ _ _ exew => S (loop_size exew)
+    | E_WhileTrue _ _ _ _ _ _ _ _ exew => S (loop_size exew)
     | _ => 0
     end.
 
-  Definition loop_measureR {Sigma : Env} b c Q n st : Prop :=
-    (exists st' (exe : st =[ WHILE b DO c END ]=> st'),
+  Definition loop_measureR (Sigma : Env) b c Q n st : Prop :=
+    (exists st' (exe : Sigma |- st =[ WHILE b DO c END ]=> st'),
         Q st' /\
         n = loop_size exe).
 
-  Lemma ewp_loop_measureR {Sigma : Env} b c Q st
-    : ewp (WHILE b DO c END) Q st <-> exists n, loop_measureR b c Q n st.
+  Lemma ewp_loop_measureR (Sigma : Env) b c Q st
+    : ewp Sigma (WHILE b DO c END) Q st <-> exists n, loop_measureR Sigma b c Q n st.
   Proof.
     unfold ewp, loop_measureR. split.
     - intros H. destruct H as [st' [exe HQ]].
@@ -151,16 +151,16 @@ Section EHoare.
     - exists n. intuition. apply Nat.nlt_ge. eauto.
   Qed.
 
-  Lemma loop_measureR_smallest_ex {Sigma : Env} b c Q st :
-    (exists st' (exe : st =[ WHILE b DO c END ]=> st'), Q st') ->
-    exists st' (exe : st =[ WHILE b DO c END ]=> st'),
+  Lemma loop_measureR_smallest_ex (Sigma : Env) b c Q st :
+    (exists st' (exe : Sigma |- st =[ WHILE b DO c END ]=> st'), Q st') ->
+    exists st' (exe : Sigma |- st =[ WHILE b DO c END ]=> st'),
       Q st' /\
-      (forall st'' (exe' : st =[ WHILE b DO c END ]=> st''),
+      (forall st'' (exe' : Sigma |- st =[ WHILE b DO c END ]=> st''),
           Q st'' -> loop_size exe <= loop_size exe').
   Proof.
     intros.
     edestruct (nonempty_smallest_ex
-                 (fun m => exists st' (exe : st =[ WHILE b DO c END ]=> st'),
+                 (fun m => exists st' (exe : Sigma |- st =[ WHILE b DO c END ]=> st'),
                       Q st' /\ loop_size exe = m)).
     - firstorder eauto.
     - destruct_conjs. subst. repeat econstructor; eauto.
@@ -168,8 +168,8 @@ Section EHoare.
       auto.
   Qed.
 
-  Theorem ehoare_proof_complete Sigma : forall P c Q,
-      @ehoare_triple {| funSpecs := Sigma; funDefs := empty |} P c Q
+  Theorem ehoare_proof_complete Sigs Sigma : forall P c Q,
+      {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |} |= {[P]} c {[Q]}#
       -> Sigma |- {[P]} c {[Q]}#.
   Proof.
     unfold ehoare_triple.
@@ -189,7 +189,7 @@ Section EHoare.
       inversion exe; subst. eauto.
       simpl in *; rewrite apply_empty in H6; discriminate.
     - (* ;; *)
-      apply EH_Seq with (@ewp {| funSpecs := Sigma; funDefs := empty |} c2 Q); eauto. apply IHc1.
+      apply EH_Seq with (@ewp {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |} c2 Q); eauto. apply IHc1.
       intros. edestruct HT as [? [exe ?]]; eauto.
       inversion exe; subst. repeat econstructor; eauto.
     - (* IFB *)
@@ -203,10 +203,10 @@ Section EHoare.
     - (* WHILE *)
       eapply EH_Consequence
         (* These two conjunction components are actually equivalent. See ewp_loop_measureR *)
-        with (P':=fun st => ewp (WHILE b DO c END) Q st /\ exists n, loop_measureR b c Q n st).
+        with (P':=fun st => ewp _ (WHILE b DO c END) Q st /\ exists n, loop_measureR _ b c Q n st).
       + apply EH_While.
         intros. apply IHc. intros st [Hwp [Hb Hm]].
-        edestruct (@loop_measureR_smallest_ex {| funSpecs := Sigma; funDefs := empty |}) as [st' [exe [HQ H]]]; eauto.
+        edestruct (@loop_measureR_smallest_ex {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |}) as [st' [exe [HQ H]]]; eauto.
         remember (WHILE b DO c END)%imp eqn:Heq.
         destruct exe; inversion Heq; subst; clear Heq. exfalso. congruence.
         unfold loop_measureR in *. destruct_conjs. subst. simpl in H.
@@ -222,8 +222,8 @@ Section EHoare.
 
 End EHoare.
 
-Notation "{[ P ]}  c  {[ Q ]}#" :=
-  (ehoare_triple P c Q) (at level 90, c at next level)
+Notation "Sigma |= {[ P ]}  c  {[ Q ]}#" :=
+  (ehoare_triple Sigma P c Q) (at level 90, c at next level)
   : hoare_spec_scope.
 
 Notation "Sigma |- {[ P ]}  c  {[ Q ]}#" :=

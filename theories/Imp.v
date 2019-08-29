@@ -3,10 +3,22 @@
 (* Adapted from the Software Foundations series:
    https://softwarefoundations.cis.upenn.edu/ *)
 
+Ltac injections :=
+  repeat match goal with
+         | [ H : _ = _ |- _ ]
+           => injection H; intros; subst; clear H
+         end.
+
+Ltac find_if_inside :=
+  match goal with
+  | [ |- context[if ?X then _ else _] ] => destruct X
+  | [ H : context[if ?X then _ else _] |- _ ]=> destruct X
+  end.
+
 Require Import
         Coq.Bool.Bool
-        Coq.Lists.List
-        Coq.Strings.String.
+        Coq.Strings.String
+        Coq.Lists.List.
 
 Import Nat.
 Require Import Maps.
@@ -91,10 +103,12 @@ Notation "a '!->' x" := (t_update empty_st a x) (at level 100).
 (* ================================================================= *)
 (** ** Syntax *)
 
+Definition funName := string.
+
 Inductive com : Type :=
   | CSkip
   | CAss (x : string) (a : aexp)
-  | CCall (x : string) (f : string) (args : list aexp)
+  | CCall (x : string) (f : funName) (args : list aexp)
   | CSeq (c1 c2 : com)
   | CIf (b : bexp) (c1 c2 : com)
   | CWhile (b : bexp) (c : com).
@@ -119,8 +133,12 @@ Notation "'TEST' c1 'THEN' c2 'ELSE' c3 'FI'" :=
 (* ----------------------------------------------------------------- *)
 (** *** Operational Semantics *)
 
+Structure funSig : Type :=
+  { arity : nat }.
+
 Structure funSpec : Type :=
-  { pre : list nat -> Prop; post : nat -> list nat -> Prop }.
+  { pre : list nat -> Prop;
+    post : nat -> list nat -> Prop }.
 
 Structure funDef : Type :=
   { funArgs : list string;
@@ -129,107 +147,279 @@ Structure funDef : Type :=
   }.
 
 Class Env : Type :=
-  { funSpecs : total_map funSpec;
+  { funSigs : total_map funSig;
+    funSpecs : total_map funSpec;
     funDefs : partial_map funDef
   }.
 
-Reserved Notation "st '=[' c ']=>' st'"
+Reserved Notation "Sigma '|-' st '=[' c ']=>' st'"
                   (at level 40).
 
-Inductive ceval {env : Env} : com -> state -> state -> Type :=
+Inductive ceval (Sigma : Env) : com -> state -> state -> Type :=
   | E_Skip : forall st,
-      st =[ SKIP ]=> st
+      Sigma |- st =[ SKIP ]=> st
   | E_Ass  : forall st a1 n x,
       aeval st a1 = n ->
-      st =[ x ::= a1 ]=> (x !-> n ; st)
+      Sigma |- st =[ x ::= a1 ]=> (x !-> n ; st)
   | E_Seq : forall c1 c2 st st' st'',
-      st  =[ c1 ]=> st'  ->
-      st' =[ c2 ]=> st'' ->
-      st  =[ c1 ;; c2 ]=> st''
+      Sigma |- st  =[ c1 ]=> st'  ->
+      Sigma |- st' =[ c2 ]=> st'' ->
+      Sigma |- st  =[ c1 ;; c2 ]=> st''
   | E_IfTrue : forall st st' b c1 c2,
       beval st b = true ->
-      st =[ c1 ]=> st' ->
-      st =[ TEST b THEN c1 ELSE c2 FI ]=> st'
+      Sigma |- st =[ c1 ]=> st' ->
+      Sigma |- st =[ TEST b THEN c1 ELSE c2 FI ]=> st'
   | E_IfFalse : forall st st' b c1 c2,
       beval st b = false ->
-      st =[ c2 ]=> st' ->
-      st =[ TEST b THEN c1 ELSE c2 FI ]=> st'
+      Sigma |- st =[ c2 ]=> st' ->
+      Sigma |- st =[ TEST b THEN c1 ELSE c2 FI ]=> st'
   | E_WhileFalse : forall b st c,
       beval st b = false ->
-      st =[ WHILE b DO c END ]=> st
+      Sigma |- st =[ WHILE b DO c END ]=> st
   | E_WhileTrue : forall st st' st'' b c,
       beval st b = true ->
-      st  =[ c ]=> st' ->
-      st' =[ WHILE b DO c END ]=> st'' ->
-      st  =[ WHILE b DO c END ]=> st''
+      Sigma |- st  =[ c ]=> st' ->
+      Sigma |- st' =[ WHILE b DO c END ]=> st'' ->
+      Sigma |- st  =[ WHILE b DO c END ]=> st''
 
   (* Evaluation of Function Calls *)
   | E_CallSpec : forall st args n x f,
       funDefs f = None ->
       (funSpecs f).(pre) (aseval st args) ->
       (funSpecs f).(post) n (aseval st args) ->
-      st =[ x :::= f $ args ]=> (x !-> n ; st)
+      Sigma |- st =[ x :::= f $ args ]=> (x !-> n ; st)
 
   | E_CallImpl : forall st st' args fd x f,
       funDefs f = Some fd ->
-      build_total_map (funArgs fd) (aseval st args) 0 =[ funBody fd ]=> st' ->
-      st =[ x :::= f $ args ]=> (x !-> aeval st' (funRet fd); st)
+      Sigma |- build_total_map (funArgs fd) (aseval st args) 0 =[ funBody fd ]=> st' ->
+      Sigma |- st =[ x :::= f $ args ]=> (x !-> aeval st' (funRet fd); st)
 
-  where "st =[ c ]=> st'" := (ceval c st st').
+where "Sigma |- st =[ c ]=> st'" := (ceval Sigma c st st').
+
+(* Well-formed expressions call functions with the right number of arguments. *)
+Inductive WF_Com (Sigma : Env) : com -> Prop :=
+| WF_Skip : WF_Com Sigma SKIP
+| WF_Ass  : forall a1 x, WF_Com Sigma (x ::= a1)
+| WF_Seq : forall c1 c2, WF_Com Sigma c1 -> WF_Com Sigma c2 -> WF_Com Sigma (c1 ;; c2)
+| WF_If : forall b c1 c2,
+    WF_Com Sigma c1 -> WF_Com Sigma c2 -> WF_Com Sigma (TEST b THEN c1 ELSE c2 FI)
+| WF_While : forall b c,
+    WF_Com Sigma c -> WF_Com Sigma (WHILE b DO c END)
+| WF_Call : forall args x f,
+    length args = (funSigs f).(arity) ->
+    WF_Com Sigma (x :::= f $ args).
+
+Inductive AppearsIn (f : funName) : com -> Prop :=
+| AI_Seq_L : forall c1 c2, AppearsIn f c1 -> AppearsIn f (c1 ;; c2)
+| AI_Seq_R : forall c1 c2, AppearsIn f c2 -> AppearsIn f (c1 ;; c2)
+| AI_If_T : forall b c1 c2,
+    AppearsIn f c1 -> AppearsIn f (TEST b THEN c1 ELSE c2 FI)
+| AI_If_E : forall b c1 c2,
+    AppearsIn f c2 -> AppearsIn f (TEST b THEN c1 ELSE c2 FI)
+| AI_While : forall b c,
+    AppearsIn f c -> AppearsIn f (WHILE b DO c END)
+| AI_Call : forall args x,
+    AppearsIn f (x :::= f $ args).
 
 (* A safe program is one that is guaranteed not to crash / get stuck *)
-CoInductive Safe {env : Env} : com -> state -> Type :=
+CoInductive Safe (Sigma : Env) : com -> state -> Type :=
     | Safe_Skip : forall st,
-      Safe SKIP st
+      Safe Sigma SKIP st
   | Safe_Ass  : forall st x a,
-      Safe (x ::= a) st
+      Safe Sigma (x ::= a) st
   | Safe_Seq : forall c1 c2 st,
-      Safe c1 st ->
-      (forall st', st  =[ c1 ]=> st' -> Safe c2 st') ->
-      Safe (c1 ;; c2) st
+      Safe Sigma c1 st ->
+      (forall st', Sigma |- st =[ c1 ]=> st' -> Safe Sigma c2 st') ->
+      Safe Sigma (c1 ;; c2) st
   | Safe_IfTrue : forall st b c1 c2,
       beval st b = true ->
-      Safe c1 st ->
-      Safe (TEST b THEN c1 ELSE c2 FI) st
+      Safe Sigma c1 st ->
+      Safe Sigma (TEST b THEN c1 ELSE c2 FI) st
   | Safe_IfFalse : forall st b c1 c2,
       beval st b = false ->
-      Safe c2 st ->
-      Safe (TEST b THEN c1 ELSE c2 FI) st
+      Safe Sigma c2 st ->
+      Safe Sigma (TEST b THEN c1 ELSE c2 FI) st
   | Safe_WhileFalse : forall b st c,
       beval st b = false ->
-      Safe (WHILE b DO c END) st
+      Safe Sigma (WHILE b DO c END) st
   | Safe_WhileTrue : forall st b c,
       beval st b = true ->
-      Safe c st ->
-      (forall st', st =[ c ]=> st' -> Safe (WHILE b DO c END) st') ->
-      Safe (WHILE b DO c END) st
+      Safe Sigma c st ->
+      (forall st', Sigma |- st =[ c ]=> st' -> Safe Sigma (WHILE b DO c END) st') ->
+      Safe Sigma (WHILE b DO c END) st
   | Safe_CallDef :
       forall st args x f fd,
         funDefs f = Some fd ->
-        Safe (x :::= f $ args) (build_total_map (funArgs fd) (aseval st args) 0)->
-        Safe (x :::= f $ args) st
+        Safe Sigma (x :::= f $ args) (build_total_map (funArgs fd) (aseval st args) 0)->
+        Safe Sigma (x :::= f $ args) st
   | Safe_CallSpec : forall st args x f,
       funDefs f = None ->
       (funSpecs f).(pre) (aseval st args) ->
-      Safe (x :::= f $ args) st.
+      Safe Sigma (x :::= f $ args) st.
 
-Definition valid_funDef (sigma : Env) (fs : funSpec) (fd : funDef) : Prop :=
+Definition valid_funDef (Sigma : Env)
+           (fs : funSpec)
+           (fd : funDef) : Prop :=
   forall (args : list nat) st',
     (pre fs) args ->
-    build_total_map (funArgs fd) args 0 =[ funBody fd ]=> st' ->
+    Sigma |- build_total_map (funArgs fd) args 0 =[ funBody fd ]=> st' ->
     (post fs) (aeval st' (funRet fd)) args.
 
-Definition valid_Env (sigma : Env) : Prop :=
+Definition valid_Env (Sigma : Env) : Prop :=
   forall f fd,
     funDefs f = Some fd ->
-    valid_funDef sigma (funSpecs f) fd.
+    valid_funDef Sigma (funSpecs f) fd.
 
-Theorem valid_Env_refine {sigma : Env} :
+(* Proof: if a function doesn't call itself (or is called by other defined functions),
+   and it implements its spec, it's safe to extend the context with.
+ *)
+
+Local Hint Constructors ceval.
+Local Hint Constructors AppearsIn.
+
+Lemma eval_Env_Weaken
+  : forall (Sigma : Env)
+           (f : funName)
+           (c : com),
+    ~ AppearsIn f c ->
+    (forall f' fd', funDefs f' = Some fd' ->
+                    ~ AppearsIn f (funBody fd')) ->
+    forall st st' fd,
+      Sigma |- st =[ c ]=> st' ->
+      {| funSigs := funSigs;
+                    funSpecs := funSpecs;
+                    funDefs := f |-> fd; funDefs |} |- st =[ c ]=> st'.
+Proof.
+  induction 3; simpl; intros; eauto.
+  - econstructor; eauto.
+  - econstructor; eauto.
+  - eapply E_IfFalse; eauto.
+  - econstructor; eauto.
+  - econstructor; eauto; simpl in *.
+    unfold update, t_update; find_if_inside; subst; eauto.
+    destruct H; eauto.
+  - eapply E_CallImpl; simpl; eauto.
+    unfold update, t_update; find_if_inside; eauto.
+    destruct H; subst; eauto.
+Qed.
+
+Lemma eval_Env_Strengthen
+  : forall (Sigma : Env)
+           (f : funName)
+           (c : com),
+    ~ AppearsIn f c ->
+    (forall f' fd', funDefs f' = Some fd' ->
+                    ~ AppearsIn f (funBody fd')) ->
+    forall st st' fd,
+      {| funSigs := funSigs;
+                    funSpecs := funSpecs;
+                    funDefs := f |-> fd; funDefs |} |- st =[ c ]=> st' ->
+      Sigma |- st =[ c ]=> st'.
+Proof.
+  induction 3; simpl; intros; eauto.
+  - econstructor; eauto.
+  - econstructor; eauto.
+  - eapply E_IfFalse; eauto.
+  - econstructor; eauto.
+  - econstructor; eauto; simpl in *.
+    unfold update, t_update in *; find_if_inside; subst; eauto;
+      discriminate.
+  - eapply E_CallImpl; simpl in *; eauto.
+    + unfold update, t_update in *; find_if_inside; eauto.
+      destruct H; subst; eauto.
+    + unfold update, t_update in *; find_if_inside; eauto.
+      destruct H; subst; eauto.
+Qed.
+
+Lemma valid_Env_Extend
+  : forall (Sigma : Env)
+           (f : funName)
+           (fd : funDef),
+    valid_Env Sigma ->
+    funDefs f = None ->
+    (forall f' fd', funDefs f' = Some fd' ->
+                   ~ AppearsIn f (funBody fd'))
+    -> ~ AppearsIn f (funBody fd)
+    -> valid_funDef Sigma (funSpecs f) fd
+    -> valid_Env {| funSigs := funSigs;
+                    funSpecs := funSpecs;
+                    funDefs := f |-> fd; funDefs |}.
+Proof.
+  unfold valid_Env; simpl; intros.
+  unfold update, t_update in H4; find_if_inside; subst.
+  - injections.
+    unfold valid_funDef; intros; eapply H3;
+      eauto using eval_Env_Strengthen.
+  - unfold valid_funDef; intros.
+    eapply H; eauto using eval_Env_Strengthen.
+Qed.
+
+Definition build_Env
+           (names : list funName)
+           (Sigs : list funSig)
+           (Specs : list funSpec)
+           (Defs : list funDef) :
+  Env :=
+  {| funSigs := fold_right (fun ffd Sigma'  =>
+                             t_update Sigma' (fst ffd) (snd ffd))
+                           (t_empty {| arity := 0 |})
+                           (combine names Sigs);
+     funSpecs := fold_right (fun ffd Sigma'  =>
+                             t_update Sigma' (fst ffd) (snd ffd))
+                          (t_empty {| pre := fun _ => True;
+                                      post := fun _ _ => False |})
+                          (combine names Specs);
+     funDefs := fold_right (fun ffd Sigma' => update Sigma' (fst ffd) (snd ffd))
+                           empty (combine names Defs) |}.
+
+Fixpoint safe_Env
+           (names : list funName)
+           (Sigs : list funSig)
+           (Specs : list funSpec)
+           (Defs : list funDef)
+  : Prop :=
+  match names, Sigs, Specs, Defs with
+  | f :: names', sig :: Sigs', spec :: Specs', fd :: Defs' =>
+    Forall (fun fd' => ~ AppearsIn f (funBody fd)) Defs' /\
+    ~ AppearsIn f (funBody fd) /\
+    valid_funDef (build_Env names' Sigs' Specs' Defs')
+                 spec fd
+  | _, _, _, _ => True
+  end.
+
+Lemma safe_Env_is_valid
+  : forall (names : list funName)
+           (Sigs : list funSig)
+           (Specs : list funSpec)
+           (Defs : list funDef),
+    NoDup names ->
+    length names = length Sigs ->
+    length names = length Specs ->
+    length names = length Defs ->
+    safe_Env names Sigs Specs Defs ->
+    valid_Env (build_Env names Sigs Specs Defs).
+Proof.
+  induction names; simpl; intros.
+  - unfold valid_Env; unfold build_Env; simpl; intros;
+      compute in H1; discriminate.
+  - destruct Sigs; destruct Specs; destruct Defs; simpl in *;
+      try discriminate; injections.
+    simpl.
+    unfold build_Env; simpl.
+(* This is a straightforward proof. *)
+Admitted.
+
+Theorem valid_Env_refine (Sigma : Env) :
   forall (c : com) (st st' : state),
-    valid_Env sigma ->
-    @Safe {| funSpecs := @funSpecs sigma; funDefs := empty |} c st ->
-    st =[ c ]=> st' ->
-    @ceval {| funSpecs := @funSpecs sigma; funDefs := empty |} c st st'.
+    valid_Env Sigma ->
+    Safe {|
+        funSigs := @funSigs Sigma;
+        funSpecs := @funSpecs Sigma;
+        funDefs := empty |} c st ->
+    Sigma |- st =[ c ]=> st' ->
+    {| funSigs := @funSigs Sigma;
+       funSpecs := @funSpecs Sigma;
+       funDefs := empty |} |- st =[ c ]=> st'.
 Proof.
   induction 3; intros; try (solve [econstructor; eauto]).
   - inversion X; subst; try congruence; econstructor; eauto.
@@ -238,7 +428,7 @@ Proof.
   - inversion X; subst; try congruence; econstructor; eauto.
   - inversion X; subst; try congruence.
     + simpl in *; rewrite apply_empty in H4; discriminate.
-    + eapply (E_CallSpec (env := {| funSpecs := @funSpecs sigma; funDefs := empty |}));
+    + eapply (E_CallSpec {| funSpecs := @funSpecs Sigma; funDefs := empty |});
         simpl in *; eauto.
       eapply H; eauto.
 Qed.
