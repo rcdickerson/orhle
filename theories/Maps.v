@@ -146,3 +146,13 @@ Proof.
   intros A m x1 x2 v1 v2. unfold update.
   apply t_update_permute.
 Qed.
+
+Lemma update_inv
+  : forall (A : Type) (m : partial_map A) x1 x2 v1 v2,
+    (update m x1 v1) x2 = Some v2 ->
+    (x1 = x2 /\ v1 = v2) \/ (x1 <> x2 /\ m x2 = Some v2).
+Proof.
+  unfold update, t_update; intros.
+  destruct (string_dec x1 x2);
+    try injection H; intros; subst; intuition.
+Qed.

@@ -15,6 +15,11 @@ Ltac find_if_inside :=
   | [ H : context[if ?X then _ else _] |- _ ]=> destruct X
   end.
 
+Ltac split_and :=
+  repeat match goal with
+           H : _ /\ _ |- _ => destruct H
+         end.
+
 Require Import
         Coq.Bool.Bool
         Coq.Strings.String
@@ -325,8 +330,9 @@ Proof.
     unfold update, t_update in *; find_if_inside; subst; eauto;
       discriminate.
   - eapply E_CallImpl; simpl in *; eauto.
-    + unfold update, t_update in *; find_if_inside; eauto.
-      destruct H; subst; eauto.
+    + eapply update_inv in e; destruct e as [[? ?] | [? ?]];
+        subst; eauto.
+      destruct H; eauto.
     + unfold update, t_update in *; find_if_inside; eauto.
       destruct H; subst; eauto.
 Qed.
@@ -372,42 +378,96 @@ Definition build_Env
      funDefs := fold_right (fun ffd Sigma' => update Sigma' (fst ffd) (snd ffd))
                            empty (combine names Defs) |}.
 
-Fixpoint safe_Env
+Fixpoint build_valid_Env'
+           (Sigs : total_map funSig)
+           (Specs : total_map funSpec)
+           (names : list funName)
+           (Defs : list funDef)
+  : Prop :=
+  match names, Defs with
+  | f :: names', fd :: Defs' =>
+    Forall (fun fd' => ~ AppearsIn f (funBody fd')) Defs' /\
+    ~ AppearsIn f (funBody fd) /\
+    valid_funDef
+      {| funSigs := Sigs;
+         funSpecs := Specs;
+         funDefs := fold_right (fun ffd Sigma' => update Sigma' (fst ffd) (snd ffd))
+                               empty (combine names Defs) |}
+      (Specs f) fd /\
+      (build_valid_Env' Sigs Specs names' Defs')
+  | _, _ => True
+  end.
+
+Definition build_valid_Env
            (names : list funName)
            (Sigs : list funSig)
            (Specs : list funSpec)
            (Defs : list funDef)
   : Prop :=
-  match names, Sigs, Specs, Defs with
-  | f :: names', sig :: Sigs', spec :: Specs', fd :: Defs' =>
-    Forall (fun fd' => ~ AppearsIn f (funBody fd)) Defs' /\
-    ~ AppearsIn f (funBody fd) /\
-    valid_funDef (build_Env names' Sigs' Specs' Defs')
-                 spec fd
-  | _, _, _, _ => True
-  end.
+  let funSigs' := fold_right (fun ffd Sigma'  =>
+                             t_update Sigma' (fst ffd) (snd ffd))
+                           (t_empty {| arity := 0 |})
+                           (combine names Sigs) in
+  let funSpecs' := fold_right (fun ffd Sigma'  =>
+                             t_update Sigma' (fst ffd) (snd ffd))
+                          (t_empty {| pre := fun _ => True;
+                                      post := fun _ _ => False |})
+                          (combine names Specs) in
+  build_valid_Env' funSigs' funSpecs' names Defs.
 
-Lemma safe_Env_is_valid
+Lemma build_valid_Env_is_valid'
+  : forall (names : list funName)
+           (Defs : list funDef)
+           (funSpecs' : total_map funSpec)
+           (funSigs' : total_map funSig),
+    NoDup names ->
+    length names = length Defs ->
+    build_valid_Env' funSigs' funSpecs' names Defs ->
+    valid_Env
+      {|
+        funSigs := funSigs';
+        funSpecs := funSpecs';
+        funDefs := fold_right
+                     (fun (ffd : string * funDef) (Sigma' : partial_map funDef) => fst ffd |-> snd ffd; Sigma') empty
+                     (combine names Defs) |}.
+Proof.
+  induction names; simpl; intros.
+  - unfold valid_Env; unfold build_Env; simpl; intros;
+      compute in H1; discriminate.
+  - destruct Defs; simpl in *;
+      try discriminate; injections; split_and.
+    inversion H; subst.
+    unfold valid_Env in *.
+    simpl; intros ? ? e; eapply update_inv in e;
+      destruct e as [ [? ?] | [? ?] ]; subst; eauto.
+    specialize (IHnames _ _ _ H8 H2 H4 _ _ H6).
+    unfold valid_funDef in *; intros.
+    eapply IHnames; eauto.
+    eapply eval_Env_Strengthen; eauto.
+    + generalize Defs H1 H0 H6; clear; induction names; simpl; intros.
+      * compute in H6; discriminate.
+      * destruct Defs; simpl in *; try discriminate.
+        apply update_inv in H6; destruct H6 as [ [? ?] | [? ?] ]; subst;
+          inversion H0; subst; eauto.
+    + generalize Defs H1 H0; clear; induction names; simpl; intros.
+      * compute in H; discriminate.
+      * destruct Defs; simpl in *; try discriminate.
+        apply update_inv in H; destruct H as [ [? ?] | [? ?] ]; subst;
+          inversion H0; subst; eauto.
+Qed.
+
+Corollary build_valid_Env_is_valid
   : forall (names : list funName)
            (Sigs : list funSig)
            (Specs : list funSpec)
            (Defs : list funDef),
     NoDup names ->
-    length names = length Sigs ->
-    length names = length Specs ->
     length names = length Defs ->
-    safe_Env names Sigs Specs Defs ->
+    build_valid_Env names Sigs Specs Defs ->
     valid_Env (build_Env names Sigs Specs Defs).
 Proof.
-  induction names; simpl; intros.
-  - unfold valid_Env; unfold build_Env; simpl; intros;
-      compute in H1; discriminate.
-  - destruct Sigs; destruct Specs; destruct Defs; simpl in *;
-      try discriminate; injections.
-    simpl.
-    unfold build_Env; simpl.
-(* This is a straightforward proof. *)
-Admitted.
+  intros; eapply build_valid_Env_is_valid'; eauto.
+Qed.
 
 Theorem valid_Env_refine (Sigma : Env) :
   forall (c : com) (st st' : state),
@@ -431,4 +491,41 @@ Proof.
     + eapply (E_CallSpec {| funSpecs := @funSpecs Sigma; funDefs := empty |});
         simpl in *; eauto.
       eapply H; eauto.
+Qed.
+
+Corollary build_valid_Env_refine :
+  forall (c : com) (st st' : state)
+         (names : list funName)
+         (Sigs : list funSig)
+         (Specs : list funSpec)
+         (Defs : list funDef),
+    NoDup names ->
+    length names = length Defs ->
+    build_valid_Env names Sigs Specs Defs ->
+    Safe {|
+        funSigs := fold_right (fun ffd Sigma'  =>
+                             t_update Sigma' (fst ffd) (snd ffd))
+                           (t_empty {| arity := 0 |})
+                           (combine names Sigs);
+        funSpecs := fold_right (fun ffd Sigma'  =>
+                             t_update Sigma' (fst ffd) (snd ffd))
+                          (t_empty {| pre := fun _ => True;
+                                      post := fun _ _ => False |})
+                          (combine names Specs);
+        funDefs := empty |} c st ->
+    (build_Env names Sigs Specs Defs) |- st =[ c ]=> st' ->
+    {| funSigs := fold_right (fun ffd Sigma'  =>
+                             t_update Sigma' (fst ffd) (snd ffd))
+                           (t_empty {| arity := 0 |})
+                           (combine names Sigs);
+       funSpecs := fold_right (fun ffd Sigma'  =>
+                             t_update Sigma' (fst ffd) (snd ffd))
+                          (t_empty {| pre := fun _ => True;
+                                      post := fun _ _ => False |})
+                          (combine names Specs);
+       funDefs := empty |} |- st =[ c ]=> st'.
+Proof.
+  intros.
+  eapply valid_Env_refine in X0; simpl in X0;
+    eauto using build_valid_Env_is_valid.
 Qed.

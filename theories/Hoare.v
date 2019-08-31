@@ -161,177 +161,178 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
       eauto using valid_Env_refine, hoare_proof_sound.
   Qed.
 
-  (*Fixpoint prove_safe_Env
-           (names : list funName)
-           (Sigs : list funSig)
-           (Specs : list funSpec)
-           (Defs : list funDef)
-  : Prop :=
-  match names, Sigs, Specs, Defs with
-  | f :: names', sig :: Sigs', spec :: Specs', fd :: Defs' =>
-    Forall (fun fd' => ~ AppearsIn f (funBody fd)) Defs' /\
-    ~ AppearsIn f (funBody fd) /\
-      (forall orig_args,
-          Specs |- {{ fun st => Forall2 (fun orig arg => st arg = orig)
-                                           orig_args
-                                           args -> pre (funSpecs f) orig_args }}
-                        body
-                        {{ fun st => post (funSpecs f) (aeval st ret) orig_args }})
-
-
-    valid_funDef (build_Env names' Sigs' Specs' Defs')
-                 spec fd
-  | _, _, _, _ => True
-  end.
-
-Fixpoint safe_Env
-           (names : list funName)
-           (Sigs : list funSig)
-           (Specs : list funSpec)
-           (Defs : list funDef)
-  : Prop :=
-  match names, Sigs, Specs, Defs with
-  | f :: names', sig :: Sigs', spec :: Specs', fd :: Defs' =>
-    Forall (fun fd' => ~ AppearsIn f (funBody fd)) Defs' /\
-    ~ AppearsIn f (funBody fd) /\
-    valid_funDef (build_Env names' Sigs' Specs' Defs')
-                 spec fd
-  | _, _, _, _ => True
-  end.
-
-Lemma safe_Env_is_valid
-  : forall (names : list funName)
-           (Sigs : list funSig)
-           (Specs : list funSpec)
-           (Defs : list funDef),
-    NoDup names ->
-    length names = length Sigs ->
-    length names = length Specs ->
-    length names = length Defs ->
-    safe_Env names Sigs Specs Defs ->
-    valid_Env (build_Env names Sigs Specs Defs).
-Proof.
-  induction names; simpl; intros.
-  - unfold valid_Env; unfold build_Env; simpl; intros;
-      compute in H1; discriminate.
-  - destruct Sigs; destruct Specs; destruct Defs; simpl in *;
-      try discriminate; injections.
-    simpl.
-    unfold build_Env; simpl.
-(* This is a straightforward proof. *)
-Admitted.
-
-  Lemma extend_funDefs
-    : forall
-      (Sigma' : Env)
-      (c : com)
-      (st st' : total_map nat)
-      (H : Sigma' |- st =[ c ]=> st')
-      (Sigma : Env)
-      (fd : funDef)
-      (f : String.string),
-      (Safe {| funSigs := funSigs; funSpecs := funSpecs; funDefs := empty |} c st) ->
-      Sigma' = {| funSigs := funSigs;
-                  funSpecs := funSpecs;
-                  funDefs := fun x' : String.string => if String.string_dec f x' then Some fd else funDefs x' |} ->
-      funDefs f = None ->
-      Sigma |- st =[ c ]=> st'.
-  Proof.
-    induction 1; intros; eauto; subst; simpl in *.
-    - inversion X; subst; econstructor; eauto.
-      eapply IHceval2; eauto.
-      eapply X1.
-      admit.
-    - simpl in *.
-
-  (*- find_if_inside; try discriminate; econstructor; eauto.
-    - find_if_inside; injections; eauto.
-      + econstructor; eauto. *)
-  Admitted.
-
-  Lemma hoare_valid_funDef
-    : forall {Sigma : Env} f args body ret,
+  Lemma valid_funDef_hoare :
+    forall (Sigma : Env) spec args body ret,
       valid_Env Sigma ->
-      funDefs f = None ->
-      (forall orig_args st,
-          (Forall2 (fun orig arg => st arg = orig)
-                   orig_args
-                   args -> pre (funSpecs f) orig_args)
-          -> @Safe {| funSigs := @funSigs Sigma;
-                      funSpecs := @funSpecs Sigma;
-                      funDefs := empty |} body st) ->
+      (forall args0,
+          pre spec args0 ->
+          Safe {| funSigs := funSigs; funSpecs := funSpecs; funDefs := empty |} body
+               (build_total_map (funArgs {| funArgs := args; funBody := body; funRet := ret |}) args0 0)) ->
       (forall orig_args,
           funSpecs |- {{ fun st => Forall2 (fun orig arg => st arg = orig)
-                                           orig_args
-                                           args -> pre (funSpecs f) orig_args }}
-                        body
-                        {{ fun st => post (funSpecs f) (aeval st ret) orig_args }}) ->
-      valid_Env {|
-          funSigs := funSigs;
-          funSpecs := funSpecs;
-                   funDefs := f |-> {| funArgs := args;
-                                       funBody := body;
-                                       funRet := ret |};
-                   funDefs |}.
+                                        orig_args
+                                        args -> pre spec orig_args }}
+                     body
+                     {{ fun st => post spec (aeval st ret) orig_args }})
+      -> valid_funDef Sigma spec {| funArgs := args; funBody := body; funRet := ret |}.
   Proof.
-    unfold valid_Env; simpl; unfold update, t_update; intros.
-    find_if_inside; subst; injections.
-    - assert (forall orig_args,
-                 Sigma |= {{ fun st => Forall2 (fun orig arg => st arg = orig)
-                                               orig_args
-                                               args -> pre (funSpecs f0) orig_args}} body
-                       {{fun st : state => post (funSpecs f0) (aeval st ret) orig_args}}) by
-          eauto using hoare_proof_link.
-      unfold valid_funDef, hoare_triple in *; intros.
-      simpl in *; eapply H2 with (st := build_total_map args args0 0); eauto.
-      replace body with (funBody {| funArgs := args; funBody := body; funRet := ret |}) in X by reflexivity.
-      simpl in X.
-      eapply extend_funDefs in X0; eauto.
-    -
-
-
-        inversion X0; subst; eapply E_IfFalse; eauto; congruence.
-
-        econstructor; eauto.
-          eapply IHbody1; eauto; intros; eapply X in H; inversion H; subst; eauto.
-
-
-      + admit.
-      + eauto.
-
-
     intros.
-    eapply hoare_proof_link
-    - injections.
-      unfold valid_funDef; intros.
-      eapply hoare_proof_sound in H1; unfold hoare_triple in H1;
-        eapply H1 with (st := build_total_map args args0 0); simpl in *; firstorder.
-      admit.
-    - unfold valid_funDef in *; intros.
-      eapply H; eauto.
+    unfold valid_funDef in *; intros.
+    specialize (H0 args0); eapply hoare_proof_sound in H0.
+    unfold hoare_triple in H0.
+    simpl; eapply H0; eauto.
+    eapply valid_Env_refine; eauto.
+  Qed.
 
-      Unset Printing Notations.
-      Set Printing Implicit.
+  Fixpoint build_valid_Env_hoare'
+           (Sigs : total_map funSig)
+           (Specs : total_map funSpec)
+           (names : list funName)
+           (Defs : list funDef)
+  : Prop :=
+  match names, Defs with
+  | f :: names', fd :: Defs' =>
+    Forall (fun fd' => ~ AppearsIn f (funBody fd')) Defs' /\
+    ~ AppearsIn f (funBody fd) /\
+    (forall orig_args,
+        Specs |- {{ fun st => Forall2 (fun orig arg => st arg = orig)
+                                         orig_args
+                                         (funArgs fd) -> pre (Specs f) orig_args }}
+                   funBody fd
+                   {{ fun st => post (Specs f) (aeval st (funRet fd)) orig_args }})
+      /\ (build_valid_Env_hoare' Sigs Specs names' Defs')
+  | _, _ => True
+  end.
 
+  Definition build_valid_Env_hoare
+             (names : list funName)
+             (Sigs : list funSig)
+             (Specs : list funSpec)
+             (Defs : list funDef)
+    : Prop :=
+    let funSigs' := fold_right (fun ffd Sigma'  =>
+                                  t_update Sigma' (fst ffd) (snd ffd))
+                               (t_empty {| arity := 0 |})
+                               (combine names Sigs) in
+    let funSpecs' := fold_right (fun ffd Sigma'  =>
+                                   t_update Sigma' (fst ffd) (snd ffd))
+                                (t_empty {| pre := fun _ => True;
+                                            post := fun _ _ => False |})
+                                (combine names Specs) in
+    build_valid_Env_hoare' funSigs' funSpecs' names Defs.
 
-
-    - injection H2; intros; subst.
-      Focus 2.
-    eapply H in
-    2: eapply H.
-  Abort. *)
-
-  (* This one is going to require more care...*)
-  Theorem hoare_valid_Env
-    : forall {Sigma : Env},
-      (forall f fd,
-          funDefs f = Some fd ->
-          funSpecs |- {{ fun st => pre (funSpecs f) (List.map st (funArgs fd)) }}
-                        funBody fd
-                      {{ fun st => post (funSpecs f) (aeval st (funRet fd)) (List.map st (funArgs fd)) }}) ->
-      valid_Env Sigma.
+  Lemma build_valid_Env_hoare_is_valid
+    : forall (names : list funName)
+             (Sigs : list funSig)
+             (Specs : list funSpec)
+             (Defs : list funDef)
+             (SafeDefs :
+                (fold_right (fun ffd P =>
+                               ((forall args0 : list nat,
+                                   pre ( fold_right
+                                                          (fun (ffd : String.string * funSpec) (Sigma' : total_map funSpec) => fst ffd !-> snd ffd; Sigma')
+                                                          (_ !-> {| pre := fun _ : list nat => True; post := fun (_ : nat) (_ : list nat) => False |})
+                                                          (combine names Specs) (fst ffd)) args0 ->
+                                   Safe {| funSigs := fold_right
+                                                        (fun (ffd : String.string * funSig) (Sigma' : total_map funSig) => fst ffd !-> snd ffd; Sigma')
+                                                        (_ !-> {| arity := 0 |}) (combine names Sigs);
+                                           funSpecs := fold_right
+                                                          (fun (ffd : String.string * funSpec) (Sigma' : total_map funSpec) => fst ffd !-> snd ffd; Sigma')
+                                                          (_ !-> {| pre := fun _ : list nat => True; post := fun (_ : nat) (_ : list nat) => False |})
+                                                          (combine names Specs);
+                                           funDefs := empty |} (Imp.funBody (snd ffd))
+                                        (build_total_map (Imp.funArgs (snd ffd)) args0 0)) * P)%type)
+                            unit
+                            (combine names Defs))),
+      NoDup names ->
+      length names = length Defs ->
+      build_valid_Env_hoare names Sigs Specs Defs ->
+      valid_Env (build_Env names Sigs Specs Defs).
   Proof.
-  Abort.
+    unfold build_Env, build_valid_Env_hoare, build_valid_Env in *.
+    intros ? ? ? ?.
+    generalize
+      Defs
+      (fold_right
+         (fun (ffd : String.string * funSig) (Sigma' : total_map funSig) => fst ffd !-> snd ffd; Sigma')
+         (_ !-> {| arity := 0 |}) (combine names Sigs))
+      (fold_right
+         (fun (ffd : String.string * funSpec) (Sigma' : total_map funSpec) => fst ffd !-> snd ffd; Sigma')
+         (_ !-> {| pre := fun _ : list nat => True; post := fun (_ : nat) (_ : list nat) => False |})
+         (combine names Specs)); clear.
+    induction names; destruct Defs; simpl in *; intros; try discriminate.
+    intuition eauto.
+    eapply valid_Env_Extend with (Sigma := {| funSigs := _; funSpecs := _; funDefs := _ |});
+      eauto.
+    - inversion H; subst; eauto.
+    - inversion H; subst.
+      simpl; generalize H7 Defs; clear.
+      induction names; destruct Defs; try reflexivity; intros.
+      simpl.
+      unfold update, t_update; find_if_inside; subst.
+      + destruct H7; simpl; eauto.
+      + eapply IHnames.
+        intro; eapply H7; simpl; intuition.
+    - simpl; generalize H2 names; clear.
+      intro; induction H2; destruct names; simpl; intros;
+        try (compute in H; discriminate).
+      apply update_inv in H0; intuition; subst; eauto.
+    - eapply valid_funDef_hoare; eauto.
+      inversion H; subst; eauto.
+  Qed.
+
+  Corollary hoare_proof_link_valid_Env
+    : forall (names : list funName)
+             (Sigs : list funSig)
+             (Specs : list funSpec)
+             (Defs : list funDef)
+             (SafeDefs :
+                (fold_right (fun ffd P =>
+                               ((forall args0 : list nat,
+                                   pre ( fold_right
+                                                          (fun (ffd : String.string * funSpec) (Sigma' : total_map funSpec) => fst ffd !-> snd ffd; Sigma')
+                                                          (_ !-> {| pre := fun _ : list nat => True; post := fun (_ : nat) (_ : list nat) => False |})
+                                                          (combine names Specs) (fst ffd)) args0 ->
+                                   Safe {| funSigs := fold_right
+                                                        (fun (ffd : String.string * funSig) (Sigma' : total_map funSig) => fst ffd !-> snd ffd; Sigma')
+                                                        (_ !-> {| arity := 0 |}) (combine names Sigs);
+                                           funSpecs := fold_right
+                                                          (fun (ffd : String.string * funSpec) (Sigma' : total_map funSpec) => fst ffd !-> snd ffd; Sigma')
+                                                          (_ !-> {| pre := fun _ : list nat => True; post := fun (_ : nat) (_ : list nat) => False |})
+                                                          (combine names Specs);
+                                           funDefs := empty |} (Imp.funBody (snd ffd))
+                                        (build_total_map (Imp.funArgs (snd ffd)) args0 0)) * P)%type)
+                            unit
+                            (combine names Defs)))
+             (P Q : Assertion) c,
+      NoDup names ->
+      length names = length Sigs ->
+      length names = length Specs ->
+      length names = length Defs ->
+      build_valid_Env_hoare names Sigs Specs Defs ->
+      (forall st,
+          P st ->
+          Safe {| funSigs := fold_right (fun ffd Sigma'  =>
+                                           t_update Sigma' (fst ffd) (snd ffd))
+                                        (t_empty {| arity := 0 |})
+                                        (combine names Sigs);
+                  funSpecs := fold_right (fun ffd Sigma'  =>
+                                            t_update Sigma' (fst ffd) (snd ffd))
+                                         (t_empty {| pre := fun _ => True;
+                                                     post := fun _ _ => False |})
+                                         (combine names Specs);
+                  funDefs := empty |} c st) ->
+      fold_right (fun ffd Sigma' =>
+                    t_update Sigma' (fst ffd) (snd ffd))
+                 (t_empty {| pre := fun _ => True;
+                             post := fun _ _ => False |})
+                 (combine names Specs) |- {{P}} c {{Q}} ->
+    (build_Env names Sigs Specs Defs) |= {{P}} c {{Q}}.
+  Proof.
+    intros.
+    eapply hoare_proof_link; eauto.
+    eapply build_valid_Env_hoare_is_valid; eauto.
+  Qed.
 
 End Hoare.
 
