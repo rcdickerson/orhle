@@ -5,6 +5,7 @@
 
 Require Import
         Coq.Strings.String
+        Coq.Lists.List
         Coq.Logic.FunctionalExtensionality.
 
 (* ################################################################# *)
@@ -24,6 +25,9 @@ Notation "'_' '!->' v" := (t_empty v)
 
 Notation "x '!->' v ';' m" := (t_update m x v)
                               (at level 100, v at next level, right associativity).
+
+Definition build_total_map {A} (xs : list string) (l : list A) (a : A) : total_map A :=
+  fold_left (fun m xa => t_update m (fst xa) (snd xa)) (combine xs l) (t_empty a).
 
 Lemma t_apply_empty : forall (A : Type) (x : string) (v : A),
     (_ !-> v) x = v.
@@ -141,4 +145,14 @@ Theorem update_permute : forall (A : Type) (m : partial_map A)
 Proof.
   intros A m x1 x2 v1 v2. unfold update.
   apply t_update_permute.
+Qed.
+
+Lemma update_inv
+  : forall (A : Type) (m : partial_map A) x1 x2 v1 v2,
+    (update m x1 v1) x2 = Some v2 ->
+    (x1 = x2 /\ v1 = v2) \/ (x1 <> x2 /\ m x2 = Some v2).
+Proof.
+  unfold update, t_update; intros.
+  destruct (string_dec x1 x2);
+    try injection H; intros; subst; intuition.
 Qed.
