@@ -1,5 +1,5 @@
 module Abduction
-    ( AbductionProblem
+    ( AbductionProblem(..)
     , AbductionResult
     , abduce
     , imapStrengthen

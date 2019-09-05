@@ -4,11 +4,13 @@ import RHLEVerifier
 import Test.HUnit
 import Z3.Monad
 
+import AbductionTests
 import Verifier1Tests
 import Verifier2Tests
 
 main :: IO Counts
 main = runTestTT $ TestList
-  [ --verifier1Tests
-  verifier2Tests
+  [ abductionTests
+  --, verifier1Tests
+  --, verifier2Tests
   ]

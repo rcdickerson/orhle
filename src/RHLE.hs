@@ -4,8 +4,8 @@ module RHLE
   ) where
 
 import Imp
+import SMTParser
 import Z3.Monad
-import Z3Util
 
 data RHLETrip = RHLETrip
   { rhlePre   :: AST
@@ -16,6 +16,6 @@ data RHLETrip = RHLETrip
 
 mkRHLETrip :: String -> Prog -> Prog -> String -> Z3 RHLETrip
 mkRHLETrip pre progA progE post = do
-  preAST  <- parseSMT pre
-  postAST <- parseSMT post
+  preAST  <- parseSMTOrError pre
+  postAST <- parseSMTOrError post
   return $ RHLETrip preAST progA progE postAST

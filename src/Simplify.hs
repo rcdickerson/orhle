@@ -31,12 +31,12 @@ ddaSimplify expr subexpr = do
 
 -- TODO: need to repeat this until fixpoint
 calcC' :: (AST -> Z3 AST) -> AST -> [AST] -> Z3 [AST]
-calcC' star expr asts = distList $ mapCompList calcCi' asts
+calcC' star expr asts = sequence $ mapCompList calcCi' asts
   where
     calcCi' :: AST -> [AST] -> Z3 AST
     calcCi' x xs = do
-      xs' <- distList $ map star xs
-      a' <- mkAnd $ expr : xs'
+      xs' <- sequence $ map star xs
+      a'  <- mkAnd $ expr : xs'
       ddaSimplify a' x
 
 mapCompList :: (a -> [a] -> b) -> [a] -> [b]

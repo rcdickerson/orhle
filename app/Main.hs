@@ -4,7 +4,8 @@ import RHLEVerifier
 import Z3.Monad
 
 main :: IO ()
-main = useVerifier2
+main = do
+  useVerifier2
 
 {-
 useVerifier1 :: IO ()

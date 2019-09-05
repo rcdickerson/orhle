@@ -5,8 +5,8 @@ module HoareE
   ) where
 
 import Imp
+import SMTParser
 import Z3.Monad
-import Z3Util
 
 data HLETrip = HLETrip
   { hlePre  :: AST
@@ -16,8 +16,8 @@ data HLETrip = HLETrip
 
 mkHLETrip :: String -> Prog -> String -> Z3 HLETrip
 mkHLETrip pre prog post = do
-  preAST  <- parseSMT pre
-  postAST <- parseSMT post
+  preAST  <- parseSMTOrError pre
+  postAST <- parseSMTOrError post
   return $ HLETrip preAST prog postAST
 
 hleSP :: Stmt -> AST -> Z3 AST
