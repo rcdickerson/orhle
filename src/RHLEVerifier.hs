@@ -11,6 +11,7 @@ module RHLEVerifier
     , Stmt(..)
     , UFunc(..)
     , Var
+    , Verifier
     , VResult
     , VTrace
     , abduce
@@ -21,7 +22,7 @@ module RHLEVerifier
     , parseImpOrError
     , ppVTrace
     , putInterpMap
-    , runVerifier2
+    , runVerifier
     , verify1
     , verify2
     ) where
@@ -33,5 +34,6 @@ import Imp
 import ImpParser
 import InterpMap
 import RHLE
+import Verifier
 import Verifier1
 import Verifier2

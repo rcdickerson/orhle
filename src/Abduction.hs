@@ -108,7 +108,7 @@ singleAbduction name vars conds posts = do
   qeResSimpl <- simplifyWrt condAST qeRes
   sat        <- checkSat qeResSimpl
   case sat of
-    False -> return.Left $ "No satisfying abduction found."
+    False -> return.Left  $ "No satisfying abduction found."
     True  -> return.Right $ Map.insert name qeResSimpl emptyIMap
 
 multiAbduction :: [Var] -> [AST] -> [AST] -> Z3 AbductionResult

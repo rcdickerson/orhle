@@ -4,16 +4,34 @@ module Verifier1
     ) where
 
 import Abduction
+import Control.Monad.Writer
 import Imp
+import InterpMap
 import RHLE
+import Verifier
+import VTrace
 import Z3.Monad
 
-verify1 :: RHLETrip -> Z3 AbductionResult
-verify1 (RHLETrip pre progA progE post) = do
-  (cA, aA)  <- encodeImp progA
-  (cE, aE)  <- encodeImp progE
-  fPosts <- mapM (fPostCond.snd) (aA ++ aE)
-  abduce (fst.unzip $ aA ++ aE, [pre, cA, cE], post:fPosts)
+verify1 :: RHLETrip -> Z3 (VResult, [VTrace])
+verify1 trip = do
+  runWriterT $ verify1' trip
+
+verify1' :: RHLETrip -> VTracedResult
+verify1' (RHLETrip pre progA progE post) = do
+  (cA, aA)  <- lift $ encodeImp progA
+  (cE, aE)  <- lift $ encodeImp progE
+  fPosts    <- lift $ mapM (fPostCond.snd) (aA ++ aE)
+  result    <- lift $ abduce (fst.unzip $ aA ++ aE, [pre, cA, cE], post:fPosts)
+  preStr    <- lift $ astToString =<< mkAnd [pre, cA, cE]
+  postStr   <- lift $ astToString =<< mkAnd (post:fPosts)
+  case result of
+    Left reason -> do
+      logAbductionFailure preStr postStr
+      return.Left $ reason
+    Right imap  -> do
+      interpLines <- lift $ ppInterpMap imap
+      logAbductionSuccess interpLines preStr postStr
+      return.Right $ imap
 
 encodeImp :: Stmt -> Z3 (AST, [(Var, UFunc)])
 encodeImp stmt =

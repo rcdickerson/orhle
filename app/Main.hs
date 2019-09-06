@@ -4,48 +4,21 @@ import RHLEVerifier
 import Z3.Monad
 
 main :: IO ()
-main = do
-  useVerifier2
+main = do runSimpleNonRefinement
 
-{-
-useVerifier1 :: IO ()
-useVerifier1 = do
-  putStrLn "------------------------------------------------"
-  putStrLn $ "Universal Program:\n" ++ (show.rhleProgA $ rhleTrip)
-  putStrLn "------------------------------------------------"
-  putStrLn $ "Existential Program:\n" ++ (show.rhleProgE $ rhleTrip)
-  putStrLn "------------------------------------------------"
-  (cA, aA) <- evalZ3 . encodeImp $ rhleProgA =<< rhleTrip
-  (cE, aE) <- evalZ3 . encodeImp $ rhleProgE =<< rhleTrip
-  putStrLn $ "A Abducibles: " ++ (show aA)
-  putStrLn $ "A Encoding:\n" ++ cA
-  putStrLn "------------------------------------------------"
-  putStrLn $ "E Abducibles: " ++ (show aE)
-  putStrLn $ "E Encoding:\n" ++ cE
-  putStrLn "------------------------------------------------"
-  result <- evalZ3 $ verify1 rhleTrip
-  case result of
-    Left err -> putStrLn $ "FAILURE: " ++ err
-    Right interp -> do
-      putStrLn "SUCCESS"
-      putInterpMap interp
-  putStrLn "------------------------------------------------"
--}
+runSimpleExample :: IO ()
+runSimpleExample = do
+  putStrLn =<< runVerifier verify2 "true" progA1 progE2 "(= y1 y2)"
 
-useVerifier2 :: IO ()
-useVerifier2 = do
-  putStrLn =<< runVerifier2 "true" progA1 progE1 "(= y1 y2)"
+-------------------------------------
+-- Useful for REPL experimentation --
+-------------------------------------
 
 printZ3 :: AST -> IO String
 printZ3 = evalZ3.astToString
 
 printZ3Simpl :: AST -> IO String
 printZ3Simpl ast = evalZ3 $ astToString =<< simplify ast
-
-
--------------------------------------
--- Useful for REPL experimentation --
--------------------------------------
 
 p = printZ3
 ps symbolList = mapM evalZ3 $ map getSymbolString symbolList
@@ -79,7 +52,43 @@ progE2 = parseImpOrError "     \
 \    post {(= (mod x2 2) 1)};  \
 \  if x2 == 3 then             \
 \    call y2 := randOddY()     \
-\      pre {(true)}            \
+\      pre {true}              \
 \      post {(= (mod y2 2) 1)} \
 \  else                        \
 \    y2 := 500                 "
+
+
+------------------------------------
+-- Some hard-coded klive examples --
+------------------------------------
+
+runSimpleNonRefinement :: IO ()
+runSimpleNonRefinement = do
+--  fails: forall t1. exists t2.
+--    t1|refinement == t2|original;
+  let progOriginal = parseImpOrError "  \
+  \  call t1_x := randInt()             \
+  \     pre {true}                      \
+  \     post {(and (>= t1_x 0) (< t1_x 20))}; \
+  \  t1_refinement := t1_x"
+  let progRefinement = parseImpOrError " \
+  \  call t2_x := randInt()              \
+  \     pre {true}                       \
+  \     post {(= t2_x 5)} ; \
+  \  t2_original := t2_x"
+  putStrLn =<< runVerifier verify2 "true" progRefinement progOriginal "(= t1_refinement t2_original)"
+
+runSimpleRefinement :: IO ()
+runSimpleRefinement = do
+--  satisfies: forall t1. exists t2.
+--    t1|refinement == t2|original;
+  let progOriginal = parseImpOrError "  \
+  \  call t1_x := randInt()    \
+  \     pre {true}                      \
+  \     post {(and (>= t1_x 0) (< t1_x 20))}"
+  let progRefinement = parseImpOrError " \
+  \  call t2_x := randOddInt()    \
+  \     pre {true}                       \
+  \     post {(= t2_x 5)}"
+
+  putStrLn =<< runVerifier verify2 "true" progRefinement progOriginal "(= t1_x t2_x)"

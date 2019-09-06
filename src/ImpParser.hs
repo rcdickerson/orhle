@@ -21,7 +21,7 @@ languageDef = Token.LanguageDef
   , Token.commentEnd      = "*/"
   , Token.commentLine     = "//"
   , Token.identStart      = letter
-  , Token.identLetter     = alphaNum
+  , Token.identLetter     = alphaNum <|> char '_'
   , Token.nestedComments  = True
   , Token.opStart         = Token.opLetter languageDef
   , Token.opLetter        = oneOf ":!#$%&*+./<=>?@\\^|-~"
