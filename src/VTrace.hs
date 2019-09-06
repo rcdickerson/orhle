@@ -20,7 +20,6 @@ import HoareE
 import Imp
 import RHLE
 import Z3.Monad
-import Z3Util
 
 data VTrace = VTRhle RHLETrip
             | VTHle  HLETrip
@@ -76,12 +75,12 @@ ppVTrace' indent (t:ts) =
     VTRhle (RHLETrip pre progA progE post) -> do
       progStr <- ppStmtStart progA
       rest    <- ppVTrace' indent ts
-      preStr  <- smtString pre
+      preStr  <- astToString pre
       return $ start ++ "A " ++ preStr ++ " :: " ++ progStr ++ "\n" ++ rest
     VTHle  (HLETrip  pre progE post) -> do
       progStr <- ppStmtStart progE
       rest    <- ppVTrace' indent ts
-      preStr  <- smtString pre
+      preStr  <- astToString pre
       return $ start ++ "E " ++ preStr ++ " :: " ++ progStr ++ "\n" ++ rest
     VTAbduction sat interpLines pre post -> do
       rest    <- ppVTrace' indent ts

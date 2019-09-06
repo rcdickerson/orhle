@@ -101,11 +101,11 @@ verifyAIf c s1 s2 rest (HLETrip pre progE post) imap = do
   case (consistent1, consistent2) of
     (True , True ) -> verifyAIf' c s1 s2 rest (HLETrip pre progE post) imap
     (True , False) -> do
-      condStr <- lift $ smtString notC
+      condStr <- lift $ astToString notC
       logMsgA $ "(A) Skipping inconsistent else branch: " ++ condStr
       inBranchLog c $ verifyA (RHLETrip cond1 s1 progE post) imap
     (False, True ) -> do
-      condStr <- lift $ smtString c
+      condStr <- lift $ astToString c
       logMsgA $ "(A) Skipping inconsistent then branch: " ++ condStr
       inBranchLog notC $ verifyA (RHLETrip cond2 s2 progE post) imap
     (False, False) -> return.Left $ "(A) Neither if-branch is consistent"
@@ -152,8 +152,8 @@ verifyESeq pre (s:ss) post imap = do
 
 verifyFinalImpl :: AST -> InterpMap -> AST -> VTracedResult
 verifyFinalImpl pre imap post = do
-  preStr  <- lift $ smtString pre
-  postStr <- lift $ smtString post
+  preStr  <- lift $ astToString pre
+  postStr <- lift $ astToString post
   result  <- lift $ imapStrengthen pre imap post
   case result of
     Right imap' -> do
@@ -166,7 +166,7 @@ verifyFinalImpl pre imap post = do
 
 verifyECall :: Var -> UFunc -> HLETrip -> InterpMap -> VTracedResult
 verifyECall asg f (HLETrip pre progE post) imap = do
-  preStr <- lift $ smtString pre
+  preStr <- lift $ astToString pre
   logCallE preStr (fPreSMT f)
   fPre <- lift $ fPreCond f
   preCondImp <- lift $ mkImplies pre fPre
@@ -191,21 +191,21 @@ verifyEIf c s1 s2 pre rest post imap = do
   case (canEnter1, canEnter2) of
     (False, False) -> return.Left $ "(E) Neither if-branch is enterable"
     (True , False) -> do
-      condStr <- lift $ smtString notC
+      condStr <- lift $ astToString notC
       logMsgE $ "Skipping unenterable if-branch: " ++ condStr
       inBranchLog c $ verifyE (HLETrip cond1 (Seq $ s1:rest) post) imap1
     (False, True ) -> do
-      condStr <- lift $ smtString c
+      condStr <- lift $ astToString c
       logMsgE $ "Skipping unenterable if-branch: " ++ condStr
       inBranchLog notC $ verifyE (HLETrip cond2 (Seq $ s2:rest) post) imap2
     (True , True ) -> do
       mapLines1 <- lift $ ppInterpMap imap1
       mapLines2 <- lift $ ppInterpMap imap2
-      preStr    <- lift $ smtString pre
-      cStr      <- lift $ smtString c
+      preStr    <- lift $ astToString pre
+      cStr      <- lift $ astToString c
       logAbductionSuccess mapLines1 preStr cStr
       res1 <- inBranchLog c $ verifyE (HLETrip cond1 (Seq $ s1:rest) post) imap1
-      notCStr <- lift $ smtString notC
+      notCStr <- lift $ astToString notC
       logAbductionSuccess mapLines2 preStr notCStr
       res2 <- inBranchLog notC $ verifyE (HLETrip cond2 (Seq $ s2:rest) post) imap2
       case (res1, res2) of
@@ -225,7 +225,7 @@ tryStrengthening pre imap branchAST = do
 
 inBranchLog :: AST -> VTracedResult -> VTracedResult
 inBranchLog cond branch = do
-  condStr <- lift $ smtString cond
+  condStr <- lift $ astToString cond
   logBranchStart condStr
   result <- branch
   logBranchEnd

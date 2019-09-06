@@ -7,8 +7,8 @@ module Hoare
     ) where
 
 import Imp
+import SMTParser
 import Z3.Monad
-import Z3Util
 
 data HLTrip = HLTrip
   { hlPre  :: AST
@@ -18,8 +18,8 @@ data HLTrip = HLTrip
 
 mkHLTrip :: String -> Prog -> String -> Z3 HLTrip
 mkHLTrip pre prog post = do
-  preAST  <- parseSMT pre
-  postAST <- parseSMT post
+  preAST  <- parseSMTOrError pre
+  postAST <- parseSMTOrError post
   return $ HLTrip preAST prog postAST
 
 hlWP :: Stmt -> AST -> Z3 AST

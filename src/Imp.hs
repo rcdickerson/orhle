@@ -20,8 +20,8 @@ module Imp
     , Var
     ) where
 
+import SMTParser
 import Z3.Monad
-import Z3Util
 
 infix 1 :=
 infix 2 :=:
@@ -156,18 +156,18 @@ data UFunc = UFunc
 
 fsubst :: UFunc -> Var -> Var -> Z3 UFunc
 fsubst f@(UFunc name params _ _) var repl = do
-  pre'  <- smtString =<< subAST =<< fPreCond f
-  post' <- smtString =<< subAST =<< fPostCond f
+  pre'  <- astToString =<< subAST =<< fPreCond f
+  post' <- astToString =<< subAST =<< fPostCond f
   let params' = map (\p -> if p == var then repl else p) params
   return $ UFunc name params' pre' post'
   where
     subAST ast = subVar ast var repl
 
 fPreCond :: UFunc -> Z3 AST
-fPreCond = parseSMT.fPreSMT
+fPreCond = parseSMTOrError.fPreSMT
 
 fPostCond :: UFunc -> Z3 AST
-fPostCond = parseSMT.fPostSMT
+fPostCond = parseSMTOrError.fPostSMT
 
 funSP :: UFunc -> AST -> Z3 AST
 funSP f pre = do
