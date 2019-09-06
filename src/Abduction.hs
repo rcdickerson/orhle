@@ -1,5 +1,5 @@
 module Abduction
-    ( AbductionProblem(..)
+    ( AbductionProblem
     , AbductionResult
     , abduce
     , imapStrengthen
@@ -20,12 +20,14 @@ type AbductionResult  = Either String InterpMap
 
 imapStrengthen :: AST -> InterpMap -> AST -> Z3 AbductionResult
 imapStrengthen pre imap post = do
-  let vars      = Map.keys imap
-  let freshen v = mkFreshIntVar v >>= astToString >>= \f -> return (v, f)
-  let subFresh  = \pre' (v, f) -> subVar pre' v f
-  freshVars     <- mapM freshen vars
-  preZ3         <- foldM subFresh pre freshVars
-  abduce (vars, [preZ3], post:(Map.elems imap))
+  let vars  = Map.keys imap
+  freshPre <- foldM (\pre' -> uncurry $ subVar pre') pre =<< mapM freshen vars
+  abduce (vars, [freshPre], post:(Map.elems imap))
+  where
+    -- Fresh vars in the precondition effectively "forget" what we know
+    -- about the variables in the interpretation map. This ensures the
+    -- abduced replacement interpretations are sufficiently strong.
+    freshen v = mkFreshIntVar v >>= astToString >>= \fresh -> return (v, fresh)
 
 abduce :: AbductionProblem -> Z3 AbductionResult
 abduce (vars, pres, posts) = do
@@ -33,10 +35,11 @@ abduce (vars, pres, posts) = do
   if not consistencyCheck
     then return.Left $ "Preconditions are not consistent."
     else do
-      case vars of
+      result <- case vars of
         []     -> noAbduction               pres posts
         var:[] -> singleAbduction var [var] pres posts
         _      -> multiAbduction  vars      pres posts
+      return result
 
 astVars :: AST -> Z3 [Symbol]
 astVars ast = do
@@ -96,18 +99,17 @@ noAbduction conds posts = do
 singleAbduction :: String -> [Var] -> [AST] -> [AST]
                 -> Z3 AbductionResult
 singleAbduction name vars conds posts = do
-  condAST <- mkAnd conds
-  postAST <- mkAnd posts
-  imp     <- mkImplies condAST postAST
-  impVars <- astVars imp
-  vbar    <- filterVars impVars vars
-  qeRes   <- performQe vbar imp
-  sat     <- checkSat qeRes
+  condAST    <- mkAnd conds
+  postAST    <- mkAnd posts
+  imp        <- mkImplies condAST postAST
+  impVars    <- astVars imp
+  vbar       <- filterVars impVars vars
+  qeRes      <- performQe vbar imp
+  qeResSimpl <- simplifyWrt condAST qeRes
+  sat        <- checkSat qeResSimpl
   case sat of
     False -> return.Left $ "No satisfying abduction found."
-    True  -> do
-      qeResSimpl <- simplifyWrt condAST qeRes
-      return.Right $ Map.insert name qeResSimpl emptyIMap
+    True  -> return.Right $ Map.insert name qeResSimpl emptyIMap
 
 multiAbduction :: [Var] -> [AST] -> [AST] -> Z3 AbductionResult
 multiAbduction vars conds posts = do

@@ -22,6 +22,7 @@ dependencies:
 - containers
 - mtl
 - parsec
+- text
 - z3 >= 408.0 && < 409
 
 library:

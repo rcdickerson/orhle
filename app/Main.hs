@@ -75,7 +75,7 @@ progE1 = parseImpOrError "     \
 
 progE2 = parseImpOrError "     \
 \  call x2 := randOddX()       \
-\    pre {(true)}              \
+\    pre {true}                \
 \    post {(= (mod x2 2) 1)};  \
 \  if x2 == 3 then             \
 \    call y2 := randOddY()     \

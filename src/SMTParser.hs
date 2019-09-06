@@ -12,6 +12,7 @@ type SMTParser a = Parsec String () (Z3 a)
 data SMTFunc = SMTAnd
              | SMTEq
              | SMTMod
+             | SMTNot
              | SMTOr
 
 parseSMT :: String -> Either ParseError (Z3 AST)
@@ -24,7 +25,7 @@ parseSMTOrError smt =
     Right ast -> ast
 
 smtExpr :: SMTParser AST
-smtExpr = try smtApp <|> smtLit
+smtExpr = try smtApp <|> try smtLit
 
 whitespace :: SMTParser ()
 whitespace = do
@@ -51,7 +52,7 @@ smtInt = do
 smtIdent :: SMTParser AST
 smtIdent = do
   start <- letter
-  rest  <- many alphaNum
+  rest  <- many $ alphaNum <|> char '!'
   let id = start:rest
   whitespace
   return $ case id of
@@ -73,16 +74,19 @@ funcDecl :: SMTParser SMTFunc
 funcDecl =     funcParser "and" SMTAnd
            <|> funcParser "="   SMTEq
            <|> funcParser "mod" SMTMod
+           <|> funcParser "not" SMTNot
            <|> funcParser "or"  SMTOr
 
 smtApply :: SMTFunc -> [AST] -> Z3 AST
 smtApply SMTAnd ops = mkAnd ops
 smtApply SMTEq (lhs:rhs:[]) = mkEq lhs rhs
 smtApply SMTMod (lhs:rhs:[]) = mkMod lhs rhs
+smtApply SMTNot (expr:[]) = mkNot expr
 smtApply SMTOr ops = mkOr ops
 -- TODO: something better than error
 smtApply SMTEq _ = error "equals takes exactly two arguments"
 smtApply SMTMod _ = error "mod takes exactly two arguments"
+smtApply SMTNot _ = error "not takes exactly one argument"
 
 funcParser :: String -> SMTFunc -> SMTParser SMTFunc
 funcParser str func = string str >> whitespace >> (return $ return func)

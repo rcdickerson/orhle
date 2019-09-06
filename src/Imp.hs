@@ -22,6 +22,7 @@ module Imp
 
 import SMTParser
 import Z3.Monad
+import Z3Util
 
 infix 1 :=
 infix 2 :=:
@@ -77,16 +78,13 @@ aexpToZ3 aexp =
       mkMod dividend divisor
 
 subVar :: AST -> Var -> Var -> Z3 AST
-subVar ast var repl = do
-  z3Var  <- aexpToZ3 $ V var
-  z3Repl <- aexpToZ3 $ V repl
-  substituteVars ast [z3Var, z3Repl]
+subVar ast var repl = subAexp ast (V var) (V repl)
 
 subAexp :: AST -> AExp -> AExp -> Z3 AST
-subAexp ast lhs rhs = do
-  z3Lhs <- aexpToZ3 $ lhs
-  z3Rhs <- aexpToZ3 $ rhs
-  substituteVars ast [z3Lhs, z3Rhs]
+subAexp ast expr repl = do
+  z3Expr <- aexpToZ3 $ expr
+  z3Repl <- aexpToZ3 $ repl
+  subAST ast z3Expr z3Repl
 
 assignPost :: Var -> AExp -> AST -> Z3 AST
 assignPost var aexp post = do
