@@ -226,8 +226,31 @@ Inductive AppearsIn (f : funName) : com -> Prop :=
 | AI_Call : forall args x,
     AppearsIn f (x :::= f $ args).
 
-(* A safe program is one that is guaranteed not to crash / get stuck *)
-CoInductive Safe (Sigma : Env) : com -> state -> Type :=
+Section safe_Execution.
+
+  (* Formalizing when it is safe to use function definitions.  Safe
+     here means that the composite program doesn't introduce any new
+     behaviors that fall outside the spec. *)
+
+  (* A safe function definition is one that doesn't introduce any new
+     behaviors outside those allowed by its specifiction. *)
+  Definition safe_funDef (Sigma : Env)
+             (fs : funSpec)
+             (fd : funDef) : Prop :=
+    forall (args : list nat) st',
+      (pre fs) args ->
+      Sigma |- build_total_map (funArgs fd) args 0 =[ funBody fd ]=> st' ->
+      (post fs) (aeval st' (funRet fd)) args.
+
+  (* An environment is safe if all of its function definitions are
+     safe with respect to their specs.  *)
+  Definition safe_Env (Sigma : Env) : Prop :=
+    forall f fd,
+      funDefs f = Some fd ->
+      safe_funDef Sigma (funSpecs f) fd.
+
+  (* A safe initial state is one that guarantees the program will not crash / get stuck *)
+  CoInductive Safe (Sigma : Env) : com -> state -> Type :=
     | Safe_Skip : forall st,
       Safe Sigma SKIP st
   | Safe_Ass  : forall st x a,
@@ -255,277 +278,391 @@ CoInductive Safe (Sigma : Env) : com -> state -> Type :=
   | Safe_CallDef :
       forall st args x f fd,
         funDefs f = Some fd ->
-        Safe Sigma (x :::= f $ args) (build_total_map (funArgs fd) (aseval st args) 0)->
+        Safe Sigma (funBody fd) (build_total_map (funArgs fd) (aseval st args) 0)->
         Safe Sigma (x :::= f $ args) st
   | Safe_CallSpec : forall st args x f,
       funDefs f = None ->
       (funSpecs f).(pre) (aseval st args) ->
       Safe Sigma (x :::= f $ args) st.
 
-Definition valid_funDef (Sigma : Env)
-           (fs : funSpec)
-           (fd : funDef) : Prop :=
-  forall (args : list nat) st',
-    (pre fs) args ->
-    Sigma |- build_total_map (funArgs fd) args 0 =[ funBody fd ]=> st' ->
-    (post fs) (aeval st' (funRet fd)) args.
-
-Definition valid_Env (Sigma : Env) : Prop :=
-  forall f fd,
-    funDefs f = Some fd ->
-    valid_funDef Sigma (funSpecs f) fd.
-
-(* Proof: if a function doesn't call itself (or is called by other defined functions),
-   and it implements its spec, it's safe to extend the context with.
- *)
-
-Local Hint Constructors ceval.
-Local Hint Constructors AppearsIn.
-
-Lemma eval_Env_Weaken
-  : forall (Sigma : Env)
-           (f : funName)
-           (c : com),
-    ~ AppearsIn f c ->
-    (forall f' fd', funDefs f' = Some fd' ->
-                    ~ AppearsIn f (funBody fd')) ->
-    forall st st' fd,
+  (* Key Safety Theorem: executing a program in a safe environment and
+  initial state will not produce any values that a 'pure'
+  specification environment (i.e. one without any function
+  definitions) would not. In other words, the composite program is a
+  /refinement/ of the specification-only program. *)
+  Theorem safe_Env_refine (Sigma : Env) :
+    forall (c : com) (st st' : state),
+      safe_Env Sigma ->
+      Safe {|
+          funSigs := funSigs;
+          funSpecs := funSpecs;
+          funDefs := empty |} c st ->
       Sigma |- st =[ c ]=> st' ->
       {| funSigs := funSigs;
-                    funSpecs := funSpecs;
-                    funDefs := f |-> fd; funDefs |} |- st =[ c ]=> st'.
-Proof.
-  induction 3; simpl; intros; eauto.
-  - econstructor; eauto.
-  - econstructor; eauto.
-  - eapply E_IfFalse; eauto.
-  - econstructor; eauto.
-  - econstructor; eauto; simpl in *.
-    unfold update, t_update; find_if_inside; subst; eauto.
-    destruct H; eauto.
-  - eapply E_CallImpl; simpl; eauto.
-    unfold update, t_update; find_if_inside; eauto.
-    destruct H; subst; eauto.
-Qed.
+         funSpecs := funSpecs;
+         funDefs := empty |} |- st =[ c ]=> st'.
+  Proof.
+    induction 3; intros; try (solve [econstructor; eauto]).
+    - inversion X; subst; try congruence; econstructor; eauto.
+    - inversion X; subst; try congruence; econstructor; eauto.
+    - inversion X; subst; eapply E_IfFalse; eauto; congruence.
+    - inversion X; subst; try congruence; econstructor; eauto.
+    - inversion X; subst; try congruence.
+      + simpl in *; rewrite apply_empty in H4; discriminate.
+      + eapply (E_CallSpec {| funSpecs := funSpecs; funDefs := empty |});
+          simpl in *; eauto.
+        eapply H; eauto.
+  Qed.
 
-Lemma eval_Env_Strengthen
-  : forall (Sigma : Env)
-           (f : funName)
-           (c : com),
-    ~ AppearsIn f c ->
-    (forall f' fd', funDefs f' = Some fd' ->
-                    ~ AppearsIn f (funBody fd')) ->
-    forall st st' fd,
-      {| funSigs := funSigs;
-                    funSpecs := funSpecs;
-                    funDefs := f |-> fd; funDefs |} |- st =[ c ]=> st' ->
-      Sigma |- st =[ c ]=> st'.
-Proof.
-  induction 3; simpl; intros; eauto.
-  - econstructor; eauto.
-  - econstructor; eauto.
-  - eapply E_IfFalse; eauto.
-  - econstructor; eauto.
-  - econstructor; eauto; simpl in *.
-    unfold update, t_update in *; find_if_inside; subst; eauto;
-      discriminate.
-  - eapply E_CallImpl; simpl in *; eauto.
-    + eapply update_inv in e; destruct e as [[? ?] | [? ?]];
-        subst; eauto.
+  (* Next, we prove how to actually *build* a Safe Environment from
+  set of function definitions. *)
+
+  Local Hint Constructors ceval.
+  Local Hint Constructors AppearsIn.
+
+  (* Some standard weakening and strengthing lemmas for evaluation. *)
+
+  Lemma eval_Env_Weaken
+    : forall (Sigma : Env)
+             (f : funName)
+             (c : com),
+      ~ AppearsIn f c ->
+      (forall f' fd', funDefs f' = Some fd' ->
+                      ~ AppearsIn f (funBody fd')) ->
+      forall st st' fd,
+        Sigma |- st =[ c ]=> st' ->
+                             {| funSigs := funSigs;
+                                funSpecs := funSpecs;
+                                funDefs := f |-> fd; funDefs |} |- st =[ c ]=> st'.
+  Proof.
+    induction 3; simpl; intros; eauto.
+    - econstructor; eauto.
+    - econstructor; eauto.
+    - eapply E_IfFalse; eauto.
+    - econstructor; eauto.
+    - econstructor; eauto; simpl in *.
+      unfold update, t_update; find_if_inside; subst; eauto.
       destruct H; eauto.
-    + unfold update, t_update in *; find_if_inside; eauto.
+    - eapply E_CallImpl; simpl; eauto.
+      unfold update, t_update; find_if_inside; eauto.
       destruct H; subst; eauto.
-Qed.
+  Qed.
 
-Lemma valid_Env_Extend
-  : forall (Sigma : Env)
-           (f : funName)
-           (fd : funDef),
-    valid_Env Sigma ->
-    funDefs f = None ->
-    (forall f' fd', funDefs f' = Some fd' ->
-                   ~ AppearsIn f (funBody fd'))
-    -> ~ AppearsIn f (funBody fd)
-    -> valid_funDef Sigma (funSpecs f) fd
-    -> valid_Env {| funSigs := funSigs;
-                    funSpecs := funSpecs;
-                    funDefs := f |-> fd; funDefs |}.
-Proof.
-  unfold valid_Env; simpl; intros.
-  unfold update, t_update in H4; find_if_inside; subst.
-  - injections.
-    unfold valid_funDef; intros; eapply H3;
-      eauto using eval_Env_Strengthen.
-  - unfold valid_funDef; intros.
-    eapply H; eauto using eval_Env_Strengthen.
-Qed.
+  Lemma eval_Env_Strengthen
+    : forall (Sigma : Env)
+             (f : funName)
+             (c : com),
+      ~ AppearsIn f c ->
+      (forall f' fd', funDefs f' = Some fd' ->
+                      ~ AppearsIn f (funBody fd')) ->
+      forall st st' fd,
+        {| funSigs := funSigs;
+           funSpecs := funSpecs;
+           funDefs := f |-> fd; funDefs |} |- st =[ c ]=> st' ->
+                                                          Sigma |- st =[ c ]=> st'.
+  Proof.
+    induction 3; simpl; intros; eauto.
+    - econstructor; eauto.
+    - econstructor; eauto.
+    - eapply E_IfFalse; eauto.
+    - econstructor; eauto.
+    - econstructor; eauto; simpl in *.
+      unfold update, t_update in *; find_if_inside; subst; eauto;
+        discriminate.
+    - eapply E_CallImpl; simpl in *; eauto.
+      + eapply update_inv in e; destruct e as [[? ?] | [? ?]];
+          subst; eauto.
+        destruct H; eauto.
+      + unfold update, t_update in *; find_if_inside; eauto.
+        destruct H; subst; eauto.
+  Qed.
 
-Definition build_Env
-           (names : list funName)
-           (Sigs : list funSig)
-           (Specs : list funSpec)
-           (Defs : list funDef) :
-  Env :=
-  {| funSigs := fold_right (fun ffd Sigma'  =>
-                             t_update Sigma' (fst ffd) (snd ffd))
-                           (t_empty {| arity := 0 |})
-                           (combine names Sigs);
-     funSpecs := fold_right (fun ffd Sigma'  =>
-                             t_update Sigma' (fst ffd) (snd ffd))
-                          (t_empty {| pre := fun _ => True;
-                                      post := fun _ _ => False |})
-                          (combine names Specs);
-     funDefs := fold_right (fun ffd Sigma' => update Sigma' (fst ffd) (snd ffd))
-                           empty (combine names Defs) |}.
+  Lemma safe_Env_Extend
+    : forall (Sigma : Env)
+             (f : funName)
+             (fd : funDef),
+      safe_Env Sigma ->
+      funDefs f = None ->
+      (forall f' fd', funDefs f' = Some fd' ->
+                      ~ AppearsIn f (funBody fd'))
+      -> ~ AppearsIn f (funBody fd)
+      -> safe_funDef Sigma (funSpecs f) fd
+      -> safe_Env {| funSigs := funSigs;
+                     funSpecs := funSpecs;
+                     funDefs := f |-> fd; funDefs |}.
+  Proof.
+    unfold safe_Env; simpl; intros.
+    unfold update, t_update in H4; find_if_inside; subst.
+    - injections.
+      unfold safe_funDef; intros; eapply H3;
+        eauto using eval_Env_Strengthen.
+    - unfold safe_funDef; intros.
+      eapply H; eauto using eval_Env_Strengthen.
+  Qed.
 
-Fixpoint build_valid_Env'
+  (* Building an environment from a list of function definitions. *)
+
+  Definition build_funSigs
+             (names : list funName)
+             (Sigs : list funSig)
+    := fold_right (fun ffd Sigma'  =>
+                                t_update Sigma' (fst ffd) (snd ffd))
+                             (t_empty {| arity := 0 |})
+                             (combine names Sigs).
+
+  Definition build_funSpecs
+             (names : list funName)
+             (Specs : list funSpec)
+    := fold_right (fun ffd Sigma'  =>
+                     t_update Sigma' (fst ffd) (snd ffd))
+                  (t_empty {| pre := fun _ => True;
+                              post := fun _ _ => False |})
+                  (combine names Specs).
+
+  Definition build_funDefs
+             (names : list funName)
+             (Defs : list funDef)
+  := fold_right (fun ffd Sigma' => update Sigma' (fst ffd) (snd ffd))
+                empty (combine names Defs).
+
+  Definition build_Env
+             (names : list funName)
+             (Sigs : list funSig)
+             (Specs : list funSpec)
+             (Defs : list funDef) :
+    Env :=
+    {| funSigs := build_funSigs names Sigs;
+       funSpecs := build_funSpecs names Specs;
+       funDefs := build_funDefs names Defs |}.
+
+  Fixpoint build_safe_Env'
            (Sigs : total_map funSig)
            (Specs : total_map funSpec)
            (names : list funName)
            (Defs : list funDef)
-  : Prop :=
-  match names, Defs with
-  | f :: names', fd :: Defs' =>
-    Forall (fun fd' => ~ AppearsIn f (funBody fd')) Defs' /\
-    ~ AppearsIn f (funBody fd) /\
-    valid_funDef
-      {| funSigs := Sigs;
-         funSpecs := Specs;
-         funDefs := fold_right (fun ffd Sigma' => update Sigma' (fst ffd) (snd ffd))
-                               empty (combine names Defs) |}
-      (Specs f) fd /\
-      (build_valid_Env' Sigs Specs names' Defs')
-  | _, _ => True
-  end.
+    : Prop :=
+    match names, Defs with
+    | f :: names', fd :: Defs' =>
+      Forall (fun fd' => ~ AppearsIn f (funBody fd')) Defs' /\
+      ~ AppearsIn f (funBody fd) /\
+      safe_funDef
+        {| funSigs := Sigs;
+           funSpecs := Specs;
+           funDefs := fold_right (fun ffd Sigma' => update Sigma' (fst ffd) (snd ffd))
+                                 empty (combine names Defs) |}
+        (Specs f) fd /\
+      (build_safe_Env' Sigs Specs names' Defs')
+    | _, _ => True
+    end.
 
-Definition build_valid_Env
+  (* [build_safe_Env] defines a sufficient condition for the
+  environment built [build_env] to be safe. *)
+  Definition build_safe_Env
+             (names : list funName)
+             (Sigs : list funSig)
+             (Specs : list funSpec)
+             (Defs : list funDef)
+    : Prop :=
+    build_safe_Env' (build_funSigs names Sigs)
+                    (build_funSpecs names Specs)
+                    names Defs.
+
+  Lemma build_safe_Env_is_safe'
+    : forall (names : list funName)
+             (Defs : list funDef)
+             (funSpecs' : total_map funSpec)
+             (funSigs' : total_map funSig),
+      NoDup names ->
+      length names = length Defs ->
+      build_safe_Env' funSigs' funSpecs' names Defs ->
+      safe_Env
+        {|
+          funSigs := funSigs';
+          funSpecs := funSpecs';
+          funDefs := fold_right
+                       (fun (ffd : string * funDef) (Sigma' : partial_map funDef) => fst ffd |-> snd ffd; Sigma') empty
+                       (combine names Defs) |}.
+  Proof.
+    induction names; simpl; intros.
+    - unfold safe_Env; unfold build_Env; simpl; intros;
+        compute in H1; discriminate.
+    - destruct Defs; simpl in *;
+        try discriminate; injections; split_and.
+      inversion H; subst.
+      unfold safe_Env in *.
+      simpl; intros ? ? e; eapply update_inv in e;
+        destruct e as [ [? ?] | [? ?] ]; subst; eauto.
+      specialize (IHnames _ _ _ H8 H2 H4 _ _ H6).
+      unfold safe_funDef in *; intros.
+      eapply IHnames; eauto.
+      eapply eval_Env_Strengthen; eauto.
+      + generalize Defs H1 H0 H6; clear; induction names; simpl; intros.
+        * compute in H6; discriminate.
+        * destruct Defs; simpl in *; try discriminate.
+          apply update_inv in H6; destruct H6 as [ [? ?] | [? ?] ]; subst;
+            inversion H0; subst; eauto.
+      + generalize Defs H1 H0; clear; induction names; simpl; intros.
+        * compute in H; discriminate.
+        * destruct Defs; simpl in *; try discriminate.
+          apply update_inv in H; destruct H as [ [? ?] | [? ?] ]; subst;
+            inversion H0; subst; eauto.
+  Qed.
+
+  (* Thankfully, [build_safe_Env] does guarantee safety! *)
+  Corollary build_safe_Env_is_safe
+    : forall (names : list funName)
+             (Sigs : list funSig)
+             (Specs : list funSpec)
+             (Defs : list funDef),
+      NoDup names ->
+      length names = length Defs ->
+      build_safe_Env names Sigs Specs Defs ->
+      safe_Env (build_Env names Sigs Specs Defs).
+  Proof.
+    intros; eapply build_safe_Env_is_safe'; eauto.
+  Qed.
+
+  (* We can combining this [build_safe_Env_is_safe] with
+  [safe_Env_refine], to show that if [build_safe_Env] holds, it is
+  safe to execute the composite program built by 'linking' in the
+  enviroment built by [build_Env]. *)
+  Corollary build_safe_Env_refine :
+    forall (c : com) (st st' : state)
            (names : list funName)
            (Sigs : list funSig)
            (Specs : list funSpec)
-           (Defs : list funDef)
-  : Prop :=
-  let funSigs' := fold_right (fun ffd Sigma'  =>
-                             t_update Sigma' (fst ffd) (snd ffd))
-                           (t_empty {| arity := 0 |})
-                           (combine names Sigs) in
-  let funSpecs' := fold_right (fun ffd Sigma'  =>
-                             t_update Sigma' (fst ffd) (snd ffd))
-                          (t_empty {| pre := fun _ => True;
-                                      post := fun _ _ => False |})
-                          (combine names Specs) in
-  build_valid_Env' funSigs' funSpecs' names Defs.
-
-Lemma build_valid_Env_is_valid'
-  : forall (names : list funName)
-           (Defs : list funDef)
-           (funSpecs' : total_map funSpec)
-           (funSigs' : total_map funSig),
-    NoDup names ->
-    length names = length Defs ->
-    build_valid_Env' funSigs' funSpecs' names Defs ->
-    valid_Env
-      {|
-        funSigs := funSigs';
-        funSpecs := funSpecs';
-        funDefs := fold_right
-                     (fun (ffd : string * funDef) (Sigma' : partial_map funDef) => fst ffd |-> snd ffd; Sigma') empty
-                     (combine names Defs) |}.
-Proof.
-  induction names; simpl; intros.
-  - unfold valid_Env; unfold build_Env; simpl; intros;
-      compute in H1; discriminate.
-  - destruct Defs; simpl in *;
-      try discriminate; injections; split_and.
-    inversion H; subst.
-    unfold valid_Env in *.
-    simpl; intros ? ? e; eapply update_inv in e;
-      destruct e as [ [? ?] | [? ?] ]; subst; eauto.
-    specialize (IHnames _ _ _ H8 H2 H4 _ _ H6).
-    unfold valid_funDef in *; intros.
-    eapply IHnames; eauto.
-    eapply eval_Env_Strengthen; eauto.
-    + generalize Defs H1 H0 H6; clear; induction names; simpl; intros.
-      * compute in H6; discriminate.
-      * destruct Defs; simpl in *; try discriminate.
-        apply update_inv in H6; destruct H6 as [ [? ?] | [? ?] ]; subst;
-          inversion H0; subst; eauto.
-    + generalize Defs H1 H0; clear; induction names; simpl; intros.
-      * compute in H; discriminate.
-      * destruct Defs; simpl in *; try discriminate.
-        apply update_inv in H; destruct H as [ [? ?] | [? ?] ]; subst;
-          inversion H0; subst; eauto.
-Qed.
-
-Corollary build_valid_Env_is_valid
-  : forall (names : list funName)
-           (Sigs : list funSig)
-           (Specs : list funSpec)
            (Defs : list funDef),
-    NoDup names ->
-    length names = length Defs ->
-    build_valid_Env names Sigs Specs Defs ->
-    valid_Env (build_Env names Sigs Specs Defs).
-Proof.
-  intros; eapply build_valid_Env_is_valid'; eauto.
-Qed.
+      NoDup names ->
+      length names = length Defs ->
+      build_safe_Env names Sigs Specs Defs ->
+      Safe {|
+          funSigs := build_funSigs names Sigs;
+          funSpecs := build_funSpecs names Specs;
+          funDefs := empty |} c st ->
+      (build_Env names Sigs Specs Defs) |- st =[ c ]=> st' ->
+              {| funSigs := build_funSigs names Sigs;
+                 funSpecs := build_funSpecs names Specs;
+                 funDefs := empty |} |- st =[ c ]=> st'.
+  Proof.
+    intros.
+    eapply safe_Env_refine in X0; simpl in X0;
+      eauto using build_safe_Env_is_safe.
+  Qed.
 
-Theorem valid_Env_refine (Sigma : Env) :
-  forall (c : com) (st st' : state),
-    valid_Env Sigma ->
-    Safe {|
-        funSigs := @funSigs Sigma;
-        funSpecs := @funSpecs Sigma;
-        funDefs := empty |} c st ->
-    Sigma |- st =[ c ]=> st' ->
-    {| funSigs := @funSigs Sigma;
-       funSpecs := @funSpecs Sigma;
-       funDefs := empty |} |- st =[ c ]=> st'.
-Proof.
-  induction 3; intros; try (solve [econstructor; eauto]).
-  - inversion X; subst; try congruence; econstructor; eauto.
-  - inversion X; subst; try congruence; econstructor; eauto.
-  - inversion X; subst; eapply E_IfFalse; eauto; congruence.
-  - inversion X; subst; try congruence; econstructor; eauto.
-  - inversion X; subst; try congruence.
-    + simpl in *; rewrite apply_empty in H4; discriminate.
-    + eapply (E_CallSpec {| funSpecs := @funSpecs Sigma; funDefs := empty |});
-        simpl in *; eauto.
-      eapply H; eauto.
-Qed.
+End safe_Execution.
 
-Corollary build_valid_Env_refine :
-  forall (c : com) (st st' : state)
-         (names : list funName)
-         (Sigs : list funSig)
-         (Specs : list funSpec)
-         (Defs : list funDef),
-    NoDup names ->
-    length names = length Defs ->
-    build_valid_Env names Sigs Specs Defs ->
-    Safe {|
-        funSigs := fold_right (fun ffd Sigma'  =>
-                             t_update Sigma' (fst ffd) (snd ffd))
-                           (t_empty {| arity := 0 |})
-                           (combine names Sigs);
-        funSpecs := fold_right (fun ffd Sigma'  =>
-                             t_update Sigma' (fst ffd) (snd ffd))
-                          (t_empty {| pre := fun _ => True;
-                                      post := fun _ _ => False |})
-                          (combine names Specs);
-        funDefs := empty |} c st ->
-    (build_Env names Sigs Specs Defs) |- st =[ c ]=> st' ->
-    {| funSigs := fold_right (fun ffd Sigma'  =>
-                             t_update Sigma' (fst ffd) (snd ffd))
-                           (t_empty {| arity := 0 |})
-                           (combine names Sigs);
-       funSpecs := fold_right (fun ffd Sigma'  =>
-                             t_update Sigma' (fst ffd) (snd ffd))
-                          (t_empty {| pre := fun _ => True;
-                                      post := fun _ _ => False |})
-                          (combine names Specs);
-       funDefs := empty |} |- st =[ c ]=> st'.
-Proof.
-  intros.
-  eapply valid_Env_refine in X0; simpl in X0;
-    eauto using build_valid_Env_is_valid.
-Qed.
+Section productive_Execution.
+
+  (* Formalizing when it is productive to use function definitions.
+     Productive here means that the function definition doesn't rule
+     out some behavior allowed by the spec, i.e. the composite program
+     still "produces" that behavior.
+
+     Note: I (Ben) am not in love with this terminology, anyone who reads
+     this should feel free to suggest another. Living? NotDead? UnDead?
+     *)
+
+  (* A productive function definition is one that produces at least
+     one behavior allowed by its specifiction. *)
+  Definition productive_funDef (Sigma : Env)
+             (fs : funSpec)
+             (fd : funDef) : Prop :=
+    forall (args : list nat),
+      (pre fs) args ->
+      exists (st' : state)
+             (exe : Sigma |- build_total_map (funArgs fd) args 0 =[ funBody fd ]=> st'),
+        (post fs) (aeval st' (funRet fd)) args.
+
+  (* An environment is productive if all of its function definitions are
+     productive with respect to their specs.  *)
+  Definition productive_Env (Sigma : Env) : Prop :=
+    forall f fd,
+      funDefs f = Some fd ->
+      productive_funDef Sigma (funSpecs f) fd.
+
+  (* A productive initial state is one that ensures the program
+  *always* produces the specified final state *)
+
+  (*CoInductive Productive (Sigma : Env) : com -> state -> state -> Type :=
+    | Productive_Skip : forall st,
+        Productive Sigma SKIP st st
+    | Productive_Ass  : forall st x a,
+        Productive Sigma (x ::= a) st (x !-> (aeval st a) ; st)
+    | Productive_Seq : forall c1 c2 st st'',
+        (forall st', Sigma |- st =[ c1 ]=> st' -> Productive Sigma c2 st' st'') ->
+        Productive Sigma (c1 ;; c2) st st''
+    | Productive_IfTrue : forall st st' b c1 c2,
+        beval st b = true ->
+        Productive Sigma c1 st st' ->
+        Productive Sigma (TEST b THEN c1 ELSE c2 FI) st st'
+    | Productive_IfFalse : forall st b c1 c2 st',
+        beval st b = false ->
+        Productive Sigma c2 st st' ->
+        Productive Sigma (TEST b THEN c1 ELSE c2 FI) st st'
+    | Productive_WhileFalse : forall b st c,
+        beval st b = false ->
+        Productive Sigma (WHILE b DO c END) st st
+    | Productive_WhileTrue : forall st b c st'',
+        beval st b = true ->
+        (forall st', Sigma |- st =[ c ]=> st' ->
+                     Productive Sigma (WHILE b DO c END) st' st'') ->
+        Productive Sigma (WHILE b DO c END) st st''
+    | Productive_CallDef :
+        forall st st' args x f fd,
+          funDefs f = Some fd ->
+          Productive Sigma (funBody fd) (build_total_map (funArgs fd) (aseval st args) 0) st'
+          -> Productive Sigma (x :::= f $ args) st (x !-> aeval st' (funRet fd); st)
+    | Productive_CallSpec : forall st args x f n,
+        funDefs f = None ->
+        (funSpecs f).(pre) (aseval st args) ->
+        (funSpecs f).(post) n (aseval st args) ->
+        Productive Sigma (x :::= f $ args) st (x !-> n ; st). *)
+
+  (* Key Productivity Theorem: executing a program in a productive
+  environment and productive initial state will produce some value that a
+  'pure' specification environment (i.e. one without any function
+  definitions) would have. *)
+
+  (*Theorem productive_Env_produces (Sigma : Env) :
+    forall (c : com) (st st' : state),
+      productive_Env Sigma ->
+      Productive {|
+          funSigs := funSigs;
+          funSpecs := funSpecs;
+          funDefs := empty |} c st ->
+      { st'' : state & ((Sigma |- st =[ c ]=> st'') *
+      ({| funSigs := funSigs;
+          funSpecs := funSpecs;
+          funDefs := empty |} |- st =[ c ]=> st''))%type}.
+  Proof.
+    induction c; intros st Prod_Sig Safe_Sig;
+      try (solve [eexists _; split; econstructor; eauto]).
+    - admit.
+    - inversion Safe_Sig; subst; clear Safe_Sig.
+      destruct (IHc1 _ Prod_Sig X) as [st' [? ?] ].
+      specialize (X0 _ c0).
+      destruct (IHc2 _ Prod_Sig X0) as [st'' [? ?] ].
+      exists st''; split; econstructor; eauto.
+    - inversion Safe_Sig; subst; clear Safe_Sig.
+      + destruct (IHc1 _ Prod_Sig X) as [st' [? ?] ].
+        exists st'; split; econstructor; eauto.
+      + destruct (IHc2 _ Prod_Sig X) as [st' [? ?] ].
+        exists st'; split; eapply E_IfFalse; eauto.
+    - inversion Safe_Sig; subst; clear Safe_Sig.
+      + exists st; split; econstructor; eauto.
+      + destruct (IHc _ Prod_Sig X) as [st' [? ?] ].
+        eapply X0 in c1.
+        destruct (IHc _ Prod_Sig c1) as [st' [? ?] ].
+
+      inversion X; subst; try congruence; econstructor; eauto.
+    - inversion X; subst; try congruence; econstructor; eauto.
+    - inversion X; subst; eapply E_IfFalse; eauto; congruence.
+    - inversion X; subst; try congruence; econstructor; eauto.
+    - inversion X; subst; try congruence.
+      + simpl in *; rewrite apply_empty in H4; discriminate.
+      + eapply (E_CallSpec {| funSpecs := @funSpecs Sigma; funDefs := empty |});
+          simpl in *; eauto.
+        eapply H; eauto.
+  Qed. *)
+
+End productive_Execution.
