@@ -15,30 +15,32 @@ data SMTFunc = SMTAnd
              | SMTOr
 
 parseSMT :: String -> Either ParseError (Z3 AST)
-parseSMT smt = runParser smtParser () "" smt
+parseSMT smt = runParser smtExpr () "" smt
 
 parseSMTOrError :: String -> Z3 AST
 parseSMTOrError smt =
   case parseSMT smt of
-    Left  err -> error $ "On input " ++ smt ++ "\nSMT parse error: " ++ (show err)
+    Left  err -> error $ "SMT parse error: " ++ (show err) ++ "\nOn input: " ++ smt
     Right ast -> ast
 
-smtParser :: SMTParser AST
-smtParser = sexp <|> lit
+smtExpr :: SMTParser AST
+smtExpr = try smtApp <|> smtLit
 
 whitespace :: SMTParser ()
 whitespace = do
   many $ oneOf " \n\t"
   return $ return ()
 
-lit :: SMTParser AST
-lit = smtInt <|> smtIdent <|> smtTrue <|> smtFalse
+smtLit :: SMTParser AST
+smtLit = smtParenedLit <|> smtInt <|> smtIdent
 
-smtTrue :: SMTParser AST
-smtTrue = string "true" >> whitespace >> return mkTrue
-
-smtFalse :: SMTParser AST
-smtFalse = string "false" >> whitespace >> return mkFalse
+smtParenedLit :: SMTParser AST
+smtParenedLit = do
+  char '(' >> whitespace
+  lit <- smtLit
+  whitespace
+  char ')' >> whitespace
+  return lit
 
 smtInt :: SMTParser AST
 smtInt = do
@@ -50,15 +52,19 @@ smtIdent :: SMTParser AST
 smtIdent = do
   start <- letter
   rest  <- many alphaNum
+  let id = start:rest
   whitespace
-  return $ mkStringSymbol (start:rest) >>= mkIntVar
+  return $ case id of
+    "true"  -> mkTrue
+    "false" -> mkFalse
+    _       -> mkStringSymbol id >>= mkIntVar
 
-sexp :: SMTParser AST
-sexp = do
+smtApp :: SMTParser AST
+smtApp = do
   char '(' >> whitespace
   func <- funcDecl
   whitespace
-  operands <- many smtParser
+  operands <- many smtExpr
   whitespace
   char ')' >> whitespace
   return.join $ (liftM2 smtApply) func $ sequence operands

@@ -64,14 +64,14 @@ progE0 = parseImpOrError "\
 \  else                  \
 \    y2 := 5             "
 
-progE1 = parseImpOrError "    \
-\  call x2 := rand()          \
-\    pre {(true)}      \
-\    post {(= (mod x2 2) 1))};    \
-\  if x2 == 3 then            \
-\    y2 := 5                  \
-\  else                       \
-\    y2 := 500                "
+progE1 = parseImpOrError "     \
+\  call x2 := rand()           \
+\    pre {true}                \
+\    post {(= (mod x2 2) 1))}; \
+\  if x2 == 3 then             \
+\    y2 := 5                   \
+\  else                        \
+\    y2 := 500                 "
 
 progE2 = parseImpOrError "     \
 \  call x2 := randOddX()       \
