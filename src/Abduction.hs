@@ -11,6 +11,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Imp
 import InterpMap
+import MSA
 import Simplify
 import Z3.Monad
 import Z3Util
@@ -41,43 +42,6 @@ abduce (vars, pres, posts) = do
         _      -> multiAbduction  vars      pres posts
       return result
 
-astVars :: AST -> Z3 [Symbol]
-astVars ast = do
-  astIsApp <- isApp ast
-  case astIsApp of
-    False -> return []
-    True  -> do
-      app      <- toApp ast
-      astIsVar <- isVar ast
-      numArgs  <- getAppNumArgs app
-      case (numArgs, astIsVar) of
-        (0, False) -> return []
-        (0, True ) -> return . (:[]) =<< getDeclName =<< getAppDecl app
-        _          -> appVars app
-  where
-    appVars :: App -> Z3 [Symbol]
-    appVars app = do
-      args <- getAppArgs app
-      vars <- mapM astVars args
-      let dedup = Set.toList . Set.fromList
-      return . dedup . concat $ vars
-
-isVar :: AST -> Z3 Bool
-isVar ast = do
-  name <- astToString ast
-  kind <- getAstKind ast
-  let nameOk = hasVarishName name
-  case kind of
-    Z3_APP_AST       -> return nameOk
-    Z3_FUNC_DECL_AST -> return nameOk
-    Z3_VAR_AST       -> return nameOk
-    _                -> return False
-
--- This is super hacky, but I don't see another way to
--- distinguish actual variables in Z3.
-hasVarishName :: String -> Bool
-hasVarishName s = not.elem s $ ["true", "false"]
-
 filterVars :: [Symbol] -> [Var] -> Z3 [Symbol]
 filterVars symbols vars = do
   symbolStrs <- mapM getSymbolString symbols
@@ -104,7 +68,8 @@ singleAbduction name vars conds posts = do
   imp        <- mkImplies condAST postAST
   impVars    <- astVars imp
   vbar       <- filterVars impVars vars
-  qeRes      <- performQe vbar imp
+  msaVars    <- findMsaVars imp vbar
+  qeRes      <- performQe msaVars imp
   qeResSimpl <- simplifyWrt condAST qeRes
   sat        <- checkSat qeResSimpl
   case sat of
@@ -162,6 +127,7 @@ initSolution vars conds combinedResult = do
 
 
 performQe :: [Symbol] -> AST -> Z3 AST
+performQe [] formula = return formula
 performQe vars formula = do
   push
   intVars  <- mapM mkIntVar vars

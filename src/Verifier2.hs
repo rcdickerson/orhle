@@ -20,7 +20,7 @@ import Z3Util
 
 verify2 :: RHLETrip -> Z3 (VResult, [VTrace])
 verify2 trip = do
-  imap <- imapInit $ rhleProgE trip
+  imap <- imapInit [rhleProgA trip, rhleProgE trip]
   runWriterT $ verifyA trip imap
 
 verifyA :: RHLETrip -> InterpMap -> VTracedResult

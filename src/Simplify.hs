@@ -1,3 +1,9 @@
+-- EXPLAIN paper:
+-- https://www.cs.utexas.edu/~isil/cav2013-tool.pdf
+
+-- Simplification Algorithm:
+-- https://theory.stanford.edu/~aiken/publications/papers/sas10.pdf
+
 module Simplify
   ( simplifyWrt
   )

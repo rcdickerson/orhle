@@ -67,28 +67,25 @@ runSimpleNonRefinement = do
 --  fails: forall t1. exists t2.
 --    t1|refinement == t2|original;
   let progOriginal = parseImpOrError "  \
-  \  call t1_x := randInt()             \
+  \  call t1_x := t1_randInt()          \
   \     pre {true}                      \
-  \     post {(and (>= t1_x 0) (< t1_x 20))}; \
-  \  t1_refinement := t1_x"
+  \     post {(= t1_x 20)}"
   let progRefinement = parseImpOrError " \
-  \  call t2_x := randInt()              \
+  \  call t2_x := t2_randInt()           \
   \     pre {true}                       \
-  \     post {(= t2_x 5)} ; \
-  \  t2_original := t2_x"
-  putStrLn =<< runVerifier verify2 "true" progRefinement progOriginal "(= t1_refinement t2_original)"
+  \     post {(and (>= t2_x 0) (< t2_x 10))}"
+  putStrLn =<< runVerifier verify2 "true" progRefinement progOriginal "(= t1_x t2_x)"
 
 runSimpleRefinement :: IO ()
 runSimpleRefinement = do
 --  satisfies: forall t1. exists t2.
 --    t1|refinement == t2|original;
   let progOriginal = parseImpOrError "  \
-  \  call t1_x := randInt()    \
+  \  call t1_x := t1_randInt()    \
   \     pre {true}                      \
   \     post {(and (>= t1_x 0) (< t1_x 20))}"
   let progRefinement = parseImpOrError " \
-  \  call t2_x := randOddInt()    \
+  \  call t2_x := t2_randInt()    \
   \     pre {true}                       \
-  \     post {(= t2_x 5)}"
-
+  \     post {(and (>= t2_x 0) (< t2_x 10))}"
   putStrLn =<< runVerifier verify2 "true" progRefinement progOriginal "(= t1_x t2_x)"
