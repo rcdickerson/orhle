@@ -32,25 +32,29 @@ ppInterpMap imap = mapM line (Map.toList imap)
           interp <- astToString =<< simplify smt
           return $ var ++ ": " ++ interp
 
-imapInit :: Prog -> Z3 InterpMap
-imapInit prog =
-  case prog of
-    Skip          -> return $ emptyIMap
-    Seq []        -> imapInit Skip
-    Seq (s:ss)    -> do
-                     first <- imapInit s
-                     rest  <- imapInit $ Seq ss
-                     return $ Map.union first rest
-    (:=) _ _      -> return $ emptyIMap
-    If _ s1 s2    -> do
-                     first  <- imapInit s1
-                     second <- imapInit s2
-                     return $ Map.union first second
-    Call var f    -> do
-                     -- TODO: Need to make the name unique per callsite?
-                     callsiteFun <- mkFreshFuncDecl (fName f) [] =<< mkIntSort
-                     fPost <- fPostCond f
-                     return $ Map.insert var fPost emptyIMap
+imapInit :: [Prog] -> Z3 InterpMap
+imapInit progs = do
+  imaps <- sequence $ map initFromProg progs
+  return $ Map.unions imaps
+  where
+    initFromProg prog =
+      case prog of
+        Skip          -> return $ emptyIMap
+        Seq []        -> initFromProg Skip
+        Seq (s:ss)    -> do
+                         first <- initFromProg s
+                         rest  <- initFromProg $ Seq ss
+                         return $ Map.union first rest
+        (:=) _ _      -> return $ emptyIMap
+        If _ s1 s2    -> do
+                         first  <- initFromProg s1
+                         second <- initFromProg s2
+                         return $ Map.union first second
+        Call var f    -> do
+                         -- TODO: Need to make the name unique per callsite?
+                         callsiteFun <- mkFreshFuncDecl (fName f) [] =<< mkIntSort
+                         fPost <- fPostCond f
+                         return $ Map.insert var fPost emptyIMap
 
 imapCondUnion :: (AST, InterpMap) -> (AST, InterpMap) -> Z3 InterpMap
 imapCondUnion (cond1, imap1) (cond2, imap2) =

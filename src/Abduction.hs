@@ -1,5 +1,5 @@
 module Abduction
-    ( AbductionProblem(..)
+    ( AbductionProblem
     , AbductionResult
     , abduce
     , imapStrengthen
@@ -11,6 +11,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Imp
 import InterpMap
+import MSA
 import Simplify
 import Z3.Monad
 import Z3Util
@@ -20,12 +21,14 @@ type AbductionResult  = Either String InterpMap
 
 imapStrengthen :: AST -> InterpMap -> AST -> Z3 AbductionResult
 imapStrengthen pre imap post = do
-  let vars      = Map.keys imap
-  let freshen v = mkFreshIntVar v >>= astToString >>= \f -> return (v, f)
-  let subFresh  = \pre' (v, f) -> subVar pre' v f
-  freshVars     <- mapM freshen vars
-  preZ3         <- foldM subFresh pre freshVars
-  abduce (vars, [preZ3], post:(Map.elems imap))
+  let vars  = Map.keys imap
+  freshPre <- foldM (\pre' -> uncurry $ subVar pre') pre =<< mapM freshen vars
+  abduce (vars, [freshPre], post:(Map.elems imap))
+  where
+    -- Fresh vars in the precondition effectively "forget" what we know
+    -- about the variables in the interpretation map. This ensures the
+    -- abduced replacement interpretations are sufficiently strong.
+    freshen v = mkFreshIntVar v >>= astToString >>= \fresh -> return (v, fresh)
 
 abduce :: AbductionProblem -> Z3 AbductionResult
 abduce (vars, pres, posts) = do
@@ -33,47 +36,11 @@ abduce (vars, pres, posts) = do
   if not consistencyCheck
     then return.Left $ "Preconditions are not consistent."
     else do
-      case vars of
+      result <- case vars of
         []     -> noAbduction               pres posts
         var:[] -> singleAbduction var [var] pres posts
         _      -> multiAbduction  vars      pres posts
-
-astVars :: AST -> Z3 [Symbol]
-astVars ast = do
-  astIsApp <- isApp ast
-  case astIsApp of
-    False -> return []
-    True  -> do
-      app      <- toApp ast
-      astIsVar <- isVar ast
-      numArgs  <- getAppNumArgs app
-      case (numArgs, astIsVar) of
-        (0, False) -> return []
-        (0, True ) -> return . (:[]) =<< getDeclName =<< getAppDecl app
-        _          -> appVars app
-  where
-    appVars :: App -> Z3 [Symbol]
-    appVars app = do
-      args <- getAppArgs app
-      vars <- mapM astVars args
-      let dedup = Set.toList . Set.fromList
-      return . dedup . concat $ vars
-
-isVar :: AST -> Z3 Bool
-isVar ast = do
-  name <- astToString ast
-  kind <- getAstKind ast
-  let nameOk = hasVarishName name
-  case kind of
-    Z3_APP_AST       -> return nameOk
-    Z3_FUNC_DECL_AST -> return nameOk
-    Z3_VAR_AST       -> return nameOk
-    _                -> return False
-
--- This is super hacky, but I don't see another way to
--- distinguish actual variables in Z3.
-hasVarishName :: String -> Bool
-hasVarishName s = not.elem s $ ["true", "false"]
+      return result
 
 filterVars :: [Symbol] -> [Var] -> Z3 [Symbol]
 filterVars symbols vars = do
@@ -96,18 +63,18 @@ noAbduction conds posts = do
 singleAbduction :: String -> [Var] -> [AST] -> [AST]
                 -> Z3 AbductionResult
 singleAbduction name vars conds posts = do
-  condAST <- mkAnd conds
-  postAST <- mkAnd posts
-  imp     <- mkImplies condAST postAST
-  impVars <- astVars imp
-  vbar    <- filterVars impVars vars
-  qeRes   <- performQe vbar imp
-  sat     <- checkSat qeRes
+  condAST    <- mkAnd conds
+  postAST    <- mkAnd posts
+  imp        <- mkImplies condAST postAST
+  impVars    <- astVars imp
+  vbar       <- filterVars impVars vars
+  msaVars    <- findMsaVars imp vbar
+  qeRes      <- performQe msaVars imp
+  qeResSimpl <- simplifyWrt condAST qeRes
+  sat        <- checkSat qeResSimpl
   case sat of
-    False -> return.Left $ "No satisfying abduction found."
-    True  -> do
-      qeResSimpl <- simplifyWrt condAST qeRes
-      return.Right $ Map.insert name qeResSimpl emptyIMap
+    False -> return.Left  $ "No satisfying abduction found."
+    True  -> return.Right $ Map.insert name qeResSimpl emptyIMap
 
 multiAbduction :: [Var] -> [AST] -> [AST] -> Z3 AbductionResult
 multiAbduction vars conds posts = do
@@ -160,6 +127,7 @@ initSolution vars conds combinedResult = do
 
 
 performQe :: [Symbol] -> AST -> Z3 AST
+performQe [] formula = return formula
 performQe vars formula = do
   push
   intVars  <- mapM mkIntVar vars

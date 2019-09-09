@@ -2,68 +2,25 @@ module Verifier2
   ( VResult
   , VTrace
   , ppVTrace
-  , runVerifier2
   , verify2
   ) where
 
 import Abduction
 import Control.Monad.Trans
 import Control.Monad.Writer
-import Data.List(intercalate)
-import qualified Data.Map as Map
 import Hoare
 import HoareE
 import Imp
 import InterpMap
 import RHLE
+import Verifier
 import VTrace
 import Z3.Monad
 import Z3Util
 
-type VResult       = Either String InterpMap
-type VTracedResult = WriterT [VTrace] Z3 VResult
-
-runVerifier2 :: String -> Prog -> Prog -> String -> IO String
-runVerifier2 pre progA progE post = do
-  (_, result) <- evalZ3 $ runWriterT $ runVerifier2' pre progA progE post
-  return result
-
-runVerifier2' :: String -> Prog -> Prog -> String -> WriterT String Z3 ()
-runVerifier2' pre progA progE post = do
-  tell "------------------------------------------------\n"
-  tell $ "Universal Program:\n" ++ (show progA) ++ "\n"
-  tell "------------------------------------------------\n"
-  tell $ "Existential Program:\n" ++ (show progE) ++ "\n"
-  tell "------------------------------------------------\n"
-  trip <- lift $ mkRHLETrip pre progA progE post
-  (result, trace) <- lift $ verify2 trip
-  traceStr <- lift $ ppVTrace trace
-  tell $ "Verification Trace:\n" ++ traceStr ++ "\n"
-  tell "------------------------------------------------\n"
-  case result of
-    Right interp -> do
-      tell "VALID iff the following executions are possible:\n"
-      let funNames = assigneeToFuncNames (Seq [progA, progE])
-      let funMap   = Map.mapKeys (\v -> Map.findWithDefault v v funNames) interp
-      mapLines <- lift $ ppInterpMap funMap
-      tell $ intercalate "\n" mapLines
-      tell $ "\n"
-    Left reason -> do
-      tell $ "INVALID: " ++ reason ++ "\n"
-  tell "------------------------------------------------"
-
-assigneeToFuncNames :: Prog -> Map.Map Var String
-assigneeToFuncNames prog =
-  case prog of
-    Seq s      -> Map.unions $ map assigneeToFuncNames s
-    If _ s1 s2 -> Map.unions $ map assigneeToFuncNames [s1, s2]
-    Call v (UFunc name _ _ _)
-               -> Map.singleton v name
-    _          -> Map.empty
-
 verify2 :: RHLETrip -> Z3 (VResult, [VTrace])
 verify2 trip = do
-  imap <- imapInit $ rhleProgE trip
+  imap <- imapInit [rhleProgA trip, rhleProgE trip]
   runWriterT $ verifyA trip imap
 
 verifyA :: RHLETrip -> InterpMap -> VTracedResult
@@ -78,8 +35,9 @@ verifyA trip@(RHLETrip pre progA progE post) imap = do
     If b s1 s2 -> do
       cond <- lift $ bexpToZ3 b
       verifyAIf cond s1 s2 [] (HLETrip pre progE post) imap
-    Call var f -> return.Left $
-        "Function calls in universal execution currently unsupported"
+    Call var f ->  do
+      pre' <- lift $ hlSP (Call var f) pre
+      verifyE (HLETrip pre' progE post) imap
 
 verifyASeq :: AST -> [Stmt] -> Prog -> AST -> InterpMap -> VTracedResult
 verifyASeq pre [] progE post imap =
