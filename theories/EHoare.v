@@ -1,6 +1,7 @@
 Require Import
         Coq.Arith.Arith
         Coq.micromega.Psatz
+        Coq.Sets.Ensembles
         Coq.Logic.Classical
         Coq.Program.Tactics.
 
@@ -39,8 +40,8 @@ Section EHoare.
       Sigma |- {[fun st =>
             (Sigma f).(pre) (aseval st xs) /\
             exists v, (Sigma f).(post) v (aseval st xs) /\
+                      forall v, (Sigma f).(post) v (aseval st xs) ->
                  Q[y |-> v] st]} y :::= f $ xs {[Q]}#
-
 
   where "Sigma |- {[ P ]}  c  {[ Q ]}#" := (ehoare_proof Sigma P c Q) : hoare_spec_scope.
 
@@ -60,7 +61,6 @@ Section EHoare.
   Hint Resolve bassn_eval_true bassn_eval_false : hoare.
   Hint Constructors ehoare_proof : hoare.
   Hint Constructors ceval.
-
 
   Lemma ehoare_while (Sigma : Env)  : forall P M b c,
       (forall n : nat,
@@ -101,6 +101,7 @@ Section EHoare.
     - (* :::= *)
       destruct_conjs.
       repeat econstructor; eauto.
+      eapply H2; eauto.
   Qed.
 
   Definition ewp (Sigma : Env) (c:com) (Q:Assertion) : Assertion :=
@@ -168,30 +169,67 @@ Section EHoare.
       auto.
   Qed.
 
+  (* Pretty sure this is the completeness statement we want. *)
   Theorem ehoare_proof_complete Sigs Sigma : forall P c Q,
-      {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |} |= {[P]} c {[Q]}#
+      (forall funDefs,
+          productive_Env {| funSigs := Sigs; funSpecs := Sigma; funDefs := funDefs |}
+          -> {| funSigs := Sigs; funSpecs := Sigma; funDefs := funDefs |} |= {[P]} c {[Q]}#)
       -> Sigma |- {[P]} c {[Q]}#.
   Proof.
     unfold ehoare_triple.
     intros P c. revert dependent P.
     induction c; intros P Q HT.
     - (* SKIP *)
+      specialize (HT _ (productive_empty _ _)).
       eapply EH_Consequence; eauto with hoare.
       intros. edestruct HT as [? [exe ?]]; eauto.
       inversion exe; subst. eauto.
     - (* ::= *)
+      specialize (HT _ (productive_empty _ _)).
       eapply EH_Consequence; eauto with hoare.
       intros. edestruct HT as [? [exe ?]]; eauto.
       inversion exe; subst. eauto.
     - (* :::= *)
       eapply EH_Consequence; eauto with hoare.
-      simpl. intros. edestruct HT as [? [exe ?]]; eauto.
-      inversion exe; subst. eauto.
-      simpl in *; rewrite apply_empty in H6; discriminate.
+      simpl. intros.
+      generalize (HT _ (productive_empty _ _)) as HT'; intros.
+      edestruct HT' as [? [exe ?]]; eauto; clear HT'.
+      admit.
+      (*inversion exe; subst.
+      + firstorder; eauto.
+        eexists _; split; eauto.
+        intros.
+        assert (productive_Env {| funSigs := Sigs;
+                                  funSpecs := Sigma;
+                                  funDefs := update empty f {| funArgs := nil;
+                                                               funBody := SKIP;
+                                                               funRet := v |} |}).
+        { unfold productive_Env; simpl; intros.
+          eapply update_inv in H2; intuition; subst.
+          - unfold productive_funDef; intros.
+            simpl.
+            eassert (Productive
+                                 {|
+                                 funSigs := Sigs;
+                                 funSpecs := Sigma;
+                                 funDefs := f0 |-> {| funArgs := nil; funBody := SKIP; funRet := v |} |} SKIP
+                                 (build_total_map nil args0 0) _).
+            econstructor.
+            simpl; eexists _, H3; eauto.
+            intros.
+      admit.
+          - compute in H5; discriminate.
+        } 
+        admit.
+      + *)
     - (* ;; *)
       apply EH_Seq with (@ewp {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |} c2 Q); eauto. apply IHc1.
-      intros. edestruct HT as [? [exe ?]]; eauto.
+      intros.
+  (* edestruct HT as [? [exe ?]]; eauto.
       inversion exe; subst. repeat econstructor; eauto.
+
+-     
+      eapply IHc1.
     - (* IFB *)
       apply EH_If.
       + apply IHc1. intros. destruct_conjs.
@@ -217,7 +255,86 @@ Section EHoare.
         subst; eauto.
       + setoid_rewrite <- ewp_loop_measureR. firstorder eauto.
       + simpl. intros ? [H ?]. destruct H as [? [exe ?]].
-        inversion exe; subst; eauto. exfalso. eauto.
+        inversion exe; subst; eauto. exfalso. eauto. *)
+  Admitted.
+
+  Hint Constructors Productive : hoare.
+
+  Theorem ehoare_proof_produces {Sigma : Env}
+    : forall (P Q : Assertion) c,
+      productive_Env Sigma ->
+      funSpecs |- {[P]} c {[Q]}# ->
+      forall st,
+        P st ->
+        Productive {| funSigs := @funSigs Sigma;
+                      funSpecs := @funSpecs Sigma;
+                      funDefs := empty |} c st Q.
+  Proof.
+    induction 2; intros; eauto.
+    - eapply Productive_Weaken; try solve [econstructor; eauto].
+      unfold Included, In; intros; inversion H1; subst; eauto.
+    - eapply Productive_Weaken; try solve [econstructor].
+      unfold Included, In; intros; inversion H1; subst; eauto.
+    - eapply Productive_Weaken; try solve [econstructor; eauto].
+      firstorder.
+    - destruct (beval st b) eqn:?.
+      + eapply Productive_Weaken; try solve [econstructor; eauto].
+        firstorder.
+      + eapply Productive_Weaken.
+        * eapply Productive_IfFalse; firstorder eauto.
+          eapply IHehoare_proof2; firstorder eauto with hoare.
+          eapply bassn_eval_false; eauto.
+        * firstorder.
+    - destruct H2 as [P_st [n M' ] ].
+      revert dependent st.
+      induction n as [n IH] using (well_founded_ind lt_wf). intros.
+      destruct (beval st b) eqn:?.
+      + econstructor; eauto; intros.
+        destruct H2 as [P_st' [n' [M_n' lt_n'] ] ]; eauto.
+      + eapply Productive_Weaken; eauto using Productive_WhileFalse.
+        unfold Included, In; intros.
+        inversion H2; subst; intuition.
+        eapply bassn_eval_false; eauto.
+    - eapply Productive_Weaken; eauto.
+    - destruct H0 as [? [n [? ?] ] ].
+      eapply Productive_Weaken; eauto.
+      + eapply Productive_CallSpec; firstorder eauto.
+      + unfold Included, In; intros.
+        destruct H3 as [n' [? ?] ]; subst.
+        eapply H2; eauto.
+  Qed.
+
+  (* The Productive predicate and the existential hoare rules should
+  be equivalent. This proof will let us prove the soundness of vc
+  generation with respect to the hoare rules. *)
+
+  Theorem produces_ehoare_proof {Sigma : Env}
+    : forall (P Q : Assertion) c,
+      productive_Env Sigma ->
+      (forall st,
+        P st ->
+        Productive {| funSigs := @funSigs Sigma;
+                      funSpecs := @funSpecs Sigma;
+                      funDefs := empty |} c st Q) ->
+        funSpecs |- {[P]} c {[Q]}#.
+  Proof.
+    intros; eapply ehoare_proof_complete.
+    intros.
+    unfold ehoare_triple; intros.
+    eapply productive_com_produces.
+    eapply productive_Env_produces; eauto.
+  Qed.
+
+  Theorem ehoare_proof_link {Sigma : Env}
+    : forall (P Q : Assertion) c,
+      productive_Env Sigma ->
+      funSpecs |- {[P]} c {[Q]}# ->
+      Sigma |= {[P]} c {[Q]}#.
+  Proof.
+    intros; intros ? ?.
+    eapply productive_com_produces.
+    eapply productive_Env_produces; eauto.
+    eapply ehoare_proof_produces; eauto.
   Qed.
 
 End EHoare.
