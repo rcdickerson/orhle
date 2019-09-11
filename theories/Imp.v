@@ -607,7 +607,7 @@ Section productive_Execution.
         Productive Sigma (x :::= f $ args) st
                    (fun st' => exists n, (funSpecs f).(post) n (aseval st args)
                                          /\ st' = (x !-> n; st))
-    | Productive_Weaken : forall st c Q Q',
+  | Productive_Weaken : forall st c Q Q',
         Productive Sigma c st Q ->
         Included state Q Q' ->
         Productive Sigma c st Q'.
@@ -673,10 +673,10 @@ Section productive_Execution.
     unfold productive_Env; simpl; intros; discriminate.
   Qed.
 
-    (* Key Productivity Theorem: executing a program in a productive
-  environment and productive initial state will produce some value that a
-  'pure' specification environment (i.e. one without any function
-  definitions) would have. *)
+  (* Key Productivity Theorem: executing a program in a productive
+     environment and productive initial state will produce some value that a
+     'pure' specification environment (i.e. one without any function
+     definitions) would have. *)
   Theorem productive_Env_produces (Sigma : Env) :
     forall (c : com) (st : state) (Q : Ensemble state),
       productive_Env Sigma ->
@@ -697,5 +697,56 @@ Section productive_Execution.
         eexists (aeval x1 (funRet f0)); split; eauto.
       + eapply (@Productive_CallSpec Sigma); eauto.
   Qed.
+
+  Local Hint Constructors ceval.
+  Local Hint Constructors AppearsIn.
+  Lemma productive_Weaken :
+    forall Sigma c st Q f fd,
+      ~ AppearsIn f c
+      -> (forall (f' : String.string) (fd' : funDef),
+             funDefs f' = Some fd' -> ~ AppearsIn f (funBody fd'))
+      -> Productive Sigma c st Q
+      -> Productive {| funSigs := funSigs;
+                     funSpecs := funSpecs;
+                     funDefs := f |-> fd; funDefs |} c st Q.
+  Proof.
+    induction 3; simpl; try solve [econstructor; eauto].
+    - econstructor; eauto.
+      simpl; unfold update, t_update; find_if_inside; eauto.
+      destruct H; subst; eauto.
+    - econstructor; eauto.
+      eapply Productive_CallSpec; eauto.
+      + simpl; unfold update, t_update; find_if_inside; eauto.
+        destruct H; subst; eauto.
+      + unfold Included, In; eauto.
+  Qed.
+
+  Lemma productive_Env_Extend
+    : forall (Sigma : Env)
+             (f : funName)
+             (fd : funDef),
+      productive_Env Sigma ->
+      funDefs f = None ->
+      (forall f' fd', funDefs f' = Some fd' ->
+                      ~ AppearsIn f (funBody fd'))
+      -> ~ AppearsIn f (funBody fd)
+      -> productive_funDef Sigma (funSpecs f) fd
+      -> productive_Env {| funSigs := funSigs;
+                     funSpecs := funSpecs;
+                     funDefs := f |-> fd; funDefs |}.
+  Proof.
+    unfold productive_Env; simpl; intros.
+    unfold update, t_update in H4; find_if_inside; subst.
+    - injections.
+      unfold productive_funDef in *; intros.
+      eapply H3 in H4; destruct H4 as [Q [? ?] ].
+      eexists Q, (productive_Weaken _ _ _ _ _ _ H2 H1 x); eauto.
+    - pose proof (H _ _ H4).
+      unfold productive_funDef; intros.
+      eapply H5 in H6.
+      destruct H6 as [Q [? ?] ].
+      eexists Q, (productive_Weaken _ _ _ _ _ _ (H1 _ _ H4) H1 x); eauto.
+  Qed.
+
 
 End productive_Execution.
