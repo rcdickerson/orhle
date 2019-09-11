@@ -12,7 +12,7 @@ Section EHoare.
   Reserved Notation "Sigma |- {[ P ]}  c  {[ Q ]}#"
            (at level 40, c at next level).
 
-  Inductive ehoare_proof (Sigma : total_map funSpec)
+  Inductive ehoare_proof (Sigma : total_map funExSpec)
     : Assertion -> com -> Assertion -> Prop :=
   | EH_Skip : forall P,
       Sigma |- {[P]} SKIP {[P]}#
@@ -36,11 +36,11 @@ Section EHoare.
       (forall st, Q' st -> Q st) ->
       Sigma |- {[P]} c {[Q]}#
 
-  | EH_Spec : forall Q y f xs,
+  | EH_Spec : forall Q y f xs params,
       Sigma |- {[fun st =>
-            (Sigma f).(pre) (aseval st xs) /\
-            (exists v, (Sigma f).(post) v (aseval st xs)) /\
-            forall v, (Sigma f).(post) v (aseval st xs) ->
+            (Sigma f).(preEx) params (aseval st xs) /\
+            (exists v, (Sigma f).(postEx) v params (aseval st xs)) /\
+            forall v, (Sigma f).(postEx) v params (aseval st xs) ->
                       Q[y |-> v] st]} y :::= f $ xs {[Q]}#
 
   where "Sigma |- {[ P ]}  c  {[ Q ]}#" := (ehoare_proof Sigma P c Q) : hoare_spec_scope.
@@ -77,9 +77,10 @@ Section EHoare.
     - repeat econstructor; eauto. firstorder with hoare.
   Qed.
 
-  Theorem ehoare_proof_sound Sigs Sigma : forall P c Q,
-      Sigma |- {[P]} c {[Q]}# ->
-      {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |} |= {[P]} c {[Q]}#.
+  (* Theorem ehoare_proof_sound Sigs Sigma ESigma : forall P c Q,
+      ESigma |- {[P]} c {[Q]}# ->
+      {| AllEnv := {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |};
+         funExSpecs := ESigma |} |= {[P]} c {[Q]}#.
   Proof.
     unfold ehoare_triple.
     intros ? ? ? pf. induction pf; intros st HP.
@@ -102,7 +103,7 @@ Section EHoare.
       destruct_conjs.
       repeat econstructor; eauto.
       eapply H1; eauto.
-  Qed.
+  Qed. *)
 
   Definition ewp (Sigma : Env) (c:com) (Q:Assertion) : Assertion :=
     fun st => exists st' (exe : Sigma |- st =[ c ]=> st'), Q st'.
@@ -174,17 +175,19 @@ Section EHoare.
 
   Hint Constructors Productive : hoare.
 
-  Theorem ehoare_proof_produces {Sigma : Env}
-    : forall (P Q : Assertion) c,
+  Theorem ehoare_proof_produces {Sigma : ExEnv}
+    : forall (P Q : Assertion) c
+      (consistent_Sigma : Consistent_Env Sigma),
       productive_Env Sigma ->
-      funSpecs |- {[P]} c {[Q]}# ->
+      funExSpecs |- {[P]} c {[Q]}# ->
       forall st,
         P st ->
-        Productive {| funSigs := @funSigs Sigma;
-                      funSpecs := @funSpecs Sigma;
-                      funDefs := empty |} c st Q.
+        Productive {| AllEnv := {| funSigs := @funSigs AllEnv;
+                                   funSpecs := @funSpecs AllEnv;
+                                   funDefs := empty |};
+                      funExSpecs := funExSpecs |} c st Q.
   Proof.
-    induction 2; intros; eauto.
+    induction 3; intros; eauto.
     - eapply Productive_Weaken; try solve [econstructor; eauto].
       unfold Included, In; intros; inversion H1; subst; eauto.
     - eapply Productive_Weaken; try solve [econstructor].
@@ -218,11 +221,12 @@ Section EHoare.
         eapply H2; eauto.
   Qed.
 
-  Theorem ehoare_proof_link {Sigma : Env}
+  Theorem ehoare_proof_link {Sigma : ExEnv}
     : forall (P Q : Assertion) c,
       productive_Env Sigma ->
-      funSpecs |- {[P]} c {[Q]}# ->
-      Sigma |= {[P]} c {[Q]}#.
+      Consistent_Env Sigma ->
+      funExSpecs |- {[P]} c {[Q]}# ->
+      AllEnv |= {[P]} c {[Q]}#.
   Proof.
     intros; intros ? ?.
     eapply productive_com_produces.
@@ -323,7 +327,7 @@ Section EHoare.
         inversion exe; subst; eauto. exfalso. eauto. *)
   Admitted. *)
 
-  Inductive Productive_Bound {Sigma : Env}
+  Inductive Productive_Bound {Sigma : ExEnv}
     : forall {st c Q}
               (prod : Productive Sigma c st Q), nat -> Prop :=
   | Bound_Skip :
@@ -344,21 +348,21 @@ Section EHoare.
   | Bound_CallDef :
       forall st Q args x f fd H H' n,
         Productive_Bound (Productive_CallDef Sigma st Q args x f fd H H') n
-  | Bound_CallSpec : forall st args x f n H H' H'' n',
-      Productive_Bound (Productive_CallSpec Sigma st args x f n H H' H'') n'
+  | Bound_CallSpec : forall st args x f n H H' H'' H3 H4 H5 n',
+      Productive_Bound (Productive_CallSpec Sigma st args x f n H H' H'' H3 H4 H5) n'
   | Bound_Weaken : forall st c Q Q' H H' n,
-      Productive_Bound H n -> 
+      Productive_Bound H n ->
       Productive_Bound (Productive_Weaken Sigma st c Q Q' H H') n.
 
-  Definition ewp' (Sigma : Env) (c:com) (Q:Assertion) : Assertion :=
+  Definition ewp' (Sigma : ExEnv) (c:com) (Q:Assertion) : Assertion :=
     fun st => Productive Sigma c st Q.
 
-  Definition loop_measureR' (Sigma : Env) b c Q n st : Prop :=
+  Definition loop_measureR' (Sigma : ExEnv) b c Q n st : Prop :=
     forall (prod : Productive Sigma (WHILE b DO c END) st Q),
       Productive_Bound prod n.
 
   Fixpoint Productive_ind'
-           (Sigma : Env) (P : forall (c : com) (st : state) (Q : Ensemble state),
+           (Sigma : ExEnv) (P : forall (c : com) (st : state) (Q : Ensemble state),
                              Productive Sigma c st Q -> Prop)
            (f : forall st : state, P SKIP%imp st (Singleton state st) (Productive_Skip Sigma st))
            (f0 : forall (st : state) (x : String.string) (a : aexp),
@@ -366,7 +370,7 @@ Section EHoare.
                  (Productive_Ass Sigma st x a))
            (f1 : forall (c1 c2 : com) (st : state) (Q Q' : Ensemble state)
                         (H : Productive Sigma c1 st Q)
-                        (IH : P c1 st Q H) 
+                        (IH : P c1 st Q H)
                         (H' : forall st' : state, Q st' -> Productive Sigma c2 st' Q'),
                (forall (st' : state) (Q_st' : Q st'), P c2 st' Q' (H' _ Q_st')) ->
                P (c1;; c2)%imp st Q' (Productive_Seq Sigma c1 c2 st Q Q' H H'))
@@ -397,19 +401,20 @@ Section EHoare.
                P (x :::= f6 $ args)%imp st
                  (fun st' : state => exists st'' : state, Q st'' /\ st' = (x !-> aeval st'' (funRet fd); st))
                  (Productive_CallDef Sigma st Q args x f6 fd H H'))
-           (f7 : forall (st : state) (args : list aexp) (x f7 : String.string) (n : nat)
+           (f7 : forall (st : state) (args : list aexp) (x f7 : String.string) (n : nat) params
                         (H : funDefs f7 = None)
-                        (H' : pre (funSpecs f7) (aseval st args))
-                        (H'' : post (funSpecs f7) n (aseval st args)),
+                        (H' : preEx (funExSpecs f7) params (aseval st args))
+                        (H'' : postEx (funExSpecs f7) n params (aseval st args))
+                        H3 H4,
                P (x :::= f7 $ args)%imp st
-                 (fun st' : state => exists n0 : nat, post (funSpecs f7) n0 (aseval st args) /\ st' = (x !-> n0; st))
-                 (Productive_CallSpec Sigma st args x f7 n H H' H''))
+                 (fun st' : state => exists n0 : nat, postEx (funExSpecs f7) n0 params (aseval st args) /\ st' = (x !-> n0; st))
+                 (Productive_CallSpec Sigma st args x f7 n params H H' H'' H3 H4))
            (f8 : forall (st : state) (c : com) (Q Q' : Ensemble state)
                         (H : Productive Sigma c st Q)
                         (IH : P c st Q H)
                         (H' : Included state Q Q'),
-               P c st Q' (Productive_Weaken Sigma st c Q Q' H H'))    
-           (c : com) (s : state) (e : Ensemble state) (p : Productive Sigma c s e) {struct p} : 
+               P c st Q' (Productive_Weaken Sigma st c Q Q' H H'))
+           (c : com) (s : state) (e : Ensemble state) (p : Productive Sigma c s e) {struct p} :
     P c s e p.
   Proof.
     destruct p; eauto.
@@ -428,8 +433,8 @@ Section EHoare.
     - eapply f8.
       eapply Productive_ind'; eauto.
   Defined.
-        
-  Lemma ewp'_loop_measureR' (Sigma : Env) b c Q st
+
+  Lemma ewp'_loop_measureR' (Sigma : ExEnv) b c Q st
     : ewp' Sigma (WHILE b DO c END) Q st -> exists n, loop_measureR' Sigma b c Q n st.
   Proof.
     unfold ewp', loop_measureR'; intros.
@@ -456,17 +461,17 @@ Section EHoare.
         try congruence; econstructor; eauto.
     - injections.
       admit.
-    - 
-      
+    -
+
       (*with (P := (fun (c : com) (s : state) (e0 : Ensemble state) (p : Productive Sigma c s e0) =>
    e0 = Singleton state s ->
    forall (c1 : com) (b : bexp), beval s b = false -> c = (WHILE b DO c1 END)%imp -> Productive_Bound p 0))
       remember ((Singleton state st))
       econstructor.
       econstructor.
-      
+
       subst; injections.
-      
+
       injections; exists 0.
       intros.
       2: { eexists 0; intros.
@@ -561,7 +566,7 @@ Section EHoare.
       auto.
   Qed. *)
 
-  Lemma ewp'_is_precondition {Sigma : Env}: forall c Q,
+  Lemma ewp'_is_precondition {Sigma : ExEnv}: forall c Q,
       forall st,
         ewp' Sigma c Q st ->
         Productive Sigma c st Q.
@@ -569,7 +574,7 @@ Section EHoare.
     firstorder.
   Qed.
 
-  Lemma ewp'_is_weakest (Sigma : Env) : forall c Q (P : Assertion),
+  Lemma ewp'_is_weakest (Sigma : ExEnv) : forall c Q (P : Assertion),
       (forall st, P st -> Productive Sigma c st Q) ->
       P ->> ewp' Sigma c Q.
   Proof.
@@ -579,15 +584,17 @@ Section EHoare.
   (* The Productive predicate and the existential hoare rules should
   be equivalent. This proof will let us prove the soundness of vc
   generation with respect to the hoare rules. *)
-  Theorem produces_ehoare_proof {Sigma : Env}
+  Theorem produces_ehoare_proof {Sigma : ExEnv}
     : forall c (P Q : Assertion),
       productive_Env Sigma ->
       (forall st,
         P st ->
-        Productive {| funSigs := @funSigs Sigma;
-                      funSpecs := @funSpecs Sigma;
-                      funDefs := empty |} c st Q) ->
-        funSpecs |- {[P]} c {[Q]}#.
+        Productive {| AllEnv := {| funSigs := @funSigs AllEnv;
+                                   funSpecs := @funSpecs AllEnv;
+                                   funDefs := empty |};
+                      funExSpecs := funExSpecs |}
+                      c st Q) ->
+        funExSpecs |- {[P]} c {[Q]}#.
   Proof.
     induction c; intros.
     - eapply EH_Consequence; eauto with hoare; intros.
@@ -600,13 +607,14 @@ Section EHoare.
       induction H1; try congruence; injections.
       + econstructor.
       + eapply H0; apply IHProductive; eauto.
-    - eapply EH_Consequence; eauto with hoare; intros.
+    - admit.
+      (*eapply EH_Consequence; eauto with hoare; intros.
       eapply H0 in H1; remember (CCall x f args) in H1; clear H0.
       induction H1; try congruence; injections.
       + simpl in H0; discriminate.
       + firstorder eauto.
-      + firstorder eauto.
-    - apply EH_Seq with (fun st => Productive {| funSigs := funSigs; funSpecs := funSpecs; funDefs := empty |} c2 st Q); eauto.
+      + firstorder eauto. *)
+    - eapply EH_Seq with (fun st => Productive {|AllEnv := {| funSigs := funSigs; funSpecs := funSpecs; funDefs := empty |} |} c2 st Q); eauto.
       + apply IHc1; eauto.
         intros.
         eapply H0 in H1; remember (CSeq c1 c2) in H1; clear H0.
@@ -623,7 +631,7 @@ Section EHoare.
         eapply H0 in H2; remember (CIf b c1 c2) in H2; clear H0.
         induction H2; try congruence; injections.
         eapply Productive_Weaken; eauto with hoare; intros.
-    - eapply EH_Consequence with (P' := fun st => ewp' {| funSigs := funSigs; funSpecs := funSpecs; funDefs := empty |} (WHILE b DO c END) Q st /\ (exists n : nat, loop_measureR' {| funSigs := funSigs; funSpecs := funSpecs; funDefs := empty |} b c Q n st)).
+    - eapply EH_Consequence with (P' := fun st => ewp' {|AllEnv := {| funSigs := funSigs; funSpecs := funSpecs; funDefs := empty |} |} (WHILE b DO c END) Q st /\ (exists n : nat, loop_measureR' {|AllEnv := {| funSigs := funSigs; funSpecs := funSpecs; funDefs := empty |} |} b c Q n st)).
       + eapply EH_While.
         * intros; eapply IHc; eauto; intros st [Hwp [Hb Hm]].
           unfold loop_measureR', ewp' in *.
@@ -639,15 +647,15 @@ Section EHoare.
           eapply Hm; eapply H0; eauto.
           unfold Included, In; intros; intuition eauto using Productive_Weaken.
           destruct H3 as [? [? ?] ]; eexists; intuition eauto.
-          eapply H1. *)  
-
-
+          eapply H1. *)
+          admit.
           admit.
           admit.
       + intros; eapply H0 in H1.
         unfold ewp'; split; eauto.
         unfold loop_measureR'.
-        eapply ewp'_loop_measureR'; eauto.
+        admit.
+        (*eapply ewp'_loop_measureR'; eauto. *)
       + simpl; intros st [? ?].
         remember (CWhile b c) in H1; clear H0.
         induction H1; try congruence; injections.

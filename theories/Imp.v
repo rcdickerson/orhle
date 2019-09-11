@@ -563,12 +563,20 @@ Section productive_Execution.
      this should feel free to suggest another. Living? NotDead? UnDead?
      *)
 
+  Structure funExSpec : Type :=
+  { preEx : list nat -> list nat -> Prop;
+    postEx : nat -> list nat -> list nat -> Prop }.
+
+  Class ExEnv : Type :=
+    { AllEnv :> Env;
+      funExSpecs : total_map funExSpec }.
+
   (* A productive initial state is one that ensures the program
   *always* produces the specified final state *)
 
   Local Arguments Singleton [_] _.
 
-  Inductive Productive (Sigma : Env) : com -> state -> Ensemble state -> Prop :=
+  Inductive Productive (Sigma : ExEnv) : com -> state -> Ensemble state -> Prop :=
     | Productive_Skip : forall st,
         Productive Sigma SKIP st (Singleton st)
     | Productive_Ass  : forall st x a,
@@ -600,12 +608,14 @@ Section productive_Execution.
           Productive Sigma (funBody fd) (build_total_map (funArgs fd) (aseval st args) 0) Q
           -> Productive Sigma (x :::= f $ args) st
                         (fun st' => exists st'', Q st'' /\ st' = (x !-> aeval st'' (funRet fd); st))
-    | Productive_CallSpec : forall st args x f n,
+    | Productive_CallSpec : forall st args x f n params,
         funDefs f = None ->
+        (funExSpecs f).(preEx) params (aseval st args) ->
+        (funExSpecs f).(postEx) n params (aseval st args) ->
         (funSpecs f).(pre) (aseval st args) ->
         (funSpecs f).(post) n (aseval st args) ->
         Productive Sigma (x :::= f $ args) st
-                   (fun st' => exists n, (funSpecs f).(post) n (aseval st args)
+                   (fun st' => exists n, (funExSpecs f).(postEx) n params (aseval st args)
                                          /\ st' = (x !-> n; st))
   | Productive_Weaken : forall st c Q Q',
         Productive Sigma c st Q ->
@@ -615,36 +625,36 @@ Section productive_Execution.
   (* Productivity is a *stronger* property than evaluation-- it forces
      a command to evaluate to a final state regardless of how
      nondeterministic choices are made. *)
-  Theorem productive_com_produces (Sigma : Env) :
+  Theorem productive_com_produces (Sigma : ExEnv) :
     forall (c : com) (st : state) (Q : Ensemble state),
       Productive Sigma c st Q ->
-      exists st' (exe : Sigma |- st =[c]=> st'), Q st'.
+      exists st' (exe : (AllEnv) |- st =[c]=> st'), Q st'.
   Proof.
     induction 1.
-    - assert (Sigma |- st =[ SKIP ]=> st) by econstructor.
+    - assert (AllEnv |- st =[ SKIP ]=> st) by econstructor.
       eexists _, X; econstructor.
-    - eassert (Sigma |- st =[ x ::= a ]=> _) by (econstructor; eauto).
+    - eassert (AllEnv |- st =[ x ::= a ]=> _) by (econstructor; eauto).
       eexists _, X; econstructor.
     - destruct IHProductive as [st' [exe Q_st'] ].
       specialize (H0 _ Q_st'); destruct (H1 _ Q_st') as [st'' [exe' Q'_st']].
-      assert (Sigma |- st =[ c1;; c2 ]=> st'') by (econstructor; eauto).
+      assert (AllEnv |- st =[ c1;; c2 ]=> st'') by (econstructor; eauto).
       eauto.
     - destruct IHProductive as [st' [exe Q_st'] ].
-      assert (Sigma |- st =[ TEST b THEN c1 ELSE c2 FI ]=> st') by (econstructor; eauto).
+      assert (AllEnv |- st =[ TEST b THEN c1 ELSE c2 FI ]=> st') by (econstructor; eauto).
       eexists _, X ; eauto.
     - destruct IHProductive as [st' [exe Q_st'] ].
-      assert (Sigma |- st =[ TEST b THEN c1 ELSE c2 FI ]=> st') by (econstructor; eauto).
+      assert (AllEnv |- st =[ TEST b THEN c1 ELSE c2 FI ]=> st') by (econstructor; eauto).
       eexists _, X; eauto.
-    - assert (Sigma |- st =[ WHILE b DO c END ]=> st) by (econstructor; eauto).
+    - assert (AllEnv |- st =[ WHILE b DO c END ]=> st) by (econstructor; eauto).
       eexists _, X; eauto; econstructor.
     - destruct IHProductive as [st' [exe Q_st'] ].
       specialize (H1 _ Q_st'); destruct (H2 _ Q_st') as [st'' [exe' Q'_st']].
-      assert (Sigma |- st =[ WHILE b DO c END ]=> st'') by (econstructor; eauto).
+      assert (AllEnv |- st =[ WHILE b DO c END ]=> st'') by (econstructor; eauto).
       eauto.
     - destruct IHProductive as [st' [exe Q_st'] ].
-      eassert (Sigma |- st =[ x :::= f $ args ]=> _) by (eapply (@E_CallDef Sigma); eauto).
+      eassert (AllEnv |- st =[ x :::= f $ args ]=> _) by (eapply (@E_CallDef AllEnv); eauto).
       eexists _, X; eauto.
-    - eassert (Sigma |- st =[ x :::= f $ args ]=> _) by (eapply (@E_CallSpec Sigma); eauto).
+    - eassert (AllEnv |- st =[ x :::= f $ args ]=> _) by (eapply (@E_CallSpec AllEnv); eauto).
       eexists _, X; eauto.
     - destruct IHProductive as [st' [exe Q_st'] ]; eexists _, exe; eauto.
       eapply H0; apply Q_st'.
@@ -652,24 +662,34 @@ Section productive_Execution.
 
   (* A productive function definition is one that produces at least
      one behavior allowed by its specifiction. *)
-  Definition productive_funDef (Sigma : Env)
-             (fs : funSpec)
+  Definition productive_funDef (Sigma : ExEnv)
+             (fs : funExSpec)
              (fd : funDef) : Prop :=
-    forall (args : list nat),
-      (pre fs) args ->
+    forall (params args : list nat),
+      (preEx fs) params args ->
       exists Q (exe : Productive Sigma (funBody fd) (build_total_map (funArgs fd) args 0) Q),
-        forall st', Q st' -> (post fs) (aeval st' (funRet fd)) args.
+        forall st', Q st' -> (postEx fs) (aeval st' (funRet fd)) params args.
 
   (* An environment is productive if all of its function definitions are
      productive with respect to their specs.  *)
-  Definition productive_Env (Sigma : Env) : Prop :=
+  Definition productive_Env (Sigma : ExEnv) : Prop :=
     forall f fd,
       funDefs f = Some fd ->
-      productive_funDef Sigma (funSpecs f) fd.
+      productive_funDef Sigma (funExSpecs f) fd.
+
+  (* An existential environment is consistent if all of its existential specifications
+     imply their universal counterparts.  *)
+  Definition Consistent_Env (Sigma : ExEnv) : Prop :=
+    forall f,
+      (forall (params args : list nat), preEx (funExSpecs f) params args -> pre (funSpecs f) args)
+      /\ (forall (ret : nat) (params args : list nat),
+             postEx (funExSpecs f) ret params args -> post (funSpecs f) ret args).
 
   Lemma productive_empty
-    : forall Sigs Sigma,
-      productive_Env {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |}.
+    : forall Sigs Sigma ESigma,
+      productive_Env {| AllEnv := {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |};
+                        funExSpecs := ESigma |} .
+  Proof.
     unfold productive_Env; simpl; intros; discriminate.
   Qed.
 
@@ -677,23 +697,25 @@ Section productive_Execution.
      environment and productive initial state will produce some value that a
      'pure' specification environment (i.e. one without any function
      definitions) would have. *)
-  Theorem productive_Env_produces (Sigma : Env) :
+  Theorem productive_Env_produces (Sigma : ExEnv) :
     forall (c : com) (st : state) (Q : Ensemble state),
       productive_Env Sigma ->
-      Productive {|
-          funSigs := funSigs;
-          funSpecs := funSpecs;
-          funDefs := empty |} c st Q ->
+      Productive {| AllEnv := {|
+                               funSigs := funSigs;
+                               funSpecs := funSpecs;
+                               funDefs := empty |};
+                    funExSpecs := funExSpecs |}
+                 c st Q ->
       Productive Sigma c st Q.
   Proof.
     induction 2; intros; try (solve [econstructor; eauto]).
     - simpl in *; rewrite apply_empty in H0; discriminate.
-    - destruct (@funDefs Sigma f) eqn: ?.
-      + destruct (H _ _ Heqo _ H1) as [Q [exe Q_exe] ].
+    - destruct (@funDefs (@AllEnv Sigma) f) eqn: ?.
+      + destruct (H _ _ Heqo _ _ H1) as [Q [exe Q_exe] ].
         eapply Productive_Weaken.
         econstructor; eauto.
         unfold Included, In; intros.
-        destruct H3 as [? [? ?] ].
+        destruct H5 as [? [? ?] ].
         eexists (aeval x1 (funRet f0)); split; eauto.
       + eapply (@Productive_CallSpec Sigma); eauto.
   Qed.
@@ -706,9 +728,10 @@ Section productive_Execution.
       -> (forall (f' : String.string) (fd' : funDef),
              funDefs f' = Some fd' -> ~ AppearsIn f (funBody fd'))
       -> Productive Sigma c st Q
-      -> Productive {| funSigs := funSigs;
-                     funSpecs := funSpecs;
-                     funDefs := f |-> fd; funDefs |} c st Q.
+      -> Productive {| AllEnv := {| funSigs := funSigs;
+                                    funSpecs := funSpecs;
+                                    funDefs := f |-> fd; funDefs |};
+                       funExSpecs := funExSpecs |} c st Q.
   Proof.
     induction 3; simpl; try solve [econstructor; eauto].
     - econstructor; eauto.
@@ -722,7 +745,7 @@ Section productive_Execution.
   Qed.
 
   Lemma productive_Env_Extend
-    : forall (Sigma : Env)
+    : forall (Sigma : ExEnv)
              (f : funName)
              (fd : funDef),
       productive_Env Sigma ->
@@ -730,10 +753,12 @@ Section productive_Execution.
       (forall f' fd', funDefs f' = Some fd' ->
                       ~ AppearsIn f (funBody fd'))
       -> ~ AppearsIn f (funBody fd)
-      -> productive_funDef Sigma (funSpecs f) fd
-      -> productive_Env {| funSigs := funSigs;
-                     funSpecs := funSpecs;
-                     funDefs := f |-> fd; funDefs |}.
+      -> productive_funDef Sigma (funExSpecs f) fd
+      -> productive_Env {| AllEnv := {| funSigs := funSigs;
+                                        funSpecs := funSpecs;
+                                        funDefs := f |-> fd; funDefs |};
+                           funExSpecs := funExSpecs
+                           |}.
   Proof.
     unfold productive_Env; simpl; intros.
     unfold update, t_update in H4; find_if_inside; subst.

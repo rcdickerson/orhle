@@ -14,39 +14,39 @@ Definition assert2_implies (P Q : Assertion2) : Prop :=
 
 Section RHLE.
 
-  Definition rhle_triple (Sigma : Env)
+  Definition rhle_triple (Sigma : ExEnv)
              (P : Assertion2) (c1 : com) (c2 : com) (Q : Assertion2) : Prop :=
     forall st1 st2 st1',
-      Sigma |- st1 =[ c1 ]=> st1'  ->
+      AllEnv |- st1 =[ c1 ]=> st1'  ->
                     P st1 st2 ->
-                    exists st2' (exe : Sigma |- st2 =[ c2 ]=> st2'), Q st1' st2'.
+                    exists st2' (exe : AllEnv |- st2 =[ c2 ]=> st2'), Q st1' st2'.
 
   Notation "Sigma |= {{ P }}  c1 ~# c2  {[ Q ]}" :=
     (rhle_triple Sigma P c1 c2 Q) (at level 90, c1 at next level, c2 at next level)
     : hoare_spec_scope.
 
-  Reserved Notation "Sigma |- {{ P }}  c1 ~# c2  {[ Q ]}"
+  Reserved Notation "Sigma , ESigma |- {{ P }}  c1 ~# c2  {[ Q ]}"
            (at level 40, c1 at next level, c2 at next level).
 
-  Inductive rhle_proof Sigma : Assertion2 -> com -> com -> Assertion2 -> Prop :=
+  Inductive rhle_proof Sigma ESigma : Assertion2 -> com -> com -> Assertion2 -> Prop :=
   | RHE_Skip : forall P,
-      Sigma |- {{P}} SKIP ~# SKIP {[P]}
+      rhle_proof Sigma ESigma P SKIP SKIP P
   | RHE_SkipIntroL : forall P Q c1 c2,
-      Sigma |- {{P}} c1;;SKIP ~# c2 {[Q]} ->
-      Sigma |- {{P}} c1 ~# c2 {[Q]}
+      rhle_proof Sigma ESigma P (c1;;SKIP) c2 Q ->
+      rhle_proof Sigma ESigma P c1 c2 Q
   | RHE_SkipIntroR : forall P Q c1 c2,
-      Sigma |- {{P}} c1 ~# c2;;SKIP {[Q]} ->
-      Sigma |- {{P}} c1 ~# c2 {[Q]}
+      rhle_proof Sigma ESigma P c1 (c2;;SKIP) Q ->
+      rhle_proof Sigma ESigma P c1 c2 Q
   | RHE_StepL : forall P Q R c1 c2 c3,
       (forall st2, hoare_proof Sigma (fun st => P st st2) c1 (fun st => Q st st2)) ->
-      Sigma |- {{Q}} c2 ~# c3 {[R]} ->
-      Sigma |- {{P}} c1;;c2 ~# c3 {[R]}
+      rhle_proof Sigma ESigma Q c2 c3 R ->
+      rhle_proof Sigma ESigma P (c1;;c2) c3 R
   | RHE_StepR : forall P Q R c1 c2 c3,
-      (forall st1, ehoare_proof Sigma (fun st => P st1 st) c2 (fun st => Q st1 st)) ->
-      Sigma |- {{Q}} c1 ~# c3 {[R]} ->
-      Sigma |- {{P}} c1 ~# c2;;c3 {[R]}
+      (forall st1, ehoare_proof ESigma (fun st => P st1 st) c2 (fun st => Q st1 st)) ->
+      rhle_proof Sigma ESigma Q c1 c3 R ->
+      rhle_proof Sigma ESigma P c1 (c2;;c3) R
 
-  where "Sigma |- {{ P }}  c1 ~# c2  {[ Q ]}" := (rhle_proof Sigma P c1 c2 Q) : hoare_spec_scope.
+  where "Sigma , ESigma |- {{ P }}  c1 ~# c2  {[ Q ]}" := (rhle_proof Sigma ESigma P c1 c2 Q) : hoare_spec_scope.
 
   Hint Resolve bassn_eval_true bassn_eval_false : hoare.
   Hint Constructors rhle_proof : hoare.
@@ -61,9 +61,12 @@ Section RHLE.
       eapply ehoare_proof_sound in H
     end. *)
 
-  Theorem rhle_proof_sound Sigs Sigma : forall P c1 c2 Q,
-      Sigma |- {{P}} c1 ~# c2 {[Q]} ->
-      {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |} |= {{P}} c1 ~# c2 {[Q]}.
+  Theorem rhle_proof_sound Sigs Sigma ESigma
+          (Cons_Env : Consistent_Env {| AllEnv := {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |}; funExSpecs := ESigma |})
+    : forall P c1 c2 Q,
+      rhle_proof Sigma ESigma P c1 c2 Q ->
+      {| AllEnv := {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |};
+         funExSpecs := ESigma |} |= {{P}} c1 ~# c2 {[Q]}.
   Proof.
     intros ? ? ? ? pf.
     unfold rhle_triple.
@@ -76,7 +79,7 @@ Section RHLE.
       eexists _, X; eauto.
     - inversion exe; subst; edestruct IHpf; eauto.
       eapply hoare_proof_sound in H; eauto.
-    - eapply ehoare_proof_sound in H; eauto.
+    - eapply (@ehoare_proof_link {| AllEnv := {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |}; funExSpecs := ESigma |}) in H; eauto using productive_empty.
       edestruct H as [st' [exe' HQ]]; eauto.
       edestruct IHpf as [st2' [? ?]]; eauto.
   Qed.
@@ -84,7 +87,8 @@ Section RHLE.
   Definition rwp (Sigma : Env) c (Q : Assertion2) : Assertion2 :=
     fun st1 st2 => exists st2' (exe : Sigma |- st2 =[ c ]=> st2'), Q st1 st2'.
 
-  Theorem rhle_proof_complete Sigs Sigma : forall P c1 c2 Q,
+        (* Need to adjust this proof to align with new semantics. *)
+  (*Theorem rhle_proof_complete Sigs Sigma : forall P c1 c2 Q,
       {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |} |= {{P}} c1 ~# c2 {[Q]} ->
       Sigma |- {{P}} c1 ~# c2 {[Q]}.
   Proof.
@@ -95,9 +99,9 @@ Section RHLE.
     - intros st2. eapply hoare_proof_complete with (Sigs := Sigs); firstorder.
     - apply RHE_SkipIntroR. eapply RHE_StepR. 2: constructor.
       intros st1.
-      (* Need to adjust this proof to align with new semantics. *)
+
       (* apply ehoare_proof_complete with (Sigs := Sigs); firstorder. *)
-  Admitted.
+  Admitted. *)
 
 End RHLE.
 
