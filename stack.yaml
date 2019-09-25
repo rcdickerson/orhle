@@ -35,11 +35,14 @@ resolver: lts-13.22
 #  - wai
 packages:
 - .
-- ../haskell-z3
+
 # Dependency packages to be pulled from upstream that are not in the resolver
 # using the same syntax as the packages field.
 # (e.g., acme-missiles-0.3)
 # extra-deps: [z3-408.0]
+extra-deps:
+- github: rcdickerson/haskell-z3
+  commit: 7c3c40528e9a224ab4702d0b5f2fa75125d37b7d
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
