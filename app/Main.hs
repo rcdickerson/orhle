@@ -4,11 +4,11 @@ import RHLEVerifier
 import Z3.Monad
 
 main :: IO ()
-main = do runSimpleNonRefinement
+main = do runSimpleExample
 
 runSimpleExample :: IO ()
 runSimpleExample = do
-  putStrLn =<< runVerifier verify2 "true" progA1 progE2 "(= y1 y2)"
+  putStrLn =<< runVerifier singleAbdVerifier "true" progA1 progE1 "(= y1 y2)"
 
 -------------------------------------
 -- Useful for REPL experimentation --
@@ -32,7 +32,7 @@ progA1 = parseImpOrError "\
 
 progE0 = parseImpOrError "\
 \  x2 := 3;              \
-\  if x2 == 4 then       \
+\  if x2 == 3 then       \
 \    y2 := 500           \
 \  else                  \
 \    y2 := 5             "
@@ -74,7 +74,7 @@ runSimpleNonRefinement = do
   \  call t2_x := t2_randInt()           \
   \     pre {true}                       \
   \     post {(and (>= t2_x 0) (< t2_x 10))}"
-  putStrLn =<< runVerifier verify2 "true" progRefinement progOriginal "(= t1_x t2_x)"
+  putStrLn =<< runVerifier singleAbdVerifier "true" progRefinement progOriginal "(= t1_x t2_x)"
 
 runSimpleRefinement :: IO ()
 runSimpleRefinement = do
@@ -88,4 +88,4 @@ runSimpleRefinement = do
   \  call t2_x := t2_randInt()    \
   \     pre {true}                       \
   \     post {(and (>= t2_x 0) (< t2_x 10))}"
-  putStrLn =<< runVerifier verify2 "true" progRefinement progOriginal "(= t1_x t2_x)"
+  putStrLn =<< runVerifier singleAbdVerifier "true" progRefinement progOriginal "(= t1_x t2_x)"

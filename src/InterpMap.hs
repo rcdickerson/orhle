@@ -1,60 +1,35 @@
 module InterpMap
     ( InterpMap
     , emptyIMap
-    , imapInit
     , imapCondUnion
     , ppInterpMap
     , putInterpMap
     , singletonIMap
     ) where
 
+import Abducible
 import qualified Data.Map as Map
-import Imp
 import Z3.Monad
 
-type InterpMap = Map.Map Var AST
+type InterpMap = Map.Map Abducible AST
 
 emptyIMap :: InterpMap
 emptyIMap = Map.empty
 
-singletonIMap :: Var -> AST -> InterpMap
+singletonIMap :: Abducible -> AST -> InterpMap
 singletonIMap var duc = Map.singleton var duc
 
 putInterpMap :: InterpMap -> IO ()
 putInterpMap imap = mapM_ putInterpLine (Map.toList imap)
-  where putInterpLine = \(var, smt) -> do
+  where putInterpLine = \(abd, smt) -> do
           interp <- evalZ3 $ astToString =<< simplify smt
-          putStrLn $ "  " ++ var ++ ": " ++ interp
+          putStrLn $ "  " ++ (abdName abd) ++ ": " ++ interp
 
 ppInterpMap :: InterpMap -> Z3 [String]
 ppInterpMap imap = mapM line (Map.toList imap)
-  where line = \(var, smt) -> do
+  where line = \(abd, smt) -> do
           interp <- astToString =<< simplify smt
-          return $ var ++ ": " ++ interp
-
-imapInit :: [Prog] -> Z3 InterpMap
-imapInit progs = do
-  imaps <- sequence $ map initFromProg progs
-  return $ Map.unions imaps
-  where
-    initFromProg prog =
-      case prog of
-        Skip          -> return $ emptyIMap
-        Seq []        -> initFromProg Skip
-        Seq (s:ss)    -> do
-                         first <- initFromProg s
-                         rest  <- initFromProg $ Seq ss
-                         return $ Map.union first rest
-        (:=) _ _      -> return $ emptyIMap
-        If _ s1 s2    -> do
-                         first  <- initFromProg s1
-                         second <- initFromProg s2
-                         return $ Map.union first second
-        Call var f    -> do
-                         -- TODO: Need to make the name unique per callsite?
-                         callsiteFun <- mkFreshFuncDecl (fName f) [] =<< mkIntSort
-                         fPost <- fPostCond f
-                         return $ Map.insert var fPost emptyIMap
+          return $ (abdName abd) ++ ": " ++ interp
 
 imapCondUnion :: (AST, InterpMap) -> (AST, InterpMap) -> Z3 InterpMap
 imapCondUnion (cond1, imap1) (cond2, imap2) =

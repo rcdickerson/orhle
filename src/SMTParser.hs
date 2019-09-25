@@ -5,7 +5,48 @@ module SMTParser
 
 import Control.Monad
 import Text.Parsec
+import Text.Parsec.Language
+import qualified Text.Parsec.Token as Token
 import Z3.Monad
+
+languageDef :: LanguageDef ()
+languageDef = Token.LanguageDef
+  { Token.caseSensitive   = True
+  , Token.commentStart    = ""
+  , Token.commentEnd      = ""
+  , Token.commentLine     = ";"
+  , Token.identStart      = letter <|> char '_'
+  , Token.identLetter     = alphaNum <|> char '_' <|> char '!' <|> char '.'
+  , Token.nestedComments  = False
+  , Token.opStart         = oneOf ":!#$%&*+/<=>?\\^|-~" -- No @ or . at start
+  , Token.opLetter        = oneOf ":!#$%&*+./<=>?@\\^|-~"
+  , Token.reservedNames = ["par", "NUMERAL", "DECIMAL", "STRING", "_", "!",
+                             "as", "let", "forall", "exists", "assert",
+                             "check-sat", "declare-fun", "declare-sort",
+                             "define-fun", "define-sort", "exit",
+                             "get-assertions", "get-assignment", "get-info",
+                             "get-option", "get-proof", "set-unsat-core",
+                             "get-value", "pop", "push", "set-info",
+                             "set-logic", "set-option"
+                            ]
+  , Token.reservedOpNames = [ "+", "-", "*"
+                            , ":="
+                            , "=="
+                            , "mod"
+                            , "not", "and", "or"
+                            ]
+  }
+
+lexer = Token.makeTokenParser languageDef
+
+identifier = Token.identifier lexer
+reserved   = Token.reserved   lexer
+reservedOp = Token.reservedOp lexer
+parens     = Token.parens     lexer
+integer    = Token.integer    lexer
+comma      = Token.comma      lexer
+semi       = Token.semi       lexer
+whitespace = Token.whiteSpace lexer
 
 type SMTParser a = Parsec String () (Z3 a)
 
@@ -19,7 +60,7 @@ data SMTFunc = SMTAnd
              | SMTOr
 
 parseSMT :: String -> Either ParseError (Z3 AST)
-parseSMT smt = runParser smtExpr () "" smt
+parseSMT smt = runParser smtParser () "" smt
 
 parseSMTOrError :: String -> Z3 AST
 parseSMTOrError smt =
@@ -27,24 +68,14 @@ parseSMTOrError smt =
     Left  err -> error $ "SMT parse error: " ++ (show err) ++ "\nOn input: " ++ smt
     Right ast -> ast
 
-smtExpr :: SMTParser AST
-smtExpr = try smtApp <|> try smtLit
+smtParser :: SMTParser AST
+smtParser = whitespace >> smtExpr
 
-whitespace :: SMTParser ()
-whitespace = do
-  many $ oneOf " \n\t"
-  return $ return ()
+smtExpr :: SMTParser AST
+smtExpr = try smtSexpr <|> smtLit
 
 smtLit :: SMTParser AST
-smtLit = smtParenedLit <|> smtInt <|> smtIdent
-
-smtParenedLit :: SMTParser AST
-smtParenedLit = do
-  char '(' >> whitespace
-  lit <- smtLit
-  whitespace
-  char ')' >> whitespace
-  return lit
+smtLit = smtInt <|> smtIdent
 
 smtInt :: SMTParser AST
 smtInt = do
@@ -62,6 +93,65 @@ smtIdent = do
     "true"  -> mkTrue
     "false" -> mkFalse
     _       -> mkStringSymbol id >>= mkIntVar
+
+smtSexpr :: SMTParser AST
+smtSexpr = try smtForall <|> try smtExists <|> smtApp
+
+smtForall :: SMTParser AST
+smtForall = do
+  char '(' >> whitespace
+  reserved "forall"
+  vars <- parens $ many smtQuantVar
+  body <- smtExpr
+  char ')' >> whitespace
+  return $ constructForall vars body
+
+smtExists :: SMTParser AST
+smtExists = do
+  char '(' >> whitespace
+  reserved "exists"
+  vars <- parens $ many smtQuantVar
+  body <- smtExpr
+  char ')' >> whitespace
+  return $ constructExists vars body
+
+smtQuantVar :: SMTParser (String, String)
+smtQuantVar = do
+  char '(' >> whitespace
+  name <- identifier
+  whitespace
+  sort <- identifier
+  char ')' >> whitespace
+  return $ return (name, sort)
+
+constructQuantVars :: [(String, String)] -> Z3 ([Symbol], [Sort])
+constructQuantVars varDecls  = do
+  vars <- sequence $ map mkQuantVar varDecls
+  return $ unzip vars
+  where
+    mkQuantVar :: (String, String) -> Z3 (Symbol, Sort)
+    mkQuantVar (symbName, sortName) = do
+      symb     <- mkStringSymbol symbName
+      sort     <- sortFromString sortName
+      return (symb, sort)
+
+sortFromString :: String -> Z3 Sort
+sortFromString "Bool" = mkBoolSort
+sortFromString "Int"  = mkIntSort
+sortFromString "Real" = mkRealSort
+sortFromString s = do
+  sortSymb <- mkStringSymbol s
+  mkUninterpretedSort sortSymb
+
+constructForall :: [Z3 (String, String)] -> (Z3 AST) -> Z3 AST
+constructForall decls body = do
+  (symbs, sorts) <- constructQuantVars =<< sequence decls
+  mkForall [] symbs sorts =<< body
+
+constructExists :: [Z3 (String, String)] -> (Z3 AST) -> Z3 AST
+constructExists decls body = do
+  (symbs, sorts) <- constructQuantVars =<< sequence decls
+  mkExists [] symbs sorts =<< body
 
 smtApp :: SMTParser AST
 smtApp = do

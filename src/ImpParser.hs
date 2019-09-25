@@ -7,7 +7,6 @@ module ImpParser
     ) where
 
 import Control.Monad
-import Control.Monad.Trans
 import Imp
 import Text.Parsec
 import Text.Parsec.Expr
@@ -113,7 +112,8 @@ funcStmt = do
   reserved "post"
   post <- between (char '{') (char '}') (many $ noneOf "{}")
   whiteSpace
-  return $ Call assignee (UFunc funcName params pre post)
+  -- TODO: Return a Spec as well to continue allowing inline specs?
+  return $ Call assignee (Func funcName params)
 
 skipStmt :: ImpParser Stmt
 skipStmt = reserved "skip" >> return Skip

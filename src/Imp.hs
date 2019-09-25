@@ -1,26 +1,22 @@
 module Imp
     ( AExp(..)
+    , BExp(..)
+    , Prog
+    , Stmt(..)
+    , Func(..)
+    , Var
     , aexpToZ3
     , assignPost
     , asubst
     , avars
-    , BExp(..)
     , bexpToZ3
     , bsubst
     , bvars
-    , fPostCond
-    , fPreCond
     , fsubst
-    , funSP
     , subAexp
     , subVar
-    , Prog
-    , Stmt(..)
-    , UFunc(..)
-    , Var
     ) where
 
-import SMTParser
 import Z3.Monad
 import Z3Util
 
@@ -84,7 +80,7 @@ subAexp :: AST -> AExp -> AExp -> Z3 AST
 subAexp ast expr repl = do
   z3Expr <- aexpToZ3 $ expr
   z3Repl <- aexpToZ3 $ repl
-  subAST ast z3Expr z3Repl
+  substitute ast [z3Expr] [z3Repl]
 
 assignPost :: Var -> AExp -> AST -> Z3 AST
 assignPost var aexp post = do
@@ -141,36 +137,19 @@ bexpToZ3 bexp =
     BOr  b1 b2 -> mkOr  =<< mapM bexpToZ3 [b1, b2]
 
 
------------------------------
--- Uninterpreted Functions --
------------------------------
+---------------
+-- Functions --
+---------------
 
-data UFunc = UFunc
+data Func = Func
   { fName     :: String
   , fParams   :: [Var]
-  , fPreSMT  :: String
-  , fPostSMT :: String
   } deriving (Eq, Ord, Show)
 
-fsubst :: UFunc -> Var -> Var -> Z3 UFunc
-fsubst f@(UFunc name params _ _) var repl = do
-  pre'  <- astToString =<< subAST =<< fPreCond f
-  post' <- astToString =<< subAST =<< fPostCond f
+fsubst :: Func -> Var -> Var -> Z3 Func
+fsubst f@(Func name params) var repl = do
   let params' = map (\p -> if p == var then repl else p) params
-  return $ UFunc name params' pre' post'
-  where
-    subAST ast = subVar ast var repl
-
-fPreCond :: UFunc -> Z3 AST
-fPreCond = parseSMTOrError.fPreSMT
-
-fPostCond :: UFunc -> Z3 AST
-fPostCond = parseSMTOrError.fPostSMT
-
-funSP :: UFunc -> AST -> Z3 AST
-funSP f pre = do
-  post <- fPostCond f
-  mkAnd [pre, post]
+  return $ Func name params'
 
 
 ---------------------------
@@ -182,7 +161,7 @@ data Stmt
   | Var := AExp
   | Seq [Stmt]
   | If BExp Stmt Stmt
-  | Call Var UFunc
+  | Call Var Func
   deriving (Eq, Ord, Show)
 
 type Prog = Stmt

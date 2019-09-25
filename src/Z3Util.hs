@@ -1,14 +1,17 @@
 module Z3Util
-  ( astVars
+  ( astFreeVars
   , checkSat
   , checkValid
-  , subAST
+  , mkFreshIntVars
+  , symbolsToStrings
   ) where
 
+import Control.Monad (foldM)
+import Data.List
 import qualified Data.Set as Set
-import qualified Data.Text as T
-import SMTParser
 import Z3.Monad
+
+import Debug.Trace
 
 checkValid :: AST -> Z3 Bool
 checkValid ast = do
@@ -22,55 +25,76 @@ checkValid ast = do
 
 checkSat :: AST -> Z3 Bool
 checkSat ast = do
+  astStr <- astToString ast
+  traceM $ "Checking SAT: " ++ astStr
   push
+  traceM "Pushed"
   assert ast
+  traceM "Asserted"
   result <- check
+  traceM $ "Result: " ++ (show result)
   pop 1
+  traceM "Popped"
   case result of
     Sat -> return True
     _   -> return False
 
-subAST :: AST -> AST -> AST -> Z3 AST
-subAST ast from to = do
-  astStr  <- astToString ast
-  fromStr <- astToString from
-  toStr   <- astToString to
-  let replacedStr = T.unpack $ T.replace (T.pack fromStr) (T.pack toStr) (T.pack astStr)
-  parseSMTOrError replacedStr
+symbolsToStrings :: [Symbol] -> Z3 [String]
+symbolsToStrings syms = sequence $ map getSymbolString syms
 
-astVars :: AST -> Z3 [Symbol]
-astVars ast = do
-  astIsApp <- isApp ast
-  case astIsApp of
-    False -> return []
-    True  -> do
+astFreeVars :: AST -> Z3 [Symbol]
+astFreeVars ast = do
+  vars <- astFreeVars' ast Set.empty Set.empty
+  return $ Set.toList vars
+
+astFreeVars' :: AST -> (Set.Set Symbol) -> (Set.Set Symbol) -> Z3 (Set.Set Symbol)
+astFreeVars' ast boundVars freeVars = do
+  astIsApp    <- isApp ast
+  astIsExists <- isQuantifierExists ast
+  astIsForall <- isQuantifierForall ast
+  case (astIsApp, astIsExists || astIsForall) of
+    (False, False) -> return freeVars
+    (True, _)  -> do
       app      <- toApp ast
-      astIsVar <- isVar ast
       numArgs  <- getAppNumArgs app
-      case (numArgs, astIsVar) of
-        (0, False) -> return []
-        (0, True ) -> return . (:[]) =<< getDeclName =<< getAppDecl app
-        _          -> appVars app
-  where
-    appVars :: App -> Z3 [Symbol]
-    appVars app = do
-      args <- getAppArgs app
-      vars <- mapM astVars args
-      let dedup = Set.toList . Set.fromList
-      return . dedup . concat $ vars
+      case numArgs of
+        0 -> do
+          astIsVar <- isVar ast
+          varSymb <- getDeclName =<< getAppDecl app
+          return $ if (varSymb `Set.member` boundVars) || (not astIsVar)
+                      then freeVars
+                      else (Set.insert) varSymb freeVars
+        _ -> getAppArgs app >>=
+             foldM (\free' arg -> astFreeVars' arg boundVars free') freeVars
+    (_, True) -> do
+      numBound <- getQuantifierNumBound ast
+      bound    <- sequence $ map (\i -> getQuantifierBoundName ast i) [0..numBound-1]
+      body     <- getQuantifierBody ast
+      astFreeVars' body (foldr Set.insert boundVars bound) freeVars
 
 isVar :: AST -> Z3 Bool
 isVar ast = do
-  name <- astToString ast
-  kind <- getAstKind ast
-  let nameOk = hasVarishName name
-  case kind of
-    Z3_APP_AST       -> return nameOk
-    Z3_FUNC_DECL_AST -> return nameOk
-    Z3_VAR_AST       -> return nameOk
-    _                -> return False
+  astStr <- astToString ast
+  case stripPrefix "(:var " astStr of
+    Just _ -> return True
+    _      -> do
+      astIsApp <- isApp ast
+      if not astIsApp then return True else do
+        app     <- toApp ast
+        arity   <- getAppNumArgs app
+        boolLit <- isBoolLit ast
+        if arity == 0 then return $ not boolLit else do
+          kind <- getAstKind ast
+          case kind of
+            Z3_VAR_AST       -> return $ not boolLit
+            _                -> return False
 
 -- This is super hacky, but I don't see another way to
--- distinguish actual variables in Z3.
-hasVarishName :: String -> Bool
-hasVarishName s = not.elem s $ ["true", "false"]
+-- distinguish variables from boolean literals.
+isBoolLit :: AST -> Z3 Bool
+isBoolLit ast = do
+  astStr <- astToString ast
+  return $ astStr `elem` ["true", "false"]
+
+mkFreshIntVars :: [String] -> Z3 [AST]
+mkFreshIntVars vars = mapM mkFreshIntVar vars
