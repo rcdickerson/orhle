@@ -106,9 +106,9 @@ generateVCs stmt post quant spec = case stmt of
         frAsgnVar    <- astToString frAsgnAst
         frAsgnApp    <- toApp frAsgnAst
         (fPre, fPost, abds) <- specOrAbducibles frAsgnVar f spec
-        fPostImpPost <- mkImplies fPost post
         existsPost   <- mkExistsConst [] [frAsgnApp]
                         =<< substitute fPost [asgnAst] [frAsgnAst]
+        fPostImpPost <- mkImplies fPost post
         forallPost   <- mkForallConst [] [frAsgnApp]
                         =<< substitute fPostImpPost [asgnAst] [frAsgnAst]
         vc           <- mkAnd [fPre, existsPost, forallPost]

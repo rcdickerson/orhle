@@ -1,4 +1,4 @@
-module RHLEVerifier
+module Orhle
     ( AbductionResult
     , AExp(..)
     , BExp(..)

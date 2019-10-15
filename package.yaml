@@ -1,4 +1,4 @@
-name:                rhle-verifier
+name:                orhle
 version:             0.1.0.0
 github:              "rcdickerson/rhle-verifier"
 author:              "Rob Dickerson"
@@ -29,7 +29,7 @@ library:
   source-dirs: src
 
 executables:
-  rhle-verifier-exe:
+  orhle-exe:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
@@ -37,10 +37,10 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - rhle-verifier
+    - orhle
 
 tests:
-  rhle-verifier-test:
+  orhle-test:
     main:                Main.hs
     source-dirs:         test
     ghc-options:
@@ -48,5 +48,5 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - rhle-verifier
+    - orhle
     - HUnit

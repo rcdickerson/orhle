@@ -1,6 +1,6 @@
 module Main where
 
-import RHLEVerifier
+import Orhle
 import Z3.Monad
 
 main :: IO ()
