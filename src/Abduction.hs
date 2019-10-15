@@ -18,6 +18,8 @@ import Simplify
 import Z3.Monad
 import Z3Util
 
+import Debug.Trace
+
 --------------------------------------------------------------------------------
 
 data AbductionProblem = AbductionProblem
@@ -78,22 +80,22 @@ noAbduction pre post = do
 singleAbduction :: Abducible -> AST -> AST -> TracedResult
 singleAbduction abd@(Abducible abdName abdParams) pre post = do
   logAbdMessage $ "Performing single abduction for " ++ abdName
-  imp        <- lift $ mkImplies pre post
+  imp           <- lift $ mkImplies pre post
   logAbdFormula "Initial implication" imp
-  freeVars    <- lift $ astFreeVars imp
-  freeVarStrs <- lift $ sequence $ map getSymbolString freeVars
+  freeVars      <- lift $ astFreeVars imp
+  freeVarStrs   <- lift $ sequence $ map getSymbolString freeVars
   logAbdMessage $ "Formula variables: " ++ (show freeVarStrs)
-  vbar       <- lift $ filterVars freeVars abdParams
-  vbarStrs   <- lift $ symbolsToStrings vbar
+  vbar          <- lift $ filterVars freeVars abdParams
+  vbarStrs      <- lift $ symbolsToStrings vbar
   logAbdMessage $ "Candidate variables for MUS: " ++ (show vbarStrs)
-  musVars    <- lift $ findMusVars imp vbar
-  musVarStrs <- lift $ symbolsToStrings musVars
+  musVars       <- lift $ findMusVars imp vbar
+  musVarStrs    <- lift $ symbolsToStrings musVars
   logAbdMessage $ "MUS Vars: " ++ (show musVarStrs)
-  qeRes      <- lift $ performQe musVars imp
+  qeRes         <- lift $ performQe musVars imp
   logAbdFormula "QE Result" qeRes
-  qeResSimpl <- lift $ simplifyWrt pre qeRes
+  qeResSimpl    <- lift $ simplifyWrt pre qeRes
   logAbdFormula "Simplified QE Result" qeResSimpl
-  sat        <- lift $ checkSat qeResSimpl
+  sat           <- lift $ checkSat qeResSimpl
   case sat of
     False -> return.Left  $ "No satisfying abduction found."
     True  -> return.Right $ Map.insert abd qeResSimpl emptyIMap
@@ -172,16 +174,36 @@ initSolution abds pre combinedResult = do
 
 
 performQe :: [Symbol] -> AST -> Z3 AST
-performQe [] formula = return formula
+performQe [] formula = do
+  dummy <- mkFreshConst "dummy" =<< mkIntSort
+  dummySymbol <- mkStringSymbol =<< astToString dummy
+  result <- performQe [dummySymbol] =<< simplify formula
+  resultStr <- astToString result
+  formulaStr <- astToString formula
+  simplFormulaStr <- astToString =<< simplify formula
+  traceM $ "QE with dummy var before: " ++ formulaStr
+  traceM $ "QE with dummy var before (simplified): " ++ simplFormulaStr
+  traceM $ "QE with dummy var: " ++ resultStr
+  return result
 performQe vars formula = do
+  formulaStr <- astToString formula
+  traceM $ "formula: " ++ formulaStr
+  assumptions <- solverCheckAssumptions [formula]
+  traceM $ "Assumptions: " ++ (show assumptions)
+  unsatCore <- astToString =<< mkAnd =<< solverGetUnsatCore
+  traceM $ "Unsat Core: " ++ unsatCore
   push
   intVars  <- mapM mkIntVar vars
   appVars  <- mapM toApp intVars
   qf       <- mkForallConst [] appVars formula
+  qfStr <- astToString qf
+  traceM $ "QE: " ++ qfStr
   goal     <- mkGoal False False False
   goalAssert goal qf
-  qe       <- mkTactic "qe"
+  qe       <- mkQuantifierEliminationTactic
   qeResult <- applyTactic qe goal
+  numSubgoals <- getApplyResultNumSubgoals qeResult
+  traceM $ "num subgoals: " ++ (show numSubgoals)
   subgoals <- getApplyResultSubgoals qeResult
   formulas <- mapM getGoalFormulas subgoals
   pop 1

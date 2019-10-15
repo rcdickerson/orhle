@@ -11,30 +11,14 @@ import Data.List
 import qualified Data.Set as Set
 import Z3.Monad
 
-import Debug.Trace
-
 checkValid :: AST -> Z3 Bool
 checkValid ast = do
-  push
-  assert =<< mkNot ast
-  result <- check
-  pop 1
-  case result of
-    Unsat -> return True
-    _     -> return False
+  negSat <- checkSat =<< mkNot ast
+  return $ not negSat
 
 checkSat :: AST -> Z3 Bool
 checkSat ast = do
-  astStr <- astToString ast
-  traceM $ "Checking SAT: " ++ astStr
-  push
-  traceM "Pushed"
-  assert ast
-  traceM "Asserted"
-  result <- check
-  traceM $ "Result: " ++ (show result)
-  pop 1
-  traceM "Popped"
+  result <- solverCheckAssumptions [ast]
   case result of
     Sat -> return True
     _   -> return False
@@ -64,8 +48,9 @@ astFreeVars' ast boundVars freeVars = do
           return $ if (varSymb `Set.member` boundVars) || (not astIsVar)
                       then freeVars
                       else (Set.insert) varSymb freeVars
-        _ -> getAppArgs app >>=
-             foldM (\free' arg -> astFreeVars' arg boundVars free') freeVars
+        _ -> do
+          appArgs <- getAppArgs app
+          foldM (\free' arg -> astFreeVars' arg boundVars free') freeVars appArgs
     (_, True) -> do
       numBound <- getQuantifierNumBound ast
       bound    <- sequence $ map (\i -> getQuantifierBoundName ast i) [0..numBound-1]
@@ -83,11 +68,11 @@ isVar ast = do
         app     <- toApp ast
         arity   <- getAppNumArgs app
         boolLit <- isBoolLit ast
-        if arity == 0 then return $ not boolLit else do
+        if arity > 0 then return False else do
           kind <- getAstKind ast
           case kind of
-            Z3_VAR_AST       -> return $ not boolLit
-            _                -> return False
+            Z3_APP_AST  -> return $ not boolLit
+            _           -> return False
 
 -- This is super hacky, but I don't see another way to
 -- distinguish variables from boolean literals.

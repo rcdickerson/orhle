@@ -13,8 +13,6 @@ module AbdTrace
 import Control.Monad.Writer
 import Z3.Monad
 
-import Debug.Trace
-
 data AbdTrace = ATAbdStart [String] AST AST
               | ATFailure String
               | ATFlatten String AST AST
@@ -28,13 +26,13 @@ logAbdFailure :: (Monad m) => String -> ATWriter m ()
 logAbdFailure message = do tell [ATFailure message]
 
 logAbdFlatten :: (Monad m) => String -> AST -> AST -> ATWriter m ()
-logAbdFlatten name from to = do (trace "<Flatten>") tell [ATFlatten name from to]
+logAbdFlatten name from to = do tell [ATFlatten name from to]
 
 logAbdFormula :: (Monad m) => String -> AST -> ATWriter m ()
-logAbdFormula message formula = do (trace $ message ++ ": <formula>") tell [ATFormula message formula]
+logAbdFormula message formula = do tell [ATFormula message formula]
 
 logAbdMessage :: (Monad m) => String -> ATWriter m ()
-logAbdMessage message = do (trace message) tell [ATMessage message]
+logAbdMessage message = do tell [ATMessage message]
 
 logAbdStart :: (Monad m) => [String] -> AST -> AST -> ATWriter m ()
 logAbdStart abdDescs pre post = do tell [ATAbdStart abdDescs pre post]

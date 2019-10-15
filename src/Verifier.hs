@@ -56,10 +56,11 @@ singleAbdVerifier trip = do
 
 verifySingleAbd :: RHLETrip -> VTracedResult
 verifySingleAbd (RHLETrip pre progA progE post) = do
-  (vcsA, abdsA)  <- lift $ generateVCs progA post VCUniversal emptySpec
   (vcsE, abdsE)  <- lift $ generateVCs progE post VCExistential emptySpec
+  post'          <- lift $ simplify =<< mkAnd vcsE
+  (vcsA, abdsA)  <- lift $ generateVCs progA post' VCUniversal emptySpec
   let abds = Set.toList $ Set.union abdsA abdsE
-  (result, trace) <- lift $ abduce abds [pre] $ vcsA ++ vcsE
+  (result, trace) <- lift $ abduce abds [pre] vcsA
   logAbductionTrace trace
   preStr <- lift $ astToString pre
   vcsStr <- lift $ astToString =<< mkAnd (vcsA ++ vcsE)
@@ -79,7 +80,7 @@ generateVCs stmt post quant spec = case stmt of
   Seq (s:ss) -> do
     (vcs2, abds2) <- generateVCs (Seq ss) post quant spec
     (vcs1, abds1) <- (\post' -> generateVCs s post' quant spec) =<< mkAnd vcs2
-    return (vcs1 ++ vcs2, Set.union abds1 abds2)
+    return (vcs1, Set.union abds1 abds2)
   lhs := rhs -> do
     subPost <- subAexp post (V lhs) rhs
     return ([subPost], Set.empty)
@@ -121,7 +122,8 @@ specOrAbducibles assignee func@(Func name args) spec =
         fPreAbd  <- mkBoolVar =<< mkStringSymbol fPreVar
         fPostAbd <- mkBoolVar =<< mkStringSymbol fPostVar
         return (fPreAbd, fPostAbd, Set.fromList
-                [(Abducible fPreVar args), (Abducible fPostVar $ assignee:args)])
+                [ Abducible fPreVar args
+                , Abducible fPostVar $ assignee:args ])
           where
             fPreVar  = name ++ "_pre"
             fPostVar = name ++ "_post"
