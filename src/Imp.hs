@@ -13,6 +13,9 @@ module Imp
     , bsubst
     , bvars
     , fsubst
+    , prefixAExpVars
+    , prefixBExpVars
+    , prefixProgVars
     , subAexp
     , subVar
     ) where
@@ -89,6 +92,16 @@ assignPost var aexp post = do
   eq      <- mkEq z3Var z3Aexp
   mkAnd [eq, post]
 
+prefixAExpVars :: String -> AExp -> AExp
+prefixAExpVars pre aexp =
+  case aexp of
+    I i          -> I i
+    V v          -> V $ pre ++ v
+    lhs :+: rhs  -> prefix lhs :+: prefix rhs
+    lhs :-: rhs  -> prefix lhs :+: prefix rhs
+    lhs :*: rhs  -> prefix lhs :+: prefix rhs
+    AMod lhs rhs -> AMod (prefix lhs) (prefix rhs)
+  where prefix = prefixAExpVars pre
 
 -------------------------
 -- Boolean Expressions --
@@ -136,6 +149,13 @@ bexpToZ3 bexp =
     BAnd b1 b2 -> mkAnd =<< mapM bexpToZ3 [b1, b2]
     BOr  b1 b2 -> mkOr  =<< mapM bexpToZ3 [b1, b2]
 
+prefixBExpVars :: String -> BExp -> BExp
+prefixBExpVars pre bexp =
+  case bexp of
+    lhs :=: rhs -> (prefix lhs) :=: (prefix rhs)
+    _ -> bexp
+  where prefix = prefixAExpVars pre
+
 
 ---------------
 -- Functions --
@@ -163,5 +183,20 @@ data Stmt
   | If BExp Stmt Stmt
   | Call Var Func
   deriving (Eq, Ord, Show)
+
+prefixProgVars :: String -> Prog -> Prog
+prefixProgVars pre prog =
+  case prog of
+    Skip        -> Skip
+    var := aexp -> (pre ++ var) := prefixA aexp
+    Seq stmts   -> Seq $ map prefixP stmts
+    If c s1 s2  -> If (prefixB c) (prefixP s1) (prefixP s2)
+    Call var (Func fname fparams) ->
+      Call (prefix var) (Func (prefix fname) $ map prefix fparams)
+  where
+    prefix s = pre ++ s
+    prefixA = prefixAExpVars pre
+    prefixB = prefixBExpVars pre
+    prefixP = prefixProgVars pre
 
 type Prog = Stmt

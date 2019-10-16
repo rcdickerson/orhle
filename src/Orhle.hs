@@ -20,6 +20,9 @@ module Orhle
     , parseImp
     , parseImpOrError
     , parseSMT
+    , prefixAExpVars
+    , prefixBExpVars
+    , prefixProgVars
     , ppVTrace
     , putInterpMap
     , runVerifier

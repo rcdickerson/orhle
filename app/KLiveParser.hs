@@ -8,12 +8,13 @@ import Orhle
 import Text.Parsec
 import Text.Parsec.Language
 import qualified Text.Parsec.Token as Token
+import Z3.Monad
 
 data KLQuery = KLQuery
-               { klPreCondSMT  :: String
+               { klPreCondSMT  :: Z3 AST
                , klForallProgs :: [Prog]
                , klExistsProgs :: [Prog]
-               , klPostCondSMT :: String
+               , klPostCondSMT :: Z3 AST
                }
 data KLExpectedResult = KLSuccess | KLFailure
 
@@ -62,17 +63,18 @@ kliveParser = do
   let (aProgs, eProgs) = categorizeProgs execs progs
   return (KLQuery preCond aProgs eProgs postCond, expectedResult)
 
-preCondition :: KLiveParser String
+preCondition :: KLiveParser (Z3 AST)
 preCondition = do
   reserved "pre"
   char ':'
-  return "<SMT>"
+  smtParser
 
-postCondition :: KLiveParser (String, KLExpectedResult)
+postCondition :: KLiveParser ((Z3 AST), KLExpectedResult)
 postCondition = do
   expectedResult <- try expectedSat <|> expectedFail
   char ':'
-  return ("<SMT>", expectedResult)
+  ast <- smtParser
+  return (ast, expectedResult)
 
 expectedSat :: KLiveParser KLExpectedResult
 expectedSat = do
@@ -115,5 +117,5 @@ categorizeProgs execs namedProgs = foldr categorize ([], []) execs
     categorize (QEExists name) (aProgs, eProgs) = (aProgs, nappend name eProgs)
     nappend name progs =
       case lookup name namedProgs of
-        Just prog -> prog:progs
+        Just prog -> (prefixProgVars name prog):progs
         Nothing   -> fail $ "Program definition not found: " ++ name
