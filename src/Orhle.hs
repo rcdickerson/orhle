@@ -19,16 +19,19 @@ module Orhle
     , mkRHLETrip
     , parseImp
     , parseImpOrError
+    , parseSMT
     , ppVTrace
     , putInterpMap
     , runVerifier
     , singleAbdVerifier
+    , smtParser
     ) where
 
 import Abduction
 import Imp
 import ImpParser
 import InterpMap
+import SMTParser
 import Triples
 import Verifier
 import VTrace
