@@ -2,7 +2,8 @@
 -- Based on https://wiki.haskell.org/Parsing_a_simple_imperative_language
 
 module ImpParser
-    ( parseImp
+    ( impParser
+    , parseImp
     , parseImpOrError
     ) where
 
@@ -29,9 +30,6 @@ languageDef = Token.LanguageDef
                             , "skip"
                             , "true"
                             , "false"
-                            , "not"
-                            , "and"
-                            , "or"
                             ]
   , Token.reservedOpNames = [ "+", "-", "*"
                             , ":="

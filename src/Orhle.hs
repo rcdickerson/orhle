@@ -15,6 +15,7 @@ module Orhle
     , VTrace
     , abduce
     , aexpToZ3
+    , impParser
     , mkRHLETrip
     , parseImp
     , parseImpOrError

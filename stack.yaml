@@ -42,7 +42,7 @@ packages:
 # extra-deps: [z3-408.0]
 extra-deps:
 - github: rcdickerson/haskell-z3
-  commit: 7c3c40528e9a224ab4702d0b5f2fa75125d37b7d
+  commit: 29d15ef59afb6d177e44155505d157db3788e0a0
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
