@@ -1,6 +1,7 @@
 module SMTParser
   ( parseSMT
   , parseSMTOrError
+  , smtParser
   ) where
 
 import Control.Monad
@@ -53,8 +54,10 @@ type SMTParser a = Parsec String () (Z3 a)
 data SMTFunc = SMTAnd
              | SMTEq
              | SMTImp
+             | SMTGT
              | SMTGTE
              | SMTLT
+             | SMTLTE
              | SMTMod
              | SMTNot
              | SMTOr
@@ -165,9 +168,11 @@ smtApp = do
 
 funcDecl :: SMTParser SMTFunc
 funcDecl =     funcParser "and" SMTAnd
+           <|> funcParser ">"   SMTGT
            <|> funcParser ">="  SMTGTE
            <|> funcParser "=>"  SMTImp
            <|> funcParser "<"   SMTLT
+           <|> funcParser "<="  SMTLTE
            <|> funcParser "mod" SMTMod
            <|> funcParser "not" SMTNot
            <|> funcParser "or"  SMTOr
@@ -175,20 +180,23 @@ funcDecl =     funcParser "and" SMTAnd
 
 smtApply :: SMTFunc -> [AST] -> Z3 AST
 smtApply SMTAnd ops = mkAnd ops
-smtApply SMTEq (lhs:rhs:[]) = mkEq lhs rhs
+smtApply SMTEq  (lhs:rhs:[]) = mkEq lhs rhs
+smtApply SMTGT  (lhs:rhs:[]) = mkGt lhs rhs
 smtApply SMTGTE (lhs:rhs:[]) = mkGe lhs rhs
 smtApply SMTImp (lhs:rhs:[]) = mkImplies lhs rhs
-smtApply SMTLT (lhs:rhs:[]) = mkLt lhs rhs
+smtApply SMTLT  (lhs:rhs:[]) = mkLt lhs rhs
+smtApply SMTLTE (lhs:rhs:[]) = mkLe lhs rhs
 smtApply SMTMod (lhs:rhs:[]) = mkMod lhs rhs
 smtApply SMTNot (expr:[]) = mkNot expr
 smtApply SMTOr ops = mkOr ops
--- TODO: something better than error
-smtApply SMTEq _ = error "equals takes exactly two arguments"
-smtApply SMTGTE _ = error ">= takes exactly two arguments"
-smtApply SMTImp _ = error "=> takes exactly two arguments"
-smtApply SMTLT _ = error "< takes exactly two arguments"
-smtApply SMTMod _ = error "mod takes exactly two arguments"
-smtApply SMTNot _ = error "not takes exactly one argument"
+smtApply SMTEq  _ = fail "equals takes exactly two arguments"
+smtApply SMTGT  _ = fail "> takes exactly two arguments"
+smtApply SMTGTE _ = fail ">= takes exactly two arguments"
+smtApply SMTImp _ = fail "=> takes exactly two arguments"
+smtApply SMTLT  _ = fail "< takes exactly two arguments"
+smtApply SMTLTE _ = fail "<= takes exactly two arguments"
+smtApply SMTMod _ = fail "mod takes exactly two arguments"
+smtApply SMTNot _ = fail "not takes exactly one argument"
 
 funcParser :: String -> SMTFunc -> SMTParser SMTFunc
 funcParser str func = try $ string str >> whitespace >> (return $ return func)
