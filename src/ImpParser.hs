@@ -62,23 +62,20 @@ parseImpOrError str =
     Right stmt -> stmt
 
 impParser :: ImpParser Prog
-impParser = whiteSpace >> statement
+impParser = whiteSpace >> program
+
+program :: ImpParser Stmt
+program = do
+  stmts <- many1 $ statement
+  case length stmts of
+    1 -> return $ head stmts
+    _ -> return $ Seq  stmts
 
 statement :: ImpParser Stmt
-statement = parens statement <|> sequenceOfStmt
-
-sequenceOfStmt :: ImpParser Stmt
-sequenceOfStmt = do
-  list <- sepBy1 statement' semi
-  case length list of
-    1 -> return $ head list
-    _ -> return $ Seq list
-
-statement' :: ImpParser Stmt
-statement' =   ifStmt
-           <|> skipStmt
-           <|> assignStmt
-           <|> funcStmt
+statement =   ifStmt
+          <|> skipStmt
+          <|> assignStmt
+          <|> funcStmt
 
 ifStmt :: ImpParser Stmt
 ifStmt = do
@@ -88,6 +85,7 @@ ifStmt = do
   stmt1 <- statement
   reserved "else"
   stmt2 <- statement
+  semi
   return $ If cond stmt1 stmt2
 
 assignStmt :: ImpParser Stmt
@@ -95,6 +93,7 @@ assignStmt = do
   var  <- identifier
   reservedOp ":="
   expr <- aExpression
+  semi
   return $ var := expr
 
 funcStmt :: ImpParser Stmt
@@ -110,11 +109,12 @@ funcStmt = do
   reserved "post"
   post <- between (char '{') (char '}') (many $ noneOf "{}")
   whiteSpace
+  semi
   -- TODO: Return a Spec as well to continue allowing inline specs?
   return $ Call assignee (Func funcName params)
 
 skipStmt :: ImpParser Stmt
-skipStmt = reserved "skip" >> return Skip
+skipStmt = reserved "skip" >> semi >> return Skip
 
 aExpression :: ImpParser AExp
 aExpression = buildExpressionParser aOperators aTerm
