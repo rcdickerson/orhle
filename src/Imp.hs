@@ -21,7 +21,6 @@ module Imp
     ) where
 
 import Z3.Monad
-import Z3Util
 
 infix 1 :=
 infix 2 :=:

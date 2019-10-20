@@ -17,6 +17,7 @@ module Orhle
     , aexpToZ3
     , impParser
     , mkRHLETrip
+    , noAbdVerifier
     , parseImp
     , parseImpOrError
     , parseSMT

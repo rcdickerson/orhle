@@ -2,6 +2,7 @@ module Verifier
   ( Verifier
   , VResult
   , VTracedResult
+  , noAbdVerifier
   , runVerifier
   , singleAbdVerifier
   ) where
@@ -16,8 +17,9 @@ import Specification
 import Triples
 import VTrace
 import Z3.Monad
+import Z3Util
 
-type Verifier = RHLETrip -> Z3 (VResult, [VTrace])
+type Verifier      = RHLETrip -> Z3 (VResult, [VTrace])
 type VResult       = Either String InterpMap
 type VTracedResult = WriterT [VTrace] Z3 VResult
 
@@ -50,9 +52,28 @@ runVerifier' verifier pre progA progE post = do
       tell $ "INVALID: " ++ reason ++ "\n"
   tell "------------------------------------------------"
 
+noAbdVerifier :: RHLETrip -> Z3 (VResult, [VTrace])
+noAbdVerifier trip = runWriterT $ verifyNoAbd trip
+
+verifyNoAbd :: RHLETrip -> VTracedResult
+verifyNoAbd (RHLETrip pre progA progE post) = do
+  (vcsE, abdsE)  <- lift $ generateVCs progE post VCExistential emptySpec
+  post'          <- lift $ simplify =<< mkAnd vcsE
+  (vcsA, abdsA)  <- lift $ generateVCs progA post' VCUniversal emptySpec
+  let combinedAbds = Set.union abdsE abdsA
+  if not $ Set.null combinedAbds then
+    return.Left $ "Missing specifications: " ++ (abdNameList combinedAbds)
+    else do
+      vcs <- lift . mkAnd $ vcsE ++ vcsA
+      valid <- lift $ checkValid =<< mkImplies pre vcs
+      if valid
+        then return.Right $ emptyIMap
+        else return.Left  $ "Invalid"
+  where
+    abdNameList abds = show . Set.toList $ Set.map abdName abds
+
 singleAbdVerifier :: RHLETrip -> Z3 (VResult, [VTrace])
-singleAbdVerifier trip = do
-  runWriterT $ verifySingleAbd trip
+singleAbdVerifier trip = runWriterT $ verifySingleAbd trip
 
 verifySingleAbd :: RHLETrip -> VTracedResult
 verifySingleAbd (RHLETrip pre progA progE post) = do

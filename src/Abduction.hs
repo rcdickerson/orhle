@@ -18,8 +18,6 @@ import Simplify
 import Z3.Monad
 import Z3Util
 
-import Debug.Trace
-
 --------------------------------------------------------------------------------
 
 data AbductionProblem = AbductionProblem
@@ -178,32 +176,32 @@ performQe [] formula = do
   dummy <- mkFreshConst "dummy" =<< mkIntSort
   dummySymbol <- mkStringSymbol =<< astToString dummy
   result <- performQe [dummySymbol] =<< simplify formula
-  resultStr <- astToString result
-  formulaStr <- astToString formula
-  simplFormulaStr <- astToString =<< simplify formula
-  traceM $ "QE with dummy var before: " ++ formulaStr
-  traceM $ "QE with dummy var before (simplified): " ++ simplFormulaStr
-  traceM $ "QE with dummy var: " ++ resultStr
+--  resultStr <- astToString result
+--  formulaStr <- astToString formula
+--  simplFormulaStr <- astToString =<< simplify formula
+--  traceM $ "QE with dummy var before: " ++ formulaStr
+--  traceM $ "QE with dummy var before (simplified): " ++ simplFormulaStr
+--  traceM $ "QE with dummy var: " ++ resultStr
   return result
 performQe vars formula = do
-  formulaStr <- astToString formula
-  traceM $ "formula: " ++ formulaStr
-  assumptions <- solverCheckAssumptions [formula]
-  traceM $ "Assumptions: " ++ (show assumptions)
-  unsatCore <- astToString =<< mkAnd =<< solverGetUnsatCore
-  traceM $ "Unsat Core: " ++ unsatCore
+--  formulaStr <- astToString formula
+--  traceM $ "formula: " ++ formulaStr
+--  assumptions <- solverCheckAssumptions [formula]
+--  traceM $ "Assumptions: " ++ (show assumptions)
+--  unsatCore <- astToString =<< mkAnd =<< solverGetUnsatCore
+--  traceM $ "Unsat Core: " ++ unsatCore
   push
   intVars  <- mapM mkIntVar vars
   appVars  <- mapM toApp intVars
   qf       <- mkForallConst [] appVars formula
-  qfStr <- astToString qf
-  traceM $ "QE: " ++ qfStr
+--  qfStr <- astToString qf
+--  traceM $ "QE: " ++ qfStr
   goal     <- mkGoal False False False
   goalAssert goal qf
   qe       <- mkQuantifierEliminationTactic
   qeResult <- applyTactic qe goal
-  numSubgoals <- getApplyResultNumSubgoals qeResult
-  traceM $ "num subgoals: " ++ (show numSubgoals)
+--  numSubgoals <- getApplyResultNumSubgoals qeResult
+--  traceM $ "num subgoals: " ++ (show numSubgoals)
   subgoals <- getApplyResultSubgoals qeResult
   formulas <- mapM getGoalFormulas subgoals
   pop 1
