@@ -3,6 +3,7 @@ module Z3Util
   , checkSat
   , checkValid
   , mkFreshIntVars
+  , substituteByName
   , symbolsToStrings
   ) where
 
@@ -25,6 +26,14 @@ checkSat ast = do
 
 symbolsToStrings :: [Symbol] -> Z3 [String]
 symbolsToStrings syms = sequence $ map getSymbolString syms
+
+substituteByName :: AST -> [String] -> [String] -> Z3 AST
+substituteByName ast fromStrings toStrings = do
+  fromSymbols <- mapM mkStringSymbol fromStrings
+  toSymbols   <- mapM mkStringSymbol toStrings
+  fromASTs    <- mapM mkIntVar fromSymbols
+  toASTs      <- mapM mkIntVar toSymbols
+  substitute ast fromASTs toASTs
 
 astFreeVars :: AST -> Z3 [Symbol]
 astFreeVars ast = do

@@ -52,23 +52,25 @@ runVerifier' verifier pre progA progE post = do
       tell $ "INVALID: " ++ reason ++ "\n"
   tell "------------------------------------------------"
 
-noAbdVerifier :: RHLETrip -> Z3 (VResult, [VTrace])
-noAbdVerifier trip = runWriterT $ verifyNoAbd trip
+noAbdVerifier :: ASTSpec -> RHLETrip -> Z3 (VResult, [VTrace])
+noAbdVerifier spec trip = runWriterT $ verifyNoAbd spec trip
 
-verifyNoAbd :: RHLETrip -> VTracedResult
-verifyNoAbd (RHLETrip pre progA progE post) = do
-  (vcsE, abdsE)  <- lift $ generateVCs progE post VCExistential emptySpec
+verifyNoAbd :: ASTSpec -> RHLETrip -> VTracedResult
+verifyNoAbd spec (RHLETrip pre progA progE post) = do
+  (vcsE, abdsE)  <- lift $ generateVCs progE post VCExistential spec
   post'          <- lift $ simplify =<< mkAnd vcsE
-  (vcsA, abdsA)  <- lift $ generateVCs progA post' VCUniversal emptySpec
+  (vcsA, abdsA)  <- lift $ generateVCs progA post' VCUniversal spec
   let combinedAbds = Set.union abdsE abdsA
   if not $ Set.null combinedAbds then
     return.Left $ "Missing specifications: " ++ (abdNameList combinedAbds)
     else do
-      vcs <- lift . mkAnd $ vcsE ++ vcsA
-      valid <- lift $ checkValid =<< mkImplies pre vcs
+      vcs    <- lift . mkAnd $ vcsE ++ vcsA
+      vcsStr <- lift $ astToString vcs
+      logMsg $ "Verification Conditions\n  " ++ vcsStr
+      valid  <- lift $ checkValid =<< mkImplies pre vcs
       if valid
         then return.Right $ emptyIMap
-        else return.Left  $ "Invalid"
+        else return.Left  $ "Invalid Verification Conditions"
   where
     abdNameList abds = show . Set.toList $ Set.map abdName abds
 
@@ -77,9 +79,9 @@ singleAbdVerifier trip = runWriterT $ verifySingleAbd trip
 
 verifySingleAbd :: RHLETrip -> VTracedResult
 verifySingleAbd (RHLETrip pre progA progE post) = do
-  (vcsE, abdsE)  <- lift $ generateVCs progE post VCExistential emptySpec
-  post'          <- lift $ simplify =<< mkAnd vcsE
-  (vcsA, abdsA)  <- lift $ generateVCs progA post' VCUniversal emptySpec
+  (vcsE, abdsE)   <- lift $ generateVCs progE post VCExistential emptyASTSpec
+  post'           <- lift $ simplify =<< mkAnd vcsE
+  (vcsA, abdsA)   <- lift $ generateVCs progA post' VCUniversal emptyASTSpec
   let abds = Set.toList $ Set.union abdsA abdsE
   (result, trace) <- lift $ abduce abds [pre] vcsA
   logAbductionTrace trace
@@ -94,7 +96,7 @@ verifySingleAbd (RHLETrip pre progA progE post) = do
       logAbductionSuccess interpLines preStr vcsStr
       return.Right $ imap
 
-generateVCs :: Stmt -> AST -> VCQuant -> Spec -> Z3 ([AST], (Set.Set Abducible))
+generateVCs :: Stmt -> AST -> VCQuant -> ASTSpec -> Z3 ([AST], (Set.Set Abducible))
 generateVCs stmt post quant spec = case stmt of
   Skip       -> return ([post], Set.empty)
   Seq []     -> generateVCs Skip post quant spec
@@ -135,7 +137,7 @@ generateVCs stmt post quant spec = case stmt of
         vc           <- mkAnd [fPre, existsPost, forallPost]
         return ([vc], abds)
 
-specOrAbducibles :: Var -> Func -> Spec -> Z3 (AST, AST, Set.Set Abducible)
+specOrAbducibles :: Var -> Func -> ASTSpec -> Z3 (AST, AST, Set.Set Abducible)
 specOrAbducibles assignee func@(Func name args) spec =
   case funSpec func spec of
       Just (pr, po) -> return (pr, po, Set.empty)

@@ -106,7 +106,7 @@ ppVTrace' indent (t:ts) =
         ++ "\n" ++ rest
     VTCall kind pre fpre -> do
       rest    <- ppVTrace' indent ts
-      return $ start ++ (kindStr kind) ++ " :: Precondition Check: "
+      return $ start ++ (kindStr kind) ++ ":: Precondition Check: "
         ++ pre ++ " -> " ++ fpre
         ++ "\n" ++ rest
     VTStartBranch cond -> do
@@ -117,7 +117,7 @@ ppVTrace' indent (t:ts) =
       return $ (concat $ replicate (indent - 1) "| ") ++ "-\n" ++ rest
     VTMessage kind msg -> do
       rest <- ppVTrace' indent ts
-      return $ start ++ (kindStr kind) ++ " :: " ++ msg ++ "\n" ++ rest
+      return $ start ++ (kindStr kind) ++ ":: " ++ msg ++ "\n" ++ rest
   where
     start = (concat $ replicate indent "| ")
 

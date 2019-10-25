@@ -8,13 +8,16 @@ module ImpParser
     ) where
 
 import Control.Monad
+import Control.Monad.Identity
+import Control.Monad.State
 import Imp
+import Specification
 import Text.Parsec
 import Text.Parsec.Expr
 import Text.Parsec.Language
 import qualified Text.Parsec.Token as Token
 
-languageDef :: LanguageDef ()
+languageDef :: GenLanguageDef String () (StateT StringSpec Identity)
 languageDef = Token.LanguageDef
   { Token.caseSensitive   = True
   , Token.commentStart    = "/*"
@@ -50,21 +53,28 @@ comma      = Token.comma      lexer
 semi       = Token.semi       lexer
 whiteSpace = Token.whiteSpace lexer
 
-type ImpParser a = Parsec String () a
+type ImpParser a = ParsecT String () (StateT StringSpec Identity) a
 
-parseImp :: String -> Either ParseError Prog
-parseImp str = runParser impParser () "" str
+parseImp :: String -> Either ParseError (Prog, StringSpec)
+parseImp str =
+  let (prog, spec) = runIdentity $ runStateT (runPT impParser () "" str) emptyStringSpec
+  in case prog of
+    Left error -> Left error
+    Right prog -> Right (prog, spec)
 
-parseImpOrError :: String -> Prog
+parseImpOrError :: String -> (Prog, StringSpec)
 parseImpOrError str =
   case parseImp str of
     Left  err  -> error $ "Parse error: " ++ (show err)
     Right stmt -> stmt
 
 impParser :: ImpParser Prog
-impParser = whiteSpace >> program
+impParser = do
+  whiteSpace
+  prog <- program
+  return prog
 
-program :: ImpParser Stmt
+program :: ImpParser Prog
 program = do
   stmts <- many1 $ statement
   case length stmts of
@@ -76,6 +86,7 @@ statement =   ifStmt
           <|> skipStmt
           <|> assignStmt
           <|> funcStmt
+          <|> parens statement
 
 ifStmt :: ImpParser Stmt
 ifStmt = do
@@ -102,7 +113,8 @@ funcStmt = do
   assignee <- identifier
   reservedOp ":="
   funcName <- identifier
-  params <- parens $ sepBy identifier comma
+  params   <- parens $ sepBy identifier comma
+  let func = Func funcName params
   reserved "pre"
   pre <- between (char '{') (char '}') (many $ noneOf "{}")
   whiteSpace
@@ -110,8 +122,8 @@ funcStmt = do
   post <- between (char '{') (char '}') (many $ noneOf "{}")
   whiteSpace
   semi
-  -- TODO: Return a Spec as well to continue allowing inline specs?
-  return $ Call assignee (Func funcName params)
+  get >>= \spec -> put $ addSpec func pre post spec
+  return $ Call assignee func
 
 skipStmt :: ImpParser Stmt
 skipStmt = reserved "skip" >> semi >> return Skip

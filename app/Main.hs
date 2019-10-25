@@ -8,7 +8,9 @@ main = do runSimpleExample
 
 runSimpleExample :: IO ()
 runSimpleExample = do
-  putStrLn =<< runVerifier singleAbdVerifier "true" progA1 progE1 "(= y1 y2)"
+  let (progA, specA) = exampleA1
+  let (progE, specE) = exampleE1
+  putStrLn =<< runVerifier singleAbdVerifier "true" progA progE "(= y1 y2)"
 
 -------------------------------------
 -- Useful for REPL experimentation --
@@ -23,21 +25,21 @@ printZ3Simpl ast = evalZ3 $ astToString =<< simplify ast
 p = printZ3
 ps symbolList = mapM evalZ3 $ map getSymbolString symbolList
 
-progA1 = parseImpOrError "\
+exampleA1 = parseImpOrError "\
 \  x1 := 3;              \
 \  if x1 == 3 then       \
 \    y1 := 5             \
 \  else                  \
 \    y1 := 500           "
 
-progE0 = parseImpOrError "\
+exampleE0 = parseImpOrError "\
 \  x2 := 3;              \
 \  if x2 == 3 then       \
 \    y2 := 500           \
 \  else                  \
 \    y2 := 5             "
 
-progE1 = parseImpOrError "     \
+exampleE1 = parseImpOrError "     \
 \  call x2 := rand()           \
 \    pre {true}                \
 \    post {(= (mod x2 2) 1))}; \
@@ -46,7 +48,7 @@ progE1 = parseImpOrError "     \
 \  else                        \
 \    y2 := 500                 "
 
-progE2 = parseImpOrError "     \
+exampleE2 = parseImpOrError "     \
 \  call x2 := randOddX()       \
 \    pre {true}                \
 \    post {(= (mod x2 2) 1)};  \
@@ -66,11 +68,11 @@ runSimpleNonRefinement :: IO ()
 runSimpleNonRefinement = do
 --  fails: forall t1. exists t2.
 --    t1|refinement == t2|original;
-  let progOriginal = parseImpOrError "  \
+  let (progOriginal, specOriginal) = parseImpOrError "  \
   \  call t1_x := t1_randInt()          \
   \     pre {true}                      \
   \     post {(= t1_x 20)}"
-  let progRefinement = parseImpOrError " \
+  let (progRefinement, specRefinement) = parseImpOrError " \
   \  call t2_x := t2_randInt()           \
   \     pre {true}                       \
   \     post {(and (>= t2_x 0) (< t2_x 10))}"
@@ -80,11 +82,11 @@ runSimpleRefinement :: IO ()
 runSimpleRefinement = do
 --  satisfies: forall t1. exists t2.
 --    t1|refinement == t2|original;
-  let progOriginal = parseImpOrError "  \
+  let (progOriginal, specOriginal) = parseImpOrError "  \
   \  call t1_x := t1_randInt()    \
   \     pre {true}                      \
   \     post {(and (>= t1_x 0) (< t1_x 20))}"
-  let progRefinement = parseImpOrError " \
+  let (progRefinement, specRefinement) = parseImpOrError " \
   \  call t2_x := t2_randInt()    \
   \     pre {true}                       \
   \     post {(and (>= t2_x 0) (< t2_x 10))}"

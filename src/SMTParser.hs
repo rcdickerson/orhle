@@ -1,5 +1,6 @@
 module SMTParser
-  ( parseSMT
+  ( ParseError
+  , parseSMT
   , parseSMTOrError
   , smtParser
   ) where
@@ -168,11 +169,11 @@ smtApp = do
 
 funcDecl :: SMTParser SMTFunc
 funcDecl =     funcParser "and" SMTAnd
-           <|> funcParser ">"   SMTGT
            <|> funcParser ">="  SMTGTE
-           <|> funcParser "=>"  SMTImp
-           <|> funcParser "<"   SMTLT
            <|> funcParser "<="  SMTLTE
+           <|> funcParser "=>"  SMTImp
+           <|> funcParser ">"   SMTGT
+           <|> funcParser "<"   SMTLT
            <|> funcParser "mod" SMTMod
            <|> funcParser "not" SMTNot
            <|> funcParser "or"  SMTOr
