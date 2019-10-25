@@ -70,7 +70,9 @@ verifyNoAbd spec (RHLETrip pre progA progE post) = do
       valid  <- lift $ checkValid =<< mkImplies pre vcs
       if valid
         then return.Right $ emptyIMap
-        else return.Left  $ "Invalid Verification Conditions"
+        else do
+          model <- lift $ getModelAsString =<< mkNot vcs
+          return.Left $ "Invalid Verification Conditions\n Model: " ++ model
   where
     abdNameList abds = show . Set.toList $ Set.map abdName abds
 

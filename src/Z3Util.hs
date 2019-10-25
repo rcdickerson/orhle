@@ -3,6 +3,7 @@ module Z3Util
   , checkSat
   , checkValid
   , mkFreshIntVars
+  , getModelAsString
   , substituteByName
   , symbolsToStrings
   ) where
@@ -23,6 +24,16 @@ checkSat ast = do
   case result of
     Sat -> return True
     _   -> return False
+
+getModelAsString :: AST -> Z3 String
+getModelAsString ast = do
+  push
+  assert ast
+  res <- getModel
+  pop 1
+  case res of
+    (Sat, Just model) -> showModel model
+    _                 -> return "<< Unable to model >>"
 
 symbolsToStrings :: [Symbol] -> Z3 [String]
 symbolsToStrings syms = sequence $ map getSymbolString syms
