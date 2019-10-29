@@ -59,12 +59,13 @@ verifyNoAbd :: ASTSpec -> RHLETrip -> VTracedResult
 verifyNoAbd spec (RHLETrip pre progA progE post) = do
   (vcsE, abdsE)  <- lift $ generateVCs progE post VCExistential spec
   post'          <- lift $ simplify =<< mkAnd vcsE
+  post'Str <- lift $ astToString post'
   (vcsA, abdsA)  <- lift $ generateVCs progA post' VCUniversal spec
   let combinedAbds = Set.union abdsE abdsA
   if not $ Set.null combinedAbds then
     return.Left $ "Missing specifications: " ++ (abdNameList combinedAbds)
     else do
-      vcs    <- lift . mkAnd $ vcsE ++ vcsA
+      vcs    <- lift . mkAnd $ vcsA
       vcsStr <- lift $ astToString vcs
       logMsg $ "Verification Conditions\n  " ++ vcsStr
       valid  <- lift $ checkValid =<< mkImplies pre vcs
@@ -131,12 +132,10 @@ generateVCs stmt post quant spec = case stmt of
         frAsgnVar    <- astToString frAsgnAst
         frAsgnApp    <- toApp frAsgnAst
         (fPre, fPost, abds) <- specOrAbducibles frAsgnVar f spec
+        fPostAndPost <- mkAnd [fPost, post]
         existsPost   <- mkExistsConst [] [frAsgnApp]
-                        =<< substitute fPost [asgnAst] [frAsgnAst]
-        fPostImpPost <- mkImplies fPost post
-        forallPost   <- mkForallConst [] [frAsgnApp]
-                        =<< substitute fPostImpPost [asgnAst] [frAsgnAst]
-        vc           <- mkAnd [fPre, existsPost, forallPost]
+                        =<< substitute fPostAndPost [asgnAst] [frAsgnAst]
+        vc           <- mkAnd [fPre, existsPost]
         return ([vc], abds)
 
 specOrAbducibles :: Var -> Func -> ASTSpec -> Z3 (AST, AST, Set.Set Abducible)
