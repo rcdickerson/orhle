@@ -84,8 +84,8 @@ program = do
 statement :: ImpParser Stmt
 statement =   ifStmt
           <|> skipStmt
+          <|> try funcStmt
           <|> assignStmt
-          <|> funcStmt
           <|> parens statement
 
 ifStmt :: ImpParser Stmt
@@ -109,9 +109,9 @@ assignStmt = do
 
 funcStmt :: ImpParser Stmt
 funcStmt = do
-  reserved "call"
   assignee <- identifier
   reservedOp ":="
+  reserved "call"
   funcName <- identifier
   params   <- parens $ sepBy identifier comma
   let func = Func funcName params
