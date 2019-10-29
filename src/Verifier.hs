@@ -59,7 +59,6 @@ verifyNoAbd :: ASTSpec -> RHLETrip -> VTracedResult
 verifyNoAbd spec (RHLETrip pre progA progE post) = do
   (vcsE, abdsE)  <- lift $ generateVCs progE post VCExistential spec
   post'          <- lift $ simplify =<< mkAnd vcsE
-  post'Str <- lift $ astToString post'
   (vcsA, abdsA)  <- lift $ generateVCs progA post' VCUniversal spec
   let combinedAbds = Set.union abdsE abdsA
   if not $ Set.null combinedAbds then
