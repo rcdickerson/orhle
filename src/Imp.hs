@@ -97,8 +97,8 @@ prefixAExpVars pre aexp =
     I i          -> I i
     V v          -> V $ pre ++ v
     lhs :+: rhs  -> prefix lhs :+: prefix rhs
-    lhs :-: rhs  -> prefix lhs :+: prefix rhs
-    lhs :*: rhs  -> prefix lhs :+: prefix rhs
+    lhs :-: rhs  -> prefix lhs :-: prefix rhs
+    lhs :*: rhs  -> prefix lhs :*: prefix rhs
     AMod lhs rhs -> AMod (prefix lhs) (prefix rhs)
   where prefix = prefixAExpVars pre
 

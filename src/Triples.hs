@@ -36,14 +36,14 @@ mkHLETrip pre prog post = do
   return $ HLETrip preAST prog postAST
 
 data RHLETrip = RHLETrip
-  { rhlePre   :: AST
-  , rhleProgA :: Prog
-  , rhleProgE :: Prog
-  , rhlePost  :: AST
+  { rhlePre    :: AST
+  , rhleAProgs :: [Prog]
+  , rhleEProgs :: [Prog]
+  , rhlePost   :: AST
   } deriving (Show)
 
-mkRHLETrip :: String -> Prog -> Prog -> String -> Z3 RHLETrip
-mkRHLETrip pre progA progE post = do
+mkRHLETrip :: String -> [Prog] -> [Prog] -> String -> Z3 RHLETrip
+mkRHLETrip pre aProgs eProgs post = do
   preAST  <- parseSMTOrError pre
   postAST <- parseSMTOrError post
-  return $ RHLETrip preAST progA progE postAST
+  return $ RHLETrip preAST aProgs eProgs postAST

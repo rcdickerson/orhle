@@ -81,8 +81,8 @@ ppVTrace' :: Int -> [VTrace] -> Z3 String
 ppVTrace' _ [] = return ""
 ppVTrace' indent (t:ts) =
   case t of
-    VTRhle (RHLETrip pre progA progE post) -> do
-      progStr <- ppStmtStart progA
+    VTRhle (RHLETrip pre aProgs eProgs post) -> do
+      progStr <- ppStmtsStart aProgs
       rest    <- ppVTrace' indent ts
       preStr  <- astToString pre
       return $ start ++ "A " ++ preStr ++ " :: " ++ progStr ++ "\n" ++ rest
@@ -120,6 +120,10 @@ ppVTrace' indent (t:ts) =
       return $ start ++ (kindStr kind) ++ ":: " ++ msg ++ "\n" ++ rest
   where
     start = (concat $ replicate indent "| ")
+
+ppStmtsStart :: [Stmt] -> Z3 String
+ppStmtsStart [] = return "<No Programs>"
+ppStmtsStart (stmt:_) = ppStmtStart stmt
 
 ppStmtStart :: Stmt -> Z3 String
 ppStmtStart stmt =

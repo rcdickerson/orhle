@@ -28,7 +28,7 @@ languageDef = Token.LanguageDef
   , Token.nestedComments  = True
   , Token.opStart         = Token.opLetter languageDef
   , Token.opLetter        = oneOf ":!#$%&*+./<=>?@\\^|-~"
-  , Token.reservedNames   = [ "if", "then", "else"
+  , Token.reservedNames   = [ "if", "then", "else", "endif"
                             , "call", "pre", "post"
                             , "skip"
                             , "true"
@@ -93,11 +93,11 @@ ifStmt = do
   reserved "if"
   cond  <- bExpression
   reserved "then"
-  stmt1 <- statement
+  tbranch <- many1 $ try statement
   reserved "else"
-  stmt2 <- statement
-  semi
-  return $ If cond stmt1 stmt2
+  ebranch <- many1 $ try statement
+  reserved "endif"
+  return $ If cond (Seq tbranch) (Seq ebranch)
 
 assignStmt :: ImpParser Stmt
 assignStmt = do

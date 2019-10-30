@@ -10,7 +10,7 @@ runSimpleExample :: IO ()
 runSimpleExample = do
   let (progA, specA) = exampleA1
   let (progE, specE) = exampleE1
-  putStrLn =<< runVerifier singleAbdVerifier "true" progA progE "(= y1 y2)"
+  putStrLn =<< runVerifier singleAbdVerifier "true" [progA] [progE] "(= y1 y2)"
 
 -------------------------------------
 -- Useful for REPL experimentation --
@@ -76,7 +76,7 @@ runSimpleNonRefinement = do
   \  call t2_x := t2_randInt()           \
   \     pre {true}                       \
   \     post {(and (>= t2_x 0) (< t2_x 10))}"
-  putStrLn =<< runVerifier singleAbdVerifier "true" progRefinement progOriginal "(= t1_x t2_x)"
+  putStrLn =<< runVerifier singleAbdVerifier "true" [progRefinement] [progOriginal] "(= t1_x t2_x)"
 
 runSimpleRefinement :: IO ()
 runSimpleRefinement = do
@@ -90,4 +90,4 @@ runSimpleRefinement = do
   \  call t2_x := t2_randInt()    \
   \     pre {true}                       \
   \     post {(and (>= t2_x 0) (< t2_x 10))}"
-  putStrLn =<< runVerifier singleAbdVerifier "true" progRefinement progOriginal "(= t1_x t2_x)"
+  putStrLn =<< runVerifier singleAbdVerifier "true" [progRefinement] [progOriginal] "(= t1_x t2_x)"
