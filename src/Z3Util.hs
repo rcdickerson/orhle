@@ -4,6 +4,7 @@ module Z3Util
   , checkValid
   , mkFreshIntVars
   , getModelAsString
+  , stringsToApps
   , substituteByName
   , symbolsToStrings
   ) where
@@ -37,6 +38,9 @@ getModelAsString ast = do
 
 symbolsToStrings :: [Symbol] -> Z3 [String]
 symbolsToStrings syms = sequence $ map getSymbolString syms
+
+stringsToApps :: [String] -> Z3 [App]
+stringsToApps = mapM $ \s -> toApp =<< mkIntVar =<< mkStringSymbol s
 
 substituteByName :: AST -> [String] -> [String] -> Z3 AST
 substituteByName ast fromStrings toStrings = do

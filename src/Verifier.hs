@@ -132,7 +132,7 @@ generateVCs stmt post quant spec = case stmt of
   Call assignee f ->
     case quant of
       VCUniversal -> do
-        (fPre, fPost, abds) <- specOrAbducibles assignee f spec
+        (_, fPre, fPost, abds) <- specOrAbducibles assignee f spec
         postImp <- mkImplies fPost post
         vc      <- mkAnd [fPre, postImp]
         return ([vc], abds)
@@ -141,21 +141,27 @@ generateVCs stmt post quant spec = case stmt of
         frAsgnAst    <- mkFreshIntVar assignee
         frAsgnVar    <- astToString frAsgnAst
         frAsgnApp    <- toApp frAsgnAst
-        (fPre, fPost, abds) <- specOrAbducibles frAsgnVar f spec
-        fPostAndPost <- mkAnd [fPost, post]
-        existsPost   <- mkExistsConst [] [frAsgnApp]
-                        =<< substitute fPostAndPost [asgnAst] [frAsgnAst]
-        vc           <- mkAnd [fPre, existsPost]
-        return ([vc], abds)
+        (tvars, fPre, fPost, abds) <- specOrAbducibles frAsgnVar f spec
+        frPost       <- substitute post [asgnAst] [frAsgnAst]
+        frFPost      <- substitute fPost [asgnAst] [frAsgnAst]
+        existsPost   <- mkExistsConst [] [frAsgnApp] frFPost
+        forallPost   <- mkForallConst [] [frAsgnApp] =<< mkImplies frFPost frPost
+        let vcs = [fPre, existsPost, forallPost]
+        stringsToApps tvars >>= \tvarApps ->
+          case tvarApps of
+            [] -> return (vcs, abds)
+            _  -> do
+              quantVcs <- mkExistsConst [] tvarApps =<< mkAnd vcs
+              return ([quantVcs], abds)
 
-specOrAbducibles :: Var -> Func -> ASTSpec -> Z3 (AST, AST, Set.Set Abducible)
+specOrAbducibles :: Var -> Func -> ASTSpec -> Z3 ([Var], AST, AST, Set.Set Abducible)
 specOrAbducibles assignee func@(Func name args) spec =
   case funSpec func spec of
-      Just (pr, po) -> return (pr, po, Set.empty)
+      Just (tvars, pre, post) -> return (tvars, pre, post, Set.empty)
       Nothing -> do
         fPreAbd  <- mkBoolVar =<< mkStringSymbol fPreVar
         fPostAbd <- mkBoolVar =<< mkStringSymbol fPostVar
-        return (fPreAbd, fPostAbd, Set.fromList
+        return ([], fPreAbd, fPostAbd, Set.fromList
                 [ Abducible fPreVar args
                 , Abducible fPostVar $ assignee:args ])
           where

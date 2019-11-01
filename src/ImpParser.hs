@@ -29,7 +29,7 @@ languageDef = Token.LanguageDef
   , Token.opStart         = Token.opLetter languageDef
   , Token.opLetter        = oneOf ":!#$%&*+./<=>?@\\^|-~"
   , Token.reservedNames   = [ "if", "then", "else", "endif"
-                            , "call", "pre", "post"
+                            , "call", "templateVars", "pre", "post"
                             , "skip"
                             , "true"
                             , "false"
@@ -48,6 +48,7 @@ identifier = Token.identifier lexer
 reserved   = Token.reserved   lexer
 reservedOp = Token.reservedOp lexer
 parens     = Token.parens     lexer
+braces     = Token.braces     lexer
 integer    = Token.integer    lexer
 comma      = Token.comma      lexer
 semi       = Token.semi       lexer
@@ -114,15 +115,20 @@ funcStmt = do
   reserved "call"
   funcName <- identifier
   params   <- parens $ sepBy identifier comma
-  let func = Func funcName params
+  whiteSpace
+  tvars <- option [] $ do
+    reserved "templateVars"
+    braces $ sepBy identifier comma
+  whiteSpace
   reserved "pre"
-  pre <- between (char '{') (char '}') (many $ noneOf "{}")
+  pre <- braces $ many $ noneOf "{}"
   whiteSpace
   reserved "post"
-  post <- between (char '{') (char '}') (many $ noneOf "{}")
+  post <- braces $ many $ noneOf "{}"
   whiteSpace
   semi
-  get >>= \spec -> put $ addSpec func pre post spec
+  let func = Func funcName params
+  get >>= \spec -> put $ addSpec func tvars pre post spec
   return $ Call assignee func
 
 skipStmt :: ImpParser Stmt

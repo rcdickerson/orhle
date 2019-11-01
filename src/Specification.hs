@@ -12,6 +12,7 @@ module Specification
   , preCond
   , prefixSpec
   , stringToASTSpec
+  , templateVars
   ) where
 
 import qualified Data.Map as Map
@@ -21,7 +22,7 @@ import SMTParser
 import Z3.Monad
 import Z3Util
 
-type Spec a     = Map.Map Func (a, a)
+type Spec a     = Map.Map Func ([Var], a, a)
 type StringSpec = Spec String
 type ASTSpec    = Spec AST
 
@@ -31,17 +32,20 @@ emptyStringSpec = Map.empty
 emptyASTSpec :: ASTSpec
 emptyASTSpec = Map.empty
 
-addSpec :: Func -> a -> a -> Spec a -> Spec a
-addSpec func pre post spec =
-  Map.insert func (pre, post) spec
+addSpec :: Func -> [Var] -> a -> a -> Spec a -> Spec a
+addSpec func tvars pre post spec =
+  Map.insert func (tvars, pre, post) spec
+
+templateVars :: Func -> Spec a -> Maybe [Var]
+templateVars func spec = Map.lookup func spec >>= \(tvars, _, _) -> return tvars
 
 preCond :: Func -> Spec a -> Maybe a
-preCond func spec = Map.lookup func spec >>= return . fst
+preCond func spec = Map.lookup func spec >>= \(_, pre, _) -> return pre
 
 postCond :: Func -> Spec a -> Maybe a
-postCond func spec = Map.lookup func spec >>= return . snd
+postCond func spec = Map.lookup func spec >>= \(_, _, post) -> return post
 
-funSpec :: Func -> Spec a -> Maybe (a, a)
+funSpec :: Func -> Spec a -> Maybe ([Var], a, a)
 funSpec = Map.lookup
 
 prefixSpec :: String -> ASTSpec -> Z3 ASTSpec
@@ -49,10 +53,11 @@ prefixSpec prefix spec = traverse (\v -> prefixSpecs v)
                          $ Map.mapKeys (\k -> prefixFunc k) spec
   where
     prefixFunc  (Func n p)  = Func (prefix ++ n) p
-    prefixSpecs (pre, post) = do
+    prefixSpecs (tvars, pre, post) = do
+      let prefixedTVars = map (\v -> prefix ++ v) tvars
       prefixedPre  <- prefixAST pre
       prefixedPost <- prefixAST post
-      return (prefixedPre, prefixedPost)
+      return (prefixedTVars, prefixedPre, prefixedPost)
     prefixAST ast = do
       freeVars <- astFreeVars ast
       foldr subSymbol (return ast) freeVars
@@ -64,9 +69,9 @@ prefixSpec prefix spec = traverse (\v -> prefixSpecs v)
 stringToASTSpec :: StringSpec -> Either ParseError (Z3 ASTSpec)
 stringToASTSpec = Map.foldrWithKey parse $ Right (return emptyASTSpec)
   where
-    parse :: Func -> (String, String) -> Either ParseError (Z3 ASTSpec)
+    parse :: Func -> ([Var], String, String) -> Either ParseError (Z3 ASTSpec)
           -> Either ParseError (Z3 ASTSpec)
-    parse func (preStr, postStr) z3SpecOrError =
+    parse func (tvars, preStr, postStr) z3SpecOrError =
       case z3SpecOrError of
         l@(Left _)   -> l
         Right z3Spec ->
@@ -77,4 +82,4 @@ stringToASTSpec = Map.foldrWithKey parse $ Right (return emptyASTSpec)
               preAST  <- z3Pre
               postAST <- z3Post
               spec    <- z3Spec
-              return $ addSpec func preAST postAST spec
+              return $ addSpec func tvars preAST postAST spec
