@@ -9,7 +9,7 @@ module Verifier
 
 import Abduction
 import Control.Monad.Writer
-import Data.List(intercalate)
+import Data.List(intercalate, sort)
 import qualified Data.Set as Set
 import Imp
 import InterpMap
@@ -73,10 +73,12 @@ verifyNoAbd spec (RHLETrip pre aProgs eProgs post) = do
         then return.Right $ emptyIMap
         else do
           model <- lift $ getModelAsString =<< mkNot vcs
-          return.Left $ "Invalid Verification Conditions\nModel:\n" ++ (indent model)
+          return.Left $ "Invalid Verification Conditions\nModel:\n"
+            ++ (sortAndIndent $ model)
   where
     abdNameList abds = show . Set.toList $ Set.map abdName abds
     indent = concat . (map $ \l -> "  " ++ l ++ "\n") . lines
+    sortAndIndent = concat . (map $ \l -> "  " ++ l ++ "\n") . sort . lines
 
 singleAbdVerifier :: RHLETrip -> Z3 (VResult, [VTrace])
 singleAbdVerifier trip = runWriterT $ verifySingleAbd trip
