@@ -39,7 +39,7 @@ languageDef = Token.LanguageDef
   , Token.nestedComments  = True
   , Token.opStart         = Token.opLetter languageDef
   , Token.opLetter        = oneOf ""
-  , Token.reservedNames   = [ "end", "pre", "prog", "sat", "unsat" ]
+  , Token.reservedNames   = [ "end", "expected", "invalid", "pre", "post", "prog", "valid" ]
   , Token.reservedOpNames = [ ]
   }
 
@@ -67,9 +67,11 @@ kliveParser = do
   preCond <- option mkTrue $ do
     reserved "pre" >> whiteSpace >> char ':' >> whiteSpace
     condition
+  postCond <- option mkTrue $ do
+    reserved "post" >> whiteSpace >> char ':' >> whiteSpace
+    condition
   whiteSpace
-  expectedResult <- expectedSat <|> expectedUnsat; whiteSpace
-  postCond       <- condition; whiteSpace
+  expectedResult <- try expectedValid <|> expectedInvalid; whiteSpace
   progs          <- many program
   let execs = aExecs ++ eExecs
   let (aProgs, eProgs, spec) = collateProgs execs progs
@@ -92,14 +94,20 @@ condition = do
     Left err  -> fail $ show err
     Right ast -> return ast
 
-expectedSat :: KLiveParser KLExpectedResult
-expectedSat = do
-  reserved "sat" >> whiteSpace >> char ':' >> whiteSpace
+expectedValid :: KLiveParser KLExpectedResult
+expectedValid = do
+  reserved "expected" >> whiteSpace
+  char ':' >> whiteSpace
+  reserved "valid" >> whiteSpace
+  semi >> whiteSpace
   return KLSuccess
 
-expectedUnsat :: KLiveParser KLExpectedResult
-expectedUnsat = do
-  reserved "unsat" >> whiteSpace >> char ':' >> whiteSpace
+expectedInvalid :: KLiveParser KLExpectedResult
+expectedInvalid = do
+  reserved "expected" >> whiteSpace
+  char ':' >> whiteSpace
+  reserved "invalid" >> whiteSpace
+  semi >> whiteSpace
   return KLFailure
 
 execs :: String -> (String -> QExecId -> QExec) -> KLiveParser [QExec]
