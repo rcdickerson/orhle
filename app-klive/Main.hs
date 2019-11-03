@@ -54,5 +54,5 @@ runKLQuery z3Query = do
   return $ traceStr ++ (resultStr result)
   where
     resultStr r = case r of
-      Left  reason -> "Failed: " ++ reason
-      Right _      -> "Verified."
+      Left  reason -> "Invalid. " ++ reason
+      Right _      -> "Valid."

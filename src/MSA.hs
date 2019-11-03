@@ -28,9 +28,9 @@ findMusVarSet formula candidateVars lowerBound = do
     else do
       let best = Set.empty
       let (var, candidateVars') = chooseFrom candidateVars
-      varApp   <- toApp =<< mkIntVar var
-      formula' <- mkForallConst [] [varApp] formula
-      isSat    <- checkSat formula'
+      varApp     <- toApp =<< mkIntVar var
+      formula'   <- mkForallConst [] [varApp] formula
+      (isSat, _) <- checkSat formula'
       best' <- if isSat
         then do
           y <- findMusVarSet formula' candidateVars' $ lowerBound - 1

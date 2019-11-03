@@ -26,8 +26,8 @@ ddaSimplify expr subexpr = do
   (ntype, children) <- inspect subexpr
   case ntype of
     NTLeaf -> do
-      nonconstraining <- checkValid =<< mkImplies expr subexpr
-      nonrelaxing     <- checkValid =<< mkImplies expr =<< mkNot subexpr
+      (nonconstraining, _) <- checkValid =<< mkImplies expr subexpr
+      (nonrelaxing, _)     <- checkValid =<< mkImplies expr =<< mkNot subexpr
       case (nonconstraining, nonrelaxing) of
         (True, _   ) -> mkTrue
         (_   , True) -> mkFalse

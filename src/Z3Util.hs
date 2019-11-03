@@ -3,7 +3,7 @@ module Z3Util
   , checkSat
   , checkValid
   , mkFreshIntVars
-  , getModelAsString
+  , maybeModelToString
   , stringsToApps
   , substituteByName
   , symbolsToStrings
@@ -14,27 +14,24 @@ import Data.List
 import qualified Data.Set as Set
 import Z3.Monad
 
-checkValid :: AST -> Z3 Bool
+checkValid :: AST -> Z3 (Bool, Maybe Model)
 checkValid ast = do
-  negSat <- checkSat =<< mkNot ast
-  return $ not negSat
+  (negSat, model) <- checkSat =<< mkNot ast
+  return (not negSat, model)
 
-checkSat :: AST -> Z3 Bool
+checkSat :: AST -> Z3 (Bool, Maybe Model)
 checkSat ast = do
-  result <- solverCheckAssumptions [ast]
-  case result of
-    Sat -> return True
-    _   -> return False
-
-getModelAsString :: AST -> Z3 String
-getModelAsString ast = do
   push
   assert ast
-  res <- getModel
+  result <- getModel
   pop 1
-  case res of
-    (Sat, Just model) -> showModel model
-    _                 -> return "<< Unable to model >>"
+  case result of
+    (Sat, model) -> return (True, model)
+    (_  , model) -> return (False, model)
+
+maybeModelToString :: Maybe Model -> Z3 String
+maybeModelToString Nothing = return "<< Unable to model >>"
+maybeModelToString (Just model) = showModel model
 
 symbolsToStrings :: [Symbol] -> Z3 [String]
 symbolsToStrings syms = sequence $ map getSymbolString syms

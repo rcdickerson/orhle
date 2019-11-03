@@ -40,7 +40,7 @@ abduce abds pres posts = do
 tracedAbduce :: AbductionProblem -> TracedResult
 tracedAbduce (AbductionProblem abds pre post) = do
   logAbdStart (map show abds) pre post
-  consistencyCheck <- lift $ checkSat pre
+  (consistencyCheck, _) <- lift $ checkSat pre
   if not consistencyCheck
     then (\msg -> logAbdFailure msg >>= (return.return.Left $ msg))
       "Preconditions are not consistent."
@@ -67,10 +67,10 @@ filterVars symbols vars = do
 noAbduction :: AST -> AST -> TracedResult
 noAbduction pre post = do
   logAbdMessage "No variables to abduce over; using simplified pre => post."
-  imp   <- lift $ mkImplies pre post
-  simpl <- lift $ simplifyWrt pre imp
+  imp      <- lift $ mkImplies pre post
+  simpl    <- lift $ simplifyWrt pre imp
   logAbdFormula "Simplified implication" simpl
-  sat   <- lift $ checkSat simpl
+  (sat, _) <- lift $ checkSat simpl
   if sat
     then return.Right $ emptyIMap
     else return.Left  $ "Preconditions are inconsistent with postconditions."
@@ -93,7 +93,7 @@ singleAbduction abd@(Abducible abdName abdParams) pre post = do
   logAbdFormula "QE Result" qeRes
   qeResSimpl    <- lift $ simplifyWrt pre qeRes
   logAbdFormula "Simplified QE Result" qeResSimpl
-  sat           <- lift $ checkSat qeResSimpl
+  (sat, _)      <- lift $ checkSat qeResSimpl
   case sat of
     False -> return.Left  $ "No satisfying abduction found."
     True  -> return.Right $ Map.insert abd qeResSimpl emptyIMap

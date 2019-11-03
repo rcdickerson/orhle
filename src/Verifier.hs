@@ -67,18 +67,17 @@ verifyNoAbd spec (RHLETrip pre aProgs eProgs post) = do
       vcsConj <- lift $ mkAnd vcsA
       vcs     <- lift $ mkImplies pre vcsConj
       vcsStr  <- lift $ astToString vcs
-      logMsg  $ "Verification Conditions\n" ++ (indent vcsStr)
-      valid   <- lift $ checkValid =<< mkImplies pre vcs
+      logMsg  $ "Verification Conditions\n" ++ (indent vcsStr) ++ "\n"
+      (valid, model) <- lift $ checkValid vcs
       if valid
         then return.Right $ emptyIMap
         else do
-          model <- lift $ getModelAsString =<< mkNot vcs
-          return.Left $ "Invalid Verification Conditions\nModel:\n"
-            ++ (sortAndIndent $ model)
+          modelStr <- lift $ maybeModelToString model
+          return.Left $ "Model:\n" ++ (sortAndIndent $ modelStr)
   where
     abdNameList abds = show . Set.toList $ Set.map abdName abds
-    indent = concat . (map $ \l -> "  " ++ l ++ "\n") . lines
-    sortAndIndent = concat . (map $ \l -> "  " ++ l ++ "\n") . sort . lines
+    indent = intercalate "\n" . (map $ \l -> "  " ++ l) . lines
+    sortAndIndent = intercalate "\n" . (map $ \l -> "  " ++ l) . sort . lines
 
 singleAbdVerifier :: RHLETrip -> Z3 (VResult, [VTrace])
 singleAbdVerifier trip = runWriterT $ verifySingleAbd trip
