@@ -2,9 +2,10 @@
 -- Based on https://wiki.haskell.org/Parsing_a_simple_imperative_language
 
 module ImpParser
-    ( impParser
+    ( ParsedProg
+    , ParsedStmt
+    , impParser
     , parseImp
-    , parseImpOrError
     ) where
 
 import Control.Monad
@@ -17,28 +18,25 @@ import Text.Parsec.Expr
 import Text.Parsec.Language
 import qualified Text.Parsec.Token as Token
 
-languageDef :: GenLanguageDef String () (StateT StringSpec Identity)
+languageDef :: GenLanguageDef String () (StateT StringFunSpec Identity)
 languageDef = Token.LanguageDef
   { Token.caseSensitive   = True
   , Token.commentStart    = "/*"
   , Token.commentEnd      = "*/"
   , Token.commentLine     = "//"
-  , Token.identStart      = letter
+  , Token.identStart      = letter <|> char '@'
   , Token.identLetter     = alphaNum <|> char '_'
   , Token.nestedComments  = True
   , Token.opStart         = Token.opLetter languageDef
   , Token.opLetter        = oneOf ":!#$%&*+./<=>?@\\^|-~"
-  , Token.reservedNames   = [ "if", "then", "else", "endif"
-                            , "call", "templateVars", "pre", "post"
-                            , "skip"
-                            , "true"
-                            , "false"
+  , Token.reservedNames   = [ "if", "then", "else", "while", "do", "end"
+                            , "call", "skip"
+                            , "true", "false"
+                            , "@templateVars", "@pre", "@post", "@inv", "@var"
                             ]
-  , Token.reservedOpNames = [ "+", "-", "*"
+  , Token.reservedOpNames = [ "+", "-", "*", "/", "%"
+                            , "==", "not", "and", "or", "<="
                             , ":="
-                            , "=="
-                            , "%"
-                            , "not", "and", "or"
                             ]
   }
 
@@ -54,42 +52,41 @@ comma      = Token.comma      lexer
 semi       = Token.semi       lexer
 whiteSpace = Token.whiteSpace lexer
 
-type ImpParser a = ParsecT String () (StateT StringSpec Identity) a
+type ParsedStmt = AbsStmt String
+type ParsedProg = ParsedStmt
 
-parseImp :: String -> Either ParseError (Prog, StringSpec)
+type ImpParser a = ParsecT String () (StateT StringFunSpec Identity) a
+
+parseImp :: String -> Either ParseError (ParsedProg, StringFunSpec)
 parseImp str =
-  let (prog, spec) = runIdentity $ runStateT (runPT impParser () "" str) emptyStringSpec
+  let (prog, spec) = runIdentity $
+        runStateT (runPT impParser () "" str) emptyFunSpec
   in case prog of
     Left error -> Left error
     Right prog -> Right (prog, spec)
 
-parseImpOrError :: String -> (Prog, StringSpec)
-parseImpOrError str =
-  case parseImp str of
-    Left  err  -> error $ "Parse error: " ++ (show err)
-    Right stmt -> stmt
-
-impParser :: ImpParser Prog
+impParser :: ImpParser ParsedProg
 impParser = do
   whiteSpace
   prog <- program
   return prog
 
-program :: ImpParser Prog
+program :: ImpParser ParsedProg
 program = do
   stmts <- many1 $ statement
   case length stmts of
     1 -> return $ head stmts
-    _ -> return $ Seq  stmts
+    _ -> return $ SSeq  stmts
 
-statement :: ImpParser Stmt
+statement :: ImpParser ParsedStmt
 statement =   ifStmt
+          <|> whileStmt
           <|> skipStmt
           <|> try funcStmt
           <|> assignStmt
           <|> parens statement
 
-ifStmt :: ImpParser Stmt
+ifStmt :: ImpParser ParsedStmt
 ifStmt = do
   reserved "if"
   cond  <- bExpression
@@ -97,18 +94,40 @@ ifStmt = do
   tbranch <- many1 $ try statement
   reserved "else"
   ebranch <- many1 $ try statement
-  reserved "endif"
-  return $ If cond (Seq tbranch) (Seq ebranch)
+  reserved "end"
+  return $ SIf cond (SSeq tbranch) (SSeq ebranch)
 
-assignStmt :: ImpParser Stmt
+whileStmt :: ImpParser ParsedStmt
+whileStmt = do
+  reserved "while"
+  cond  <- bExpression
+  whiteSpace
+  reserved "do"
+  invariant <- option "true" $ do
+    reserved "@inv"
+    braces $ many $ noneOf "{}"
+  variant <- option "true" $ do
+    reserved "@var"
+    braces $ many $ noneOf "{}"
+  whiteSpace
+  body  <- many1 $ try statement
+  whiteSpace
+  reserved "end"
+  let bodySeq = case body of
+                  (stmt:[]) -> stmt
+                  _         -> SSeq body
+  let while = SWhile cond bodySeq (invariant, variant)
+  return while
+
+assignStmt :: ImpParser ParsedStmt
 assignStmt = do
   var  <- identifier
   reservedOp ":="
   expr <- aExpression
   semi
-  return $ var := expr
+  return $ SAsgn var expr
 
-funcStmt :: ImpParser Stmt
+funcStmt :: ImpParser ParsedStmt
 funcStmt = do
   assignee <- identifier
   reservedOp ":="
@@ -117,22 +136,22 @@ funcStmt = do
   params   <- parens $ sepBy identifier comma
   whiteSpace
   tvars <- option [] $ do
-    reserved "templateVars"
+    reserved "@templateVars"
     braces $ sepBy identifier comma
   whiteSpace
-  reserved "pre"
+  reserved "@pre"
   pre <- braces $ many $ noneOf "{}"
   whiteSpace
-  reserved "post"
+  reserved "@post"
   post <- braces $ many $ noneOf "{}"
   whiteSpace
   semi
-  let func = Func funcName params
-  get >>= \spec -> put $ addSpec func tvars pre post spec
-  return $ Call assignee func
+  let func = SFun funcName params
+  get >>= \spec -> put $ addFunSpec func tvars pre post spec
+  return $ SCall assignee func
 
-skipStmt :: ImpParser Stmt
-skipStmt = reserved "skip" >> semi >> return Skip
+skipStmt :: ImpParser ParsedStmt
+skipStmt = reserved "skip" >> semi >> return SSkip
 
 aExpression :: ImpParser AExp
 aExpression = buildExpressionParser aOperators aTerm
@@ -140,25 +159,30 @@ aExpression = buildExpressionParser aOperators aTerm
 bExpression :: ImpParser BExp
 bExpression = buildExpressionParser bOperators bTerm
 
-aOperators = [ [Infix  (reservedOp "*" >> return (:*: )) AssocLeft,
-                Infix  (reservedOp "%" >> return (AMod)) AssocLeft]
-             , [Infix  (reservedOp "+" >> return (:+: )) AssocLeft,
-                Infix  (reservedOp "-" >> return (:-: )) AssocLeft]
+aOperators = [ [Infix  (reservedOp "*" >> return AMul) AssocLeft,
+                Infix  (reservedOp "/" >> return ADiv) AssocLeft,
+                Infix  (reservedOp "%" >> return AMod) AssocLeft]
+             , [Infix  (reservedOp "+" >> return AAdd) AssocLeft,
+                Infix  (reservedOp "-" >> return ASub) AssocLeft]
               ]
 
-bOperators = [ [Prefix (reservedOp "not" >> return (BNot))]
-             , [Infix  (reservedOp "and" >> return (BAnd)) AssocLeft,
-                Infix  (reservedOp "or"  >> return (BOr )) AssocLeft]
+bOperators = [ [Prefix (reservedOp "not" >> return BNot)]
+             , [Infix  (reservedOp "and" >> return BAnd) AssocLeft,
+                Infix  (reservedOp "or"  >> return BOr)  AssocLeft]
              ]
 
 aTerm =  parens aExpression
-     <|> liftM V identifier
-     <|> liftM I integer
+     <|> liftM AVar identifier
+     <|> liftM ALit integer
 
 bTerm =  parens bExpression
      <|> (reserved "true"  >> return (BTrue ))
      <|> (reserved "false" >> return (BFalse))
-     <|> do lhs <- aExpression
-            reservedOp "=="
-            rhs <- aExpression
-            return $ lhs :=: rhs
+     <|> try (do lhs <- aExpression
+                 reservedOp "=="
+                 rhs <- aExpression
+                 return $ BEq lhs rhs)
+     <|> try (do lhs <- aExpression
+                 reservedOp "<="
+                 rhs <- aExpression
+                 return $ BLe lhs rhs)

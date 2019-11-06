@@ -14,7 +14,7 @@ import qualified Text.Parsec.Token as Token
 import Z3.Monad
 
 data KLQuery = KLQuery
-               { klSpec        :: ASTSpec
+               { klSpec        :: ASTFunSpec
                , klPreCond     :: AST
                , klForallProgs :: [Prog]
                , klExistsProgs :: [Prog]
@@ -23,7 +23,7 @@ data KLQuery = KLQuery
 
 data QExec = QEForall String QExecId | QEExists String QExecId
 type QExecId = Maybe String
-type NamedProg = (String, (Prog, Z3 ASTSpec))
+type NamedProg = (String, (ParsedProg, Z3 ASTFunSpec))
 
 data KLExpectedResult = KLSuccess | KLFailure
   deriving (Eq, Show)
@@ -39,7 +39,7 @@ languageDef = Token.LanguageDef
   , Token.nestedComments  = True
   , Token.opStart         = Token.opLetter languageDef
   , Token.opLetter        = oneOf ""
-  , Token.reservedNames   = [ "end", "expected", "invalid", "pre", "post", "prog", "valid" ]
+  , Token.reservedNames   = [ "endp", "expected", "invalid", "pre", "post", "prog", "valid" ]
   , Token.reservedOpNames = [ ]
   }
 
@@ -78,12 +78,14 @@ kliveParser = do
   let query = constructQuery spec preCond aProgs eProgs postCond
   return $ (execs, query, expectedResult)
 
-constructQuery :: Z3 ASTSpec -> Z3 AST -> [Prog] -> [Prog] -> Z3 AST
+constructQuery :: Z3 ASTFunSpec -> Z3 AST -> [Z3 Prog] -> [Z3 Prog] -> Z3 AST
                -> Z3 KLQuery
-constructQuery z3Spec z3PreCond aProgs eProgs z3PostCond = do
+constructQuery z3Spec z3PreCond z3AProgs z3EProgs z3PostCond = do
   preCond  <- z3PreCond
   postCond <- z3PostCond
   astSpec  <- z3Spec
+  aProgs   <- sequence z3AProgs
+  eProgs   <- sequence z3EProgs
   return $ KLQuery astSpec preCond aProgs eProgs postCond
 
 condition :: KLiveParser (Z3 AST)
@@ -136,7 +138,7 @@ program = do
   char '(' >> whiteSpace
   sepBy (identifier >> whiteSpace) $ char ',' >> whiteSpace
   char ')' >> whiteSpace >> char ':'
-  progStr <- manyTill anyChar (try $ reserved "end")
+  progStr <- manyTill anyChar (try $ reserved "endp")
   whiteSpace
   case parseImp progStr of
     Left err -> fail $ show err
@@ -153,28 +155,31 @@ getExecId :: QExec -> Maybe String
 getExecId (QEForall _ eid) = eid
 getExecId (QEExists _ eid) = eid
 
-collateProgs :: [QExec] -> [NamedProg] -> ([Prog], [Prog], Z3 ASTSpec)
-collateProgs execs namedProgs = foldr progExecFolder ([], [], return emptyASTSpec) progExecs
+collateProgs :: [QExec] -> [NamedProg] -> ([Z3 Prog], [Z3 Prog], Z3 ASTFunSpec)
+collateProgs execs namedProgs = foldr progExecFolder ([], [], return emptyFunSpec) progExecs
   where
-    progExecs :: [(QExec, Prog, Z3 ASTSpec)]
+    progExecs :: [(QExec, ParsedProg, Z3 ASTFunSpec)]
     progExecs = map progExec execs
     ----
-    progExec :: QExec -> (QExec, Prog, Z3 ASTSpec)
+    progExec :: QExec -> (QExec, ParsedProg, Z3 ASTFunSpec)
     progExec exec = case lookup (getExecName exec) namedProgs of
       Nothing -> error $ "Program definition not found: " ++ (getExecName exec)
       Just (prog, spec) -> (exec, prog, spec)
     ----
-    progExecFolder :: (QExec, Prog, Z3 ASTSpec)
-                   -> ([Prog], [Prog], Z3 ASTSpec)
-                   -> ([Prog], [Prog], Z3 ASTSpec)
-    progExecFolder (exec, prog, z3ProgSpec) (aProgs, eProgs, z3Spec) =
+    progExecFolder :: (QExec, ParsedProg, Z3 ASTFunSpec)
+                   -> ([Z3 Prog], [Z3 Prog], Z3 ASTFunSpec)
+                   -> ([Z3 Prog], [Z3 Prog], Z3 ASTFunSpec)
+    progExecFolder (exec, pprog, z3ProgSpec) (aProgs, eProgs, z3Spec) =
       let prefix  = case (getExecId exec) of
                         Nothing  -> (getExecName exec) ++ "!"
                         Just eid -> (getExecName exec) ++ "!" ++ eid ++ "!"
-          prog'   = prefixProgVars prefix prog
+          prog    = case parseLoopSpecs $ prefixProgVars prefix pprog of
+              -- TODO: Pass up parse errors
+              Left parseError -> error (show parseError)
+              Right prog      -> prog
           z3Spec' = do spec     <- z3Spec
                        progSpec <- prefixSpec prefix =<< z3ProgSpec
                        return $ Map.union spec progSpec
       in case exec of
-        (QEForall _ _) -> (prog':aProgs, eProgs,       z3Spec')
-        (QEExists _ _) -> (aProgs,       prog':eProgs, z3Spec')
+        (QEForall _ _) -> (prog:aProgs, eProgs,      z3Spec')
+        (QEExists _ _) -> (aProgs,      prog:eProgs, z3Spec')

@@ -168,7 +168,7 @@ initSolution abds pre combinedResult = do
       interp  <- getConstInterp model varDecl
       case interp of
         Nothing -> return.Left  $  "Unable to model value for " ++ var
-        Just v  -> return.Right =<< mkEq v =<< aexpToZ3 (V $ var)
+        Just v  -> return.Right =<< mkEq v =<< aexpToZ3 (AVar $ var)
 
 
 performQe :: [Symbol] -> AST -> Z3 AST

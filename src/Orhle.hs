@@ -1,31 +1,33 @@
 module Orhle
     ( AbductionResult
+    , AbsStmt(..)
     , AExp(..)
-    , ASTSpec
+    , ASTFunSpec
     , BExp(..)
     , HLTrip(..)
     , HLETrip(..)
     , InterpMap
+    , ParsedProg
+    , ParsedStmt
     , Prog
     , RHLETrip(..)
-    , Spec
-    , Stmt(..)
-    , Func(..)
-    , StringSpec
+    , FunSpec
+    , Stmt
+    , SFun(..)
+    , StringFunSpec
     , Var
     , Verifier
     , VResult
     , VTrace
     , abduce
-    , addSpec
+    , addFunSpec
     , aexpToZ3
-    , emptyASTSpec
-    , emptyStringSpec
+    , emptyFunSpec
     , impParser
     , mkRHLETrip
     , noAbdVerifier
     , parseImp
-    , parseImpOrError
+    , parseLoopSpecs
     , parseSMT
     , prefixAExpVars
     , prefixBExpVars

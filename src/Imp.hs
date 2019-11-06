@@ -1,9 +1,10 @@
 module Imp
-    ( AExp(..)
+    ( AbsStmt(..)
+    , AExp(..)
     , BExp(..)
     , Prog
-    , Stmt(..)
-    , Func(..)
+    , SFun(..)
+    , Stmt
     , Var
     , aexpToZ3
     , assignPost
@@ -22,61 +23,64 @@ module Imp
 
 import Z3.Monad
 
-infix 1 :=
-infix 2 :=:
-infixl 6 :+:, :-:
-infixl 7 :*:
-
 type Var = String
+
 
 ----------------------------
 -- Arithmetic Expressions --
 ----------------------------
 
 data AExp
-  = I Integer
-  | V Var
-  | AExp :+: AExp
-  | AExp :-: AExp
-  | AExp :*: AExp
+  = ALit Integer
+  | AVar Var
+  | AAdd AExp AExp
+  | ASub AExp AExp
+  | AMul AExp AExp
+  | ADiv AExp AExp
   | AMod AExp AExp
   deriving (Eq, Ord, Show)
 
 asubst :: AExp -> Var -> AExp -> AExp
 asubst aexp var repl =
   case aexp of
-    I i -> I i
-    V v -> if (v == var) then repl else aexp
-    lhs :+: rhs -> (asubst lhs var repl) :+: (asubst rhs var repl)
-    lhs :-: rhs -> (asubst lhs var repl) :-: (asubst rhs var repl)
-    lhs :*: rhs -> (asubst lhs var repl) :*: (asubst rhs var repl)
+    ALit i -> ALit i
+    AVar v -> if (v == var) then repl else aexp
+    AAdd lhs rhs -> AAdd (asubst lhs var repl) (asubst rhs var repl)
+    ASub lhs rhs -> ASub (asubst lhs var repl) (asubst rhs var repl)
+    AMul lhs rhs -> AMul (asubst lhs var repl) (asubst rhs var repl)
+    ADiv lhs rhs -> ADiv (asubst lhs var repl) (asubst rhs var repl)
     AMod lhs rhs -> AMod (asubst lhs var repl) (asubst rhs var repl)
 
 avars :: AExp -> [Var]
 avars aexp =
   case aexp of
-    I _          -> []
-    V v          -> [v]
-    lhs :+: rhs  -> (avars lhs) ++ (avars rhs)
-    lhs :-: rhs  -> (avars lhs) ++ (avars rhs)
-    lhs :*: rhs  -> (avars lhs) ++ (avars rhs)
+    ALit _ -> []
+    AVar v -> [v]
+    AAdd lhs rhs -> (avars lhs) ++ (avars rhs)
+    ASub lhs rhs -> (avars lhs) ++ (avars rhs)
+    AMul lhs rhs -> (avars lhs) ++ (avars rhs)
+    ADiv lhs rhs -> (avars lhs) ++ (avars rhs)
     AMod lhs rhs -> (avars lhs) ++ (avars rhs)
 
 aexpToZ3 :: AExp -> Z3 AST
 aexpToZ3 aexp =
   case aexp of
-    I i -> mkIntNum i
-    V var -> mkIntVar =<< mkStringSymbol var
-    aexp1 :+: aexp2 -> mkAdd =<< mapM aexpToZ3 [aexp1, aexp2]
-    aexp1 :-: aexp2 -> mkSub =<< mapM aexpToZ3 [aexp1, aexp2]
-    aexp1 :*: aexp2 -> mkMul =<< mapM aexpToZ3 [aexp1, aexp2]
+    ALit i   -> mkIntNum i
+    AVar var -> mkIntVar =<< mkStringSymbol var
+    AAdd aexp1 aexp2 -> mkAdd =<< mapM aexpToZ3 [aexp1, aexp2]
+    ASub aexp1 aexp2 -> mkSub =<< mapM aexpToZ3 [aexp1, aexp2]
+    AMul aexp1 aexp2 -> mkMul =<< mapM aexpToZ3 [aexp1, aexp2]
+    ADiv aexp1 aexp2 -> do
+      dividend <- aexpToZ3 aexp1
+      divisor  <- aexpToZ3 aexp2
+      mkMod dividend divisor
     AMod aexp1 aexp2 -> do
       dividend <- aexpToZ3 aexp1
       divisor  <- aexpToZ3 aexp2
       mkMod dividend divisor
 
 subVar :: AST -> Var -> Var -> Z3 AST
-subVar ast var repl = subAexp ast (V var) (V repl)
+subVar ast var repl = subAexp ast (AVar var) (AVar repl)
 
 subAexp :: AST -> AExp -> AExp -> Z3 AST
 subAexp ast expr repl = do
@@ -86,7 +90,7 @@ subAexp ast expr repl = do
 
 assignPost :: Var -> AExp -> AST -> Z3 AST
 assignPost var aexp post = do
-  z3Var   <- aexpToZ3 $ V var
+  z3Var   <- aexpToZ3 $ AVar var
   z3Aexp  <- aexpToZ3 aexp
   eq      <- mkEq z3Var z3Aexp
   mkAnd [eq, post]
@@ -94,13 +98,15 @@ assignPost var aexp post = do
 prefixAExpVars :: String -> AExp -> AExp
 prefixAExpVars pre aexp =
   case aexp of
-    I i          -> I i
-    V v          -> V $ pre ++ v
-    lhs :+: rhs  -> prefix lhs :+: prefix rhs
-    lhs :-: rhs  -> prefix lhs :-: prefix rhs
-    lhs :*: rhs  -> prefix lhs :*: prefix rhs
+    ALit i -> ALit i
+    AVar v -> AVar $ pre ++ v
+    AAdd lhs rhs -> AAdd (prefix lhs) (prefix rhs)
+    ASub lhs rhs -> ASub (prefix lhs) (prefix rhs)
+    AMul lhs rhs -> AMul (prefix lhs) (prefix rhs)
+    ADiv lhs rhs -> ADiv (prefix lhs) (prefix rhs)
     AMod lhs rhs -> AMod (prefix lhs) (prefix rhs)
   where prefix = prefixAExpVars pre
+
 
 -------------------------
 -- Boolean Expressions --
@@ -109,93 +115,115 @@ prefixAExpVars pre aexp =
 data BExp
   = BTrue
   | BFalse
-  | AExp :=: AExp
   | BNot BExp
   | BAnd BExp BExp
-  | BOr BExp BExp
+  | BOr  BExp BExp
+  | BEq  AExp AExp
+  | BLe  AExp AExp
   deriving (Eq, Ord, Show)
 
 bsubst :: BExp -> Var -> AExp -> BExp
 bsubst bexp var aexp =
   case bexp of
-    BTrue -> BTrue
-    BFalse -> BFalse
-    lhs :=: rhs -> (asubst lhs var aexp) :=: (asubst rhs var aexp)
-    BNot b -> BNot (bsubst b var aexp)
-    BAnd b1 b2 -> BAnd (bsubst b1 var aexp) (bsubst b2 var aexp)
-    BOr b1 b2 -> BOr (bsubst b1 var aexp) (bsubst b2 var aexp)
+    BTrue        -> BTrue
+    BFalse       -> BFalse
+    BNot b       -> BNot (bsubst b var aexp)
+    BAnd b1  b2  -> BAnd (bsubst b1 var aexp)  (bsubst b2 var aexp)
+    BOr  b1  b2  -> BOr  (bsubst b1 var aexp)  (bsubst b2 var aexp)
+    BEq  lhs rhs -> BEq  (asubst lhs var aexp) (asubst rhs var aexp)
+    BLe  lhs rhs -> BLe  (asubst lhs var aexp) (asubst rhs var aexp)
 
 bvars :: BExp -> [Var]
 bvars bexp =
   case bexp of
-    BTrue -> []
-    BFalse -> []
-    lhs :=: rhs -> (avars lhs) ++ (avars rhs)
-    BNot b -> bvars b
-    BAnd b1 b2 -> (bvars b1) ++ (bvars b2)
-    BOr b1 b2 -> (bvars b1) ++ (bvars b2)
+    BTrue        -> []
+    BFalse       -> []
+    BNot b       -> bvars b
+    BAnd b1  b2  -> (bvars b1)  ++ (bvars b2)
+    BOr  b1  b2  -> (bvars b1)  ++ (bvars b2)
+    BEq  lhs rhs -> (avars lhs) ++ (avars rhs)
+    BLe  lhs rhs -> (avars lhs) ++ (avars rhs)
 
 bexpToZ3 :: BExp -> Z3 AST
 bexpToZ3 bexp =
   case bexp of
-    BTrue -> mkTrue
-    BFalse -> mkFalse
-    lhs :=: rhs -> do
+    BTrue        -> mkTrue
+    BFalse       -> mkFalse
+    BNot b       -> mkNot =<< bexpToZ3 b
+    BAnd b1  b2  -> mkAnd =<< mapM bexpToZ3 [b1, b2]
+    BOr  b1  b2  -> mkOr  =<< mapM bexpToZ3 [b1, b2]
+    BEq  lhs rhs -> do
       lhsAST <- aexpToZ3 lhs
       rhsAST <- aexpToZ3 rhs
       mkEq lhsAST rhsAST
-    BNot b -> mkNot =<< bexpToZ3 b
-    BAnd b1 b2 -> mkAnd =<< mapM bexpToZ3 [b1, b2]
-    BOr  b1 b2 -> mkOr  =<< mapM bexpToZ3 [b1, b2]
+    BLe  lhs rhs -> do
+      lhsAST <- aexpToZ3 lhs
+      rhsAST <- aexpToZ3 rhs
+      mkLe lhsAST rhsAST
 
 prefixBExpVars :: String -> BExp -> BExp
 prefixBExpVars pre bexp =
   case bexp of
-    lhs :=: rhs -> (prefix lhs) :=: (prefix rhs)
-    _ -> bexp
-  where prefix = prefixAExpVars pre
+    BTrue        -> BTrue
+    BFalse       -> BFalse
+    BNot b       -> BNot $ prefixB b
+    BAnd b1  b2  -> BAnd (prefixB b1)  (prefixB b2)
+    BOr  b1  b2  -> BOr  (prefixB b1)  (prefixB b2)
+    BEq  lhs rhs -> BEq  (prefixA lhs) (prefixA rhs)
+    BLe  lhs rhs -> BLe  (prefixA lhs) (prefixA rhs)
+  where
+    prefixA = prefixAExpVars pre
+    prefixB = prefixBExpVars pre
 
 
 ---------------
 -- Functions --
 ---------------
 
-data Func = Func
+data SFun = SFun
   { fName     :: String
   , fParams   :: [Var]
   } deriving (Eq, Ord, Show)
 
-fsubst :: Func -> Var -> Var -> Z3 Func
-fsubst f@(Func name params) var repl = do
+fsubst :: SFun -> Var -> Var -> Z3 SFun
+fsubst (SFun name params) var repl = do
   let params' = map (\p -> if p == var then repl else p) params
-  return $ Func name params'
+  return $ SFun name params'
 
 
 ---------------------------
 -- Statements / Programs --
 ---------------------------
 
-data Stmt
-  = Skip
-  | Var := AExp
-  | Seq [Stmt]
-  | If BExp Stmt Stmt
-  | Call Var Func
+-- Parameterized over the type of loop specs.
+-- This allows the parser to return SMT strings
+-- instead of conflating Z3 interaction with
+-- parsing to construct Z3 ASTs at parse time.
+
+data AbsStmt a
+  = SSkip
+  | SAsgn  Var AExp
+  | SSeq   [AbsStmt a]
+  | SIf    BExp (AbsStmt a) (AbsStmt a)
+  | SWhile BExp (AbsStmt a) (a, a)
+  | SCall  Var  SFun
   deriving (Eq, Ord, Show)
 
-prefixProgVars :: String -> Prog -> Prog
+type Stmt       = AbsStmt AST
+type Prog       = Stmt
+
+prefixProgVars :: String -> AbsStmt a -> AbsStmt a
 prefixProgVars pre prog =
   case prog of
-    Skip        -> Skip
-    var := aexp -> (pre ++ var) := prefixA aexp
-    Seq stmts   -> Seq $ map prefixP stmts
-    If c s1 s2  -> If (prefixB c) (prefixP s1) (prefixP s2)
-    Call var (Func fname fparams) ->
-      Call (prefix var) (Func (prefix fname) $ map prefix fparams)
+    SSkip                 -> SSkip
+    SAsgn  var aexp       -> SAsgn  (pre ++ var) (prefixA aexp)
+    SSeq   stmts          -> SSeq $ map prefixP stmts
+    SIf    cond s1 s2     -> SIf    (prefixB cond) (prefixP s1) (prefixP s2)
+    SWhile cond body spec -> SWhile (prefixB cond) (prefixP body) spec
+    SCall  var  (SFun fname fparams) -> SCall (prefix var) $
+      SFun (prefix fname) (map prefix fparams)
   where
     prefix s = pre ++ s
     prefixA = prefixAExpVars pre
     prefixB = prefixBExpVars pre
     prefixP = prefixProgVars pre
-
-type Prog = Stmt

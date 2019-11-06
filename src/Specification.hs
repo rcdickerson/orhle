@@ -1,13 +1,10 @@
-{-# LANGUAGE QuasiQuotes #-}
-
 module Specification
-  ( Spec
-  , ASTSpec
-  , StringSpec
-  , addSpec
-  , emptyASTSpec
-  , emptyStringSpec
-  , funSpec
+  ( ASTFunSpec
+  , FunSpec
+  , StringFunSpec
+  , addFunSpec
+  , emptyFunSpec
+  , lookupFunSpec
   , postCond
   , preCond
   , prefixSpec
@@ -22,37 +19,34 @@ import SMTParser
 import Z3.Monad
 import Z3Util
 
-type Spec a     = Map.Map Func ([Var], a, a)
-type StringSpec = Spec String
-type ASTSpec    = Spec AST
+type FunSpec a     = Map.Map SFun ([Var], a, a)
+type StringFunSpec = FunSpec String
+type ASTFunSpec    = FunSpec AST
 
-emptyStringSpec :: StringSpec
-emptyStringSpec = Map.empty
+emptyFunSpec :: FunSpec a
+emptyFunSpec = Map.empty
 
-emptyASTSpec :: ASTSpec
-emptyASTSpec = Map.empty
-
-addSpec :: Func -> [Var] -> a -> a -> Spec a -> Spec a
-addSpec func tvars pre post spec =
+addFunSpec :: SFun -> [Var] -> a -> a -> FunSpec a -> FunSpec a
+addFunSpec func tvars pre post spec =
   Map.insert func (tvars, pre, post) spec
 
-templateVars :: Func -> Spec a -> Maybe [Var]
+lookupFunSpec :: SFun -> FunSpec a -> Maybe ([Var], a, a)
+lookupFunSpec = Map.lookup
+
+templateVars :: SFun -> FunSpec a -> Maybe [Var]
 templateVars func spec = Map.lookup func spec >>= \(tvars, _, _) -> return tvars
 
-preCond :: Func -> Spec a -> Maybe a
+preCond :: SFun -> FunSpec a -> Maybe a
 preCond func spec = Map.lookup func spec >>= \(_, pre, _) -> return pre
 
-postCond :: Func -> Spec a -> Maybe a
+postCond :: SFun -> FunSpec a -> Maybe a
 postCond func spec = Map.lookup func spec >>= \(_, _, post) -> return post
 
-funSpec :: Func -> Spec a -> Maybe ([Var], a, a)
-funSpec = Map.lookup
-
-prefixSpec :: String -> ASTSpec -> Z3 ASTSpec
+prefixSpec :: String -> ASTFunSpec -> Z3 ASTFunSpec
 prefixSpec prefix spec = traverse (\v -> prefixSpecs v)
-                         $ Map.mapKeys (\k -> prefixFunc k) spec
+                         $ Map.mapKeys (\k -> prefixSFun k) spec
   where
-    prefixFunc  (Func n p)  = Func (prefix ++ n) p
+    prefixSFun  (SFun n p)  = SFun (prefix ++ n) p
     prefixSpecs (tvars, pre, post) = do
       let prefixedTVars = map (\v -> prefix ++ v) tvars
       prefixedPre  <- prefixAST pre
@@ -66,11 +60,11 @@ prefixSpec prefix spec = traverse (\v -> prefixSpecs v)
       name <- getSymbolString symbol
       substituteByName ast [name] [prefix ++ name]
 
-stringToASTSpec :: StringSpec -> Either ParseError (Z3 ASTSpec)
-stringToASTSpec = Map.foldrWithKey parse $ Right (return emptyASTSpec)
+stringToASTSpec :: StringFunSpec -> Either ParseError (Z3 ASTFunSpec)
+stringToASTSpec = Map.foldrWithKey parse $ Right (return emptyFunSpec)
   where
-    parse :: Func -> ([Var], String, String) -> Either ParseError (Z3 ASTSpec)
-          -> Either ParseError (Z3 ASTSpec)
+    parse :: SFun -> ([Var], String, String) -> Either ParseError (Z3 ASTFunSpec)
+          -> Either ParseError (Z3 ASTFunSpec)
     parse func (tvars, preStr, postStr) z3SpecOrError =
       case z3SpecOrError of
         l@(Left _)   -> l
@@ -82,4 +76,4 @@ stringToASTSpec = Map.foldrWithKey parse $ Right (return emptyASTSpec)
               preAST  <- z3Pre
               postAST <- z3Post
               spec    <- z3Spec
-              return $ addSpec func tvars preAST postAST spec
+              return $ addFunSpec func tvars preAST postAST spec

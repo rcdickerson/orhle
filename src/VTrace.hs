@@ -128,21 +128,25 @@ ppStmtsStart (stmt:_) = ppStmtStart stmt
 ppStmtStart :: Stmt -> Z3 String
 ppStmtStart stmt =
   case stmt of
-    Skip -> return "Skip"
-    v := aexp -> do
+    SSkip -> return "Skip"
+    SAsgn var aexp -> do
       aexpStr <- astToString =<< aexpToZ3 aexp
-      return $ v ++ " := " ++ aexpStr
-    Seq [] -> return "Seq []"
-    Seq (s:[]) -> ppStmtStart s
-    Seq (s:ss) -> do
+      return $ var ++ " := " ++ aexpStr
+    SSeq [] -> return "Seq []"
+    SSeq (s:[]) -> ppStmtStart s
+    SSeq (s:ss) -> do
       first <- ppStmtStart s
       return $ first ++ "..."
-    If b s1 s2 -> do
+    SIf b s1 s2 -> do
       condStr <- astToString =<< bexpToZ3 b
       thenStr <- ppStmtStart s1
       elseStr <- ppStmtStart s2
       return $ "if " ++ condStr ++ " then " ++ thenStr ++ " else " ++ elseStr
-    Call v (Func name params) -> do
+    SWhile cond body _ -> do
+      condStr <- astToString =<< bexpToZ3 cond
+      bodyStr <- ppStmtStart body
+      return $ "while " ++ condStr ++ " do " ++ bodyStr ++ " end"
+    SCall v (SFun name params) -> do
       return $ v ++ " := " ++ name ++ "(" ++ (intercalate ", " params) ++ ")"
 
 kindStr :: VTKind -> String

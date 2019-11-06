@@ -52,14 +52,14 @@ runVerifier' verifier pre aProgs eProgs post = do
       tell $ "INVALID: " ++ reason ++ "\n"
   tell "------------------------------------------------"
 
-noAbdVerifier :: ASTSpec -> RHLETrip -> Z3 (VResult, [VTrace])
+noAbdVerifier :: ASTFunSpec -> RHLETrip -> Z3 (VResult, [VTrace])
 noAbdVerifier spec trip = runWriterT $ verifyNoAbd spec trip
 
-verifyNoAbd :: ASTSpec -> RHLETrip -> VTracedResult
-verifyNoAbd spec (RHLETrip pre aProgs eProgs post) = do
-  (vcsE, abdsE)  <- lift $ generateVCList eProgs post VCExistential spec
+verifyNoAbd :: ASTFunSpec -> RHLETrip -> VTracedResult
+verifyNoAbd funSpec (RHLETrip pre aProgs eProgs post) = do
+  (vcsE, abdsE)  <- lift $ generateVCList eProgs post VCExistential funSpec
   post'          <- lift $ simplify =<< mkAnd vcsE
-  (vcsA, abdsA)  <- lift $ generateVCList aProgs post' VCUniversal spec
+  (vcsA, abdsA)  <- lift $ generateVCList aProgs post' VCUniversal funSpec
   let combinedAbds = Set.union abdsE abdsA
   if not $ Set.null combinedAbds then
     return.Left $ "Missing specifications: " ++ (abdNameList combinedAbds)
@@ -84,9 +84,9 @@ singleAbdVerifier trip = runWriterT $ verifySingleAbd trip
 
 verifySingleAbd :: RHLETrip -> VTracedResult
 verifySingleAbd (RHLETrip pre aProgs eProgs post) = do
-  (vcsE, abdsE)   <- lift $ generateVCList eProgs post VCExistential emptyASTSpec
+  (vcsE, abdsE)   <- lift $ generateVCList eProgs post VCExistential emptyFunSpec
   post'           <- lift $ simplify =<< mkAnd vcsE
-  (vcsA, abdsA)   <- lift $ generateVCList aProgs post' VCUniversal emptyASTSpec
+  (vcsA, abdsA)   <- lift $ generateVCList aProgs post' VCUniversal emptyFunSpec
   let abds = Set.toList $ Set.union abdsA abdsE
   (result, trace) <- lift $ abduce abds [pre] vcsA
   logAbductionTrace trace
@@ -101,39 +101,51 @@ verifySingleAbd (RHLETrip pre aProgs eProgs post) = do
       logAbductionSuccess interpLines preStr vcsStr
       return.Right $ imap
 
-generateVCList :: [Prog] -> AST -> VCQuant -> ASTSpec -> Z3 ([AST], (Set.Set Abducible))
-generateVCList progs post quant spec =
-  foldM (vcFolder quant spec) ([post], Set.empty) progs
+generateVCList :: [Prog] -> AST -> VCQuant -> ASTFunSpec
+               -> Z3 ([AST], (Set.Set Abducible))
+generateVCList progs post quant funSpec =
+  foldM vcFolder ([post], Set.empty) progs
   where
-    vcFolder quant spec (vcs, abds) prog = do
-      post <- simplify =<< mkAnd vcs
-      (vcs', abds') <- generateVCs prog post quant spec
+    vcFolder (vcs, abds) prog = do
+      post' <- simplify =<< mkAnd vcs
+      (vcs', abds') <- generateVCs prog post' quant funSpec
       return (vcs', Set.union abds abds')
 
-generateVCs :: Stmt -> AST -> VCQuant -> ASTSpec -> Z3 ([AST], (Set.Set Abducible))
-generateVCs stmt post quant spec = case stmt of
-  Skip       -> return ([post], Set.empty)
-  Seq []     -> generateVCs Skip post quant spec
-  Seq (s:ss) -> do
-    (vcs2, abds2) <- generateVCs (Seq ss) post quant spec
-    (vcs1, abds1) <- (\post' -> generateVCs s post' quant spec) =<< mkAnd vcs2
+generateVCs :: Stmt -> AST -> VCQuant -> ASTFunSpec
+            -> Z3 ([AST], (Set.Set Abducible))
+generateVCs stmt post quant funs = case stmt of
+  SSkip       -> return ([post], Set.empty)
+  SSeq []     -> generateVCs SSkip post quant funs
+  SSeq (s:ss) -> do
+    (vcs2, abds2) <- generateVCs (SSeq ss) post quant funs
+    (vcs1, abds1) <- (\post' -> generateVCs s post' quant funs)
+                     =<< mkAnd vcs2
     return (vcs1, Set.union abds1 abds2)
-  lhs := rhs -> do
-    subPost <- subAexp post (V lhs) rhs
+  SAsgn lhs rhs -> do
+    subPost <- subAexp post (AVar lhs) rhs
     return ([subPost], Set.empty)
-  If b s1 s2 -> do
+  SIf b s1 s2 -> do
     cond  <- bexpToZ3 b
     ncond <- mkNot cond
-    (vcs1, abds1) <- generateVCs s1 post quant spec
-    (vcs2, abds2) <- generateVCs s2 post quant spec
+    (vcs1, abds1) <- generateVCs s1 post quant funs
+    (vcs2, abds2) <- generateVCs s2 post quant funs
     vcIf   <- mkImplies cond  =<< mkAnd vcs1
     vcElse <- mkImplies ncond =<< mkAnd vcs2
     vc     <- mkAnd [vcIf, vcElse]
     return ([vc], Set.union abds1 abds2)
-  Call assignee f ->
+  SWhile c body (inv, var) -> do
+        cond                <- bexpToZ3 c
+        ncond               <- mkNot cond
+        condAndInv          <- mkAnd [cond,  inv]
+        ncondAndInv         <- mkAnd [ncond, inv]
+        (bodyVCs, abdsBody) <- generateVCs body inv quant funs
+        loopVC              <- mkImplies condAndInv =<< mkAnd bodyVCs
+        endVC               <- mkImplies ncondAndInv post
+        return ([inv, loopVC, endVC], abdsBody)
+  SCall assignee f ->
     case quant of
       VCUniversal -> do
-        (_, fPre, fPost, abds) <- specOrAbducibles assignee f spec
+        (_, fPre, fPost, abds) <- specOrAbducibles assignee f funs
         postImp <- mkImplies fPost post
         vc      <- mkAnd [fPre, postImp]
         return ([vc], abds)
@@ -142,7 +154,7 @@ generateVCs stmt post quant spec = case stmt of
         frAsgnAst    <- mkFreshIntVar assignee
         frAsgnVar    <- astToString frAsgnAst
         frAsgnApp    <- toApp frAsgnAst
-        (tvars, fPre, fPost, abds) <- specOrAbducibles frAsgnVar f spec
+        (tvars, fPre, fPost, abds) <- specOrAbducibles frAsgnVar f funs
         frPost       <- substitute post [asgnAst] [frAsgnAst]
         frFPost      <- substitute fPost [asgnAst] [frAsgnAst]
         existsPost   <- mkExistsConst [] [frAsgnApp] frFPost
@@ -155,9 +167,9 @@ generateVCs stmt post quant spec = case stmt of
               quantVcs <- mkExistsConst [] tvarApps =<< mkAnd vcs
               return ([quantVcs], abds)
 
-specOrAbducibles :: Var -> Func -> ASTSpec -> Z3 ([Var], AST, AST, Set.Set Abducible)
-specOrAbducibles assignee func@(Func name args) spec =
-  case funSpec func spec of
+specOrAbducibles :: Var -> SFun -> ASTFunSpec -> Z3 ([Var], AST, AST, Set.Set Abducible)
+specOrAbducibles assignee fun@(SFun name args) spec =
+  case lookupFunSpec fun spec of
       Just (tvars, pre, post) -> return (tvars, pre, post, Set.empty)
       Nothing -> do
         fPreAbd  <- mkBoolVar =<< mkStringSymbol fPreVar

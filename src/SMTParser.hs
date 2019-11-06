@@ -1,12 +1,16 @@
 module SMTParser
   ( ParseError
+  , parseLoopSpecs
   , parseSMT
   , parseSMTOrError
   , smtParser
   ) where
 
 import Control.Monad
+import Data.Either
+import Imp
 import Text.Parsec
+import Text.Parsec.Error
 import Text.Parsec.Language
 import qualified Text.Parsec.Token as Token
 import Z3.Monad
@@ -50,6 +54,9 @@ comma      = Token.comma      lexer
 semi       = Token.semi       lexer
 whitespace = Token.whiteSpace lexer
 
+type ParsedStmt = AbsStmt String
+type ParsedProg = ParsedStmt
+
 type SMTParser a = Parsec String () (Z3 a)
 
 data SMTFunc = SMTAnd
@@ -71,6 +78,40 @@ parseSMTOrError smt =
   case parseSMT smt of
     Left  err -> error $ "SMT parse error: " ++ (show err) ++ "\nOn input: " ++ smt
     Right ast -> ast
+
+parseLoopSpecs :: ParsedProg -> Either ParseError (Z3 Prog)
+parseLoopSpecs pprog =
+  case pprog of
+    SSkip             -> Right . return $ SSkip
+    SAsgn var aexp    -> Right . return $ (SAsgn var aexp)
+    SCall var fun     -> Right . return $ (SCall var fun)
+    SIf    cond s1 s2 -> mergeZ3Parse (parseLoopSpecs s1) (parseLoopSpecs s2)
+                         (\s1' s2' -> return $ SIf cond s1' s2')
+    SSeq   stmts      ->
+      let (errors, parsed) = partitionEithers $ map parseLoopSpecs stmts
+      in case errors of
+        (e:es)  -> Left  $ foldr mergeError e es
+        []      -> Right $ do stmts <- sequence parsed; return $ SSeq stmts
+    SWhile cond body (inv, var) -> case parseLoopSpecs body of
+      Left err    -> Left err
+      Right body' -> mergeZ3Parse (parseSMT inv) (parseSMT var)
+                     (\invAST varAST -> do
+                         body'' <- body'
+                         return $ SWhile cond body'' (invAST, varAST))
+
+mergeZ3Parse :: Either ParseError (Z3 a)
+             -> Either ParseError (Z3 a)
+             -> (a -> a -> Z3 b)
+             -> Either ParseError (Z3 b)
+mergeZ3Parse errOrRes1 errOrRes2 mergeRes =
+  case (errOrRes1, errOrRes2) of
+    (Left err1, Left err2) -> Left $ mergeError err1 err2
+    (Left err1, _)         -> Left err1
+    (_, Left err2)         -> Left err2
+    (Right r1, Right r2)   -> Right $ do
+      r1' <- r1
+      r2' <- r2
+      mergeRes r1' r2'
 
 smtParser :: SMTParser AST
 smtParser = whitespace >> smtExpr
