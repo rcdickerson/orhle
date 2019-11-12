@@ -133,15 +133,21 @@ generateVCs stmt post quant funs = case stmt of
     vcElse <- mkImplies ncond =<< mkAnd vcs2
     vc     <- mkAnd [vcIf, vcElse]
     return ([vc], Set.union abds1 abds2)
-  SWhile c body (inv, var) -> do
-        cond                <- bexpToZ3 c
-        ncond               <- mkNot cond
-        condAndInv          <- mkAnd [cond,  inv]
-        ncondAndInv         <- mkAnd [ncond, inv]
-        (bodyVCs, abdsBody) <- generateVCs body inv quant funs
-        loopVC              <- mkImplies condAndInv =<< mkAnd bodyVCs
-        endVC               <- mkImplies ncondAndInv post
-        return ([inv, loopVC, endVC], abdsBody)
+  loop@(SWhile c body (inv, var)) -> do
+    progVars            <- stringsToApps . Set.toList $ svars loop
+    cond                <- bexpToZ3 c
+    ncond               <- mkNot cond
+    condAndInv          <- mkAnd [cond,  inv]
+    ncondAndInv         <- mkAnd [ncond, inv]
+    (bodyVCs, abdsBody) <- generateVCs body inv quant funs
+    loopVC              <- mkForallConst [] progVars =<<
+                             mkImplies condAndInv =<< mkAnd bodyVCs
+    endVC               <- case quant of
+                             VCUniversal   -> mkForallConst [] progVars =<<
+                                                mkImplies ncondAndInv post
+                             VCExistential -> mkExistsConst [] progVars =<<
+                                                mkAnd [ncondAndInv, post]
+    return ([inv, loopVC, endVC], abdsBody)
   SCall assignee f ->
     case quant of
       VCUniversal -> do

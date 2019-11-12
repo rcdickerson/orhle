@@ -39,7 +39,9 @@ languageDef = Token.LanguageDef
   , Token.nestedComments  = True
   , Token.opStart         = Token.opLetter languageDef
   , Token.opLetter        = oneOf ""
-  , Token.reservedNames   = [ "endp", "expected", "invalid", "pre", "post", "prog", "valid" ]
+  , Token.reservedNames   = [ "pre", "post"
+                            , "prog", "endp"
+                            , "expected", "invalid", "valid" ]
   , Token.reservedOpNames = [ ]
   }
 
@@ -155,6 +157,8 @@ getExecId :: QExec -> Maybe String
 getExecId (QEForall _ eid) = eid
 getExecId (QEExists _ eid) = eid
 
+-- TODO: This function does too many things: combines executions, prefixes program
+--       and spec variables. Split this out.
 collateProgs :: [QExec] -> [NamedProg] -> ([Z3 Prog], [Z3 Prog], Z3 ASTFunSpec)
 collateProgs execs namedProgs = foldr progExecFolder ([], [], return emptyFunSpec) progExecs
   where

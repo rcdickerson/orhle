@@ -19,8 +19,10 @@ module Imp
     , prefixProgVars
     , subAexp
     , subVar
+    , svars
     ) where
 
+import qualified Data.Set as Set
 import Z3.Monad
 
 type Var = String
@@ -51,16 +53,16 @@ asubst aexp var repl =
     ADiv lhs rhs -> ADiv (asubst lhs var repl) (asubst rhs var repl)
     AMod lhs rhs -> AMod (asubst lhs var repl) (asubst rhs var repl)
 
-avars :: AExp -> [Var]
+avars :: AExp -> Set.Set Var
 avars aexp =
   case aexp of
-    ALit _ -> []
-    AVar v -> [v]
-    AAdd lhs rhs -> (avars lhs) ++ (avars rhs)
-    ASub lhs rhs -> (avars lhs) ++ (avars rhs)
-    AMul lhs rhs -> (avars lhs) ++ (avars rhs)
-    ADiv lhs rhs -> (avars lhs) ++ (avars rhs)
-    AMod lhs rhs -> (avars lhs) ++ (avars rhs)
+    ALit _ -> Set.empty
+    AVar v -> Set.singleton v
+    AAdd lhs rhs -> Set.union (avars lhs) (avars rhs)
+    ASub lhs rhs -> Set.union (avars lhs) (avars rhs)
+    AMul lhs rhs -> Set.union (avars lhs) (avars rhs)
+    ADiv lhs rhs -> Set.union (avars lhs) (avars rhs)
+    AMod lhs rhs -> Set.union (avars lhs) (avars rhs)
 
 aexpToZ3 :: AExp -> Z3 AST
 aexpToZ3 aexp =
@@ -120,6 +122,9 @@ data BExp
   | BOr  BExp BExp
   | BEq  AExp AExp
   | BLe  AExp AExp
+  | BGe  AExp AExp
+  | BLt  AExp AExp
+  | BGt  AExp AExp
   deriving (Eq, Ord, Show)
 
 bsubst :: BExp -> Var -> AExp -> BExp
@@ -132,17 +137,23 @@ bsubst bexp var aexp =
     BOr  b1  b2  -> BOr  (bsubst b1 var aexp)  (bsubst b2 var aexp)
     BEq  lhs rhs -> BEq  (asubst lhs var aexp) (asubst rhs var aexp)
     BLe  lhs rhs -> BLe  (asubst lhs var aexp) (asubst rhs var aexp)
+    BGe  lhs rhs -> BGe  (asubst lhs var aexp) (asubst rhs var aexp)
+    BLt  lhs rhs -> BLt  (asubst lhs var aexp) (asubst rhs var aexp)
+    BGt  lhs rhs -> BGt  (asubst lhs var aexp) (asubst rhs var aexp)
 
-bvars :: BExp -> [Var]
+bvars :: BExp -> Set.Set Var
 bvars bexp =
   case bexp of
-    BTrue        -> []
-    BFalse       -> []
+    BTrue        -> Set.empty
+    BFalse       -> Set.empty
     BNot b       -> bvars b
-    BAnd b1  b2  -> (bvars b1)  ++ (bvars b2)
-    BOr  b1  b2  -> (bvars b1)  ++ (bvars b2)
-    BEq  lhs rhs -> (avars lhs) ++ (avars rhs)
-    BLe  lhs rhs -> (avars lhs) ++ (avars rhs)
+    BAnd b1  b2  -> Set.union (bvars b1)  (bvars b2)
+    BOr  b1  b2  -> Set.union (bvars b1)  (bvars b2)
+    BEq  lhs rhs -> Set.union (avars lhs) (avars rhs)
+    BLe  lhs rhs -> Set.union (avars lhs) (avars rhs)
+    BGe  lhs rhs -> Set.union (avars lhs) (avars rhs)
+    BLt  lhs rhs -> Set.union (avars lhs) (avars rhs)
+    BGt  lhs rhs -> Set.union (avars lhs) (avars rhs)
 
 bexpToZ3 :: BExp -> Z3 AST
 bexpToZ3 bexp =
@@ -160,6 +171,18 @@ bexpToZ3 bexp =
       lhsAST <- aexpToZ3 lhs
       rhsAST <- aexpToZ3 rhs
       mkLe lhsAST rhsAST
+    BGe  lhs rhs -> do
+      lhsAST <- aexpToZ3 lhs
+      rhsAST <- aexpToZ3 rhs
+      mkGe lhsAST rhsAST
+    BGt  lhs rhs -> do
+      lhsAST <- aexpToZ3 lhs
+      rhsAST <- aexpToZ3 rhs
+      mkGt lhsAST rhsAST
+    BLt  lhs rhs -> do
+      lhsAST <- aexpToZ3 lhs
+      rhsAST <- aexpToZ3 rhs
+      mkLt lhsAST rhsAST
 
 prefixBExpVars :: String -> BExp -> BExp
 prefixBExpVars pre bexp =
@@ -171,6 +194,9 @@ prefixBExpVars pre bexp =
     BOr  b1  b2  -> BOr  (prefixB b1)  (prefixB b2)
     BEq  lhs rhs -> BEq  (prefixA lhs) (prefixA rhs)
     BLe  lhs rhs -> BLe  (prefixA lhs) (prefixA rhs)
+    BGe  lhs rhs -> BGe  (prefixA lhs) (prefixA rhs)
+    BLt  lhs rhs -> BLt  (prefixA lhs) (prefixA rhs)
+    BGt  lhs rhs -> BGt  (prefixA lhs) (prefixA rhs)
   where
     prefixA = prefixAExpVars pre
     prefixB = prefixBExpVars pre
@@ -211,6 +237,17 @@ data AbsStmt a
 
 type Stmt       = AbsStmt AST
 type Prog       = Stmt
+
+svars :: AbsStmt a -> Set.Set Var
+svars stmt = case stmt of
+  SSkip                   -> Set.empty
+  SAsgn  var aexp         -> Set.insert var $ avars aexp
+  SSeq   []               -> svars SSkip
+  SSeq   (s:ss)           -> Set.union (svars s) (svars $ SSeq ss)
+  SIf    cond bThen bElse -> Set.unions
+                               [(bvars cond), (svars bThen), (svars bElse)]
+  SWhile cond body _      -> Set.union (bvars cond) (svars body)
+  SCall  var  fun         -> Set.singleton var
 
 prefixProgVars :: String -> AbsStmt a -> AbsStmt a
 prefixProgVars pre prog =

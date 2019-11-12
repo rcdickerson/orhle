@@ -35,7 +35,8 @@ languageDef = Token.LanguageDef
                             , "@templateVars", "@pre", "@post", "@inv", "@var"
                             ]
   , Token.reservedOpNames = [ "+", "-", "*", "/", "%"
-                            , "==", "not", "and", "or", "<="
+                            , "==", "<=", ">=", "<", ">"
+                            , "not", "and", "or"
                             , ":="
                             ]
   }
@@ -139,11 +140,13 @@ funcStmt = do
     reserved "@templateVars"
     braces $ sepBy identifier comma
   whiteSpace
-  reserved "@pre"
-  pre <- braces $ many $ noneOf "{}"
+  pre <- option "true" $ do
+    reserved "@pre"
+    braces $ many $ noneOf "{}"
   whiteSpace
-  reserved "@post"
-  post <- braces $ many $ noneOf "{}"
+  post <- option "true" $ do
+    reserved "@post"
+    braces $ many $ noneOf "{}"
   whiteSpace
   semi
   let func = SFun funcName params
@@ -178,11 +181,15 @@ aTerm =  parens aExpression
 bTerm =  parens bExpression
      <|> (reserved "true"  >> return (BTrue ))
      <|> (reserved "false" >> return (BFalse))
-     <|> try (do lhs <- aExpression
-                 reservedOp "=="
-                 rhs <- aExpression
-                 return $ BEq lhs rhs)
-     <|> try (do lhs <- aExpression
-                 reservedOp "<="
-                 rhs <- aExpression
-                 return $ BLe lhs rhs)
+     <|> (try $ bBinop "==" BEq)
+     <|> (try $ bBinop "<=" BLe)
+     <|> (try $ bBinop ">=" BGe)
+     <|> (try $ bBinop "<"  BLt)
+     <|> (try $ bBinop ">"  BGt)
+
+bBinop :: String -> (AExp -> AExp -> BExp) -> ImpParser BExp
+bBinop opStr opFun = do
+  lhs <- aExpression
+  reservedOp opStr
+  rhs <- aExpression
+  return $ opFun lhs rhs

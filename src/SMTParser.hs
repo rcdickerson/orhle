@@ -35,9 +35,8 @@ languageDef = Token.LanguageDef
                              "get-value", "pop", "push", "set-info",
                              "set-logic", "set-option"
                             ]
-  , Token.reservedOpNames = [ "+", "-", "*"
-                            , ":="
-                            , "=="
+  , Token.reservedOpNames = [ "+", "-", "*", "/"
+                            , "=", ">=", "<=", "<", ">"
                             , "mod"
                             , "not", "and", "or"
                             ]
@@ -59,7 +58,11 @@ type ParsedProg = ParsedStmt
 
 type SMTParser a = Parsec String () (Z3 a)
 
-data SMTFunc = SMTAnd
+data SMTFunc = SMTAdd
+             | SMTSub
+             | SMTMul
+             | SMTDiv
+             | SMTAnd
              | SMTEq
              | SMTImp
              | SMTGT
@@ -92,7 +95,10 @@ parseLoopSpecs pprog =
       in case errors of
         (e:es)  -> Left  $ foldr mergeError e es
         []      -> Right $ do stmts <- sequence parsed; return $ SSeq stmts
-    SWhile cond body (inv, var) -> case parseLoopSpecs body of
+    SWhile cond body (inv, var) ->
+     do
+
+     case parseLoopSpecs body of
       Left err    -> Left err
       Right body' -> mergeZ3Parse (parseSMT inv) (parseSMT var)
                      (\invAST varAST -> do
@@ -209,18 +215,29 @@ smtApp = do
   return.join $ (liftM2 smtApply) func $ sequence operands
 
 funcDecl :: SMTParser SMTFunc
-funcDecl =     funcParser "and" SMTAnd
-           <|> funcParser ">="  SMTGTE
-           <|> funcParser "<="  SMTLTE
-           <|> funcParser "=>"  SMTImp
+funcDecl =     funcParser "+" SMTAdd
+           <|> funcParser "-" SMTSub
+           <|> funcParser "*" SMTMul
+           <|> funcParser "/" SMTDiv
+           <|> (try $ funcParser ">="  SMTGTE)
+           <|> (try $ funcParser "<="  SMTLTE)
+           <|> (try $ funcParser "=>"  SMTImp)
            <|> funcParser ">"   SMTGT
            <|> funcParser "<"   SMTLT
+           <|> funcParser "="   SMTEq
            <|> funcParser "mod" SMTMod
+           <|> funcParser "and" SMTAnd
            <|> funcParser "not" SMTNot
            <|> funcParser "or"  SMTOr
-           <|> funcParser "="   SMTEq
+
+funcParser :: String -> SMTFunc -> SMTParser SMTFunc
+funcParser str func = reserved str >> (return $ return func)
 
 smtApply :: SMTFunc -> [AST] -> Z3 AST
+smtApply SMTAdd ops = mkAdd ops
+smtApply SMTSub ops = mkSub ops
+smtApply SMTMul ops = mkMul ops
+smtApply SMTDiv (lhs:rhs:[]) = mkDiv lhs rhs
 smtApply SMTAnd ops = mkAnd ops
 smtApply SMTEq  (lhs:rhs:[]) = mkEq lhs rhs
 smtApply SMTGT  (lhs:rhs:[]) = mkGt lhs rhs
@@ -231,6 +248,7 @@ smtApply SMTLTE (lhs:rhs:[]) = mkLe lhs rhs
 smtApply SMTMod (lhs:rhs:[]) = mkMod lhs rhs
 smtApply SMTNot (expr:[]) = mkNot expr
 smtApply SMTOr ops = mkOr ops
+smtApply SMTDiv  _ = fail "divide takes exactly two arguments"
 smtApply SMTEq  _ = fail "equals takes exactly two arguments"
 smtApply SMTGT  _ = fail "> takes exactly two arguments"
 smtApply SMTGTE _ = fail ">= takes exactly two arguments"
@@ -239,6 +257,3 @@ smtApply SMTLT  _ = fail "< takes exactly two arguments"
 smtApply SMTLTE _ = fail "<= takes exactly two arguments"
 smtApply SMTMod _ = fail "mod takes exactly two arguments"
 smtApply SMTNot _ = fail "not takes exactly one argument"
-
-funcParser :: String -> SMTFunc -> SMTParser SMTFunc
-funcParser str func = try $ string str >> whitespace >> (return $ return func)
