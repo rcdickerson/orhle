@@ -141,10 +141,10 @@ generateVCs stmt post quant funs = case stmt of
     ncondAndInv         <- mkAnd [ncond, inv]
     (bodyVCs, abdsBody) <- generateVCs body inv quant funs
     loopVC              <- case quant of
-                             VCUniversal -> mkForallConst [] progVars =<<
-                                            mkImplies condAndInv =<< mkAnd bodyVCs
+                             VCUniversal   -> mkForallConst [] progVars =<<
+                                                mkImplies condAndInv =<< mkAnd bodyVCs
                              VCExistential -> mkExistsConst [] progVars =<<
-                                            mkImplies condAndInv =<< mkAnd bodyVCs
+                                                mkImplies condAndInv =<< mkAnd bodyVCs
     endVC               <- case quant of
                              VCUniversal   -> mkForallConst [] progVars =<<
                                                 mkImplies ncondAndInv post
