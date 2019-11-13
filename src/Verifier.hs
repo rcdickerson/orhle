@@ -19,6 +19,8 @@ import VTrace
 import Z3.Monad
 import Z3Util
 
+import Debug.Trace
+
 type Verifier      = RHLETrip -> Z3 (VResult, [VTrace])
 type VResult       = Either String InterpMap
 type VTracedResult = WriterT [VTrace] Z3 VResult
@@ -33,9 +35,9 @@ runVerifier verifier pre aProgs eProgs post = do
 runVerifier' :: Verifier -> String -> [Prog] -> [Prog] -> String -> WriterT String Z3 ()
 runVerifier' verifier pre aProgs eProgs post = do
   tell "------------------------------------------------\n"
-  tell $ "Universal Program:\n" ++ (show aProgs) ++     "\n"
+  tell $ "Universal Program:\n" ++ (show aProgs) ++    "\n"
   tell "------------------------------------------------\n"
-  tell $ "Existential Program:\n" ++ (show eProgs) ++   "\n"
+  tell $ "Existential Program:\n" ++ (show eProgs) ++  "\n"
   tell "------------------------------------------------\n"
   trip <- lift $ mkRHLETrip pre aProgs eProgs post
   (result, trace) <- lift $ verifier trip
@@ -134,23 +136,46 @@ generateVCs stmt post quant funs = case stmt of
     vc     <- mkAnd [vcIf, vcElse]
     return ([vc], Set.union abds1 abds2)
   loop@(SWhile c body (inv, var)) -> do
-    progVars            <- stringsToApps . Set.toList $ svars loop
+    let progVarStrs = Set.toList $ svars loop
+    progVars            <- stringsToApps progVarStrs
     cond                <- bexpToZ3 c
     ncond               <- mkNot cond
     condAndInv          <- mkAnd [cond,  inv]
     ncondAndInv         <- mkAnd [ncond, inv]
-    (bodyVCs, abdsBody) <- generateVCs body inv quant funs
-    loopVC              <- case quant of
-                             VCUniversal   -> mkForallConst [] progVars =<<
-                                                mkImplies condAndInv =<< mkAnd bodyVCs
-                             VCExistential -> mkExistsConst [] progVars =<<
-                                                mkImplies condAndInv =<< mkAnd bodyVCs
-    endVC               <- case quant of
-                             VCUniversal   -> mkForallConst [] progVars =<<
-                                                mkImplies ncondAndInv post
-                             VCExistential -> mkExistsConst [] progVars =<<
-                                                mkAnd [ncondAndInv, post]
-    return ([inv, loopVC, endVC], abdsBody)
+    case quant of
+      VCUniversal -> do
+        (bodyVCs, abdsBody) <- generateVCs body inv quant funs
+        loopVC <- mkForallConst [] progVars
+                  =<< mkImplies condAndInv =<< mkAnd bodyVCs
+        endVC  <- mkForallConst [] progVars
+                  =<< mkImplies ncondAndInv post
+        return ([inv, loopVC, endVC], abdsBody)
+      VCExistential -> do
+        -- Unlike the universal case, the existential case reasons
+        -- about the variant, which means the body postcondition will
+        -- involve values before and after the body execution.
+        -- So, we can't just quantify over program variables, rather
+        -- we need to substitute in fresh variables to represent the
+        -- "after" values.
+        frProgVarASTs <- mkFreshIntVars progVarStrs
+        frProgVarStrs <- mapM astToString frProgVarASTs
+        frProgVars    <- stringsToApps frProgVarStrs
+        let freshen ast = substituteByName ast progVarStrs frProgVarStrs
+        frCondAndInv  <- freshen condAndInv
+        frVar         <- freshen var
+        varCond       <- mkLt frVar var
+        varCondStr <- astToString varCond
+        traceM $ "varCond: " ++ varCondStr
+        bodyPost      <- mkAnd [inv, varCond]
+        (bodyVCs, abdsBody) <- generateVCs body bodyPost quant funs
+        bodyVCsStr <- astToString =<< mkAnd bodyVCs
+        traceM $ "bodyVCs: " ++ bodyVCsStr
+        frBodyVCs     <- mapM freshen bodyVCs
+        loopVC <- mkExistsConst [] frProgVars
+                  =<< mkImplies frCondAndInv =<< mkAnd frBodyVCs
+        endVC  <- mkExistsConst [] progVars
+                  =<< mkAnd [ncondAndInv, post]
+        return ([inv, loopVC, endVC], abdsBody)
   SCall assignee f ->
     case quant of
       VCUniversal -> do
