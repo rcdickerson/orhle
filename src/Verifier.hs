@@ -151,6 +151,13 @@ generateVCs stmt post quant funs = case stmt of
                   =<< mkImplies ncondAndInv post
         return ([inv, loopVC, endVC], abdsBody)
       VCExistential -> do
+        (bodyVCs, abdsBody) <- generateVCs body inv quant funs
+        loopVC <- mkForallConst [] progVars
+                  =<< mkImplies condAndInv =<< mkAnd bodyVCs
+        endVC  <- mkForallConst [] progVars
+                  =<< mkImplies ncondAndInv post
+        return ([inv, loopVC, endVC], abdsBody)
+{-      VCExistential -> do
         -- Unlike the universal case, the existential case reasons
         -- about the variant, which means the body postcondition will
         -- involve values before and after the body execution.
@@ -175,7 +182,7 @@ generateVCs stmt post quant funs = case stmt of
                   =<< mkImplies frCondAndInv =<< mkAnd frBodyVCs
         endVC  <- mkExistsConst [] progVars
                   =<< mkAnd [ncondAndInv, post]
-        return ([inv, loopVC, endVC], abdsBody)
+        return ([inv, loopVC, endVC], abdsBody) -}
   SCall assignee f ->
     case quant of
       VCUniversal -> do
