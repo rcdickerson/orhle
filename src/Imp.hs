@@ -121,6 +121,7 @@ data BExp
   | BAnd BExp BExp
   | BOr  BExp BExp
   | BEq  AExp AExp
+  | BNe  AExp AExp
   | BLe  AExp AExp
   | BGe  AExp AExp
   | BLt  AExp AExp
@@ -136,6 +137,7 @@ bsubst bexp var aexp =
     BAnd b1  b2  -> BAnd (bsubst b1 var aexp)  (bsubst b2 var aexp)
     BOr  b1  b2  -> BOr  (bsubst b1 var aexp)  (bsubst b2 var aexp)
     BEq  lhs rhs -> BEq  (asubst lhs var aexp) (asubst rhs var aexp)
+    BNe  lhs rhs -> BNe  (asubst lhs var aexp) (asubst rhs var aexp)
     BLe  lhs rhs -> BLe  (asubst lhs var aexp) (asubst rhs var aexp)
     BGe  lhs rhs -> BGe  (asubst lhs var aexp) (asubst rhs var aexp)
     BLt  lhs rhs -> BLt  (asubst lhs var aexp) (asubst rhs var aexp)
@@ -150,6 +152,7 @@ bvars bexp =
     BAnd b1  b2  -> Set.union (bvars b1)  (bvars b2)
     BOr  b1  b2  -> Set.union (bvars b1)  (bvars b2)
     BEq  lhs rhs -> Set.union (avars lhs) (avars rhs)
+    BNe  lhs rhs -> Set.union (avars lhs) (avars rhs)
     BLe  lhs rhs -> Set.union (avars lhs) (avars rhs)
     BGe  lhs rhs -> Set.union (avars lhs) (avars rhs)
     BLt  lhs rhs -> Set.union (avars lhs) (avars rhs)
@@ -167,6 +170,10 @@ bexpToZ3 bexp =
       lhsAST <- aexpToZ3 lhs
       rhsAST <- aexpToZ3 rhs
       mkEq lhsAST rhsAST
+    BNe  lhs rhs -> do
+      lhsAST <- aexpToZ3 lhs
+      rhsAST <- aexpToZ3 rhs
+      mkNot =<< mkEq lhsAST rhsAST
     BLe  lhs rhs -> do
       lhsAST <- aexpToZ3 lhs
       rhsAST <- aexpToZ3 rhs
@@ -193,6 +200,7 @@ prefixBExpVars pre bexp =
     BAnd b1  b2  -> BAnd (prefixB b1)  (prefixB b2)
     BOr  b1  b2  -> BOr  (prefixB b1)  (prefixB b2)
     BEq  lhs rhs -> BEq  (prefixA lhs) (prefixA rhs)
+    BNe  lhs rhs -> BNe  (prefixA lhs) (prefixA rhs)
     BLe  lhs rhs -> BLe  (prefixA lhs) (prefixA rhs)
     BGe  lhs rhs -> BGe  (prefixA lhs) (prefixA rhs)
     BLt  lhs rhs -> BLt  (prefixA lhs) (prefixA rhs)

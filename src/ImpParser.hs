@@ -35,8 +35,8 @@ languageDef = Token.LanguageDef
                             , "@templateVars", "@pre", "@post", "@inv", "@var"
                             ]
   , Token.reservedOpNames = [ "+", "-", "*", "/", "%"
-                            , "==", "<=", ">=", "<", ">"
-                            , "not", "and", "or"
+                            , "==", "!=", "<=", ">=", "<", ">"
+                            , "&&", "||", "!"
                             , ":="
                             ]
   }
@@ -169,9 +169,9 @@ aOperators = [ [Infix  (reservedOp "*" >> return AMul) AssocLeft,
                 Infix  (reservedOp "-" >> return ASub) AssocLeft]
               ]
 
-bOperators = [ [Prefix (reservedOp "not" >> return BNot)]
-             , [Infix  (reservedOp "and" >> return BAnd) AssocLeft,
-                Infix  (reservedOp "or"  >> return BOr)  AssocLeft]
+bOperators = [ [Prefix (reservedOp "!" >> return BNot)]
+             , [Infix  (reservedOp "&&" >> return BAnd) AssocLeft,
+                Infix  (reservedOp "||"  >> return BOr)  AssocLeft]
              ]
 
 aTerm =  parens aExpression
@@ -182,6 +182,7 @@ bTerm =  parens bExpression
      <|> (reserved "true"  >> return (BTrue ))
      <|> (reserved "false" >> return (BFalse))
      <|> (try $ bBinop "==" BEq)
+     <|> (try $ bBinop "!=" BNe)
      <|> (try $ bBinop "<=" BLe)
      <|> (try $ bBinop ">=" BGe)
      <|> (try $ bBinop "<"  BLt)
