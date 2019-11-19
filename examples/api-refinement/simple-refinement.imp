@@ -1,0 +1,21 @@
+// A program together with a valid refinement.
+
+forall: refinement;
+exists: original;
+
+post: (= original!x refinement!x);
+
+expected: valid;
+
+prog original():
+  x := call randInt()
+         @templateVars { n }
+         @pre  { (and (>= n 0) (< n 20)) }
+         @post { (= x n) };
+endp
+
+prog refinement():
+  x := call randOddInt()
+         @pre  { true }
+         @post { (and (>= x 0) (< x 20) (= (mod x 2) 1)) };
+endp

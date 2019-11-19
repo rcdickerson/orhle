@@ -1,0 +1,40 @@
+// Example adapted from secure information flow lecture notes:
+// https://people.cs.vt.edu/~ryder/6304/lectures/10-Denning&Denning-InfoFlow-CACM7-97-KrishnanMurali.pdf
+
+forall: denning[1], denning[2];
+exists: denning[3];
+
+pre: (and
+        (= denning!1!f3_H  denning!3!f3_H)
+        (= denning!1!f4_H  denning!3!f4_H)
+        (= denning!1!f1_L  denning!2!f1_L)
+        (= denning!1!f2_L  denning!2!f2_L)
+        (= denning!2!f1_L  denning!3!f1_L)
+        (= denning!2!f2_L  denning!3!f2_L));
+
+post: (and
+        (= denning!2!f1_L denning!3!f1_L)
+        (= denning!2!f2_L denning!3!f2_L));
+
+expected: valid;
+
+prog denning(f1_L, f2_L, f3_H, f4_H):
+//  i   := 1;
+//  n   := 0;
+//  sum := 0;
+  while (i <= 100) do
+    @inv { true }
+    @var { (- 100 i) }
+    flag := f1_L;
+//    f2_L := flag;
+//    x := f3_H;
+//    if (flag != 0) then
+//      n := n + 1;
+//      sum := sum + x;
+//    else
+//      skip;
+//    end
+    i := i + 1;
+  end
+//  f4_H := n + sum + (sum / n);
+endp

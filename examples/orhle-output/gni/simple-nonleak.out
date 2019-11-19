@@ -1,0 +1,21 @@
+*******************************************
+****               ORHLE               ****
+**** k-Liveness Hyperproperty Verifier ****
+*******************************************
+
+:: Executions
+  nonleak[1] (forall)
+  nonleak[2] (forall)
+  nonleak[3] (exists)
+
+:: Verification Conditions
+  (=> (and (= nonleak!1!high nonleak!3!high)
+           (= leakA!1!low leakA!2!low)
+           (= nonleak!2!low nonleak!3!low))
+      (and (= (- (+ nonleak!2!low nonleak!2!high) nonleak!2!high) nonleak!3!low)))
+
+Valid.
+
+real	0m0.199s
+user	0m0.202s
+sys	0m0.020s

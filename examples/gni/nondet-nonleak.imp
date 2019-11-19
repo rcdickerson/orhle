@@ -1,0 +1,36 @@
+// A program which has an unreachable execution path that would
+// leak high-security state.
+
+forall: nonleakA[1], nonleakA[2];
+exists: nonleakE[3];
+
+pre: (and
+       (= nonleakA!1!high nonleakE!3!high)
+       (= nonleakA!1!low  nonleakA!2!low)
+       (= nonleakA!2!low  nonleakE!3!low));
+post:  (= nonleakA!2!ret  nonleakE!3!ret);
+
+expected: valid;
+
+prog nonleakA(high, low):
+  r := call randInt()
+         @pre  { true }
+         @post { (and (>= r 0) (< r 100)) };
+  if (r == 5000) then
+    ret := high + low;
+  else
+    ret := low;
+  end
+endp
+
+prog nonleakE(high, low):
+  r := call randInt()
+         @templateVars { n }
+         @pre  { (and (>= n 0) (< n 100)) }
+         @post { (= r n) };
+  if (r == 50000) then
+    ret := high + low;
+  else
+    ret := low;
+  end
+endp

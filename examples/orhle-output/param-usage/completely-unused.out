@@ -1,0 +1,19 @@
+*******************************************
+****               ORHLE               ****
+**** k-Liveness Hyperproperty Verifier ****
+*******************************************
+
+:: Executions
+  unused[1] (exists)
+  unused[2] (exists)
+
+:: Verification Conditions
+  (=> (not (= unused!1!param unused!2!param)) (and false))
+
+Invalid. Model:
+  unused!1!param -> 0
+  unused!2!param -> 1
+
+real	0m0.202s
+user	0m0.199s
+sys	0m0.008s

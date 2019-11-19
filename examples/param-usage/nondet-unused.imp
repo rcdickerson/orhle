@@ -1,0 +1,30 @@
+// A non-deterministic program that doesn't use one of its parameters.
+
+exists:
+  unused[1A], unused[1B],
+  unused[2A], unused[2B];
+
+pre: (and
+        (not (= unused!1A!param1 unused!1B!param1))
+        (= unused!1A!param2 unused!1B!param2)
+        (= unused!2A!param1 unused!2B!param1)
+        (not (= unused!2A!param2 unused!2B!param2)));
+
+post: (and
+        (not (= unused!1A!ret unused!1B!ret))
+        (not (= unused!2A!ret unused!2B!ret)));
+
+expected: invalid;
+
+prog unused(param1, param2):
+  x := param1 + param2;
+  r := call flip()
+         @templateVars { n }
+         @pre  { (or (= n 0) (= n 1)) }
+         @post { (= r n) };
+  if (r == 0) then
+    ret := x - param2;
+  else
+    ret := param1;
+  end
+endp
