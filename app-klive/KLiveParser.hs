@@ -177,13 +177,38 @@ collateProgs execs namedProgs = foldr progExecFolder ([], [], return emptyFunSpe
       let prefix  = case (getExecId exec) of
                         Nothing  -> (getExecName exec) ++ "!"
                         Just eid -> (getExecName exec) ++ "!" ++ eid ++ "!"
-          prog    = case parseLoopSpecs $ prefixProgVars prefix pprog of
+          prog    = case parseLoopSpecs pprog of
               -- TODO: Pass up parse errors
               Left parseError -> error (show parseError)
-              Right prog      -> prog
+              Right z3Prog    -> prefixProgVars prefix =<< z3Prog
           z3Spec' = do spec     <- z3Spec
                        progSpec <- prefixSpec prefix =<< z3ProgSpec
                        return $ Map.union spec progSpec
       in case exec of
         (QEForall _ _) -> (prog:aProgs, eProgs,      z3Spec')
         (QEExists _ _) -> (aProgs,      prog:eProgs, z3Spec')
+
+prefixProgVars :: String -> Prog -> Z3 Prog
+prefixProgVars pre prog =
+  case prog of
+    SSkip          -> return $ SSkip
+    SAsgn var aexp -> return $ SAsgn  (pre ++ var) (prefixA aexp)
+    SSeq  stmts    -> do
+      pstmts <- mapM (prefixProgVars pre) stmts
+      return $ SSeq pstmts
+    SIf   cond s1 s2 -> do
+      ps1 <- prefixProgVars pre s1
+      ps2 <- prefixProgVars pre s2
+      return $ SIf (prefixB cond) ps1 ps2
+    SWhile cond body (inv, var, local) -> do
+      pinv  <- prefixASTVars pre inv
+      pvar  <- prefixASTVars pre var
+      pbody <- prefixProgVars pre body
+      return $ if local then SWhile (prefixB cond) pbody (pinv, pvar, local)
+                        else SWhile (prefixB cond) pbody (inv,  pvar, local)
+    SCall  var  (SFun fname fparams) -> return $ SCall (prefix var) $
+      SFun (prefix fname) (map prefix fparams)
+  where
+    prefix s = pre ++ s
+    prefixA = prefixAExpVars pre
+    prefixB = prefixBExpVars pre

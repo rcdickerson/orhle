@@ -30,8 +30,8 @@ module Orhle
     , parseLoopSpecs
     , parseSMT
     , prefixAExpVars
+    , prefixASTVars
     , prefixBExpVars
-    , prefixProgVars
     , prefixSpec
     , ppVTrace
     , putInterpMap
@@ -50,3 +50,4 @@ import Specification
 import Triples
 import Verifier
 import VTrace
+import Z3Util

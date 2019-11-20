@@ -16,7 +16,6 @@ module Imp
     , fsubst
     , prefixAExpVars
     , prefixBExpVars
-    , prefixProgVars
     , subAexp
     , subVar
     , svars
@@ -239,7 +238,7 @@ data AbsStmt a
   | SAsgn  Var AExp
   | SSeq   [AbsStmt a]
   | SIf    BExp (AbsStmt a) (AbsStmt a)
-  | SWhile BExp (AbsStmt a) (a, a)
+  | SWhile BExp (AbsStmt a) (a, a, Bool)
   | SCall  Var  SFun
   deriving (Eq, Ord, Show)
 
@@ -256,19 +255,3 @@ svars stmt = case stmt of
                                [(bvars cond), (svars bThen), (svars bElse)]
   SWhile cond body _      -> Set.union (bvars cond) (svars body)
   SCall  var  fun         -> Set.singleton var
-
-prefixProgVars :: String -> AbsStmt a -> AbsStmt a
-prefixProgVars pre prog =
-  case prog of
-    SSkip                 -> SSkip
-    SAsgn  var aexp       -> SAsgn  (pre ++ var) (prefixA aexp)
-    SSeq   stmts          -> SSeq $ map prefixP stmts
-    SIf    cond s1 s2     -> SIf    (prefixB cond) (prefixP s1) (prefixP s2)
-    SWhile cond body spec -> SWhile (prefixB cond) (prefixP body) spec
-    SCall  var  (SFun fname fparams) -> SCall (prefix var) $
-      SFun (prefix fname) (map prefix fparams)
-  where
-    prefix s = pre ++ s
-    prefixA = prefixAExpVars pre
-    prefixB = prefixBExpVars pre
-    prefixP = prefixProgVars pre

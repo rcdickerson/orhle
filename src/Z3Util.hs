@@ -4,6 +4,7 @@ module Z3Util
   , checkValid
   , mkFreshIntVars
   , maybeModelToString
+  , prefixASTVars
   , stringsToApps
   , substituteByName
   , symbolsToStrings
@@ -104,3 +105,9 @@ isBoolLit ast = do
 
 mkFreshIntVars :: [String] -> Z3 [AST]
 mkFreshIntVars vars = mapM mkFreshIntVar vars
+
+prefixASTVars :: String -> AST -> Z3 AST
+prefixASTVars prefix ast = do
+  vars <- symbolsToStrings =<< astFreeVars ast
+  let pvars = map (\v -> prefix ++ v) vars
+  substituteByName ast vars pvars

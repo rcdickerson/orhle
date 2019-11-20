@@ -95,15 +95,13 @@ parseLoopSpecs pprog =
       in case errors of
         (e:es)  -> Left  $ foldr mergeError e es
         []      -> Right $ do stmts <- sequence parsed; return $ SSeq stmts
-    SWhile cond body (inv, var) ->
-     do
-
-     case parseLoopSpecs body of
-      Left err    -> Left err
-      Right body' -> mergeZ3Parse (parseSMT inv) (parseSMT var)
-                     (\invAST varAST -> do
-                         body'' <- body'
-                         return $ SWhile cond body'' (invAST, varAST))
+    SWhile cond body (inv, var, local) -> do
+      case parseLoopSpecs body of
+        Left err    -> Left err
+        Right body' -> mergeZ3Parse (parseSMT inv) (parseSMT var)
+                       (\invAST varAST -> do
+                          body'' <- body'
+                          return $ SWhile cond body'' (invAST, varAST, local))
 
 mergeZ3Parse :: Either ParseError (Z3 a)
              -> Either ParseError (Z3 a)

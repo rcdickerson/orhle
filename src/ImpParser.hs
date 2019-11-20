@@ -33,6 +33,7 @@ languageDef = Token.LanguageDef
                             , "call", "skip"
                             , "true", "false"
                             , "@templateVars", "@pre", "@post", "@inv", "@var"
+                            , "local"
                             ]
   , Token.reservedOpNames = [ "+", "-", "*", "/", "%"
                             , "==", "!=", "<=", ">=", "<", ">"
@@ -104,10 +105,12 @@ whileStmt = do
   cond  <- bExpression
   whiteSpace
   reserved "do"
-  invariant <- option "true" $ do
+  (inv, local) <- option ("true", True) $ do
     reserved "@inv"
-    braces $ many $ noneOf "{}"
-  variant <- option "true" $ do
+    local <- option False $ do reserved "local"; return True
+    inv <- braces $ many $ noneOf "{}"
+    return (inv, local)
+  var <- option "true" $ do
     reserved "@var"
     braces $ many $ noneOf "{}"
   whiteSpace
@@ -117,7 +120,7 @@ whileStmt = do
   let bodySeq = case body of
                   (stmt:[]) -> stmt
                   _         -> SSeq body
-  let while = SWhile cond bodySeq (invariant, variant)
+  let while = SWhile cond bodySeq (inv, var, local)
   return while
 
 assignStmt :: ImpParser ParsedStmt
