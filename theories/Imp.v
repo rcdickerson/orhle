@@ -773,5 +773,4 @@ Section productive_Execution.
       eexists Q, (productive_Weaken _ _ _ _ _ _ (H1 _ _ H4) H1 x); eauto.
   Qed.
 
-
 End productive_Execution.
