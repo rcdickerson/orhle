@@ -1,0 +1,17 @@
+// A program that does not leak high-security state.
+
+forall: nonleak[1], nonleak[2];
+exists: nonleak[3];
+
+pre: (and
+       (= nonleak!1!high nonleak!3!high)
+       (= leakA!1!low    leakA!2!low)
+       (= nonleak!2!low  nonleak!3!low));
+post:  (= nonleak!2!ret  nonleak!3!ret);
+
+expected: valid;
+
+prog nonleak(high, low):
+  x   := low + high;
+  ret := x - high;
+endp

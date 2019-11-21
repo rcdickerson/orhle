@@ -1,0 +1,32 @@
+// A refinement involving a simple loop.
+
+forall: refinement;
+exists: original;
+
+post: (= original!sum refinement!sum);
+
+expected: valid;
+
+prog original():
+  sum := 0;
+  while (sum <= 100) do
+    @inv { (and (=> (<= original!sum 100) (and (< 100 refinement!sum) (< refinement!sum 110)))
+                (=> (< 100 original!sum) (= original!sum refinement!sum))) }
+    @var { (- 110 sum) }
+    r := call rand()
+           @templateVars { n }
+           @pre  { (and (<= 0 n) (< n 10)) }
+           @post { (= r n) };
+    sum := sum + r;
+  end
+endp
+
+prog refinement():
+  sum := 0;
+  while (sum <= 100) do
+    @inv { (and (<= 0 refinement!sum) (< refinement!sum 110)) }
+    r := call randOdd()
+           @post { (and (<= 0 r) (< r 10) (= (mod r 2) 1)) };
+    sum := sum + r;
+  end
+endp

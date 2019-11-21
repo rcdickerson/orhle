@@ -1,0 +1,32 @@
+// A refinement involving a simple conditional.
+
+forall: refinement;
+exists: original;
+
+pre:  true;
+post: (= original!ret refinement!ret);
+
+expected: valid;
+
+prog original():
+  r := call flipCoin()
+         @templateVars { n }
+         @pre  { (or (= n 0) (= n 1)) }
+         @post { (= r n) };
+  if (r == 0) then
+    ret := 10;
+  else
+    ret := 20;
+  end
+endp
+
+prog refinement():
+  r := call flipCoin()
+         @pre  { true }
+         @post { (or (= n 0) (= n 1)) };
+  if (r == 0) then
+    ret := 20;
+  else
+    ret := 10;
+  end
+endp

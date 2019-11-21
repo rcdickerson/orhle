@@ -1,0 +1,35 @@
+// A program which sometimes (but not always) leaks high-security state.
+
+forall: leakA[1], leakA[2];
+exists: leakE[3];
+
+pre: (and
+       (= leakA!1!high leakE!3!high)
+       (= leakA!1!low  leakA!2!low)
+       (= leakA!2!low  leakE!3!low));
+post:  (= leakA!2!ret  leakE!3!ret);
+
+expected: invalid;
+
+prog leakA(high, low):
+  r := call randInt()
+         @pre  { true }
+         @post { (and (>= r 0) (< r 100)) };
+  if (r == 50) then
+    ret := high + low;
+  else
+    ret := low;
+  end
+endp
+
+prog leakE(high, low):
+  r := call randInt()
+         @templateVars { n }
+         @pre  { (and (>= n 0) (< n 100)) }
+         @post { (= r n) };
+  if (r == 50) then
+    ret := high + low;
+  else
+    ret := low;
+  end
+endp

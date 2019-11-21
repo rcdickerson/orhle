@@ -1,11 +1,13 @@
 module Abduction
-    ( AbductionProblem
+    ( Abducible(..)
     , AbductionResult
     , abduce
-    , imapStrengthen
     ) where
 
-import Control.Monad (foldM)
+import AbdTrace
+import Abducible
+import Control.Monad.Trans
+import Control.Monad.Writer
 import Data.Foldable
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -16,31 +18,44 @@ import Simplify
 import Z3.Monad
 import Z3Util
 
-type AbductionProblem = ([Var], [AST], [AST])
-type AbductionResult  = Either String InterpMap
+--------------------------------------------------------------------------------
 
-imapStrengthen :: AST -> InterpMap -> AST -> Z3 AbductionResult
-imapStrengthen pre imap post = do
-  let vars  = Map.keys imap
-  freshPre <- foldM (\pre' -> uncurry $ subVar pre') pre =<< mapM freshen vars
-  abduce (vars, [freshPre], post:(Map.elems imap))
-  where
-    -- Fresh vars in the precondition effectively "forget" what we know
-    -- about the variables in the interpretation map. This ensures the
-    -- abduced replacement interpretations are sufficiently strong.
-    freshen v = mkFreshIntVar v >>= astToString >>= \fresh -> return (v, fresh)
+data AbductionProblem = AbductionProblem
+  { apAbducibles :: [Abducible]
+  , apPreCond    :: AST
+  , apPostCond   :: AST
+  } deriving (Show)
 
-abduce :: AbductionProblem -> Z3 AbductionResult
-abduce (vars, pres, posts) = do
-  consistencyCheck <- checkSat =<< mkAnd pres
+type AbductionResult = Either String InterpMap
+type TracedResult    = ATWriter Z3 AbductionResult
+
+--------------------------------------------------------------------------------
+
+abduce :: [Abducible] -> [AST] -> [AST] -> Z3 (AbductionResult, [AbdTrace])
+abduce abds pres posts = do
+  pre  <- mkAnd pres
+  post <- mkAnd posts
+  runWriterT $ tracedAbduce =<< flatten (AbductionProblem abds pre post)
+
+tracedAbduce :: AbductionProblem -> TracedResult
+tracedAbduce (AbductionProblem abds pre post) = do
+  logAbdStart (map show abds) pre post
+  (consistencyCheck, _) <- lift $ checkSat pre
   if not consistencyCheck
-    then return.Left $ "Preconditions are not consistent."
-    else do
-      result <- case vars of
-        []     -> noAbduction               pres posts
-        var:[] -> singleAbduction var [var] pres posts
-        _      -> multiAbduction  vars      pres posts
-      return result
+    then (\msg -> logAbdFailure msg >>= (return.return.Left $ msg))
+      "Preconditions are not consistent."
+    else case abds of
+        []     -> noAbduction          pre post
+        abd:[] -> singleAbduction abd  pre post
+        _      -> multiAbduction  abds pre post
+
+flatten :: AbductionProblem -> ATWriter Z3 AbductionProblem
+flatten (AbductionProblem abds pre post) = do
+  freshVarMap <- lift $ fvmFromAbducibles abds
+  pre'        <- lift $ fvmFlatten freshVarMap pre
+  post'       <- lift $ fvmFlatten freshVarMap post
+  logAbdFlatten "Precond" pre pre' >> logAbdFlatten "Postcond" post post'
+  return $ AbductionProblem (Set.toList $ fvmFreshAbds freshVarMap) pre' post'
 
 filterVars :: [Symbol] -> [Var] -> Z3 [Symbol]
 filterVars symbols vars = do
@@ -49,94 +64,144 @@ filterVars symbols vars = do
   let filteredStrs = filter notInVars symbolStrs
   mapM mkStringSymbol filteredStrs
 
-noAbduction :: [AST] -> [AST] -> Z3 AbductionResult
-noAbduction conds posts = do
-  condAST <- mkAnd conds
-  postAST <- mkAnd posts
-  imp     <- mkImplies condAST postAST
-  vars    <- astVars imp
-  sat     <- checkSat =<< performQe vars imp
+noAbduction :: AST -> AST -> TracedResult
+noAbduction pre post = do
+  logAbdMessage "No variables to abduce over; using simplified pre => post."
+  imp      <- lift $ mkImplies pre post
+  simpl    <- lift $ simplifyWrt pre imp
+  logAbdFormula "Simplified implication" simpl
+  (sat, _) <- lift $ checkSat simpl
   if sat
     then return.Right $ emptyIMap
-    else return.Left  $ "Preconditions do not imply postconditions."
+    else return.Left  $ "Preconditions are inconsistent with postconditions."
 
-singleAbduction :: String -> [Var] -> [AST] -> [AST]
-                -> Z3 AbductionResult
-singleAbduction name vars conds posts = do
-  condAST    <- mkAnd conds
-  postAST    <- mkAnd posts
-  imp        <- mkImplies condAST postAST
-  impVars    <- astVars imp
-  vbar       <- filterVars impVars vars
-  msaVars    <- findMsaVars imp vbar
-  qeRes      <- performQe msaVars imp
-  qeResSimpl <- simplifyWrt condAST qeRes
-  sat        <- checkSat qeResSimpl
+singleAbduction :: Abducible -> AST -> AST -> TracedResult
+singleAbduction abd@(Abducible abdName abdParams) pre post = do
+  logAbdMessage $ "Performing single abduction for " ++ abdName
+  imp           <- lift $ mkImplies pre post
+  logAbdFormula "Initial implication" imp
+  freeVars      <- lift $ astFreeVars imp
+  freeVarStrs   <- lift $ sequence $ map getSymbolString freeVars
+  logAbdMessage $ "Formula variables: " ++ (show freeVarStrs)
+  vbar          <- lift $ filterVars freeVars abdParams
+  vbarStrs      <- lift $ symbolsToStrings vbar
+  logAbdMessage $ "Candidate variables for MUS: " ++ (show vbarStrs)
+  musVars       <- lift $ findMusVars imp vbar
+  musVarStrs    <- lift $ symbolsToStrings musVars
+  logAbdMessage $ "MUS Vars: " ++ (show musVarStrs)
+  qeRes         <- lift $ performQe musVars imp
+  logAbdFormula "QE Result" qeRes
+  qeResSimpl    <- lift $ simplifyWrt pre qeRes
+  logAbdFormula "Simplified QE Result" qeResSimpl
+  (sat, _)      <- lift $ checkSat qeResSimpl
   case sat of
     False -> return.Left  $ "No satisfying abduction found."
-    True  -> return.Right $ Map.insert name qeResSimpl emptyIMap
+    True  -> return.Right $ Map.insert abd qeResSimpl emptyIMap
 
-multiAbduction :: [Var] -> [AST] -> [AST] -> Z3 AbductionResult
-multiAbduction vars conds posts = do
-  let combinedDuc = "_combined"
-  combinedResult <- singleAbduction combinedDuc vars conds posts
+multiAbduction :: [Abducible] -> AST -> AST -> TracedResult
+multiAbduction abds pre post = do
+  logAbdMessage $ "Performing multiabduction over " ++ (show $ map abdName abds)
+  combinedAbd    <- lift $ combineAbducibles abds
+  combinedResult <- singleAbduction combinedAbd pre post
   case combinedResult of
     Left  err  -> return.Left $ err
-    Right imap -> cartDecomp vars conds (imap Map.! combinedDuc)
+    Right imap -> cartDecomp abds pre (imap Map.! combinedAbd)
 
-cartDecomp :: [Var] -> [AST] -> AST -> Z3 AbductionResult
-cartDecomp vars conds combinedResult = do
-  initMap <- initSolution vars conds combinedResult
-  foldlM (replaceWithDecomp combinedResult) initMap vars
+combineAbducibles :: [Abducible] -> Z3 Abducible
+combineAbducibles abds = do
+  let vars = foldr insertAbd Set.empty abds
+  return $ Abducible "_combined_abducible" $ Set.toList vars
+    where insertAbd (Abducible _ vars) varSet = foldr Set.insert varSet vars
+
+cartDecomp :: [Abducible] -> AST -> AST -> TracedResult
+cartDecomp abds pre combinedResult = do
+  logAbdMessage "! Cartesian Decomposition"
+  logAbdMessage $ "Abducibles: " ++ (show abds)
+  logAbdFormula "Precondition" pre
+  logAbdFormula "Combined Result" combinedResult
+  initMap <- lift $ initSolution abds pre combinedResult
+  foldlM (replaceWithDecomp combinedResult) initMap abds
   where
-    replaceWithDecomp :: AST -> AbductionResult -> Var -> Z3 AbductionResult
+    replaceWithDecomp :: AST -> AbductionResult -> Abducible -> TracedResult
     replaceWithDecomp _    (Left err)   _   = return.Left $ err
-    replaceWithDecomp post (Right imap) var = do
-      decResult <- (decompose post) var imap
+    replaceWithDecomp post (Right imap) abd = do
+      decResult <- (decompose post) abd imap
       case decResult of
         Left  err -> return.Left  $ err
         Right dec -> return.Right $ Map.union dec imap
-    decompose :: AST -> Var -> InterpMap -> Z3 AbductionResult
-    decompose post var imap = do
-      let complement = Map.withoutKeys imap $ Set.singleton var
-      ires <- abduce ([var], map snd $ Map.toList complement, [post])
+    decompose :: AST -> Abducible -> InterpMap -> TracedResult
+    decompose post abd imap = do
+      let complement = Map.withoutKeys imap $ Set.singleton abd
+      pre' <- lift $ mkAnd (map snd $ Map.toList complement)
+      ires <- tracedAbduce $ AbductionProblem [abd] pre' post
       case ires of
-        Left  err   -> return.Left $ "Unable to decompose " ++ (show combinedResult)
-                       ++ ": " ++ err
+        Left  err   -> return.Left $
+          "Unable to decompose " ++ (show combinedResult) ++ ": " ++ err
         Right imap' -> return.Right $ imap'
 
-initSolution :: [Var] -> [AST] -> AST -> Z3 AbductionResult
-initSolution vars conds combinedResult = do
-  condAST  <- mkAnd conds
-  modelRes <- modelAST =<< mkAnd [condAST, combinedResult]
+initSolution :: [Abducible] -> AST -> AST -> Z3 AbductionResult
+initSolution abds pre combinedResult = do
+  modelRes <- modelAST =<< mkAnd [pre, combinedResult]
   case modelRes of
     Left  err   -> return.Left $ err
-    Right model -> foldlM (getInterp model) (Right Map.empty) vars
+    Right model -> foldlM (getAbdInterp model) (Right Map.empty) abds
   where
-    getInterp :: Model -> AbductionResult -> Var -> Z3 AbductionResult
-    getInterp _     (Left  err)  _   = return.Left $ err
-    getInterp model (Right imap) var = do
+    getAbdInterp :: Model -> AbductionResult -> Abducible -> Z3 AbductionResult
+    getAbdInterp _     (Left  err)  _   = return.Left $ err
+    getAbdInterp model (Right imap) abd = do
+      varInterps <- mapM (getVarInterp model) (abdParams abd)
+      case foldr eitherCons (Right []) varInterps of
+        Left err -> return.Left $ err
+        Right asts -> do
+          interp <- mkAnd asts
+          return.Right $ Map.insert abd interp imap
+    ----
+    eitherCons :: (Either String AST) -> (Either String [AST]) -> (Either String [AST])
+    eitherCons (Left err)  _           = Left err
+    eitherCons _           (Left err)  = Left err
+    eitherCons (Right ast) (Right lst) = Right (ast:lst)
+    ----
+    getVarInterp :: Model -> Var -> Z3 (Either String AST)
+    getVarInterp model var = do
       varSymb <- mkStringSymbol $ var
       varDecl <- mkFuncDecl varSymb [] =<< mkIntSort
       interp  <- getConstInterp model varDecl
       case interp of
-        Nothing -> return.Left $ "Unable to model value for " ++ var
-        Just v  -> do
-          eqv <- mkEq v =<< aexpToZ3 (V $ var)
-          return.Right $ Map.insert var eqv imap
+        Nothing -> return.Left  $  "Unable to model value for " ++ var
+        Just v  -> return.Right =<< mkEq v =<< aexpToZ3 (AVar $ var)
 
 
 performQe :: [Symbol] -> AST -> Z3 AST
-performQe [] formula = return formula
+performQe [] formula = do
+  dummy <- mkFreshConst "dummy" =<< mkIntSort
+  dummySymbol <- mkStringSymbol =<< astToString dummy
+  result <- performQe [dummySymbol] =<< simplify formula
+--  resultStr <- astToString result
+--  formulaStr <- astToString formula
+--  simplFormulaStr <- astToString =<< simplify formula
+--  traceM $ "QE with dummy var before: " ++ formulaStr
+--  traceM $ "QE with dummy var before (simplified): " ++ simplFormulaStr
+--  traceM $ "QE with dummy var: " ++ resultStr
+  return result
 performQe vars formula = do
+--  formulaStr <- astToString formula
+--  traceM $ "formula: " ++ formulaStr
+--  assumptions <- solverCheckAssumptions [formula]
+--  traceM $ "Assumptions: " ++ (show assumptions)
+--  unsatCore <- astToString =<< mkAnd =<< solverGetUnsatCore
+--  traceM $ "Unsat Core: " ++ unsatCore
   push
   intVars  <- mapM mkIntVar vars
   appVars  <- mapM toApp intVars
   qf       <- mkForallConst [] appVars formula
+--  qfStr <- astToString qf
+--  traceM $ "QE: " ++ qfStr
   goal     <- mkGoal False False False
   goalAssert goal qf
-  qe       <- mkTactic "qe"
+  qe       <- mkQuantifierEliminationTactic
   qeResult <- applyTactic qe goal
+--  numSubgoals <- getApplyResultNumSubgoals qeResult
+--  traceM $ "num subgoals: " ++ (show numSubgoals)
   subgoals <- getApplyResultSubgoals qeResult
   formulas <- mapM getGoalFormulas subgoals
   pop 1
