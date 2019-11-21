@@ -161,7 +161,7 @@ funcStmt = do
     braces $ many $ noneOf "{}"
   whiteSpace
   semi
-  let func = SFun funcName params
+  let func = SFun funcName []
   get >>= \spec -> put $ addFunSpec func tvars pre post spec
   return $ SCall assignees func
 
