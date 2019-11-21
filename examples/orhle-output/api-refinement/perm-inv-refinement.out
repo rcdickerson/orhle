@@ -1,0 +1,59 @@
+*******************************************
+****               ORHLE               ****
+**** k-Liveness Hyperproperty Verifier ****
+*******************************************
+
+:: Executions
+  refinement (forall)
+  original (exists)
+
+:: Verification Conditions
+  (=> (or (and (= original!list_0 refinement!list_0)
+               (= original!list_1 refinement!list_1)
+               (= original!list_2 refinement!list_2))
+          (and (= original!list_0 refinement!list_0)
+               (= original!list_1 refinement!list_2)
+               (= original!list_2 refinement!list_1))
+          (and (= original!list_0 refinement!list_1)
+               (= original!list_1 refinement!list_0)
+               (= original!list_2 refinement!list_2))
+          (and (= original!list_0 refinement!list_1)
+               (= original!list_1 refinement!list_2)
+               (= original!list_2 refinement!list_0))
+          (and (= original!list_0 refinement!list_2)
+               (= original!list_1 refinement!list_0)
+               (= original!list_2 refinement!list_1))
+          (and (= original!list_0 refinement!list_2)
+               (= original!list_1 refinement!list_1)
+               (= original!list_2 refinement!list_0)))
+      (and true
+           (=> true
+               (and (exists ((original!n0 Int)
+                             (original!n1 Int)
+                             (original!n2 Int))
+                      (and (<= original!n0 original!n1)
+                           (<= original!n1 original!n2)
+                           (exists ((original!list_0!0 Int)
+                                    (original!list_1!1 Int)
+                                    (original!list_2!2 Int))
+                             (and (= original!n0 original!list_0!0)
+                                  (= original!n1 original!list_1!1)
+                                  (= original!n2 original!list_2!2)))
+                           (forall ((original!list_0!0 Int)
+                                    (original!list_1!1 Int)
+                                    (original!list_2!2 Int))
+                             (or (not (and (= original!n0 original!list_0!0)
+                                           (= original!n1 original!list_1!1)
+                                           (= original!n2 original!list_2!2)))
+                                 (= (+ original!list_0!0
+                                       original!list_1!1
+                                       original!list_2!2)
+                                    (+ refinement!list_0
+                                       refinement!list_1
+                                       refinement!list_2))))))))))
+
+Valid.
+
+real	0m0.317s
+user	0m0.294s
+sys	0m0.044s

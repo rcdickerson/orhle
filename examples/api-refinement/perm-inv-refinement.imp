@@ -1,0 +1,46 @@
+// Dropping a sort guarantee from an API is OK when
+// the caller performs some operation that doesn't
+// care about list order.
+
+forall: refinement;
+exists: original;
+
+pre: (or
+       (and (= original!list_0 refinement!list_0)
+            (= original!list_1 refinement!list_1)
+            (= original!list_2 refinement!list_2))
+       (and (= original!list_0 refinement!list_0)
+            (= original!list_1 refinement!list_2)
+            (= original!list_2 refinement!list_1))
+       (and (= original!list_0 refinement!list_1)
+            (= original!list_1 refinement!list_0)
+            (= original!list_2 refinement!list_2))
+       (and (= original!list_0 refinement!list_1)
+            (= original!list_1 refinement!list_2)
+            (= original!list_2 refinement!list_0))
+       (and (= original!list_0 refinement!list_2)
+            (= original!list_1 refinement!list_0)
+            (= original!list_2 refinement!list_1))
+       (and (= original!list_0 refinement!list_2)
+            (= original!list_1 refinement!list_1)
+            (= original!list_2 refinement!list_0)));
+post: (= original!sum refinement!sum);
+
+expected: valid;
+
+prog original():
+   // The original API call guarantees an ordered list.
+   list[3] := call getThreeThings()
+       @templateVars { n0, n1, n2 }
+       @pre  { (and (<= n0 n1) (<= n1 n2)) }
+       @post { (and (= n0 list_0) (= n1 list_1) (= n2 list_2)) };
+   sum := list_0 + list_1 + list_2;
+endp
+
+prog refinement():
+   // The refinement makes no guarantees. This is OK
+   // because the sum of the list is the same regardless
+   // of ordering.
+   list := call getThreeThings();
+   sum := list_0 + list_1 + list_2;
+endp

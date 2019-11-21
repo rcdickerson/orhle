@@ -133,7 +133,16 @@ assignStmt = do
 
 funcStmt :: ImpParser ParsedStmt
 funcStmt = do
-  assignee <- identifier
+  (assignee, num) <- try (do
+                             id <- identifier
+                             char '[' >> whiteSpace
+                             num <- integer
+                             char ']' >> whiteSpace
+                             return (id, num))
+                     <|> (do id <- identifier; return (id, 0))
+  let assignees = if (num == 0)
+                  then [assignee]
+                  else map (\n -> assignee ++ "_" ++ (show n)) [0..(num-1)]
   reservedOp ":="
   reserved "call"
   funcName <- identifier
@@ -154,7 +163,7 @@ funcStmt = do
   semi
   let func = SFun funcName params
   get >>= \spec -> put $ addFunSpec func tvars pre post spec
-  return $ SCall assignee func
+  return $ SCall assignees func
 
 skipStmt :: ImpParser ParsedStmt
 skipStmt = reserved "skip" >> semi >> return SSkip
