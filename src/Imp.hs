@@ -239,7 +239,7 @@ data AbsStmt a
   | SSeq   [AbsStmt a]
   | SIf    BExp (AbsStmt a) (AbsStmt a)
   | SWhile BExp (AbsStmt a) (a, a, Bool)
-  | SCall  Var  SFun
+  | SCall  [Var]  SFun
   deriving (Eq, Ord, Show)
 
 type Stmt       = AbsStmt AST
@@ -254,4 +254,4 @@ svars stmt = case stmt of
   SIf    cond bThen bElse -> Set.unions
                                [(bvars cond), (svars bThen), (svars bElse)]
   SWhile cond body _      -> Set.union (bvars cond) (svars body)
-  SCall  var  fun         -> Set.singleton var
+  SCall  var  _           -> Set.fromList var

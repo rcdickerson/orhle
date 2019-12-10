@@ -155,23 +155,23 @@ generateVCs stmt post quant funs = case stmt of
         endVC  <- mkForallConst [] progVars
                   =<< mkImplies ncondAndInv post
         return ([inv, loopVC, endVC], abdsBody)
-  SCall assignee f ->
+  SCall assignees f ->
     case quant of
       VCUniversal -> do
-        (_, fPre, fPost, abds) <- specOrAbducibles assignee f funs
+        (_, fPre, fPost, abds) <- specOrAbducibles assignees f funs
         postImp <- mkImplies fPost post
         vc      <- mkAnd [fPre, postImp]
         return ([vc], abds)
       VCExistential -> do
-        asgnAst      <- mkIntVar =<< mkStringSymbol assignee
-        frAsgnAst    <- mkFreshIntVar assignee
-        frAsgnVar    <- astToString frAsgnAst
-        frAsgnApp    <- toApp frAsgnAst
-        (tvars, fPre, fPost, abds) <- specOrAbducibles frAsgnVar f funs
-        frPost       <- substitute post [asgnAst] [frAsgnAst]
-        frFPost      <- substitute fPost [asgnAst] [frAsgnAst]
-        existsPost   <- mkExistsConst [] [frAsgnApp] frFPost
-        forallPost   <- mkForallConst [] [frAsgnApp] =<< mkImplies frFPost frPost
+        asgnAsts     <- mapM (\a -> do mkIntVar =<< mkStringSymbol a) assignees
+        frAsgnAsts   <- mapM mkFreshIntVar assignees
+        frAsgnVars   <- mapM astToString frAsgnAsts
+        frAsgnApps   <- mapM toApp frAsgnAsts
+        (tvars, fPre, fPost, abds) <- specOrAbducibles frAsgnVars f funs
+        frPost       <- substitute post asgnAsts frAsgnAsts
+        frFPost      <- substitute fPost asgnAsts frAsgnAsts
+        existsPost   <- mkExistsConst [] frAsgnApps frFPost
+        forallPost   <- mkForallConst [] frAsgnApps =<< mkImplies frFPost frPost
         let vcs = [fPre, existsPost, forallPost]
         stringsToApps tvars >>= \tvarApps ->
           case tvarApps of
@@ -180,8 +180,8 @@ generateVCs stmt post quant funs = case stmt of
               quantVcs <- mkExistsConst [] tvarApps =<< mkAnd vcs
               return ([quantVcs], abds)
 
-specOrAbducibles :: Var -> SFun -> ASTFunSpec -> Z3 ([Var], AST, AST, Set.Set Abducible)
-specOrAbducibles assignee fun@(SFun name args) spec =
+specOrAbducibles :: [Var] -> SFun -> ASTFunSpec -> Z3 ([Var], AST, AST, Set.Set Abducible)
+specOrAbducibles assignees fun@(SFun name args) spec =
   case lookupFunSpec fun spec of
       Just (tvars, pre, post) -> return (tvars, pre, post, Set.empty)
       Nothing -> do
@@ -189,7 +189,7 @@ specOrAbducibles assignee fun@(SFun name args) spec =
         fPostAbd <- mkBoolVar =<< mkStringSymbol fPostVar
         return ([], fPreAbd, fPostAbd, Set.fromList
                 [ Abducible fPreVar args
-                , Abducible fPostVar $ assignee:args ])
+                , Abducible fPostVar $ assignees ++ args ])
           where
             fPreVar  = name ++ "_pre"
             fPostVar = name ++ "_post"

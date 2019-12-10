@@ -146,8 +146,9 @@ ppStmtStart stmt =
       condStr <- astToString =<< bexpToZ3 cond
       bodyStr <- ppStmtStart body
       return $ "while " ++ condStr ++ " do " ++ bodyStr ++ " end"
-    SCall v (SFun name params) -> do
-      return $ v ++ " := " ++ name ++ "(" ++ (intercalate ", " params) ++ ")"
+    SCall assignees (SFun name params) -> do
+      let astr = "(" ++ (intercalate ", " assignees) ++ ")"
+      return $ astr ++ " := " ++ name ++ "(" ++ (intercalate ", " params) ++ ")"
 
 kindStr :: VTKind -> String
 kindStr VTKindA = "A"

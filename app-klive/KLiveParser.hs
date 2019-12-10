@@ -206,7 +206,7 @@ prefixProgVars pre prog =
       pbody <- prefixProgVars pre body
       return $ if local then SWhile (prefixB cond) pbody (pinv, pvar, local)
                         else SWhile (prefixB cond) pbody (inv,  pvar, local)
-    SCall  var  (SFun fname fparams) -> return $ SCall (prefix var) $
+    SCall vars (SFun fname fparams) -> return $ SCall (map prefix vars) $
       SFun (prefix fname) (map prefix fparams)
   where
     prefix s = pre ++ s
