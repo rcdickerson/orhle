@@ -1,31 +1,28 @@
 module Orhle
-    ( AbductionResult
-    , AbsStmt(..)
+    ( AbsStmt(..)
     , AExp(..)
-    , ASTFunSpec
+    , ASTFunSpecMap
     , BExp(..)
     , HLTrip(..)
     , HLETrip(..)
-    , InterpMap
     , ParsedProg
     , ParsedStmt
     , Prog
     , RHLETrip(..)
-    , FunSpec
+    , FunSpec(..)
+    , FunSpecMap
+    , FunSpecMaps(..)
     , Stmt
     , SFun(..)
-    , StringFunSpec
+    , StringFunSpecMap
     , Var
     , Verifier
-    , VResult
-    , VTrace
-    , abduce
+    , VerifierResult
     , addFunSpec
     , aexpToZ3
     , emptyFunSpec
     , impParser
     , mkRHLETrip
-    , noAbdVerifier
     , parseImp
     , parseLoopSpecs
     , parseSMT
@@ -34,20 +31,17 @@ module Orhle
     , prefixBExpVars
     , prefixSpec
     , ppVTrace
-    , putInterpMap
+    , rhleVerifier
     , runVerifier
-    , singleAbdVerifier
     , smtParser
     , stringToASTSpec
     ) where
 
-import Abduction
 import Imp
 import ImpParser
-import InterpMap
 import SMTParser
-import Specification
+import Spec
 import Triples
 import Verifier
-import VTrace
+import VerifierTrace
 import Z3Util

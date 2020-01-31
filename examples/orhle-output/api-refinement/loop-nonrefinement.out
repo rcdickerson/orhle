@@ -1,3 +1,6 @@
+/home/rcd/code/orhle/orhle.cabal was modified manually. Ignoring /home/rcd/code/orhle/package.yaml in favor of the cabal file.
+If you want to use the package.yaml file instead of the cabal file,
+then please delete the cabal file.
 *******************************************
 ****               ORHLE               ****
 **** k-Liveness Hyperproperty Verifier ****
@@ -61,6 +64,6 @@
 Invalid. Model:
 
 
-real	0m0.206s
-user	0m0.209s
-sys	0m0.010s
+real	0m0.204s
+user	0m0.195s
+sys	0m0.023s

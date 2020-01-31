@@ -26,7 +26,9 @@ dependencies:
 - z3 >= 408.0 && < 409
 
 library:
-  source-dirs: src
+  source-dirs:
+    - src
+    - src/abduction
 
 executables:
   klive-exe:

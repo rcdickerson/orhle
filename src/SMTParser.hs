@@ -85,9 +85,9 @@ parseSMTOrError smt =
 parseLoopSpecs :: ParsedProg -> Either ParseError (Z3 Prog)
 parseLoopSpecs pprog =
   case pprog of
-    SSkip             -> Right . return $ SSkip
-    SAsgn var aexp    -> Right . return $ (SAsgn var aexp)
-    SCall var fun     -> Right . return $ (SCall var fun)
+    SSkip                -> Right . return $ SSkip
+    SAsgn var aexp       -> Right . return $ (SAsgn var aexp)
+    SCall ret params fun -> Right . return $ (SCall ret params fun)
     SIf    cond s1 s2 -> mergeZ3Parse (parseLoopSpecs s1) (parseLoopSpecs s2)
                          (\s1' s2' -> return $ SIf cond s1' s2')
     SSeq   stmts      ->

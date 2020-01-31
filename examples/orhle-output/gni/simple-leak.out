@@ -1,27 +1,16 @@
+/home/rcd/code/orhle/orhle.cabal was modified manually. Ignoring /home/rcd/code/orhle/package.yaml in favor of the cabal file.
+If you want to use the package.yaml file instead of the cabal file,
+then please delete the cabal file.
 *******************************************
 ****               ORHLE               ****
 **** k-Liveness Hyperproperty Verifier ****
 *******************************************
 
-:: Executions
-  leak[1] (forall)
-  leak[2] (forall)
-  leak[3] (exists)
+(line 3, column 1):
+unexpected "f"
+expecting "expected"
 
-:: Verification Conditions
-  (=> (and (= leak!1!high leak!3!high)
-           (= leak!1!low leak!2!low)
-           (= leak!2!low leak!3!low))
-      (and (= (+ leak!2!high leak!2!low) (+ leak!3!high leak!3!low))))
 
-Invalid. Model:
-  leak!1!high -> 0
-  leak!1!low -> 2
-  leak!2!high -> (- 1)
-  leak!2!low -> 2
-  leak!3!high -> 0
-  leak!3!low -> 2
-
-real	0m0.208s
-user	0m0.195s
-sys	0m0.021s
+real	0m0.179s
+user	0m0.163s
+sys	0m0.012s
