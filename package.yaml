@@ -28,7 +28,6 @@ dependencies:
 library:
   source-dirs:
     - src
-    - src/abduction
 
 executables:
   klive-exe:
