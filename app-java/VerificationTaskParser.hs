@@ -1,7 +1,7 @@
-module InstructionsParser
-  ( Instructions(..)
+module VerificationTaskParser
+  ( VerificationTask(..)
   , Execution(..)
-  , parseInstructions
+  , parseVerificationTask
   )
 where
 
@@ -10,11 +10,11 @@ import           Text.Parsec
 import           Text.Parsec.Language
 import qualified Text.Parsec.Token             as Token
 
-data Instructions = Instructions
-  { iForallExecs :: [Execution]
-  , iExistsExecs :: [Execution]
-  , iPostCond    :: Maybe String
-  , iPreCond     :: Maybe String
+data VerificationTask = VerificationTask
+  { vtForallExecs :: [Execution]
+  , vtExistsExecs :: [Execution]
+  , vtPostCond    :: Maybe String
+  , vtPreCond     :: Maybe String
   }
   deriving (Show)
 
@@ -50,13 +50,13 @@ semi = Token.semi lexer
 whiteSpace = Token.whiteSpace lexer
 
 
-type KLiveParser a = Parsec String () a
+type VTParser a = Parsec String () a
 
-parseInstructions :: String -> Either ParseError Instructions
-parseInstructions = runParser instructionsParser () ""
+parseVerificationTask :: String -> Either ParseError VerificationTask
+parseVerificationTask = runParser verificationTaskParser () ""
 
-instructionsParser :: KLiveParser Instructions
-instructionsParser = do
+verificationTaskParser :: VTParser VerificationTask
+verificationTaskParser = do
   whiteSpace
   aExecs <- option [] $ try $ execs "forall"
   whiteSpace
@@ -69,15 +69,15 @@ instructionsParser = do
     reserved "post" >> whiteSpace >> char ':' >> whiteSpace
     condition
   whiteSpace
-  return $ Instructions aExecs eExecs preCond postCond
+  return $ VerificationTask aExecs eExecs preCond postCond
 
-condition :: KLiveParser String
+condition :: VTParser String
 condition = do
   smtStr <- manyTill anyChar (try $ char ';')
   whiteSpace
   return smtStr
 
-execs :: String -> KLiveParser [Execution]
+execs :: String -> VTParser [Execution]
 execs keyword = do
   reserved keyword >> whiteSpace
   char ':' >> whiteSpace
@@ -94,7 +94,7 @@ execs keyword = do
   char ';' >> whiteSpace
   return execs
 
-execSubscriptParser :: KLiveParser String
+execSubscriptParser :: VTParser String
 execSubscriptParser = do
   whiteSpace >> char '[' >> whiteSpace
   eid <- many1 alphaNum

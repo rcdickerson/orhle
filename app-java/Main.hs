@@ -15,20 +15,20 @@ import qualified Data.Map.Strict               as Map
 
 import qualified Language.Java.Parser          as JavaParser
 import qualified Language.Java.Syntax          as JavaSyntax
-import           InstructionsParser
+import           VerificationTaskParser
 
 main :: IO ()
 main = (>>= reportResult) $ runExceptT $ do
-  args              <- liftIO getArgs
-  instrFilePath     <- parseArgs args
-  instrFileContents <- liftIO $ readFile instrFilePath
-  instructions <- liftEither $ left show $ parseInstructions instrFileContents
-  liftIO $ print instructions
+  args           <- liftIO getArgs
+  vtFilePath     <- parseArgs args
+  vtFileContents <- liftIO $ readFile vtFilePath
+  verifTask <- liftEither $ left show $ parseVerificationTask vtFileContents
+  liftIO $ print verifTask
   let programNames =
         Set.fromList
           . map execProgramName
-          $ (iForallExecs instructions ++ iExistsExecs instructions)
-  programs <- sequence $ Map.fromSet (readJavaFile instrFilePath) programNames
+          $ (vtForallExecs verifTask ++ vtExistsExecs verifTask)
+  programs <- sequence $ Map.fromSet (readJavaFile vtFilePath) programNames
   liftIO $ print programs
   return ()
  where
@@ -42,11 +42,11 @@ parseArgs _          = liftIO showUsage >> throwError "no filename provided"
 showUsage :: IO ()
 showUsage = do
   progName <- getProgName
-  putStrLn ("Usage: " ++ progName ++ " <instructions.jklive>")
+  putStrLn ("Usage: " ++ progName ++ " <verificationTask.jklive>")
 
 readJavaFile :: String -> String -> ExceptT String IO JavaSyntax.CompilationUnit
-readJavaFile instrFilePath programName = do
-  let filePath = replaceFileName instrFilePath (programName ++ ".java")
+readJavaFile vtFilePath programName = do
+  let filePath = replaceFileName vtFilePath (programName ++ ".java")
   fileContents <- liftIO $ readFile filePath
   liftEither
     $ left ((("could not parse Java file `" ++ filePath ++ "`:\n") ++) . show)
