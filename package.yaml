@@ -50,6 +50,7 @@ executables:
     - orhle
     - language-java
     - filepath
+    - lens
 
 tests:
   orhle-test:

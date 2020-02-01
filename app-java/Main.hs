@@ -7,6 +7,7 @@ import           Control.Monad.Except           ( ExceptT
                                                 , liftIO
                                                 , liftEither
                                                 , throwError
+                                                , forM_
                                                 )
 import           Control.Arrow                  ( left )
 import           System.FilePath                ( replaceFileName )
@@ -16,6 +17,7 @@ import qualified Data.Map.Strict               as Map
 import qualified Language.Java.Parser          as JavaParser
 import qualified Language.Java.Syntax          as JavaSyntax
 import           VerificationTaskParser
+import           Translate
 
 main :: IO ()
 main = (>>= reportResult) $ runExceptT $ do
@@ -28,9 +30,11 @@ main = (>>= reportResult) $ runExceptT $ do
         Set.fromList
           . map execProgramName
           $ (vtForallExecs verifTask ++ vtExistsExecs verifTask)
-  programs <- sequence $ Map.fromSet (readJavaFile vtFilePath) programNames
-  liftIO $ print programs
-  return ()
+  javaPrograms <- sequence $ Map.fromSet (readJavaFile vtFilePath) programNames
+  impPrograms <- liftEither $ mapM translate javaPrograms
+  forM_ (Map.toList impPrograms) $ \(name, prog) -> do
+    liftIO $ putStrLn name
+    liftIO $ print prog
  where
   reportResult (Left  err) = putStrLn $ "Error: " ++ err
   reportResult (Right () ) = return ()
