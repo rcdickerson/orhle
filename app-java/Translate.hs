@@ -13,6 +13,7 @@ import           Data.Maybe                     ( mapMaybe )
 import           Control.Monad                  ( forM
                                                 , mapM_
                                                 , (<=<)
+                                                , void
                                                 )
 import           Control.Monad.Except           ( ExceptT
                                                 , MonadError
@@ -28,11 +29,12 @@ import           Control.Monad.State            ( State
                                                 , runState
                                                 , modify
                                                 )
+import           Control.Lens                   ( makeLenses )
 
 import qualified Language.Java.Syntax          as J
 import qualified Imp                           as I
 
-import           Control.Lens
+import           Control.Lens.Operators
 
 --
 -- Data types
@@ -105,6 +107,13 @@ translateStmt :: J.Stmt -> TransBody ()
 translateStmt (J.Return (Just jExp)) = do
   retExp <- translateExp jExp
   tbsStmts %= (++ [I.SAsgn "return" retExp])
+translateStmt (J.IfThenElse jCond jThen jElse) = do
+  cond        <- translateBExp jCond
+  (iThen, ()) <- inBlock (translateStmt jThen)
+  (iElse, ()) <- inBlock (translateStmt jElse)
+  tbsStmts %= (++ [I.SIf cond (I.SSeq iThen) (I.SSeq iElse)])
+translateStmt (J.StmtBlock (J.Block jStmts)) = mapM_ translateBlockStmt jStmts
+translateStmt (J.ExpStmt jExp) = void (translateExp jExp)
 translateStmt s = throwError ("unsupported statement: " ++ show s)
 
 -- TODO: we probably want to support more than only expressions of type int
@@ -122,8 +131,32 @@ translateExp (J.MethodInv (J.MethodCall jMethodName jArgs)) = do
  where
   translateMethodName :: J.Name -> TransBody String
   translateMethodName (J.Name [J.Ident unqualName]) = return unqualName
-  translateMethodName n = throwError ("unsupported name: " ++ show n)
+  translateMethodName n = throwError ("unsupported method name: " ++ show n)
+translateExp (J.Assign (J.NameLhs (J.Name [J.Ident jUnqualLhsName])) J.EqualA jRhs)
+  = do
+    rhs <- translateExp jRhs
+    tbsStmts %= (++ [I.SAsgn jUnqualLhsName rhs])
+    return (I.AVar jUnqualLhsName)
 translateExp e = throwError ("unsupported expression: " ++ show e)
+
+-- TODO: unify with `translateExp`
+translateBExp :: J.Exp -> TransBody I.BExp
+translateBExp (J.BinOp jLhs jOp jRhs) = do
+  lhs <- translateExp jLhs
+  rhs <- translateExp jRhs
+  op  <- translateBOp jOp
+  return (op lhs rhs)
+translateBExp e = throwError ("unsupported boolean expression: " ++ show e)
+
+translateBOp :: J.Op -> TransBody (I.AExp -> I.AExp -> I.BExp)
+translateBOp J.LThan  = return I.BLt
+translateBOp J.GThan  = return I.BGt
+translateBOp J.LThanE = return I.BLe
+translateBOp J.GThanE = return I.BGe
+translateBOp J.Equal  = return I.BEq
+translateBOp J.NotEq  = return I.BNe
+translateBOp o =
+  throwError ("unsupported boolean binary operation: " ++ show o)
 
 --
 -- Utilities
@@ -131,8 +164,7 @@ translateExp e = throwError ("unsupported expression: " ++ show e)
 
 freshTmpVar :: TransBody I.Var
 freshTmpVar = do
-  n <- use tbsTmpVarCounter
-  tbsTmpVarCounter += 1
+  n <- tbsTmpVarCounter <<+= 1
   return ("$tmp" ++ show n)
 
 ensureVar :: I.AExp -> TransBody I.Var
@@ -141,3 +173,10 @@ ensureVar e          = do
   v <- freshTmpVar
   tbsStmts %= (++ [I.SAsgn v e])
   return v
+
+inBlock :: TransBody a -> TransBody ([I.Stmt], a)
+inBlock m = do
+  saved <- tbsStmts <<.= []
+  a     <- m
+  ret   <- tbsStmts <<.= saved
+  return (ret, a)
