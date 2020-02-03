@@ -20,14 +20,14 @@ import           Control.Monad.Except           ( ExceptT
                                                 , runExceptT
                                                 , throwError
                                                 )
-import           Control.Monad.Reader           ( ReaderT
+import           Control.Monad.RWS              ( RWS
                                                 , MonadReader
-                                                , runReaderT
-                                                )
-import           Control.Monad.State            ( State
+                                                , MonadWriter
                                                 , MonadState
-                                                , runState
-                                                , modify
+                                                , runRWS
+                                                , tell
+                                                , listen
+                                                , censor
                                                 )
 import           Control.Lens                   ( makeLenses )
 
@@ -41,24 +41,21 @@ import           Control.Lens.Operators
 --
 
 data MethodSignature = MethodSignature
-data TransBodyState = TransBodyState { _tbsStmts :: [I.Stmt]
-                                     , _tbsTmpVarCounter :: Int
-                                     }
+data TransBodyState = TransBodyState { _tbsTmpVarCounter :: Int }
   deriving (Show)
 
 makeLenses ''TransBodyState
 
 newtype TransBody a =
-  TransBody (ExceptT String (ReaderT MethodSignature (State TransBodyState)) a)
-  deriving (Functor, Applicative, Monad, MonadReader MethodSignature, MonadState TransBodyState, MonadError String)
+  TransBody (ExceptT String (RWS MethodSignature [I.Stmt] TransBodyState) a)
+  deriving (Functor, Applicative, Monad, MonadReader MethodSignature, MonadWriter [I.Stmt], MonadState TransBodyState, MonadError String)
 
 runTransBody
   :: MethodSignature
   -> TransBodyState
   -> TransBody a
-  -> (Either String a, TransBodyState)
-runTransBody sig st (TransBody a) =
-  flip runState st . flip runReaderT sig . runExceptT $ a
+  -> (Either String a, TransBodyState, [I.Stmt])
+runTransBody sig st (TransBody a) = runRWS (runExceptT a) sig st
 
 --
 -- Translation
@@ -75,17 +72,19 @@ extractSingleMethod _ = Left "bad Java compilation unit"
 
 translateMethodBody :: J.Block -> Either String I.Stmt
 translateMethodBody (J.Block jStmts) =
-  let (e, state) = runTransBody MethodSignature (TransBodyState [] 0)
-        $ mapM_ translateBlockStmt jStmts
+  let (e, state, stmts) =
+          runTransBody MethodSignature (TransBodyState 0)
+            $ mapM_ translateBlockStmt jStmts
   in  case e of
-        Left err ->
-          Left
-            (  "error translating method:\n"
-            ++ err
-            ++ "\nlast state:\n"
-            ++ show state
-            )
-        Right () -> Right $ I.SSeq $ state ^. tbsStmts
+        Left err -> Left
+          (  "error translating method:\n"
+          ++ err
+          ++ "\nlast state:\n"
+          ++ show state
+          ++ "\n"
+          ++ show stmts
+          )
+        Right () -> Right (I.SSeq stmts)
 
 translateBlockStmt :: J.BlockStmt -> TransBody ()
 translateBlockStmt (J.LocalVars _ _ decls) = mapM_ transDecl decls
@@ -95,7 +94,7 @@ translateBlockStmt (J.LocalVars _ _ decls) = mapM_ transDecl decls
   transDecl (J.VarDecl (J.VarId (J.Ident varName)) (Just (J.InitExp jExp))) =
     do
       exp <- translateExp jExp
-      tbsStmts %= (++ [I.SAsgn varName exp])
+      tell [I.SAsgn varName exp]
       return ()
   transDecl (J.VarDecl _ _) = throwError "arrays are unsupported"
 translateBlockStmt (J.BlockStmt s) = translateStmt s
@@ -106,12 +105,12 @@ translateBlockStmt (J.LocalClass _) =
 translateStmt :: J.Stmt -> TransBody ()
 translateStmt (J.Return (Just jExp)) = do
   retExp <- translateExp jExp
-  tbsStmts %= (++ [I.SAsgn "return" retExp])
+  tell [I.SAsgn "return" retExp]
 translateStmt (J.IfThenElse jCond jThen jElse) = do
   cond        <- translateBExp jCond
-  (iThen, ()) <- inBlock (translateStmt jThen)
-  (iElse, ()) <- inBlock (translateStmt jElse)
-  tbsStmts %= (++ [I.SIf cond (I.SSeq iThen) (I.SSeq iElse)])
+  ((), iThen) <- inBlock (translateStmt jThen)
+  ((), iElse) <- inBlock (translateStmt jElse)
+  tell [I.SIf cond (I.SSeq iThen) (I.SSeq iElse)]
 translateStmt (J.StmtBlock (J.Block jStmts)) = mapM_ translateBlockStmt jStmts
 translateStmt (J.ExpStmt jExp) = void (translateExp jExp)
 translateStmt s = throwError ("unsupported statement: " ++ show s)
@@ -126,7 +125,7 @@ translateExp (J.MethodInv (J.MethodCall jMethodName jArgs)) = do
   retVar     <- freshTmpVar
   methodName <- translateMethodName jMethodName
   args       <- mapM (ensureVar <=< translateExp) jArgs
-  tbsStmts %= (++ [I.SCall [retVar] args methodName]) -- TODO: renaming?
+  tell [I.SCall [retVar] args methodName] -- TODO: renaming?
   return (I.AVar retVar)
  where
   translateMethodName :: J.Name -> TransBody String
@@ -135,7 +134,7 @@ translateExp (J.MethodInv (J.MethodCall jMethodName jArgs)) = do
 translateExp (J.Assign (J.NameLhs (J.Name [J.Ident jUnqualLhsName])) J.EqualA jRhs)
   = do
     rhs <- translateExp jRhs
-    tbsStmts %= (++ [I.SAsgn jUnqualLhsName rhs])
+    tell [I.SAsgn jUnqualLhsName rhs]
     return (I.AVar jUnqualLhsName)
 translateExp e = throwError ("unsupported expression: " ++ show e)
 
@@ -171,12 +170,8 @@ ensureVar :: I.AExp -> TransBody I.Var
 ensureVar (I.AVar v) = return v
 ensureVar e          = do
   v <- freshTmpVar
-  tbsStmts %= (++ [I.SAsgn v e])
+  tell [I.SAsgn v e]
   return v
 
-inBlock :: TransBody a -> TransBody ([I.Stmt], a)
-inBlock m = do
-  saved <- tbsStmts <<.= []
-  a     <- m
-  ret   <- tbsStmts <<.= saved
-  return (ret, a)
+inBlock :: TransBody a -> TransBody (a, [I.Stmt])
+inBlock = censor (const []) . listen
