@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase, GeneralizedNewtypeDeriving, TemplateHaskell #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 -- References to "JLS" refer to The Java Language Specification, Third Edition (for Java SE 6)
 
@@ -28,23 +28,21 @@ import           Control.Monad.RWS              ( RWS
                                                 , tell
                                                 , listen
                                                 , censor
+                                                , gets
+                                                , modify
                                                 )
-import           Control.Lens                   ( makeLenses )
 
 import qualified Language.Java.Syntax          as J
 import qualified Imp                           as I
-
-import           Control.Lens.Operators
 
 --
 -- Data types
 --
 
 data MethodSignature = MethodSignature
-data TransBodyState = TransBodyState { _tbsTmpVarCounter :: Int }
+data TransBodyState = TransBodyState { tbsTmpVarCounter :: Int }
   deriving (Show)
 
-makeLenses ''TransBodyState
 
 newtype TransBody a =
   TransBody (ExceptT String (RWS MethodSignature [I.Stmt] TransBodyState) a)
@@ -163,7 +161,8 @@ translateBOp o =
 
 freshTmpVar :: TransBody I.Var
 freshTmpVar = do
-  n <- tbsTmpVarCounter <<+= 1
+  n <- gets tbsTmpVarCounter
+  modify (\s -> s { tbsTmpVarCounter = n + 1 })
   return ("$tmp" ++ show n)
 
 ensureVar :: I.AExp -> TransBody I.Var
