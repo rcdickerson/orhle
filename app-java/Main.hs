@@ -1,4 +1,3 @@
-import           Data.String                    ( fromString )
 import           System.Environment             ( getArgs
                                                 , getProgName
                                                 )

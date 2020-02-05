@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-missing-signatures #-}
+
 module VerificationTaskParser
   ( VerificationTask(..)
   , Execution(..)
@@ -5,7 +7,6 @@ module VerificationTaskParser
   )
 where
 
-import qualified Data.Map                      as Map
 import           Text.Parsec
 import           Text.Parsec.Language
 import qualified Text.Parsec.Token             as Token
@@ -42,11 +43,6 @@ lexer = Token.makeTokenParser languageDef
 
 identifier = Token.identifier lexer
 reserved = Token.reserved lexer
-reservedOp = Token.reservedOp lexer
-parens = Token.parens lexer
-integer = Token.integer lexer
-comma = Token.comma lexer
-semi = Token.semi lexer
 whiteSpace = Token.whiteSpace lexer
 
 
@@ -81,7 +77,7 @@ execs :: String -> VTParser [Execution]
 execs keyword = do
   reserved keyword >> whiteSpace
   char ':' >> whiteSpace
-  execs <-
+  list <-
     sepBy1
       (do
         name <- identifier
@@ -92,7 +88,7 @@ execs keyword = do
     $  char ','
     >> whiteSpace
   char ';' >> whiteSpace
-  return execs
+  return list
 
 execSubscriptParser :: VTParser String
 execSubscriptParser = do

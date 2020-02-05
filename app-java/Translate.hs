@@ -7,14 +7,12 @@ module Translate
   )
 where
 
-import           Data.List                      ( intercalate )
-import           Data.Functor                   ( (<&>) )
-import           Data.Maybe                     ( mapMaybe )
+import           Prelude                 hiding ( exp )
+
 import           Data.Sequence                  ( Seq(..)
                                                 , fromList
                                                 )
-import           Control.Monad                  ( forM
-                                                , mapM_
+import           Control.Monad                  ( mapM_
                                                 , (<=<)
                                                 , void
                                                 )
@@ -67,15 +65,15 @@ translate = translateMethodBody <=< extractSingleMethod
 
 -- TODO: return more info
 extractSingleMethod :: J.CompilationUnit -> Either String J.Block
-extractSingleMethod (J.CompilationUnit maybePackageDecl importList [J.ClassTypeDecl (J.ClassDecl _ className _ _ _ (J.ClassBody [J.MemberDecl (J.MethodDecl _ _ retTy methodIdent [] _ Nothing (J.MethodBody (Just methodBodyBlock)))]))])
+extractSingleMethod (J.CompilationUnit _maybePackageDecl _importList [J.ClassTypeDecl (J.ClassDecl _ _className _ _ _ (J.ClassBody [J.MemberDecl (J.MethodDecl _ _ _retTy _methodIdent [] _ Nothing (J.MethodBody (Just methodBodyBlock)))]))])
   = Right methodBodyBlock
 extractSingleMethod _ = Left "bad Java compilation unit"
 
 translateMethodBody :: J.Block -> Either String I.Stmt
 translateMethodBody (J.Block jStmts_l) =
   let (jStmts, lastRetJExp) = case fromList jStmts_l of
-        jStmts :|> (J.BlockStmt (J.Return jRetExp)) -> (jStmts, jRetExp)
-        jStmts -> (jStmts, Nothing)
+        s :|> (J.BlockStmt (J.Return jRetExp)) -> (s, jRetExp)
+        s -> (s, Nothing)
       (eitherRetExp, state, stmts) =
           runTransBody MethodSignature (TransBodyState 0)
             $  mapM_ translateBlockStmt jStmts
