@@ -10,6 +10,9 @@ where
 import           Data.List                      ( intercalate )
 import           Data.Functor                   ( (<&>) )
 import           Data.Maybe                     ( mapMaybe )
+import           Data.Sequence                  ( Seq(..)
+                                                , fromList
+                                                )
 import           Control.Monad                  ( forM
                                                 , mapM_
                                                 , (<=<)
@@ -69,11 +72,15 @@ extractSingleMethod (J.CompilationUnit maybePackageDecl importList [J.ClassTypeD
 extractSingleMethod _ = Left "bad Java compilation unit"
 
 translateMethodBody :: J.Block -> Either String I.Stmt
-translateMethodBody (J.Block jStmts) =
-  let (e, state, stmts) =
+translateMethodBody (J.Block jStmts_l) =
+  let (jStmts, lastRetJExp) = case fromList jStmts_l of
+        jStmts :|> (J.BlockStmt (J.Return jRetExp)) -> (jStmts, jRetExp)
+        jStmts -> (jStmts, Nothing)
+      (eitherRetExp, state, stmts) =
           runTransBody MethodSignature (TransBodyState 0)
-            $ mapM_ translateBlockStmt jStmts
-  in  case e of
+            $  mapM_ translateBlockStmt jStmts
+            >> mapM translateExp lastRetJExp
+  in  case eitherRetExp of
         Left err -> Left
           (  "error translating method:\n"
           ++ err
@@ -82,7 +89,9 @@ translateMethodBody (J.Block jStmts) =
           ++ "\n"
           ++ show stmts
           )
-        Right () -> Right (I.SSeq stmts)
+        Right maybeRetExp -> Right $ I.SSeq $ case maybeRetExp of
+          Just retExp -> stmts ++ [I.SAsgn "return" retExp]
+          Nothing     -> stmts
 
 translateBlockStmt :: J.BlockStmt -> TransBody ()
 translateBlockStmt (J.LocalVars _ _ decls) = mapM_ transDecl decls
@@ -101,9 +110,6 @@ translateBlockStmt (J.LocalClass _) =
 
 
 translateStmt :: J.Stmt -> TransBody ()
-translateStmt (J.Return (Just jExp)) = do
-  retExp <- translateExp jExp
-  tell [I.SAsgn "return" retExp]
 translateStmt (J.IfThenElse jCond jThen jElse) = do
   cond        <- translateBExp jCond
   ((), iThen) <- inBlock (translateStmt jThen)
