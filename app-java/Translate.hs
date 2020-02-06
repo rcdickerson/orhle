@@ -15,6 +15,7 @@ import           Data.Sequence                  ( Seq(..)
 import           Control.Monad                  ( mapM_
                                                 , (<=<)
                                                 , void
+                                                , liftM2
                                                 )
 import           Control.Monad.Except           ( ExceptT
                                                 , MonadError
@@ -40,27 +41,29 @@ import qualified Imp                           as I
 -- Data types
 --
 
+type ITransStmt = I.AbsStmt String
+
 data MethodSignature = MethodSignature
 data TransBodyState = TransBodyState { tbsTmpVarCounter :: Int }
   deriving (Show)
 
 
 newtype TransBody a =
-  TransBody (ExceptT String (RWS MethodSignature [I.Stmt] TransBodyState) a)
-  deriving (Functor, Applicative, Monad, MonadReader MethodSignature, MonadWriter [I.Stmt], MonadState TransBodyState, MonadError String)
+  TransBody (ExceptT String (RWS MethodSignature [ITransStmt] TransBodyState) a)
+  deriving (Functor, Applicative, Monad, MonadReader MethodSignature, MonadWriter [ITransStmt], MonadState TransBodyState, MonadError String)
 
 runTransBody
   :: MethodSignature
   -> TransBodyState
   -> TransBody a
-  -> (Either String a, TransBodyState, [I.Stmt])
+  -> (Either String a, TransBodyState, [ITransStmt])
 runTransBody sig st (TransBody a) = runRWS (runExceptT a) sig st
 
 --
 -- Translation
 --
 
-translate :: J.CompilationUnit -> Either String I.Stmt
+translate :: J.CompilationUnit -> Either String ITransStmt
 translate = translateMethodBody <=< extractSingleMethod
 
 -- TODO: return more info
@@ -69,7 +72,7 @@ extractSingleMethod (J.CompilationUnit _maybePackageDecl _importList [J.ClassTyp
   = Right methodBodyBlock
 extractSingleMethod _ = Left "bad Java compilation unit"
 
-translateMethodBody :: J.Block -> Either String I.Stmt
+translateMethodBody :: J.Block -> Either String ITransStmt
 translateMethodBody (J.Block jStmts_l) =
   let (jStmts, lastRetJExp) = case fromList jStmts_l of
         s :|> (J.BlockStmt (J.Return jRetExp)) -> (s, jRetExp)
@@ -99,8 +102,7 @@ translateBlockStmt (J.LocalVars _ _ decls) = mapM_ transDecl decls
   transDecl (J.VarDecl (J.VarId (J.Ident varName)) (Just (J.InitExp jExp))) =
     do
       exp <- translateExp jExp
-      tell [I.SAsgn varName exp]
-      return ()
+      tell [I.SAsgn varName exp] -- TODO: shadowing?
   transDecl (J.VarDecl _ _) = throwError "arrays are unsupported"
 translateBlockStmt (J.BlockStmt s) = translateStmt s
 translateBlockStmt (J.LocalClass _) =
@@ -114,8 +116,28 @@ translateStmt (J.IfThenElse jCond jThen jElse) = do
   ((), iElse) <- inBlock (translateStmt jElse)
   tell [I.SIf cond (I.SSeq iThen) (I.SSeq iElse)]
 translateStmt (J.StmtBlock (J.Block jStmts)) = mapM_ translateBlockStmt jStmts
-translateStmt (J.ExpStmt jExp) = void (translateExp jExp)
+translateStmt (J.ExpStmt   jExp            ) = void (translateExp jExp)
+translateStmt (J.While jCond jBody         ) = do
+  cond                    <- translateBExp jCond
+  (smtString, jBodyStmts) <- case extractLoopInvariant jBody of
+    Just x  -> return x
+    Nothing -> throwError "no invariant found in while loop"
+  ((), body) <- inBlock (mapM_ translateBlockStmt jBodyStmts)
+  tell [I.SWhile cond (I.SSeq body) (smtString, "true", False)]
 translateStmt s = throwError ("unsupported statement: " ++ show s)
+
+
+extractLoopInvariant :: J.Stmt -> Maybe (String, [J.BlockStmt])
+extractLoopInvariant jLoopBody = case jLoopBody of
+  J.StmtBlock (J.Block ((J.BlockStmt (J.ExpStmt jExp)) : restJBody)) ->
+    case jExp of
+      J.MethodInv (J.MethodCall (J.Name [J.Ident "loopInvariant"]) [jArg]) ->
+        case jArg of
+          J.Lit (J.String smtString) -> Just (smtString, restJBody)
+          _                          -> Nothing
+      _ -> Nothing
+  _ -> Nothing
+
 
 -- TODO: we probably want to support more than only expressions of type int
 translateExp :: J.Exp -> TransBody I.AExp
@@ -138,26 +160,32 @@ translateExp (J.Assign (J.NameLhs (J.Name [J.Ident jUnqualLhsName])) J.EqualA jR
     rhs <- translateExp jRhs
     tell [I.SAsgn jUnqualLhsName rhs]
     return (I.AVar jUnqualLhsName)
+translateExp (J.BinOp jLhs jOp jRhs) = do
+  lhs <- translateExp jLhs
+  rhs <- translateExp jRhs
+  op  <- case jOp of
+    J.Add  -> return I.AAdd
+    J.Sub  -> return I.ASub
+    J.Mult -> return I.AMul
+    J.Div  -> return I.ADiv
+    J.Rem  -> return I.AMod -- TODO: are these the same semantics?
+    o      -> throwError ("unsupported arithmetic binary operation: " ++ show o)
+  return (op lhs rhs)
 translateExp e = throwError ("unsupported expression: " ++ show e)
 
 -- TODO: unify with `translateExp`
 translateBExp :: J.Exp -> TransBody I.BExp
-translateBExp (J.BinOp jLhs jOp jRhs) = do
-  lhs <- translateExp jLhs
-  rhs <- translateExp jRhs
-  op  <- translateBOp jOp
-  return (op lhs rhs)
+translateBExp (J.BinOp jLhs jOp jRhs) = case jOp of
+  J.LThan  -> liftM2 I.BLt (translateExp jLhs) (translateExp jRhs)
+  J.GThan  -> liftM2 I.BGt (translateExp jLhs) (translateExp jRhs)
+  J.LThanE -> liftM2 I.BLe (translateExp jLhs) (translateExp jRhs)
+  J.GThanE -> liftM2 I.BGe (translateExp jLhs) (translateExp jRhs)
+  J.Equal  -> liftM2 I.BEq (translateExp jLhs) (translateExp jRhs)
+  J.NotEq  -> liftM2 I.BNe (translateExp jLhs) (translateExp jRhs)
+  J.CAnd   -> liftM2 I.BAnd (translateBExp jLhs) (translateBExp jRhs)
+  J.COr    -> liftM2 I.BOr (translateBExp jLhs) (translateBExp jRhs)
+  o        -> throwError ("unsupported boolean binary operation: " ++ show o)
 translateBExp e = throwError ("unsupported boolean expression: " ++ show e)
-
-translateBOp :: J.Op -> TransBody (I.AExp -> I.AExp -> I.BExp)
-translateBOp J.LThan  = return I.BLt
-translateBOp J.GThan  = return I.BGt
-translateBOp J.LThanE = return I.BLe
-translateBOp J.GThanE = return I.BGe
-translateBOp J.Equal  = return I.BEq
-translateBOp J.NotEq  = return I.BNe
-translateBOp o =
-  throwError ("unsupported boolean binary operation: " ++ show o)
 
 --
 -- Utilities
@@ -176,5 +204,5 @@ ensureVar e          = do
   tell [I.SAsgn v e]
   return v
 
-inBlock :: TransBody a -> TransBody (a, [I.Stmt])
+inBlock :: TransBody a -> TransBody (a, [ITransStmt])
 inBlock = censor (const []) . listen

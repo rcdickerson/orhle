@@ -1,0 +1,4 @@
+forall: Refinement;
+exists: Original;
+
+post: (= Original!return Refinement!return);
