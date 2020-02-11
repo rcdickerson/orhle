@@ -7,6 +7,7 @@ public class Original {
         int sum = 0;
         while (sum <= 100) {
             loopInvariant("(and (=> (<= Original!sum 100) (and (< 100 Refinement!sum) (< Refinement!sum 110))) (=> (< 100 Original!sum) (= Original!sum Refinement!sum)))");
+            loopVariant("(- 110 sum)");
             sum = sum + randInt(10);
         }
         return sum;

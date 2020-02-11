@@ -9,6 +9,7 @@ where
 
 import           Prelude                 hiding ( exp )
 
+import           Data.Maybe                     ( fromMaybe )
 import           Data.Sequence                  ( Seq(..)
                                                 , fromList
                                                 )
@@ -116,26 +117,29 @@ translateStmt (J.IfThenElse jCond jThen jElse) = do
   ((), iElse) <- inBlock (translateStmt jElse)
   tell [I.SIf cond (I.SSeq iThen) (I.SSeq iElse)]
 translateStmt (J.StmtBlock (J.Block jStmts)) = mapM_ translateBlockStmt jStmts
-translateStmt (J.ExpStmt   jExp            ) = void (translateExp jExp)
-translateStmt (J.While jCond jBody         ) = do
-  cond                    <- translateBExp jCond
-  (smtString, jBodyStmts) <- case extractLoopInvariant jBody of
-    Just x  -> return x
-    Nothing -> throwError "no invariant found in while loop"
-  ((), body) <- inBlock (mapM_ translateBlockStmt jBodyStmts)
-  tell [I.SWhile cond (I.SSeq body) (smtString, "true", False)]
+translateStmt (J.ExpStmt jExp) = void (translateExp jExp)
+translateStmt (J.While jCond (J.StmtBlock (J.Block jStmts))) = do
+  cond           <- translateBExp jCond
+  (inv, jStmts') <- maybe (throwError "no invariant found in while loop")
+                          return
+                          (extractLoopAnnotation "loopInvariant" jStmts)
+  let (var, jStmts'') = fromMaybe
+        ("true", jStmts')
+        (extractLoopAnnotation "loopVariant" jStmts')
+  ((), body) <- inBlock (mapM_ translateBlockStmt jStmts'')
+  tell [I.SWhile cond (I.SSeq body) (inv, var, False)]
 translateStmt s = throwError ("unsupported statement: " ++ show s)
 
 
-extractLoopInvariant :: J.Stmt -> Maybe (String, [J.BlockStmt])
-extractLoopInvariant jLoopBody = case jLoopBody of
-  J.StmtBlock (J.Block ((J.BlockStmt (J.ExpStmt jExp)) : restJBody)) ->
-    case jExp of
-      J.MethodInv (J.MethodCall (J.Name [J.Ident "loopInvariant"]) [jArg]) ->
-        case jArg of
-          J.Lit (J.String smtString) -> Just (smtString, restJBody)
-          _                          -> Nothing
-      _ -> Nothing
+extractLoopAnnotation
+  :: String -> [J.BlockStmt] -> Maybe (String, [J.BlockStmt])
+extractLoopAnnotation annotationName jLoopBody = case jLoopBody of
+  J.BlockStmt (J.ExpStmt (J.MethodInv jInv)) : restJStmts -> case jInv of
+    (J.MethodCall (J.Name [J.Ident call]) [jArg]) | call == annotationName ->
+      case jArg of
+        J.Lit (J.String smtString) -> Just (smtString, restJStmts)
+        _                          -> Nothing
+    _ -> Nothing
   _ -> Nothing
 
 
