@@ -1,8 +1,5 @@
-/home/rcd/code/orhle/orhle.cabal was modified manually. Ignoring /home/rcd/code/orhle/package.yaml in favor of the cabal file.
-If you want to use the package.yaml file instead of the cabal file,
-then please delete the cabal file.
-bin/run-example.sh: line 4: 24139 Segmentation fault      (core dumped) stack exec klive-exe ./examples/$1/$2.imp
+bin/run-example.sh: line 4: 30451 Segmentation fault      (core dumped) stack exec klive-exe ./examples/$1/$2.imp
 
-real	0m0.251s
-user	0m0.197s
-sys	0m0.033s
+real	0m0.245s
+user	0m0.189s
+sys	0m0.019s

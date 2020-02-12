@@ -13,7 +13,7 @@ post: (and
         (= original!ret_2 refinement!ret_2));
 
 aspecs:
-  shuffle(list) {
+  shuffle(list[3]) {
     post: (or (and (= shuffled_0 list_0)
                    (= shuffled_1 list_1)
                    (= shuffled_2 list_2))
@@ -35,7 +35,7 @@ aspecs:
   }
 
 especs:
-  sort(list) {
+  sort(list[3]) {
     templateVars: n0, n1, n2;
     pre: (and (<= n0 n1)
               (<= n1 n2)
@@ -65,7 +65,7 @@ especs:
 // The original program sorts the list then adds three
 // to each value.
 prog original(list):
-  sorted[3] := call sort(list);
+  sorted[3] := call sort(list[3]);
   ret_0 := sorted_0 + 3;
   ret_1 := sorted_1 + 3;
   ret_2 := sorted_2 + 3;
@@ -74,7 +74,7 @@ endp
 // The refinement program shuffles the list to some
 // arbitrary permutation then adds three to each value.
 prog refinement(list):
-  shuffled[3] := call shuffle(list);
+  shuffled[3] := call shuffle(list[3]);
   ret_0 := shuffled_0 + 3;
   ret_1 := shuffled_1 + 3;
   ret_2 := shuffled_2 + 3;

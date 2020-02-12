@@ -1,21 +1,25 @@
 // A program together with an invalid refinement.
 
-forall: refinement;
-exists: original;
-
-post: (= original!x refinement!x);
-
 expected: invalid;
 
-prog original():
-  x := call randInt()
-         @templateVars { n }
-         @pre  { (and (>= n 0) (< n 20)) }
-         @post { (= x n) };
-endp
+forall: p[refinement];
+exists: p[original];
 
-prog refinement():
-  x := call randInt()
-         @pre  { true }
-         @post { (and (>= x 0) (< x 25)) };
+post: (= p!original!x p!refinement!x);
+
+aspecs:
+  randInt() {
+      pre:  true;
+      post: (and (>= x 0) (< x 25));
+  }
+
+especs:
+  randInt() {
+      templateVars: n;
+      pre:  (and (>= n 0) (< n 20));
+      post: (= x n);
+}
+
+prog p():
+  x := call randInt();
 endp

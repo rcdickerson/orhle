@@ -1,6 +1,3 @@
-/home/rcd/code/orhle/orhle.cabal was modified manually. Ignoring /home/rcd/code/orhle/package.yaml in favor of the cabal file.
-If you want to use the package.yaml file instead of the cabal file,
-then please delete the cabal file.
 *******************************************
 ****               ORHLE               ****
 **** k-Liveness Hyperproperty Verifier ****
@@ -11,6 +8,6 @@ unexpected "e"
 expecting "expected"
 
 
-real	0m0.185s
-user	0m0.173s
-sys	0m0.008s
+real	0m0.201s
+user	0m0.163s
+sys	0m0.036s

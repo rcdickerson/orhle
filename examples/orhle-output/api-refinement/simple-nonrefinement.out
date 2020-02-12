@@ -1,16 +1,28 @@
-/home/rcd/code/orhle/orhle.cabal was modified manually. Ignoring /home/rcd/code/orhle/package.yaml in favor of the cabal file.
-If you want to use the package.yaml file instead of the cabal file,
-then please delete the cabal file.
 *******************************************
 ****               ORHLE               ****
 **** k-Liveness Hyperproperty Verifier ****
 *******************************************
 
-(line 3, column 1):
-unexpected "f"
-expecting "expected"
+:: Executions
+  p[refinement] (forall)
+  p[original] (exists)
 
+:: Verification Conditions
+  (=> true
+      (and true
+           (=> (and (>= p!refinement!x 0) (< p!refinement!x 25))
+               (exists ((p!original!n Int))
+                 (and (>= p!original!n 0)
+                      (not (<= 20 p!original!n))
+                      (exists ((p!original!x!0 Int))
+                        (= p!original!x!0 p!original!n))
+                      (forall ((p!original!x!0 Int))
+                        (or (not (= p!original!x!0 p!original!n))
+                            (= p!original!x!0 p!refinement!x))))))))
 
-real	0m0.200s
-user	0m0.182s
-sys	0m0.016s
+Invalid. Model:
+  p!refinement!x -> 20
+
+real	0m0.238s
+user	0m0.229s
+sys	0m0.009s
