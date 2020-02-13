@@ -4,29 +4,29 @@
 
 expected: valid;
 
-forall: p[refinement];
-exists: p[original];
+forall: refinement;
+exists: original;
 
 pre: (or
-       (and (= p!original!list_0 p!refinement!list_0)
-            (= p!original!list_1 p!refinement!list_1)
-            (= p!original!list_2 p!refinement!list_2))
-       (and (= p!original!list_0 p!refinement!list_0)
-            (= p!original!list_1 p!refinement!list_2)
-            (= p!original!list_2 p!refinement!list_1))
-       (and (= p!original!list_0 p!refinement!list_1)
-            (= p!original!list_1 p!refinement!list_0)
-            (= p!original!list_2 p!refinement!list_2))
-       (and (= p!original!list_0 p!refinement!list_1)
-            (= p!original!list_1 p!refinement!list_2)
-            (= p!original!list_2 p!refinement!list_0))
-       (and (= p!original!list_0 p!refinement!list_2)
-            (= p!original!list_1 p!refinement!list_0)
-            (= p!original!list_2 p!refinement!list_1))
-       (and (= p!original!list_0 p!refinement!list_2)
-            (= p!original!list_1 p!refinement!list_1)
-            (= p!original!list_2 p!refinement!list_0)));
-post: (= p!original!sum p!refinement!sum);
+       (and (= original!list_0 refinement!list_0)
+            (= original!list_1 refinement!list_1)
+            (= original!list_2 refinement!list_2))
+       (and (= original!list_0 refinement!list_0)
+            (= original!list_1 refinement!list_2)
+            (= original!list_2 refinement!list_1))
+       (and (= original!list_0 refinement!list_1)
+            (= original!list_1 refinement!list_0)
+            (= original!list_2 refinement!list_2))
+       (and (= original!list_0 refinement!list_1)
+            (= original!list_1 refinement!list_2)
+            (= original!list_2 refinement!list_0))
+       (and (= original!list_0 refinement!list_2)
+            (= original!list_1 refinement!list_0)
+            (= original!list_2 refinement!list_1))
+       (and (= original!list_0 refinement!list_2)
+            (= original!list_1 refinement!list_1)
+            (= original!list_2 refinement!list_0)));
+post: (= original!sum refinement!sum);
 
 // The original API call guarantees an ordered list.
 // The refinement makes no guarantees. This is OK
@@ -34,19 +34,24 @@ post: (= p!original!sum p!refinement!sum);
 // of ordering.
 
 aspecs:
-  getThreeThings() {
+  refinedGetValues() {
     pre: true;
     post: true;
   }
 
 especs:
-  getThreeThings() {
-      templateVars: n0, n1, n2;
-      pre: (and (<= n0 n1) (<= n1 n2));
-      post (and (= ret!0 n0) (= ret!1 n1) (= ret!2 n2));
+  originalGetValues() {
+    templateVars: n0, n1, n2;
+    pre: (and (<= n0 n1) (<= n1 n2));
+    post: (and (= ret!0 n0) (= ret!1 n1) (= ret!2 n2));
   }
 
-prog p():
-   list[3] := call getThreeThings();
+prog original():
+   list[3] := call originalGetValues();
+   sum := list_0 + list_1 + list_2;
+endp
+
+prog refinement():
+   list[3] := call refinedGetValues();
    sum := list_0 + list_1 + list_2;
 endp

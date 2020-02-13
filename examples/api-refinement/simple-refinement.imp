@@ -2,24 +2,28 @@
 
 expected: valid;
 
-forall: p[refinement];
-exists: p[original];
+forall: refinement;
+exists: original;
 
-post: (= p!original!x p!refinement!x);
+post: (= original!x refinement!x);
 
 aspecs:
-  randInt() {
+  refinedRand() {
       pre:  true;
       post: (and (>= ret! 0) (< ret! 20) (= (mod ret! 2) 1));
   }
 
 especs:
-  randInt() {
+  originalRand() {
       templateVars: n;
       pre:  (and (>= n 0) (< n 20));
       post: (= ret! n);
-}
+  }
 
-prog p():
-  x := call randInt();
+prog original():
+  x := call originalRand();
+endp
+
+prog refinement():
+  x := call refinedRand();
 endp

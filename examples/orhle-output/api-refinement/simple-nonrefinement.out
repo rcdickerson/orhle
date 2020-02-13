@@ -4,25 +4,24 @@
 *******************************************
 
 :: Executions
-  p[refinement] (forall)
-  p[original] (exists)
+  refinement (forall)
+  original (exists)
 
 :: Verification Conditions
   (=> true
       (and true
-           (=> (and (>= p!refinement!x 0) (< p!refinement!x 25))
-               (exists ((p!original!n Int))
-                 (and (>= p!original!n 0)
-                      (not (<= 20 p!original!n))
-                      (exists ((p!original!x!0 Int))
-                        (= p!original!x!0 p!original!n))
-                      (forall ((p!original!x!0 Int))
-                        (or (not (= p!original!x!0 p!original!n))
-                            (= p!original!x!0 p!refinement!x))))))))
+           (=> (and (>= refinement!x 0) (< refinement!x 25))
+               (exists ((original!n Int))
+                 (and (>= original!n 0)
+                      (not (<= 20 original!n))
+                      (exists ((original!x!0 Int)) (= original!x!0 original!n))
+                      (forall ((original!x!0 Int))
+                        (or (not (= original!x!0 original!n))
+                            (= original!x!0 refinement!x))))))))
 
 Invalid. Model:
-  p!refinement!x -> 20
+  refinement!x -> 20
 
-real	0m0.233s
-user	0m0.236s
-sys	0m0.005s
+real	0m0.218s
+user	0m0.213s
+sys	0m0.014s
