@@ -1,6 +1,8 @@
 // A program that syntactically uses both of its parameters, but whose second
 // parameter is semantically meaningless.
 
+expected: invalid;
+
 exists:
   unused[1A], unused[1B],
   unused[2A], unused[2B];
@@ -15,8 +17,6 @@ pre: (and
 post: (and
         (not (= unused!1A!ret unused!1B!ret))
         (not (= unused!2A!ret unused!2B!ret)));
-
-expected: invalid;
 
 prog unused(param1, param2):
   x := param1 + param2;

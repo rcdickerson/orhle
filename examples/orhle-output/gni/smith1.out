@@ -3,11 +3,33 @@
 **** k-Liveness Hyperproperty Verifier ****
 *******************************************
 
-(line 4, column 1):
-unexpected "f"
-expecting "expected"
+:: Executions
+  smith[1] (forall)
+  smith[2] (forall)
+  smith[3] (exists)
 
+:: Verification Conditions
+  (=> (= smith!1!secret smith!3!secret)
+      (and (=> (= (mod smith!2!secret 2) 0)
+               (and (or (not (= (mod smith!1!secret 2) 0))
+                        (and (or (not (= (mod smith!3!secret 2) 0)) (= 0 0))
+                             (or (= (mod smith!3!secret 2) 0) (= 0 1))))
+                    (or (= (mod smith!1!secret 2) 0)
+                        (and (or (not (= (mod smith!3!secret 2) 0)) (= 0 0))
+                             (or (= (mod smith!3!secret 2) 0) (= 0 1))))))
+           (=> (not (= (mod smith!2!secret 2) 0))
+               (and (or (not (= (mod smith!1!secret 2) 0))
+                        (and (or (not (= (mod smith!3!secret 2) 0)) (= 1 0))
+                             (or (= (mod smith!3!secret 2) 0) (= 1 1))))
+                    (or (= (mod smith!1!secret 2) 0)
+                        (and (or (not (= (mod smith!3!secret 2) 0)) (= 1 0))
+                             (or (= (mod smith!3!secret 2) 0) (= 1 1))))))))
 
-real	0m0.208s
-user	0m0.190s
-sys	0m0.016s
+Invalid. Model:
+  smith!1!secret -> 0
+  smith!2!secret -> 1
+  smith!3!secret -> 0
+
+real	0m0.207s
+user	0m0.285s
+sys	0m0.006s

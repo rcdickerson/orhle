@@ -1,5 +1,7 @@
 // A program which sometimes (but not always) leaks high-security state.
 
+expected: invalid;
+
 forall: leak[1], leak[2];
 exists: leak[3];
 
@@ -9,19 +11,18 @@ pre: (and
        (= leak!2!low  leak!3!low));
 post:  (= leak!2!ret  leak!3!ret);
 
-expected: invalid;
+aspecs:
+  randInt() {
+    pre:  true;
+    post: (and (>= ret! 0) (< ret! 100));
+  }
 
-aspec randInt() {
-  pre:  true
-  post: (and (>= r 0) (< r 100))
-}
-
-espec randInt() {
-  templateVars: n
-  pre:  (and (>= n 0) (< n 100))
-  post: (= r n)
-
-}
+especs:
+  randInt() {
+    templateVars: n;
+    pre:  (and (>= n 0) (< n 100));
+    post: (= ret! n);
+  }
 
 prog leak(high, low):
   r := call randInt();

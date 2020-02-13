@@ -119,7 +119,7 @@ generateVCs stmt post quant specs = case stmt of
     spec <- specAtCallsite assignees cparams funName specs
     case spec of
       Nothing -> fail $ "No " ++ (show quant) ++ " specification for " ++ funName ++
-             ". Specified functions: " ++ (show $ funList specs)
+             ". Specified functions are: " ++ (show $ funList specs)
       Just (tvars, fPre, fPost) ->
         case quant of
           VCUniversal -> do

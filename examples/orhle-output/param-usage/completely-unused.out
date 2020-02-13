@@ -3,11 +3,17 @@
 **** k-Liveness Hyperproperty Verifier ****
 *******************************************
 
-(line 3, column 1):
-unexpected "e"
-expecting "expected"
+:: Executions
+  unused[1] (exists)
+  unused[2] (exists)
 
+:: Verification Conditions
+  (=> (not (= unused!1!param unused!2!param)) (and false))
 
-real	0m0.208s
-user	0m0.177s
-sys	0m0.029s
+Invalid. Model:
+  unused!1!param -> 0
+  unused!2!param -> 1
+
+real	0m0.202s
+user	0m0.206s
+sys	0m0.001s

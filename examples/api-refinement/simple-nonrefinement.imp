@@ -10,14 +10,14 @@ post: (= p!original!x p!refinement!x);
 aspecs:
   randInt() {
       pre:  true;
-      post: (and (>= x 0) (< x 25));
+      post: (and (>= ret! 0) (< ret! 25));
   }
 
 especs:
   randInt() {
       templateVars: n;
       pre:  (and (>= n 0) (< n 20));
-      post: (= x n);
+      post: (= ret! n);
 }
 
 prog p():

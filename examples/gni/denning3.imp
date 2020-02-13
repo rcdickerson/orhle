@@ -1,6 +1,8 @@
 // Example adapted from secure information flow lecture notes:
 // https://people.cs.vt.edu/~ryder/6304/lectures/10-Denning&Denning-InfoFlow-CACM7-97-KrishnanMurali.pdf
 
+expected: invalid;
+
 forall: denning[1], denning[2];
 exists: denning[3];
 
@@ -17,8 +19,6 @@ post: (and
         (= denning!2!f_L denning!3!f_L)
 
         (= denning!2!ret denning!3!ret));
-
-expected: invalid;
 
 prog denning(i_L, e_L, f_L, x_H, sum_H):
   max_sum := 100;

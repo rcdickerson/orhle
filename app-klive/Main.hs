@@ -3,7 +3,6 @@ module Main where
 import KLiveParser
 import Orhle
 import System.Environment
-import System.Exit
 import Z3.Monad
 
 main :: IO ()

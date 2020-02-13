@@ -11,14 +11,14 @@ post: (= original!ret refinement!ret);
 aspecs:
   flipCoin() {
     pre: true;
-    post: (or (= n 0) (= n 1));
+    post: (or (= ret! 0) (= ret! 1));
   }
 
 especs:
   flipCoin() {
     templateVars: n;
     pre: (or (= n 0) (= n 1));
-    post: (= r n);
+    post: (= ret! n);
   }
 
 prog original():

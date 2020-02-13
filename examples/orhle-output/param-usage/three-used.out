@@ -3,11 +3,33 @@
 **** k-Liveness Hyperproperty Verifier ****
 *******************************************
 
-(line 3, column 1):
-unexpected "e"
-expecting "expected"
+:: Executions
+  used[1A] (exists)
+  used[1B] (exists)
+  used[2A] (exists)
+  used[2B] (exists)
+  used[3A] (exists)
+  used[3B] (exists)
 
+:: Verification Conditions
+  (=> (and (not (= used!1A!param1 used!1B!param1))
+           (= used!1A!param2 used!1B!param2)
+           (= used!1A!param3 used!1B!param3)
+           (= used!2A!param1 used!2B!param1)
+           (not (= used!2A!param2 used!2B!param2))
+           (= used!2A!param3 used!2B!param3)
+           (= used!3A!param1 used!3B!param1)
+           (= used!3A!param2 used!3B!param2)
+           (not (= used!3A!param3 used!3B!param3)))
+      (and (not (= (+ used!1A!param1 used!1A!param2 (* (- 1) used!1A!param3))
+                   (+ used!1B!param1 used!1B!param2 (* (- 1) used!1B!param3))))
+           (not (= (+ used!2A!param1 used!2A!param2 (* (- 1) used!2A!param3))
+                   (+ used!2B!param1 used!2B!param2 (* (- 1) used!2B!param3))))
+           (not (= (+ used!3A!param1 used!3A!param2 (* (- 1) used!3A!param3))
+                   (+ used!3B!param1 used!3B!param2 (* (- 1) used!3B!param3))))))
 
-real	0m0.191s
-user	0m0.180s
-sys	0m0.009s
+Valid.
+
+real	0m0.211s
+user	0m0.213s
+sys	0m0.014s

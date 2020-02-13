@@ -1,5 +1,79 @@
-bin/run-example.sh: line 4: 30451 Segmentation fault      (core dumped) stack exec klive-exe ./examples/$1/$2.imp
+*******************************************
+****               ORHLE               ****
+**** k-Liveness Hyperproperty Verifier ****
+*******************************************
 
-real	0m0.245s
-user	0m0.189s
-sys	0m0.019s
+:: Executions
+  refinement (forall)
+  original (exists)
+
+:: Verification Conditions
+  (=> (and (= original!list_0 refinement!list_0)
+           (= original!list_1 refinement!list_1)
+           (= original!list_2 refinement!list_2))
+      (and true
+           (=> (and (<= refinement!sorted_0 refinement!sorted_1)
+                    (<= refinement!sorted_1 refinement!sorted_2)
+                    (or (and (= refinement!sorted_0 refinement!list_0)
+                             (= refinement!sorted_1 refinement!list_1)
+                             (= refinement!sorted_2 refinement!list_2))
+                        (and (= refinement!sorted_0 refinement!list_0)
+                             (= refinement!sorted_1 refinement!list_2)
+                             (= refinement!sorted_2 refinement!list_1))
+                        (and (= refinement!sorted_0 refinement!list_1)
+                             (= refinement!sorted_1 refinement!list_0)
+                             (= refinement!sorted_2 refinement!list_2))
+                        (and (= refinement!sorted_0 refinement!list_1)
+                             (= refinement!sorted_1 refinement!list_2)
+                             (= refinement!sorted_2 refinement!list_0))
+                        (and (= refinement!sorted_0 refinement!list_2)
+                             (= refinement!sorted_1 refinement!list_0)
+                             (= refinement!sorted_2 refinement!list_1))
+                        (and (= refinement!sorted_0 refinement!list_2)
+                             (= refinement!sorted_1 refinement!list_1)
+                             (= refinement!sorted_2 refinement!list_0))))
+               (and (exists ((original!n0 Int)
+                             (original!n1 Int)
+                             (original!n2 Int))
+                      (and (or (and (= original!n0 original!list_0)
+                                    (= original!n1 original!list_1)
+                                    (= original!n2 original!list_2))
+                               (and (= original!n0 original!list_0)
+                                    (= original!n1 original!list_2)
+                                    (= original!n2 original!list_1))
+                               (and (= original!n0 original!list_1)
+                                    (= original!n1 original!list_0)
+                                    (= original!n2 original!list_2))
+                               (and (= original!n0 original!list_1)
+                                    (= original!n1 original!list_2)
+                                    (= original!n2 original!list_0))
+                               (and (= original!n0 original!list_2)
+                                    (= original!n1 original!list_0)
+                                    (= original!n2 original!list_1))
+                               (and (= original!n0 original!list_2)
+                                    (= original!n1 original!list_1)
+                                    (= original!n2 original!list_0)))
+                           (exists ((original!shuffled_0!0 Int)
+                                    (original!shuffled_1!1 Int)
+                                    (original!shuffled_2!2 Int))
+                             (and (= original!shuffled_0!0 original!n0)
+                                  (= original!shuffled_1!1 original!n1)
+                                  (= original!shuffled_2!2 original!n2)))
+                           (forall ((original!shuffled_0!0 Int)
+                                    (original!shuffled_1!1 Int)
+                                    (original!shuffled_2!2 Int))
+                             (or (not (and (= original!shuffled_0!0 original!n0)
+                                           (= original!shuffled_1!1 original!n1)
+                                           (= original!shuffled_2!2 original!n2)))
+                                 (and (= original!shuffled_0!0
+                                         (+ (- 3) refinement!sorted_0 3))
+                                      (= original!shuffled_1!1
+                                         (+ (- 3) refinement!sorted_1 3))
+                                      (= original!shuffled_2!2
+                                         (+ (- 3) refinement!sorted_2 3)))))))))))
+
+Valid.
+
+real	0m0.236s
+user	0m0.224s
+sys	0m0.042s

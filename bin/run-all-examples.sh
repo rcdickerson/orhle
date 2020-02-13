@@ -1,6 +1,8 @@
 #! /bin/bash
 
 examples=( \
+  "api-refinement/add3-shuffled" \
+  "api-refinement/add3-sorted" \
   "api-refinement/simple-refinement" \
   "api-refinement/simple-nonrefinement" \
   "api-refinement/conditional-refinement" \

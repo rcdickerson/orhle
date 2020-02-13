@@ -1,5 +1,7 @@
 // A non-deterministic program that uses both of its parameters.
 
+expected: invalid;
+
 exists:
   used[1A], used[1B],
   used[2A], used[2B];
@@ -14,14 +16,16 @@ post: (and
         (not (= used!1A!ret used!1B!ret))
         (not (= used!2A!ret used!2B!ret)));
 
-expected: invalid;
+especs:
+  flip() {
+    templateVars: n;
+    pre: (or (= n 0) (= n 1));
+    post: (= ret! n);
+  }
 
 prog used(param1, param2):
   x := param1 + param2;
-  r := call flip()
-         @templateVars { n }
-         @pre  { (or (= n 0) (= n 1)) }
-         @post { (= r n) };
+  r := call flip();
   if (r == 0) then
     ret := x;
   else

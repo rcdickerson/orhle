@@ -1,13 +1,5 @@
-*******************************************
-****               ORHLE               ****
-**** k-Liveness Hyperproperty Verifier ****
-*******************************************
+bin/run-all-examples.sh: line 32: 16342 Segmentation fault      (core dumped) stack exec klive-exe ./examples/$ex.imp
 
-(line 4, column 1):
-unexpected "f"
-expecting "expected"
-
-
-real	0m0.194s
-user	0m0.167s
-sys	0m0.025s
+real	0m0.268s
+user	0m0.215s
+sys	0m0.017s

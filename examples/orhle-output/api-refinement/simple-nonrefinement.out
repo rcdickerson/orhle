@@ -23,6 +23,6 @@
 Invalid. Model:
   p!refinement!x -> 20
 
-real	0m0.238s
-user	0m0.229s
-sys	0m0.009s
+real	0m0.233s
+user	0m0.236s
+sys	0m0.005s

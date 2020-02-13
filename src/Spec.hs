@@ -16,6 +16,7 @@ module Spec
 import qualified Data.Map as Map
 
 import Imp
+import Data.List (isPrefixOf)
 import SMTParser
 import Z3.Monad
 import Z3Util
@@ -45,8 +46,8 @@ lookupFunSpec :: String -> FunSpecMap a -> Maybe (FunSpec a)
 lookupFunSpec = Map.lookup
 
 specAtCallsite :: [Var] -> [Var] -> String -> ASTFunSpecMap -> Z3 (Maybe ([Var], AST, AST))
-specAtCallsite assignees cparams fName funSpecs = do
-  case Map.lookup fName funSpecs of
+specAtCallsite assignees cparams funName funSpecs = do
+  case Map.lookup funName funSpecs of
     Nothing -> return Nothing
     Just (FunSpec fparams tvars pre post) -> do
       let rets = retVars $ length assignees
@@ -57,8 +58,8 @@ specAtCallsite assignees cparams fName funSpecs = do
 
 retVars :: Int -> [Var]
 retVars 0   = []
-retVars 1   = ["!ret"]
-retVars len = map (\i -> "!ret" ++ (show i)) [0..len]
+retVars 1   = ["ret!"]
+retVars len = map (\i -> "ret!" ++ (show i)) [0..len-1]
 
 prefixSpec :: String -> ASTFunSpecMap -> Z3 ASTFunSpecMap
 prefixSpec prefix spec = traverse (\v -> prefixSpecs v)
@@ -77,7 +78,9 @@ prefixSpec prefix spec = traverse (\v -> prefixSpecs v)
     subSymbol symbol z3AST = do
       ast  <- z3AST
       name <- getSymbolString symbol
-      substituteByName ast [name] [prefix ++ name]
+      if ("ret!" `isPrefixOf ` name)
+        then return ast
+        else substituteByName ast [name] [prefix ++ name]
 
 funList :: FunSpecMap a -> [String]
 funList = Map.keys

@@ -1,6 +1,8 @@
 // Example adapted from secure information flow lecture notes:
 // https://people.cs.vt.edu/~ryder/6304/lectures/10-Denning&Denning-InfoFlow-CACM7-97-KrishnanMurali.pdf
 
+expected: valid;
+
 forall: denningA1, denningA2;
 exists: denningE;
 
@@ -15,8 +17,6 @@ pre: (and
 post: (and
         (= denningA2!f1_L denningE!f1_L)
         (= denningA2!f2_L denningE!f2_L));
-
-expected: valid;
 
 prog denningA1(f1_L, f2_L, f3_H, f4_H):
   i   := 1;

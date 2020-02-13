@@ -3,11 +3,57 @@
 **** k-Liveness Hyperproperty Verifier ****
 *******************************************
 
-(line 4, column 1):
-unexpected "f"
-expecting "expected"
+:: Executions
+  nonleak[1] (forall)
+  nonleak[2] (forall)
+  nonleak[3] (exists)
 
+:: Verification Conditions
+  (let ((a!1 (exists ((nonleak!3!n Int))
+               (let ((a!1 (exists ((nonleak!3!r!0 Int))
+                            (= nonleak!3!r!0 nonleak!3!n))))
+                 (and (>= nonleak!3!n 0)
+                      (not (<= 100 nonleak!3!n))
+                      a!1
+                      (forall ((nonleak!3!r!0 Int))
+                        (or (not (= nonleak!3!r!0 nonleak!3!n))
+                            (and (or (not (= nonleak!3!r!0 5000))
+                                     (= (+ nonleak!2!high nonleak!2!low)
+                                        (+ nonleak!3!high nonleak!3!low)))
+                                 (or (= (+ nonleak!2!high nonleak!2!low)
+                                        nonleak!3!low)
+                                     (= nonleak!3!r!0 5000)))))))))
+        (a!2 (exists ((nonleak!3!n Int))
+               (let ((a!1 (exists ((nonleak!3!r!0 Int))
+                            (= nonleak!3!r!0 nonleak!3!n))))
+                 (and (>= nonleak!3!n 0)
+                      (not (<= 100 nonleak!3!n))
+                      a!1
+                      (forall ((nonleak!3!r!0 Int))
+                        (or (not (= nonleak!3!r!0 nonleak!3!n))
+                            (and (or (not (= nonleak!3!r!0 5000))
+                                     (= nonleak!2!low
+                                        (+ nonleak!3!high nonleak!3!low)))
+                                 (or (= nonleak!2!low nonleak!3!low)
+                                     (= nonleak!3!r!0 5000))))))))))
+    (=> (and (= nonleak!1!high nonleak!3!high)
+             (= nonleak!1!low nonleak!2!low)
+             (= nonleak!2!low nonleak!3!low))
+        (and true
+             (=> (and (>= nonleak!2!r 0) (< nonleak!2!r 100))
+                 (and (=> (= nonleak!2!r 5000)
+                          (and (or (not (and (>= nonleak!1!r 0)
+                                             (not (<= 100 nonleak!1!r))))
+                                   (and (or (not (= nonleak!1!r 5000)) a!1)
+                                        (or (= nonleak!1!r 5000) a!1)))))
+                      (=> (not (= nonleak!2!r 5000))
+                          (and (or (not (and (>= nonleak!1!r 0)
+                                             (not (<= 100 nonleak!1!r))))
+                                   (and (or (not (= nonleak!1!r 5000)) a!2)
+                                        (or (= nonleak!1!r 5000) a!2))))))))))
 
-real	0m0.219s
-user	0m0.177s
-sys	0m0.039s
+Valid.
+
+real	0m0.228s
+user	0m0.213s
+sys	0m0.024s

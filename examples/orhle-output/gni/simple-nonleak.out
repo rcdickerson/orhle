@@ -3,11 +3,19 @@
 **** k-Liveness Hyperproperty Verifier ****
 *******************************************
 
-(line 3, column 1):
-unexpected "f"
-expecting "expected"
+:: Executions
+  nonleak[1] (forall)
+  nonleak[2] (forall)
+  nonleak[3] (exists)
 
+:: Verification Conditions
+  (=> (and (= nonleak!1!high nonleak!3!high)
+           (= nonleak!1!low nonleak!2!low)
+           (= nonleak!2!low nonleak!3!low))
+      (and (= (- (+ nonleak!2!low nonleak!2!high) nonleak!2!high) nonleak!3!low)))
 
-real	0m0.241s
-user	0m0.225s
-sys	0m0.016s
+Valid.
+
+real	0m0.196s
+user	0m0.188s
+sys	0m0.017s

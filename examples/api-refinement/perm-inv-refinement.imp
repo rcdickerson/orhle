@@ -43,7 +43,7 @@ especs:
   getThreeThings() {
       templateVars: n0, n1, n2;
       pre: (and (<= n0 n1) (<= n1 n2));
-      post (and (= n0 list_0) (= n1 list_1) (= n2 list_2));
+      post (and (= ret!0 n0) (= ret!1 n1) (= ret!2 n2));
   }
 
 prog p():

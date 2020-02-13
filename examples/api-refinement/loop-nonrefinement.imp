@@ -9,14 +9,14 @@ post: (= original!sum refinement!sum);
 
 aspecs:
   biggerRand() {
-    post: (and (<= 0 r) (< r 11));
+    post: (and (<= 0 ret!) (< ret! 11));
   }
 
 especs:
   rand() {
     templateVars: n;
     pre:  (and (<= 0 n) (< n 10));
-    post: (= r n);
+    post: (= ret! n);
   }
 
 prog original():

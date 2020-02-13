@@ -167,7 +167,7 @@ execId = do
 specification :: KLiveParser (Z3 ASTFunSpecMap)
 specification = do
   name   <- identifier
-  params <- parens $ sepBy identifier comma
+  params <- (liftM concat) . parens $ sepBy varArray comma
   whiteSpace >> char '{' >> whiteSpace
   templateVars <- option [] $ do
     reserved "templateVars" >> whiteSpace >> char ':' >> whiteSpace
@@ -194,12 +194,26 @@ specification = do
     post <- z3Post
     return $ addFunSpec name (FunSpec params templateVars pre post) emptyFunSpec
 
+varArray :: KLiveParser [String]
+varArray = do
+  (vars, num) <- try (do
+                         var <- identifier
+                         char '[' >> whiteSpace
+                         num <- integer
+                         char ']' >> whiteSpace
+                         return (var, num))
+                     <|> (do var <- identifier; return (var, 0))
+  return $ if (num == 0)
+             then [vars]
+             else map (\n -> vars ++ "_" ++ (show n)) [0..(num-1)]
+
 program :: KLiveParser NamedProg
 program = do
   reserved "prog"
   name <- identifier
   char '(' >> whiteSpace
-  sepBy (identifier >> whiteSpace) $ char ',' >> whiteSpace
+  sepBy varArray comma
+  whiteSpace
   char ')' >> whiteSpace >> char ':'
   progStr <- manyTill anyChar (try $ reserved "endp")
   whiteSpace

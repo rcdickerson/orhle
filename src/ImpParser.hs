@@ -125,23 +125,27 @@ assignStmt = do
 
 funcStmt :: ImpParser ParsedStmt
 funcStmt = do
-  (assignee, num) <- try (do
-                             id <- identifier
-                             char '[' >> whiteSpace
-                             num <- integer
-                             char ']' >> whiteSpace
-                             return (id, num))
-                     <|> (do id <- identifier; return (id, 0))
-  let assignees = if (num == 0)
-                  then [assignee]
-                  else map (\n -> assignee ++ "_" ++ (show n)) [0..(num-1)]
+  assignees <- varArray
   reservedOp ":="
   reserved "call"
   funName <- identifier
-  params  <- parens $ sepBy identifier comma
+  params  <- (liftM concat) . parens $ sepBy varArray comma
   whiteSpace
   semi
   return $ SCall assignees params funName
+
+varArray :: ImpParser [Var]
+varArray = do
+  (vars, num) <- try (do
+                         var <- identifier
+                         char '[' >> whiteSpace
+                         num <- integer
+                         char ']' >> whiteSpace
+                         return (var, num))
+                     <|> (do var <- identifier; return (var, 0))
+  return $ if (num == 0)
+             then [vars]
+             else map (\n -> vars ++ "_" ++ (show n)) [0..(num-1)]
 
 skipStmt :: ImpParser ParsedStmt
 skipStmt = reserved "skip" >> semi >> return SSkip
