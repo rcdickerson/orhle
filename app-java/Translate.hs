@@ -69,7 +69,7 @@ translate = translateMethodBody <=< extractSingleMethod
 
 -- TODO: return more info
 extractSingleMethod :: J.CompilationUnit -> Either String J.Block
-extractSingleMethod (J.CompilationUnit _maybePackageDecl _importList [J.ClassTypeDecl (J.ClassDecl _ _className _ _ _ (J.ClassBody [J.MemberDecl (J.MethodDecl _ _ _retTy _methodIdent [] _ Nothing (J.MethodBody (Just methodBodyBlock)))]))])
+extractSingleMethod (J.CompilationUnit _maybePackageDecl _importList [J.ClassTypeDecl (J.ClassDecl _ _className _ _ _ (J.ClassBody [J.MemberDecl (J.MethodDecl _ _ _retTy _methodIdent _args _ Nothing (J.MethodBody (Just methodBodyBlock)))]))])
   = Right methodBodyBlock
 extractSingleMethod _ = Left "bad Java compilation unit"
 
