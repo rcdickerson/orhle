@@ -2,3 +2,10 @@ forall: Refinement;
 exists: Original;
 
 post: (= Original!return Refinement!return);
+
+loopInvariants:
+  Original.l:
+    (and (=> (<= Original!sum 100) (and (< 100 Refinement!sum) (< Refinement!sum 110)))
+         (=> (< 100 Original!sum) (= Original!sum Refinement!sum)));
+  Refinement.l:
+    (and (<= 0 Refinement!sum) (< Refinement!sum 110));

@@ -16,6 +16,7 @@ data VerificationTask = VerificationTask
   , vtExistsExecs :: [Execution]
   , vtPostCond    :: Maybe String
   , vtPreCond     :: Maybe String
+  , vtLoopInvariants :: [(Execution, String, String)]
   }
   deriving (Show)
 
@@ -65,7 +66,19 @@ verificationTaskParser = do
     reserved "post" >> whiteSpace >> char ':' >> whiteSpace
     condition
   whiteSpace
-  return $ VerificationTask aExecs eExecs preCond postCond
+  loopInvariants <- option [] $ try $ do
+    reserved "loopInvariants" >> whiteSpace >> char ':' >> whiteSpace
+    many loopInvariant
+  return $ VerificationTask aExecs eExecs preCond postCond loopInvariants
+
+loopInvariant :: VTParser (Execution, String, String)
+loopInvariant = do
+  e <- exec
+  _ <- char '.'
+  l <- identifier
+  char ':' >> whiteSpace
+  c <- condition
+  return (e, l, c)
 
 condition :: VTParser String
 condition = do
@@ -77,18 +90,16 @@ execs :: String -> VTParser [Execution]
 execs keyword = do
   reserved keyword >> whiteSpace
   char ':' >> whiteSpace
-  list <-
-    sepBy1
-      (do
-        name <- identifier
-        eid  <- optionMaybe $ try execSubscriptParser
-        whiteSpace
-        return $ Execution name eid
-      )
-    $  char ','
-    >> whiteSpace
+  list <- exec `sepBy1` (char ',' >> whiteSpace)
   char ';' >> whiteSpace
   return list
+
+exec :: VTParser Execution
+exec = do
+  name <- identifier
+  eid  <- optionMaybe $ try execSubscriptParser
+  whiteSpace
+  return $ Execution name eid
 
 execSubscriptParser :: VTParser String
 execSubscriptParser = do
