@@ -3,9 +3,14 @@ exists: Original;
 
 post: (= Original!return Refinement!return);
 
-loopInvariants:
+loopInvariants: {
   Original.l:
     (and (=> (<= Original!sum 100) (and (< 100 Refinement!sum) (< Refinement!sum 110)))
          (=> (< 100 Original!sum) (= Original!sum Refinement!sum)));
   Refinement.l:
     (and (<= 0 Refinement!sum) (< Refinement!sum 110));
+}
+
+loopVariants: {
+  Original.l: (- 110 sum);
+}

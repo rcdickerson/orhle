@@ -8,7 +8,6 @@ public class Denning1 {
         int n = 0;
         int sum = 0;
         l: while (i <= 100) {
-            loopVariant("(- 100 i)");
             int flag = f1_L;
             f2_L = flag;
             int x = f3_H;

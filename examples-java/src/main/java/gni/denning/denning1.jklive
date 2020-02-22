@@ -13,21 +13,21 @@ post: (and
         (= Denning1!A2!f1_L Denning1!E!f1_L)
         (= Denning1!A2!f2_L Denning1!E!f2_L));
 
-loopInvariants:
+loopInvariants: {
   Denning1[A1].l:
     (and (= Denning1!A2!f1_L Denning1!A2!f2_L)
          (= Denning1!A2!f1_L Denning1!A1!f1_L)
          (= Denning1!A1!f1_L Denning1!A2!f1_L)
          (= Denning1!A2!f1_L Denning1!E!f1_L)
          (=> (> Denning1!A1!i 1)
-             (= Denning1!A1!f1_L Denning1!A1!f2_L)))
+             (= Denning1!A1!f1_L Denning1!A1!f2_L)));
   Denning1[A2].l:
     (and
       (= Denning1!A1!f1_L Denning1!E!f1_L)
       (= Denning1!A1!f2_L Denning1!E!f2_L)
       (= Denning1!A1!f1_L Denning1!A2!f1_L)
       (= Denning1!A2!f1_L Denning1!E!f1_L)
-      (=> (> Denning1!A2!i 1) (= Denning1!A2!f1_L Denning1!A2!f2_L)))
+      (=> (> Denning1!A2!i 1) (= Denning1!A2!f1_L Denning1!A2!f2_L)));
   Denning1[E].l:
     (and (= Denning1!A2!f1_L Denning1!A2!f2_L)
          (= Denning1!A1!f1_L Denning1!A1!f2_L)
@@ -37,4 +37,11 @@ loopInvariants:
              (and
                   (= Denning1!A2!f1_L Denning1!E!f1_L)
                   (= Denning1!A2!f2_L Denning1!E!f2_L)
-                  (= Denning1!E!f1_L  Denning1!E!f2_L))))
+                  (= Denning1!E!f1_L  Denning1!E!f2_L))));
+}
+
+loopVariants: {
+  Denning1[A1].l: (- 100 i);
+  Denning1[A2].l: (- 100 i);
+  Denning1[E].l:  (- 100 i);
+}

@@ -11,12 +11,15 @@ import           Text.Parsec
 import           Text.Parsec.Language
 import qualified Text.Parsec.Token             as Token
 
+type LoopLabel = String
+
 data VerificationTask = VerificationTask
   { vtForallExecs :: [Execution]
   , vtExistsExecs :: [Execution]
   , vtPostCond    :: Maybe String
   , vtPreCond     :: Maybe String
-  , vtLoopInvariants :: [(Execution, String, String)]
+  , vtLoopInvariants :: [(Execution, LoopLabel, String)]
+  , vtLoopVariants :: [(Execution, LoopLabel, String)]
   }
   deriving (Show)
 
@@ -66,13 +69,25 @@ verificationTaskParser = do
     reserved "post" >> whiteSpace >> char ':' >> whiteSpace
     condition
   whiteSpace
-  loopInvariants <- option [] $ try $ do
-    reserved "loopInvariants" >> whiteSpace >> char ':' >> whiteSpace
-    many loopInvariant
-  return $ VerificationTask aExecs eExecs preCond postCond loopInvariants
+  loopInvariants <- option [] $ try $ conditionMap "loopInvariants"
+  whiteSpace
+  loopVariants <- option [] $ try $ conditionMap "loopVariants"
+  whiteSpace
+  eof
+  return $ VerificationTask aExecs
+                            eExecs
+                            preCond
+                            postCond
+                            loopInvariants
+                            loopVariants
 
-loopInvariant :: VTParser (Execution, String, String)
-loopInvariant = do
+conditionMap :: String -> VTParser [(Execution, LoopLabel, String)]
+conditionMap name = do
+  reserved name >> whiteSpace >> char ':' >> whiteSpace
+  between (char '{') (char '}') (whiteSpace >> many loopLabeledCondition)
+
+loopLabeledCondition :: VTParser (Execution, LoopLabel, String)
+loopLabeledCondition = do
   e <- exec
   _ <- char '.'
   l <- identifier
