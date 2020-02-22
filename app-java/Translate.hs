@@ -4,39 +4,42 @@
 
 module Translate
   ( translate
+  , MethodContext(..)
   )
 where
 
 import           Prelude                 hiding ( exp )
 
-import           Data.Maybe                     ( fromMaybe )
-import           Data.Sequence                  ( Seq(..)
-                                                , fromList
-                                                )
-import           Control.Monad                  ( mapM_
-                                                , (<=<)
+import           Control.Monad                  ( liftM2
+                                                , mapM_
                                                 , void
-                                                , liftM2
+                                                , (<=<)
                                                 )
 import           Control.Monad.Except           ( ExceptT
                                                 , MonadError
                                                 , runExceptT
                                                 , throwError
                                                 )
-import           Control.Monad.RWS              ( RWS
-                                                , MonadReader
-                                                , MonadWriter
+import           Control.Monad.RWS              ( MonadReader
                                                 , MonadState
-                                                , runRWS
-                                                , tell
-                                                , listen
+                                                , MonadWriter
+                                                , RWS
+                                                , asks
                                                 , censor
                                                 , gets
+                                                , listen
                                                 , modify
+                                                , runRWS
+                                                , tell
+                                                )
+import qualified Data.Map.Strict               as Map
+import           Data.Maybe                     ( fromMaybe )
+import           Data.Sequence                  ( Seq(..)
+                                                , fromList
                                                 )
 
-import qualified Language.Java.Syntax          as J
 import qualified Imp                           as I
+import qualified Language.Java.Syntax          as J
 
 --
 -- Data types
@@ -44,17 +47,22 @@ import qualified Imp                           as I
 
 type ITransStmt = I.AbsStmt String
 
-data MethodSignature = MethodSignature
-data TransBodyState = TransBodyState { tbsTmpVarCounter :: Int }
-  deriving (Show)
+data MethodContext = MethodContext
+    { mcLoopInvariants :: Map.Map String String
+    , mcLoopVariants   :: Map.Map String String
+    }
+data TransBodyState = TransBodyState
+    { tbsTmpVarCounter :: Int
+    }
+    deriving (Show)
 
 
 newtype TransBody a =
-  TransBody (ExceptT String (RWS MethodSignature [ITransStmt] TransBodyState) a)
-  deriving (Functor, Applicative, Monad, MonadReader MethodSignature, MonadWriter [ITransStmt], MonadState TransBodyState, MonadError String)
+  TransBody (ExceptT String (RWS MethodContext [ITransStmt] TransBodyState) a)
+  deriving (Functor, Applicative, Monad, MonadReader MethodContext, MonadWriter [ITransStmt], MonadState TransBodyState, MonadError String)
 
 runTransBody
-  :: MethodSignature
+  :: MethodContext
   -> TransBodyState
   -> TransBody a
   -> (Either String a, TransBodyState, [ITransStmt])
@@ -64,8 +72,9 @@ runTransBody sig st (TransBody a) = runRWS (runExceptT a) sig st
 -- Translation
 --
 
-translate :: J.CompilationUnit -> Either String ITransStmt
-translate = translateMethodBody <=< extractSingleMethod
+translate :: MethodContext -> J.CompilationUnit -> Either String ITransStmt
+translate methodContext =
+  translateMethodBody methodContext <=< extractSingleMethod
 
 -- TODO: return more info
 extractSingleMethod :: J.CompilationUnit -> Either String J.Block
@@ -73,13 +82,13 @@ extractSingleMethod (J.CompilationUnit _maybePackageDecl _importList [J.ClassTyp
   = Right methodBodyBlock
 extractSingleMethod _ = Left "bad Java compilation unit"
 
-translateMethodBody :: J.Block -> Either String ITransStmt
-translateMethodBody (J.Block jStmts_l) =
+translateMethodBody :: MethodContext -> J.Block -> Either String ITransStmt
+translateMethodBody methodContext (J.Block jStmts_l) =
   let (jStmts, lastRetJExp) = case fromList jStmts_l of
         s :|> (J.BlockStmt (J.Return jRetExp)) -> (s, jRetExp)
         s -> (s, Nothing)
       (eitherRetExp, state, stmts) =
-          runTransBody MethodSignature (TransBodyState 0)
+          runTransBody methodContext (TransBodyState 0)
             $  mapM_ translateBlockStmt jStmts
             >> mapM translateExp lastRetJExp
   in  case eitherRetExp of
@@ -109,7 +118,6 @@ translateBlockStmt (J.BlockStmt s) = translateStmt s
 translateBlockStmt (J.LocalClass _) =
   throwError "local classes are unsupported"
 
-
 translateStmt :: J.Stmt -> TransBody ()
 translateStmt (J.IfThenElse jCond jThen jElse) = do
   cond        <- translateBExp jCond
@@ -118,30 +126,16 @@ translateStmt (J.IfThenElse jCond jThen jElse) = do
   tell [I.SIf cond (I.SSeq iThen) (I.SSeq iElse)]
 translateStmt (J.StmtBlock (J.Block jStmts)) = mapM_ translateBlockStmt jStmts
 translateStmt (J.ExpStmt jExp) = void (translateExp jExp)
-translateStmt (J.While jCond (J.StmtBlock (J.Block jStmts))) = do
-  cond           <- translateBExp jCond
-  (inv, jStmts') <- maybe (throwError "no invariant found in while loop")
-                          return
-                          (extractLoopAnnotation "loopInvariant" jStmts)
-  let (var, jStmts'') = fromMaybe
-        ("true", jStmts')
-        (extractLoopAnnotation "loopVariant" jStmts')
-  ((), body) <- inBlock (mapM_ translateBlockStmt jStmts'')
+translateStmt (J.Labeled (J.Ident label) (J.While jCond jBody)) = do
+  cond       <- translateBExp jCond
+  ((), body) <- inBlock (translateStmt jBody)
+  maybeInv   <- asks (Map.lookup label . mcLoopInvariants)
+  inv        <- maybe noInvError return maybeInv
+  var        <- asks (fromMaybe "true" . Map.lookup label . mcLoopVariants)
   tell [I.SWhile cond (I.SSeq body) (inv, var, False)]
+ where
+  noInvError = throwError ("no invariant found for while loop: " ++ label)
 translateStmt s = throwError ("unsupported statement: " ++ show s)
-
-
-extractLoopAnnotation
-  :: String -> [J.BlockStmt] -> Maybe (String, [J.BlockStmt])
-extractLoopAnnotation annotationName jLoopBody = case jLoopBody of
-  J.BlockStmt (J.ExpStmt (J.MethodInv jInv)) : restJStmts -> case jInv of
-    (J.MethodCall (J.Name [J.Ident call]) [jArg]) | call == annotationName ->
-      case jArg of
-        J.Lit (J.String smtString) -> Just (smtString, restJStmts)
-        _                          -> Nothing
-    _ -> Nothing
-  _ -> Nothing
-
 
 -- TODO: we probably want to support more than only expressions of type int
 translateExp :: J.Exp -> TransBody I.AExp

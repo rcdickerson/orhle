@@ -1,22 +1,24 @@
+import           Control.Arrow                  ( left )
+import           Control.Monad.Except           ( ExceptT
+                                                , forM
+                                                , forM_
+                                                , liftEither
+                                                , liftIO
+                                                , runExceptT
+                                                , throwError
+                                                )
+import           Data.Map.Strict                ( (!) )
+import qualified Data.Map.Strict               as Map
+import qualified Data.Set                      as Set
 import           System.Environment             ( getArgs
                                                 , getProgName
                                                 )
-import           Control.Monad.Except           ( ExceptT
-                                                , runExceptT
-                                                , liftIO
-                                                , liftEither
-                                                , throwError
-                                                , forM_
-                                                )
-import           Control.Arrow                  ( left )
 import           System.FilePath                ( replaceFileName )
-import qualified Data.Set                      as Set
-import qualified Data.Map.Strict               as Map
 
 import qualified Language.Java.Parser          as JavaParser
 import qualified Language.Java.Syntax          as JavaSyntax
-import           VerificationTaskParser
 import           Translate
+import           VerificationTaskParser
 
 main :: IO ()
 main = (>>= reportResult) $ runExceptT $ do
@@ -25,14 +27,19 @@ main = (>>= reportResult) $ runExceptT $ do
   vtFileContents <- liftIO $ readFile vtFilePath
   verifTask <- liftEither $ left show $ parseVerificationTask vtFileContents
   liftIO $ print verifTask
-  let programNames =
-        Set.fromList
-          . map execProgramName
-          $ (vtForallExecs verifTask ++ vtExistsExecs verifTask)
+  let allExecs     = vtForallExecs verifTask ++ vtExistsExecs verifTask
+  let programNames = Set.fromList (map execProgramName allExecs)
   javaPrograms <- sequence $ Map.fromSet (readJavaFile vtFilePath) programNames
-  impPrograms <- liftEither $ mapM translate javaPrograms
-  forM_ (Map.toList impPrograms) $ \(name, prog) -> do
-    liftIO $ putStrLn name
+  impExecs     <- liftEither $ forM allExecs $ \exec ->
+    let extract f =
+            Map.fromList
+              . map (\(_, x, y) -> (x, y))
+              . filter (\(e, _, _) -> e == exec)
+              $ f verifTask
+        mc = MethodContext (extract vtLoopInvariants) (extract vtLoopVariants)
+    in  (,) exec <$> translate mc (javaPrograms ! execProgramName exec)
+  forM_ impExecs $ \(name, prog) -> do
+    liftIO $ print name
     liftIO $ print prog
  where
   reportResult (Left  err) = putStrLn $ "Error: " ++ err

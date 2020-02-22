@@ -27,7 +27,7 @@ data Execution = Execution
   { execProgramName :: String
   , execSubscript :: Maybe String
   }
-  deriving (Show)
+  deriving (Show, Eq)
 
 languageDef :: LanguageDef ()
 languageDef = Token.LanguageDef { Token.caseSensitive   = True
