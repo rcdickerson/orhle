@@ -1,5 +1,7 @@
 // A program with a straightforward leak of high-security state.
 
+expected: invalid;
+
 forall: leak[1], leak[2];
 exists: leak[3];
 
@@ -8,8 +10,6 @@ pre: (and
        (= leak!1!low   leak!2!low)
        (= leak!2!low   leak!3!low));
 post:  (= leak!2!ret   leak!3!ret);
-
-expected: invalid;
 
 prog leak(high, low):
   ret := high + low;

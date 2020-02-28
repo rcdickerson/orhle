@@ -1,18 +1,28 @@
 // A refinement involving a simple conditional.
 
+expected: valid;
+
 forall: refinement;
 exists: original;
 
 pre:  true;
 post: (= original!ret refinement!ret);
 
-expected: valid;
+aspecs:
+  flipCoin() {
+    pre: true;
+    post: (or (= ret! 0) (= ret! 1));
+  }
+
+especs:
+  flipCoin() {
+    templateVars: n;
+    pre: (or (= n 0) (= n 1));
+    post: (= ret! n);
+  }
 
 prog original():
-  r := call flipCoin()
-         @templateVars { n }
-         @pre  { (or (= n 0) (= n 1)) }
-         @post { (= r n) };
+  r := call flipCoin();
   if (r == 0) then
     ret := 10;
   else
@@ -21,9 +31,7 @@ prog original():
 endp
 
 prog refinement():
-  r := call flipCoin()
-         @pre  { true }
-         @post { (or (= n 0) (= n 1)) };
+  r := call flipCoin();
   if (r == 0) then
     ret := 20;
   else

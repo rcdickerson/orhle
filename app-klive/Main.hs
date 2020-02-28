@@ -3,7 +3,6 @@ module Main where
 import KLiveParser
 import Orhle
 import System.Environment
-import System.Exit
 import Z3.Monad
 
 main :: IO ()
@@ -14,8 +13,8 @@ main = do
      Just path -> readFile path >>= runKLive >>= putStrLn
 
 parseArgs :: [String] -> Maybe FilePath
-parseArgs [filepath] = Just filepath
-parseArgs _ = Nothing
+parseArgs [path] = Just path
+parseArgs _      = Nothing
 
 showUsage :: IO ()
 showUsage =
@@ -46,10 +45,10 @@ eidStr Nothing = ""
 eidStr (Just eid) = "[" ++ eid ++ "]"
 
 runKLQuery :: Z3 KLQuery -> Z3 String
-runKLQuery z3Query = do
-  (KLQuery spec pre forall exists post) <- z3Query
+runKLQuery query = do
+  KLQuery specs pre forall exists post <- query
   let trip = RHLETrip pre forall exists post
-  (result, trace) <- noAbdVerifier spec trip
+  (result, trace) <- rhleVerifier specs trip
   traceStr <- ppVTrace trace
   return $ traceStr ++ (resultStr result)
   where

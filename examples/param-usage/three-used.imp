@@ -1,5 +1,7 @@
 // A program that uses all of its parameters.
 
+expected: valid;
+
 exists:
   used[1A], used[1B],
   used[2A], used[2B],
@@ -22,8 +24,6 @@ post: (and
         (not (= used!1A!ret used!1B!ret))
         (not (= used!2A!ret used!2B!ret))
         (not (= used!3A!ret used!3B!ret)));
-
-expected: valid;
 
 prog used(param1, param2, param3):
   ret := (param1 + param2) - param3;

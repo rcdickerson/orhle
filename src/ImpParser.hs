@@ -9,16 +9,13 @@ module ImpParser
     ) where
 
 import Control.Monad
-import Control.Monad.Identity
-import Control.Monad.State
 import Imp
-import Specification
 import Text.Parsec
 import Text.Parsec.Expr
 import Text.Parsec.Language
 import qualified Text.Parsec.Token as Token
 
-languageDef :: GenLanguageDef String () (StateT StringFunSpec Identity)
+languageDef :: LanguageDef()
 languageDef = Token.LanguageDef
   { Token.caseSensitive   = True
   , Token.commentStart    = "/*"
@@ -32,7 +29,7 @@ languageDef = Token.LanguageDef
   , Token.reservedNames   = [ "if", "then", "else", "while", "do", "end"
                             , "call", "skip"
                             , "true", "false"
-                            , "@templateVars", "@pre", "@post", "@inv", "@var"
+                            , "@inv", "@var"
                             , "local"
                             ]
   , Token.reservedOpNames = [ "+", "-", "*", "/", "%"
@@ -57,15 +54,10 @@ whiteSpace = Token.whiteSpace lexer
 type ParsedStmt = AbsStmt String
 type ParsedProg = ParsedStmt
 
-type ImpParser a = ParsecT String () (StateT StringFunSpec Identity) a
+type ImpParser a = Parsec String () a
 
-parseImp :: String -> Either ParseError (ParsedProg, StringFunSpec)
-parseImp str =
-  let (prog, spec) = runIdentity $
-        runStateT (runPT impParser () "" str) emptyFunSpec
-  in case prog of
-    Left error -> Left error
-    Right prog -> Right (prog, spec)
+parseImp :: String -> Either ParseError ParsedProg
+parseImp = runParser impParser () ""
 
 impParser :: ImpParser ParsedProg
 impParser = do
@@ -133,37 +125,27 @@ assignStmt = do
 
 funcStmt :: ImpParser ParsedStmt
 funcStmt = do
-  (assignee, num) <- try (do
-                             id <- identifier
-                             char '[' >> whiteSpace
-                             num <- integer
-                             char ']' >> whiteSpace
-                             return (id, num))
-                     <|> (do id <- identifier; return (id, 0))
-  let assignees = if (num == 0)
-                  then [assignee]
-                  else map (\n -> assignee ++ "_" ++ (show n)) [0..(num-1)]
+  assignees <- varArray
   reservedOp ":="
   reserved "call"
-  funcName <- identifier
-  params   <- parens $ sepBy identifier comma
-  whiteSpace
-  tvars <- option [] $ do
-    reserved "@templateVars"
-    braces $ sepBy identifier comma
-  whiteSpace
-  pre <- option "true" $ do
-    reserved "@pre"
-    braces $ many $ noneOf "{}"
-  whiteSpace
-  post <- option "true" $ do
-    reserved "@post"
-    braces $ many $ noneOf "{}"
+  funName <- identifier
+  params  <- (liftM concat) . parens $ sepBy varArray comma
   whiteSpace
   semi
-  let func = SFun funcName []
-  get >>= \spec -> put $ addFunSpec func tvars pre post spec
-  return $ SCall assignees func
+  return $ SCall assignees params funName
+
+varArray :: ImpParser [Var]
+varArray = do
+  (vars, num) <- try (do
+                         var <- identifier
+                         char '[' >> whiteSpace
+                         num <- integer
+                         char ']' >> whiteSpace
+                         return (var, num))
+                     <|> (do var <- identifier; return (var, 0))
+  return $ if (num == 0)
+             then [vars]
+             else map (\n -> vars ++ "_" ++ (show n)) [0..(num-1)]
 
 skipStmt :: ImpParser ParsedStmt
 skipStmt = reserved "skip" >> semi >> return SSkip

@@ -239,7 +239,7 @@ data AbsStmt a
   | SSeq   [AbsStmt a]
   | SIf    BExp (AbsStmt a) (AbsStmt a)
   | SWhile BExp (AbsStmt a) (a, a, Bool)
-  | SCall  [Var]  SFun
+  | SCall  [Var] [Var] String
   deriving (Eq, Ord, Show)
 
 type Stmt       = AbsStmt AST
@@ -247,11 +247,11 @@ type Prog       = Stmt
 
 svars :: AbsStmt a -> Set.Set Var
 svars stmt = case stmt of
-  SSkip                   -> Set.empty
-  SAsgn  var aexp         -> Set.insert var $ avars aexp
-  SSeq   []               -> svars SSkip
-  SSeq   (s:ss)           -> Set.union (svars s) (svars $ SSeq ss)
-  SIf    cond bThen bElse -> Set.unions
-                               [(bvars cond), (svars bThen), (svars bElse)]
-  SWhile cond body _      -> Set.union (bvars cond) (svars body)
-  SCall  var  _           -> Set.fromList var
+  SSkip                      -> Set.empty
+  SAsgn  var aexp            -> Set.insert var $ avars aexp
+  SSeq   []                  -> svars SSkip
+  SSeq   (s:ss)              -> Set.union (svars s) (svars $ SSeq ss)
+  SIf    cond bThen bElse    -> Set.unions
+                                  [(bvars cond), (svars bThen), (svars bElse)]
+  SWhile cond body _         -> Set.union (bvars cond) (svars body)
+  SCall  assignees params  _ -> Set.fromList $ assignees ++ params

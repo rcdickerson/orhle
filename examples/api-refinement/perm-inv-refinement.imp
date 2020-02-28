@@ -2,6 +2,8 @@
 // the caller performs some operation that doesn't
 // care about list order.
 
+expected: valid;
+
 forall: refinement;
 exists: original;
 
@@ -26,21 +28,30 @@ pre: (or
             (= original!list_2 refinement!list_0)));
 post: (= original!sum refinement!sum);
 
-expected: valid;
+// The original API call guarantees an ordered list.
+// The refinement makes no guarantees. This is OK
+// because the sum of the list is the same regardless
+// of ordering.
+
+aspecs:
+  refinedGetValues() {
+    pre: true;
+    post: true;
+  }
+
+especs:
+  originalGetValues() {
+    templateVars: n0, n1, n2;
+    pre: (and (<= n0 n1) (<= n1 n2));
+    post: (and (= ret!0 n0) (= ret!1 n1) (= ret!2 n2));
+  }
 
 prog original():
-   // The original API call guarantees an ordered list.
-   list[3] := call getThreeThings()
-       @templateVars { n0, n1, n2 }
-       @pre  { (and (<= n0 n1) (<= n1 n2)) }
-       @post { (and (= n0 list_0) (= n1 list_1) (= n2 list_2)) };
+   list[3] := call originalGetValues();
    sum := list_0 + list_1 + list_2;
 endp
 
 prog refinement():
-   // The refinement makes no guarantees. This is OK
-   // because the sum of the list is the same regardless
-   // of ordering.
-   list := call getThreeThings();
+   list[3] := call refinedGetValues();
    sum := list_0 + list_1 + list_2;
 endp

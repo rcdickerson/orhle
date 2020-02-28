@@ -4,60 +4,59 @@
 *******************************************
 
 :: Executions
-  leakA[1] (forall)
-  leakA[2] (forall)
-  leakE[3] (exists)
+  leak[1] (forall)
+  leak[2] (forall)
+  leak[3] (exists)
 
 :: Verification Conditions
-  (let ((a!1 (exists ((leakE!3!n Int))
-               (let ((a!1 (exists ((leakE!3!r!0 Int)) (= leakE!3!r!0 leakE!3!n))))
-                 (and (>= leakE!3!n 0)
-                      (not (<= 100 leakE!3!n))
+  (let ((a!1 (exists ((leak!3!n Int))
+               (let ((a!1 (exists ((leak!3!r!0 Int)) (= leak!3!r!0 leak!3!n))))
+                 (and (>= leak!3!n 0)
+                      (not (<= 100 leak!3!n))
                       a!1
-                      (forall ((leakE!3!r!0 Int))
-                        (or (not (= leakE!3!r!0 leakE!3!n))
-                            (and (or (not (= leakE!3!r!0 50))
-                                     (= (+ leakA!2!high leakA!2!low)
-                                        (+ leakE!3!high leakE!3!low)))
-                                 (or (= (+ leakA!2!high leakA!2!low) leakE!3!low)
-                                     (= leakE!3!r!0 50)))))))))
-        (a!2 (exists ((leakE!3!n Int))
-               (let ((a!1 (exists ((leakE!3!r!0 Int)) (= leakE!3!r!0 leakE!3!n))))
-                 (and (>= leakE!3!n 0)
-                      (not (<= 100 leakE!3!n))
+                      (forall ((leak!3!r!0 Int))
+                        (or (not (= leak!3!r!0 leak!3!n))
+                            (and (or (not (= leak!3!r!0 50))
+                                     (= (+ leak!2!high leak!2!low)
+                                        (+ leak!3!high leak!3!low)))
+                                 (or (= (+ leak!2!high leak!2!low) leak!3!low)
+                                     (= leak!3!r!0 50)))))))))
+        (a!2 (exists ((leak!3!n Int))
+               (let ((a!1 (exists ((leak!3!r!0 Int)) (= leak!3!r!0 leak!3!n))))
+                 (and (>= leak!3!n 0)
+                      (not (<= 100 leak!3!n))
                       a!1
-                      (forall ((leakE!3!r!0 Int))
-                        (or (not (= leakE!3!r!0 leakE!3!n))
-                            (and (or (not (= leakE!3!r!0 50))
-                                     (= leakA!2!low (+ leakE!3!high leakE!3!low)))
-                                 (or (= leakA!2!low leakE!3!low)
-                                     (= leakE!3!r!0 50))))))))))
-    (=> (and (= leakA!1!high leakE!3!high)
-             (= leakA!1!low leakA!2!low)
-             (= leakA!2!low leakE!3!low))
+                      (forall ((leak!3!r!0 Int))
+                        (or (not (= leak!3!r!0 leak!3!n))
+                            (and (or (not (= leak!3!r!0 50))
+                                     (= leak!2!low (+ leak!3!high leak!3!low)))
+                                 (or (= leak!2!low leak!3!low) (= leak!3!r!0 50))))))))))
+    (=> (and (= leak!1!high leak!3!high)
+             (= leak!1!low leak!2!low)
+             (= leak!2!low leak!3!low))
         (and true
-             (=> (and (>= leakA!2!r 0) (< leakA!2!r 100))
-                 (and (=> (= leakA!2!r 50)
-                          (and (or (not (and (>= leakA!1!r 0)
-                                             (not (<= 100 leakA!1!r))))
-                                   (and (or (not (= leakA!1!r 50)) a!1)
-                                        (or (= leakA!1!r 50) a!1)))))
-                      (=> (not (= leakA!2!r 50))
-                          (and (or (not (and (>= leakA!1!r 0)
-                                             (not (<= 100 leakA!1!r))))
-                                   (and (or (not (= leakA!1!r 50)) a!2)
-                                        (or (= leakA!1!r 50) a!2))))))))))
+             (=> (and (>= leak!2!r 0) (< leak!2!r 100))
+                 (and (=> (= leak!2!r 50)
+                          (and (or (not (and (>= leak!1!r 0)
+                                             (not (<= 100 leak!1!r))))
+                                   (and (or (not (= leak!1!r 50)) a!1)
+                                        (or (= leak!1!r 50) a!1)))))
+                      (=> (not (= leak!2!r 50))
+                          (and (or (not (and (>= leak!1!r 0)
+                                             (not (<= 100 leak!1!r))))
+                                   (and (or (not (= leak!1!r 50)) a!2)
+                                        (or (= leak!1!r 50) a!2))))))))))
 
 Invalid. Model:
-  leakA!1!high -> 0
-  leakA!1!low -> (- 1)
-  leakA!1!r -> 51
-  leakA!2!high -> 51
-  leakA!2!low -> (- 1)
-  leakA!2!r -> 50
-  leakE!3!high -> 0
-  leakE!3!low -> (- 1)
+  leak!1!high -> 1751
+  leak!1!low -> (- 1)
+  leak!1!r -> 49
+  leak!2!high -> 1651
+  leak!2!low -> (- 1)
+  leak!2!r -> 50
+  leak!3!high -> 1751
+  leak!3!low -> (- 1)
 
-real	0m4.618s
-user	0m47.519s
-sys	0m1.852s
+real	0m2.890s
+user	0m27.735s
+sys	0m1.195s

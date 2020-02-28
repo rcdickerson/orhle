@@ -1,5 +1,7 @@
 // A non-deterministic program that doesn't use one of its parameters.
 
+expected: invalid;
+
 exists:
   unused[1A], unused[1B],
   unused[2A], unused[2B];
@@ -14,14 +16,16 @@ post: (and
         (not (= unused!1A!ret unused!1B!ret))
         (not (= unused!2A!ret unused!2B!ret)));
 
-expected: invalid;
+especs:
+  flip() {
+    templateVars: n;
+    pre: (or (= n 0) (= n 1));
+    post: (= ret! n);
+  }
 
 prog unused(param1, param2):
   x := param1 + param2;
-  r := call flip()
-         @templateVars { n }
-         @pre  { (or (= n 0) (= n 1)) }
-         @post { (= r n) };
+  r := call flip();
   if (r == 0) then
     ret := x - param2;
   else

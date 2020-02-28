@@ -10,7 +10,7 @@
 :: Verification Conditions
   (=> true
       (and true
-           (=> (or (= refinement!n 0) (= refinement!n 1))
+           (=> (or (= refinement!r 0) (= refinement!r 1))
                (and (=> (= refinement!r 0)
                         (and (exists ((original!n Int))
                                (let ((a!1 (exists ((original!r!0 Int))
@@ -35,9 +35,8 @@
                                                  (or (= 20 30) (= original!r!0 0))))))))))))))
 
 Invalid. Model:
-  refinement!n -> 0
-  refinement!r -> 2
+  refinement!r -> 1
 
-real	0m0.204s
-user	0m0.177s
-sys	0m0.034s
+real	0m0.207s
+user	0m0.190s
+sys	0m0.025s

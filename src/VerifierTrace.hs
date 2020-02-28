@@ -1,9 +1,8 @@
-module VTrace
-  ( VTrace
+module VerifierTrace
+  ( VerifierTrace
   , VTWriter
   , logAbductionFailure
   , logAbductionSuccess
-  , logAbductionTrace
   , logBranchEnd
   , logBranchStart
   , logCallA
@@ -16,25 +15,23 @@ module VTrace
   , ppVTrace
   ) where
 
-import AbdTrace
 import Control.Monad.Writer
 import Data.List
 import Imp
 import Triples
 import Z3.Monad
 
-data VTrace = VTRhle RHLETrip
-            | VTHle  HLETrip
-            | VTAbdTrace [AbdTrace]
-            | VTAbduction Bool [String] String String
-            | VTCall VTKind String String
-            | VTStartBranch String
-            | VTEndBranch
-            | VTMessage VTKind String
+data VerifierTrace = VTRhle RHLETrip
+                   | VTHle  HLETrip
+                   | VTAbduction Bool [String] String String
+                   | VTCall VTKind String String
+                   | VTStartBranch String
+                   | VTEndBranch
+                   | VTMessage VTKind String
 
 data VTKind = VTKindA | VTKindE | VTKindGeneral
 
-type VTWriter m a = WriterT [VTrace] m a
+type VTWriter m a = WriterT [VerifierTrace] m a
 
 logRhle :: (Monad m) => RHLETrip -> VTWriter m ()
 logRhle trip = do tell [VTRhle trip]
@@ -65,19 +62,16 @@ logAbductionFailure :: (Monad m) => String -> String -> VTWriter m ()
 logAbductionFailure pre post = do
   tell [VTAbduction False [] pre post]
 
-logAbductionTrace :: (Monad m) => [AbdTrace] -> VTWriter m ()
-logAbductionTrace trace = do tell [VTAbdTrace trace]
-
 logCallA :: (Monad m) => String -> String -> VTWriter m ()
 logCallA pre post = do tell [VTCall VTKindA pre post]
 
 logCallE :: (Monad m) => String -> String -> VTWriter m ()
 logCallE pre post = do tell [VTCall VTKindE pre post]
 
-ppVTrace :: [VTrace] -> Z3 String
+ppVTrace :: [VerifierTrace] -> Z3 String
 ppVTrace = ppVTrace' 0
 
-ppVTrace' :: Int -> [VTrace] -> Z3 String
+ppVTrace' :: Int -> [VerifierTrace] -> Z3 String
 ppVTrace' _ [] = return ""
 ppVTrace' indent (t:ts) =
   case t of
@@ -91,13 +85,6 @@ ppVTrace' indent (t:ts) =
       rest    <- ppVTrace' indent ts
       preStr  <- astToString pre
       return $ start ++ "E " ++ preStr ++ " :: " ++ progStr ++ "\n" ++ rest
-    VTAbdTrace trace -> do
-      traceStr <- ppAbdTrace trace
-      rest <- ppVTrace' indent ts
-      return $
-        "---- Abduction ----\n" ++
-        traceStr ++
-        "--------\n" ++ rest
     VTAbduction sat interpLines pre post -> do
       rest    <- ppVTrace' indent ts
       return $ start ++ (if sat then "O " else "X ")
@@ -146,9 +133,9 @@ ppStmtStart stmt =
       condStr <- astToString =<< bexpToZ3 cond
       bodyStr <- ppStmtStart body
       return $ "while " ++ condStr ++ " do " ++ bodyStr ++ " end"
-    SCall assignees (SFun name params) -> do
+    SCall assignees cparams fname -> do
       let astr = "(" ++ (intercalate ", " assignees) ++ ")"
-      return $ astr ++ " := " ++ name ++ "(" ++ (intercalate ", " params) ++ ")"
+      return $ astr ++ " := " ++ fname ++ "(" ++ (intercalate ", " cparams) ++ ")"
 
 kindStr :: VTKind -> String
 kindStr VTKindA = "A"

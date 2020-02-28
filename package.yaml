@@ -26,7 +26,8 @@ dependencies:
 - z3 >= 408.0 && < 409
 
 library:
-  source-dirs: src
+  source-dirs:
+    - src
 
 executables:
   klive-exe:
@@ -38,6 +39,17 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - orhle
+  java-orhle-exe:
+    main:                Main.hs
+    source-dirs:         app-java
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - orhle
+    - language-java
+    - filepath
 
 tests:
   orhle-test:

@@ -22,6 +22,6 @@ Invalid. Model:
   leak!3!high -> 0
   leak!3!low -> 2
 
-real	0m0.208s
-user	0m0.195s
-sys	0m0.021s
+real	0m0.205s
+user	0m0.209s
+sys	0m0.002s

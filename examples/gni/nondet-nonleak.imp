@@ -1,34 +1,33 @@
 // A program which has an unreachable execution path that would
 // leak high-security state.
 
-forall: nonleakA[1], nonleakA[2];
-exists: nonleakE[3];
-
-pre: (and
-       (= nonleakA!1!high nonleakE!3!high)
-       (= nonleakA!1!low  nonleakA!2!low)
-       (= nonleakA!2!low  nonleakE!3!low));
-post:  (= nonleakA!2!ret  nonleakE!3!ret);
-
 expected: valid;
 
-prog nonleakA(high, low):
-  r := call randInt()
-         @pre  { true }
-         @post { (and (>= r 0) (< r 100)) };
-  if (r == 5000) then
-    ret := high + low;
-  else
-    ret := low;
-  end
-endp
+forall: nonleak[1], nonleak[2];
+exists: nonleak[3];
 
-prog nonleakE(high, low):
-  r := call randInt()
-         @templateVars { n }
-         @pre  { (and (>= n 0) (< n 100)) }
-         @post { (= r n) };
-  if (r == 50000) then
+pre: (and
+       (= nonleak!1!high nonleak!3!high)
+       (= nonleak!1!low  nonleak!2!low)
+       (= nonleak!2!low  nonleak!3!low));
+post:  (= nonleak!2!ret  nonleak!3!ret);
+
+aspecs:
+  randInt() {
+    pre: true;
+    post: (and (>= ret! 0) (< ret! 100));
+  }
+
+especs:
+  randInt() {
+    templateVars: n;
+    pre: (and (>= n 0) (< n 100));
+    post: (= ret! n);
+  }
+
+prog nonleak(high, low):
+  r := call randInt();
+  if (r == 5000) then
     ret := high + low;
   else
     ret := low;

@@ -10,7 +10,7 @@
 :: Verification Conditions
   (=> true
       (and true
-           (=> (or (= refinement!n 0) (= refinement!n 1))
+           (=> (or (= refinement!r 0) (= refinement!r 1))
                (and (=> (= refinement!r 0)
                         (and (exists ((original!n Int))
                                (let ((a!1 (exists ((original!r!0 Int))
@@ -36,6 +36,6 @@
 
 Valid.
 
-real	0m0.198s
-user	0m0.190s
-sys	0m0.018s
+real	0m0.216s
+user	0m0.207s
+sys	0m0.017s
