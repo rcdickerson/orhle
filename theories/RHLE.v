@@ -187,7 +187,7 @@ Section RHLE.
         rewrite H0.
         econstructor.
       }
-      eexists X; subst; eauto.
+      eexists _; subst; eauto.
     - eapply IHpf; eauto.
       intros.
       destruct (Fin.eq_dec i i0); subst.
@@ -199,7 +199,7 @@ Section RHLE.
       { intros; destruct (Fin.eq_dec i i0); subst.
         + specialize (exe' i0); rewrite H0 in exe'; simpl in *.
           inversion exe'; subst.
-          inversion X0; subst.
+          inversion H6; subst.
           eauto.
         + rewrite H by eauto.
           eapply exe'.
@@ -211,7 +211,7 @@ Section RHLE.
       + intros; destruct (Fin.eq_dec i i0); subst.
         * rewrite vector_nth_replace; eauto.
         * rewrite vector_nth_replace', <- H; eauto.
-      + eapply (hoare_proof_sound _ _ _ _ _ (H2 Ust Est) _ _ X); eauto.
+      + eapply (hoare_proof_sound _ _ _ _ _ (H2 Ust Est) _ _ H5); eauto.
     - specialize (H2 Ust Est).
       eapply (@ehoare_proof_link {| AllEnv := {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |}; funExSpecs := ESigma |}) in H2; eauto using productive_empty.
       edestruct H2 as [? [? ?] ]; try tauto.
@@ -225,6 +225,8 @@ Section RHLE.
         specialize (exe' i0); rewrite vector_nth_replace in exe'; eauto.
       + specialize (exe' i0); rewrite vector_nth_replace' in exe'; eauto.
         rewrite H; eauto.
+        Grab Existential Variables.
+        intros; eauto.
   Qed.
 
   Inductive RelProductive
@@ -278,7 +280,7 @@ Section RHLE.
       { intros; destruct (Fin.eq_dec i i'); subst.
         + specialize (exe i'); rewrite H0 in exe.
           inversion exe; subst.
-          inversion X0; subst; eauto.
+          inversion H7; subst; eauto.
         + rewrite H; eauto.
       }
       eauto.
@@ -367,7 +369,7 @@ Section RHLE.
       + intros; destruct (Fin.eq_dec i i0); subst.
         * rewrite vector_nth_replace; eauto.
         * rewrite vector_nth_replace', <- H; eauto.
-      + eapply (hoare_proof_sound _ _ _ _ _ (H2 Ust Est) _ _ X); eauto.
+      + eapply (hoare_proof_sound _ _ _ _ _ (H2 Ust Est) _ _ H5); eauto.
     - assert (nth Est i = nth Est i /\ P Ust Est) as H3 by tauto.
       eapply RelP_Step; eauto.
       eapply @ehoare_proof_produces with (Sigma := {| AllEnv := {| funSigs := _ |} |});
@@ -393,10 +395,10 @@ Section RHLE.
       Sigma |= {{P}} Uc ~# Ec {[Q]}.
   Proof.
     unfold rhle_triple; intros.
-    eapply (rhle_proof_RelProductive funSigs _ _ H0 _ _ _ _ H2) in H3;
+    eapply (rhle_proof_RelProductive funSigs _ _ H0 _ _ _ _ H3) in H5;
       eauto using safe_Env_refine.
-    eapply productive_Env_produces in H3; eauto.
-    eapply RelProductive_produces in H3; eauto.
+    eapply productive_Env_produces in H5; eauto.
+    eapply RelProductive_produces in H5; eauto.
   Qed.
 
 End RHLE.

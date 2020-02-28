@@ -161,7 +161,7 @@ Class Env : Type :=
 Reserved Notation "Sigma '|-' st '=[' c ']=>' st'"
                   (at level 40).
 
-Inductive ceval (Sigma : Env) : com -> state -> state -> Type :=
+Inductive ceval (Sigma : Env) : com -> state -> state -> Prop :=
   | E_Skip : forall st,
       Sigma |- st =[ SKIP ]=> st
   | E_Ass  : forall st a1 n x,
@@ -251,7 +251,7 @@ Section safe_Execution.
       safe_funDef Sigma (funSpecs f) fd.
 
   (* A safe initial state is one that guarantees the program will not crash / get stuck *)
-  CoInductive Safe (Sigma : Env) : com -> state -> Type :=
+  CoInductive Safe (Sigma : Env) : com -> state -> Prop :=
     | Safe_Skip : forall st,
       Safe Sigma SKIP st
   | Safe_Ass  : forall st x a,
@@ -304,12 +304,12 @@ Section safe_Execution.
          funDefs := empty |} |- st =[ c ]=> st'.
   Proof.
     induction 3; intros; try (solve [econstructor; eauto]).
-    - inversion X; subst; try congruence; econstructor; eauto.
-    - inversion X; subst; try congruence; econstructor; eauto.
-    - inversion X; subst; eapply E_IfFalse; eauto; congruence.
-    - inversion X; subst; try congruence; econstructor; eauto.
-    - inversion X; subst; try congruence.
-      + simpl in *; rewrite apply_empty in H4; discriminate.
+    - inversion H0; subst; try congruence; econstructor; eauto.
+    - inversion H0; subst; try congruence; econstructor; eauto.
+    - inversion H0; subst; eapply E_IfFalse; eauto; congruence.
+    - inversion H0; subst; try congruence; econstructor; eauto.
+    - inversion H0; subst; try congruence.
+      + simpl in *; rewrite apply_empty in H7; discriminate.
       + eapply (E_CallSpec {| funSpecs := funSpecs; funDefs := empty |});
           simpl in *; eauto.
         eapply H; eauto.
@@ -320,9 +320,34 @@ Section safe_Execution.
 
   Local Hint Constructors ceval.
   Local Hint Constructors AppearsIn.
+  
+  Fixpoint unroll_loop (n : nat)
+           (b : bexp)
+           (c : com)
+    : com :=
+    match n with
+      0 => CWhile b c
+    | S n'  => CIf b (c ;; (unroll_loop n' b c)) CSkip
+    end.
+  
+  Lemma unroll_loop_eqv_while Sigma :
+    forall n b c st st',
+      Sigma |- st =[ CWhile b c ]=> st' <-> Sigma |- st =[unroll_loop n b c ]=> st'.
+  Proof.
+    induction n; simpl; split; intros; eauto.
+    - inversion H; subst.
+      + eapply E_IfFalse; eauto.
+      + econstructor; eauto.
+        econstructor; eauto.
+        eapply IHn; eauto.
+    - inversion H; subst.
+      + inversion H6; subst.
+        econstructor; eauto.
+        eapply IHn; eauto.
+      + inversion H6; subst; econstructor; eauto.
+  Qed.
 
-  (* Some standard weakening and strengthing lemmas for evaluation. *)
-
+  (* Some standard weakening and strengthing lemmas for evaluation. *)    
   Lemma eval_Env_Weaken
     : forall (Sigma : Env)
              (f : funName)
@@ -371,7 +396,7 @@ Section safe_Execution.
       unfold update, t_update in *; find_if_inside; subst; eauto;
         discriminate.
     - eapply E_CallDef; simpl in *; eauto.
-      + eapply update_inv in e; destruct e as [[? ?] | [? ?]];
+      + eapply update_inv in H1; destruct H1 as [[? ?] | [? ?]];
           subst; eauto.
         destruct H; eauto.
       + unfold update, t_update in *; find_if_inside; eauto.
@@ -546,7 +571,7 @@ Section safe_Execution.
                  funDefs := empty |} |- st =[ c ]=> st'.
   Proof.
     intros.
-    eapply safe_Env_refine in X0; simpl in X0;
+    eapply safe_Env_refine in H3; simpl in H3;
       eauto using build_safe_Env_is_safe.
   Qed.
 

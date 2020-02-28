@@ -87,30 +87,30 @@ Section productive_Execution.
   Proof.
     induction 1.
     - assert (AllEnv |- st =[ SKIP ]=> st) by econstructor.
-      eexists _, X; econstructor.
+      eexists _, H; econstructor.
     - eassert (AllEnv |- st =[ x ::= a ]=> _) by (econstructor; eauto).
-      eexists _, X; econstructor.
+      eexists _, H; econstructor.
     - destruct IHProductive as [st' [exe Q_st'] ].
       specialize (H0 _ Q_st'); destruct (H1 _ Q_st') as [st'' [exe' Q'_st']].
       assert (AllEnv |- st =[ c1;; c2 ]=> st'') by (econstructor; eauto).
       eauto.
     - destruct IHProductive as [st' [exe Q_st'] ].
       assert (AllEnv |- st =[ TEST b THEN c1 ELSE c2 FI ]=> st') by (econstructor; eauto).
-      eexists _, X ; eauto.
+      eexists _, H1 ; eauto.
     - destruct IHProductive as [st' [exe Q_st'] ].
       assert (AllEnv |- st =[ TEST b THEN c1 ELSE c2 FI ]=> st') by (econstructor; eauto).
-      eexists _, X; eauto.
+      eexists _, H1; eauto.
     - assert (AllEnv |- st =[ WHILE b DO c END ]=> st) by (econstructor; eauto).
-      eexists _, X; eauto; econstructor.
+      eexists _, H0; eauto; econstructor.
     - destruct IHProductive as [st' [exe Q_st'] ].
       specialize (H1 _ Q_st'); destruct (H2 _ Q_st') as [st'' [exe' Q'_st']].
       assert (AllEnv |- st =[ WHILE b DO c END ]=> st'') by (econstructor; eauto).
       eauto.
     - destruct IHProductive as [st' [exe Q_st'] ].
       eassert (AllEnv |- st =[ x :::= f $ args ]=> _) by (eapply (@E_CallDef AllEnv); eauto).
-      eexists _, X; eauto.
+      eexists _, H1; eauto.
     - eassert (AllEnv |- st =[ x :::= f $ args ]=> _) by (eapply (@E_CallSpec AllEnv); eauto).
-      eexists _, X; eauto.
+      eexists _, H4; eauto.
     - destruct IHProductive as [st' [exe Q_st'] ]; eexists _, exe; eauto.
       eapply H0; apply Q_st'.
   Qed.
@@ -285,114 +285,6 @@ Section EHoare.
   Hint Constructors ehoare_proof : hoare.
   Hint Constructors ceval.
 
-  Lemma ehoare_while (Sigma : Env)  : forall P M b c,
-      (forall n : nat,
-          Sigma |= {[fun st => P st /\ bassn b st /\ M n st]} c {[fun st => P st /\ exists n', M n' st /\ n' < n]}#) ->
-      Sigma |= {[fun st => P st /\ exists n, M n st]} WHILE b DO c END {[fun st => P st /\ ~ (bassn b st)]}#.
-  Proof.
-    unfold ehoare_triple.
-    intros P M b c Hc st [HP H]. destruct H as [n HM]. revert dependent st.
-    induction n as [n IH] using (well_founded_ind lt_wf). intros.
-    destruct (beval st b) eqn:?.
-    - edestruct Hc; eauto. destruct_conjs.
-      edestruct IH; eauto. destruct_conjs.
-      eauto.
-    - repeat econstructor; eauto. firstorder with hoare.
-  Qed.
-
-  (* Theorem ehoare_proof_sound Sigs Sigma ESigma : forall P c Q,
-      ESigma |- {[P]} c {[Q]}# ->
-      {| AllEnv := {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |};
-         funExSpecs := ESigma |} |= {[P]} c {[Q]}#.
-  Proof.
-    unfold ehoare_triple.
-    intros ? ? ? pf. induction pf; intros st HP.
-    - (* SKIP *)
-      eauto.
-    - (* ::= *)
-      repeat econstructor. eauto.
-    - (* ;; *)
-      firstorder eauto.
-    - (* TEST *)
-      destruct (beval st b) eqn:?.
-      + edestruct IHpf1; firstorder eauto.
-      + edestruct IHpf2; firstorder eauto. firstorder with hoare.
-    - (* WHILE *)
-      eapply ehoare_while; eauto.
-      unfold ehoare_triple; intros; eapply H0; eauto.
-    - (* Conseq *)
-      firstorder eauto.
-    - (* :::= *)
-      destruct_conjs.
-      repeat econstructor; eauto.
-      eapply H1; eauto.
-  Qed. *)
-
-  Definition ewp (Sigma : Env) (c:com) (Q:Assertion) : Assertion :=
-    fun st => exists st' (exe : Sigma |- st =[ c ]=> st'), Q st'.
-
-  Lemma ewp_is_precondition {Sigma : Env}: forall c Q,
-      Sigma |= {[ewp Sigma c Q]} c {[Q]}#.
-  Proof.
-    firstorder.
-  Qed.
-
-  Lemma ewp_is_weakest (Sigma : Env) : forall c Q P,
-      Sigma |= {[P]} c {[Q]}# -> P ->> ewp Sigma c Q.
-  Proof.
-    firstorder.
-  Qed.
-
-  Hint Resolve ewp_is_precondition ewp_is_weakest : hoare.
-  Hint Unfold ehoare_triple ewp.
-
-  Fixpoint loop_size {Sigma : Env} {st c st'} (exe : Sigma |- st =[ c ]=> st') : nat :=
-    match exe with
-    | E_WhileTrue _ _ _ _ _ _ _ _ exew => S (loop_size exew)
-    | _ => 0
-    end.
-
-  Definition loop_measureR (Sigma : Env) b c Q n st : Prop :=
-    (exists st' (exe : Sigma |- st =[ WHILE b DO c END ]=> st'),
-        Q st' /\
-        n = loop_size exe).
-
-  Lemma ewp_loop_measureR (Sigma : Env) b c Q st
-    : ewp Sigma (WHILE b DO c END) Q st <-> exists n, loop_measureR Sigma b c Q n st.
-  Proof.
-    unfold ewp, loop_measureR. split.
-    - intros H. destruct H as [st' [exe HQ]].
-      exists (loop_size exe). firstorder eauto.
-    - firstorder.
-  Qed.
-
-  Lemma nonempty_smallest_ex (P : nat -> Prop) :
-    (exists n, P n) ->
-    exists n, P n /\ (forall n', P n' -> n <= n').
-  Proof.
-    intros [n H]. induction n using (well_founded_ind lt_wf).
-    destruct (classic (exists y, y < n /\ P y)).
-    - firstorder.
-    - exists n. intuition. apply Nat.nlt_ge. eauto.
-  Qed.
-
-  Lemma loop_measureR_smallest_ex (Sigma : Env) b c Q st :
-    (exists st' (exe : Sigma |- st =[ WHILE b DO c END ]=> st'), Q st') ->
-    exists st' (exe : Sigma |- st =[ WHILE b DO c END ]=> st'),
-      Q st' /\
-      (forall st'' (exe' : Sigma |- st =[ WHILE b DO c END ]=> st''),
-          Q st'' -> loop_size exe <= loop_size exe').
-  Proof.
-    intros.
-    edestruct (nonempty_smallest_ex
-                 (fun m => exists st' (exe : Sigma |- st =[ WHILE b DO c END ]=> st'),
-                      Q st' /\ loop_size exe = m)).
-    - firstorder eauto.
-    - destruct_conjs. subst. repeat econstructor; eauto.
-      Grab Existential Variables.
-      auto.
-  Qed.
-
   Local Hint Constructors ceval.
   Local Hint Constructors AppearsIn.
 
@@ -456,6 +348,116 @@ Section EHoare.
     eapply productive_Env_produces; eauto.
     eapply ehoare_proof_produces; eauto.
   Qed.
+  
+  Lemma ehoare_while (Sigma : Env)  : forall P M b c,
+      (forall n : nat,
+          Sigma |= {[fun st => P st /\ bassn b st /\ M n st]} c {[fun st => P st /\ exists n', M n' st /\ n' < n]}#) ->
+      Sigma |= {[fun st => P st /\ exists n, M n st]} WHILE b DO c END {[fun st => P st /\ ~ (bassn b st)]}#.
+  Proof.
+    unfold ehoare_triple.
+    intros P M b c Hc st [HP H]. destruct H as [n HM]. revert dependent st.
+    induction n as [n IH] using (well_founded_ind lt_wf). intros.
+    destruct (beval st b) eqn:?.
+    - edestruct Hc; eauto. destruct_conjs.
+      edestruct IH; eauto. destruct_conjs.
+      eauto.
+    - repeat econstructor; eauto. firstorder with hoare.
+  Qed.
+
+  (* Theorem ehoare_proof_sound Sigs Sigma ESigma : forall P c Q,
+      ESigma |- {[P]} c {[Q]}# ->
+      {| AllEnv := {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |};
+         funExSpecs := ESigma |} |= {[P]} c {[Q]}#.
+  Proof.
+    unfold ehoare_triple.
+    intros ? ? ? pf. induction pf; intros st HP.
+    - (* SKIP *)
+      eauto.
+    - (* ::= *)
+      repeat econstructor. eauto.
+    - (* ;; *)
+      firstorder eauto.
+    - (* TEST *)
+      destruct (beval st b) eqn:?.
+      + edestruct IHpf1; firstorder eauto.
+      + edestruct IHpf2; firstorder eauto. firstorder with hoare.
+    - (* WHILE *)
+      eapply ehoare_while; eauto.
+      unfold ehoare_triple; intros; eapply H0; eauto.
+    - (* Conseq *)
+      firstorder eauto.
+    - (* :::= *)
+      destruct_conjs.
+      repeat econstructor; eauto.
+      eapply H1; eauto.
+  Qed. *)
+
+  Definition ewp (Sigma : Env) (c:com) (Q:Assertion) : Assertion :=
+    fun st => exists st' (exe : Sigma |- st =[ c ]=> st'), Q st'.
+
+  Lemma ewp_is_precondition {Sigma : Env}: forall c Q,
+      Sigma |= {[ewp Sigma c Q]} c {[Q]}#.
+  Proof.
+    firstorder.
+  Qed.
+
+  Lemma ewp_is_weakest (Sigma : Env) : forall c Q P,
+      Sigma |= {[P]} c {[Q]}# -> P ->> ewp Sigma c Q.
+  Proof.
+    firstorder.
+  Qed.
+
+  Hint Resolve ewp_is_precondition ewp_is_weakest : hoare.
+  Hint Unfold ehoare_triple ewp.
+
+  (*Fixpoint loop_size {Sigma : Env} {st c st'} (exe : Sigma |- st =[ c ]=> st') : nat :=
+    match exe with
+    | E_WhileTrue _ _ _ _ _ _ _ _ exew => S (loop_size exew)
+    | _ => 0
+    end.
+
+  Definition loop_measureR (Sigma : Env) b c Q n st : Prop :=
+    (exists st' (exe : Sigma |- st =[ WHILE b DO c END ]=> st'),
+        Q st' /\
+        n = loop_size exe).
+
+  Lemma ewp_loop_measureR (Sigma : Env) b c Q st
+    : ewp Sigma (WHILE b DO c END) Q st <-> exists n, loop_measureR Sigma b c Q n st.
+  Proof.
+    unfold ewp, loop_measureR. split.
+    - intros H. destruct H as [st' [exe HQ]].
+      exists (loop_size exe). firstorder eauto.
+    - firstorder.
+  Qed.
+
+  Lemma nonempty_smallest_ex (P : nat -> Prop) :
+    (exists n, P n) ->
+    exists n, P n /\ (forall n', P n' -> n <= n').
+  Proof.
+    intros [n H]. induction n using (well_founded_ind lt_wf).
+    destruct (classic (exists y, y < n /\ P y)).
+    - firstorder.
+    - exists n. intuition. apply Nat.nlt_ge. eauto.
+  Qed.
+
+  Lemma loop_measureR_smallest_ex (Sigma : Env) b c Q st :
+    (exists st' (exe : Sigma |- st =[ WHILE b DO c END ]=> st'), Q st') ->
+    exists st' (exe : Sigma |- st =[ WHILE b DO c END ]=> st'),
+      Q st' /\
+      (forall st'' (exe' : Sigma |- st =[ WHILE b DO c END ]=> st''),
+          Q st'' -> loop_size exe <= loop_size exe').
+  Proof.
+    intros.
+    edestruct (nonempty_smallest_ex
+                 (fun m => exists st' (exe : Sigma |- st =[ WHILE b DO c END ]=> st'),
+                      Q st' /\ loop_size exe = m)).
+    - firstorder eauto.
+    - destruct_conjs. subst. repeat econstructor; eauto.
+      Grab Existential Variables.
+      auto.
+  Qed. *)
+
+
 
   (* WIP on completeness proofs. *)
 
