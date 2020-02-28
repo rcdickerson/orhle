@@ -83,7 +83,7 @@ verificationTaskParser = do
 
 conditionMap :: String -> VTParser [(Execution, LoopLabel, String)]
 conditionMap name = do
-  reserved name >> whiteSpace >> char ':' >> whiteSpace
+  reserved name >> whiteSpace
   between (char '{') (char '}') (whiteSpace >> many loopLabeledCondition)
 
 loopLabeledCondition :: VTParser (Execution, LoopLabel, String)

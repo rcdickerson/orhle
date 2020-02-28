@@ -3,7 +3,7 @@ exists: Original;
 
 post: (= Original!return Nonrefinement!return);
 
-loopInvariants: {
+loopInvariants {
   Original.l:
     (and (=> (<= Original!sum 100) (and (< 100 Nonrefinement!sum) (< Nonrefinement!sum 110)))
          (=> (< 100 Original!sum) (= Original!sum Nonrefinement!sum)));
@@ -11,6 +11,6 @@ loopInvariants: {
     (and (<= 0 Nonrefinement!sum) (< Nonrefinement!sum 111));
 }
 
-loopVariants: {
+loopVariants {
   Original.l: (- 110 sum);
 }
