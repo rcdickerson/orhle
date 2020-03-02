@@ -105,18 +105,20 @@ translateMethodBody methodContext (J.Block jStmts_l) =
           Nothing     -> stmts
 
 translateBlockStmt :: J.BlockStmt -> TransBody ()
-translateBlockStmt (J.LocalVars _ _ decls) = mapM_ transDecl decls
- where
-  transDecl :: J.VarDecl -> TransBody ()
-  transDecl (J.VarDecl _ Nothing) = return () -- do nothing for uninitialized variables
-  transDecl (J.VarDecl (J.VarId (J.Ident varName)) (Just (J.InitExp jExp))) =
-    do
-      exp <- translateExp jExp
-      tell [I.SAsgn varName exp] -- TODO: shadowing?
-  transDecl (J.VarDecl _ _) = throwError "arrays are unsupported"
-translateBlockStmt (J.BlockStmt s) = translateStmt s
+-- TODO: types?
+translateBlockStmt (J.LocalVars _ _ decls) = mapM_ translateVarDecl decls
+translateBlockStmt (J.BlockStmt s        ) = translateStmt s
 translateBlockStmt (J.LocalClass _) =
   throwError "local classes are unsupported"
+
+translateVarDecl :: J.VarDecl -> TransBody ()
+translateVarDecl (J.VarDecl (J.VarId (J.Ident varName)) (Just (J.InitExp jExp)))
+  = do
+    exp <- translateExp jExp
+    tell [I.SAsgn varName exp] -- TODO: shadowing?
+-- do nothing for uninitialized variables
+translateVarDecl (J.VarDecl _ Nothing) = return ()
+translateVarDecl (J.VarDecl _ _      ) = throwError "arrays are unsupported"
 
 translateStmt :: J.Stmt -> TransBody ()
 translateStmt (J.IfThenElse jCond jThen jElse) = do
@@ -124,18 +126,37 @@ translateStmt (J.IfThenElse jCond jThen jElse) = do
   ((), iThen) <- inBlock (translateStmt jThen)
   ((), iElse) <- inBlock (translateStmt jElse)
   tell [I.SIf cond (I.SSeq iThen) (I.SSeq iElse)]
+translateStmt (J.IfThen jCond jThen) = do
+  cond        <- translateBExp jCond
+  ((), iThen) <- inBlock (translateStmt jThen)
+  tell [I.SIf cond (I.SSeq iThen) I.SSkip]
 translateStmt (J.StmtBlock (J.Block jStmts)) = mapM_ translateBlockStmt jStmts
 translateStmt (J.ExpStmt jExp) = void (translateExp jExp)
-translateStmt (J.Labeled (J.Ident label) (J.While jCond jBody)) = do
-  cond       <- translateBExp jCond
-  ((), body) <- inBlock (translateStmt jBody)
-  maybeInv   <- asks (Map.lookup label . mcLoopInvariants)
-  inv        <- maybe noInvError return maybeInv
-  var        <- asks (fromMaybe "true" . Map.lookup label . mcLoopVariants)
+translateStmt (J.Labeled jLabel (J.While jCond jBody)) = do
+  cond        <- translateBExp jCond
+  (() , body) <- inBlock (translateStmt jBody)
+  (inv, var ) <- getLoopAnnotations jLabel
   tell [I.SWhile cond (I.SSeq body) (inv, var, False)]
- where
-  noInvError = throwError ("no invariant found for while loop: " ++ label)
+translateStmt (J.Labeled jLabel (J.BasicFor jInit jCond jUpdates jBody)) = do
+  case jInit of
+    Just (J.ForInitExps exps      ) -> mapM_ translateExp exps
+    -- TODO: types?
+    Just (J.ForLocalVars _ _ decls) -> mapM_ translateVarDecl decls
+    Nothing                         -> return ()
+  cond       <- maybe (return I.BTrue) translateBExp jCond
+  ((), body) <- inBlock $ translateStmt jBody >> mapM_ translateExp
+                                                       (fromMaybe [] jUpdates)
+  (inv, var) <- getLoopAnnotations jLabel
+  tell [I.SWhile cond (I.SSeq body) (inv, var, False)]
 translateStmt s = throwError ("unsupported statement: " ++ show s)
+
+getLoopAnnotations :: J.Ident -> TransBody (String, String)
+getLoopAnnotations (J.Ident label) = do
+  maybeInv <- asks (Map.lookup label . mcLoopInvariants)
+  inv      <- maybe noInvError return maybeInv
+  var      <- asks (fromMaybe "true" . Map.lookup label . mcLoopVariants)
+  return (inv, var)
+  where noInvError = throwError ("loop has no invariant: " ++ label)
 
 -- TODO: we probably want to support more than only expressions of type int
 translateExp :: J.Exp -> TransBody I.AExp
@@ -169,6 +190,9 @@ translateExp (J.BinOp jLhs jOp jRhs) = do
     J.Rem  -> return I.AMod -- TODO: are these the same semantics?
     o      -> throwError ("unsupported arithmetic binary operation: " ++ show o)
   return (op lhs rhs)
+translateExp (J.PreIncrement (J.ExpName (J.Name [J.Ident jUnqualName]))) = do
+  tell [I.SAsgn jUnqualName (I.AAdd (I.AVar jUnqualName) (I.ALit 1))]
+  return (I.AVar jUnqualName)
 translateExp e = throwError ("unsupported expression: " ++ show e)
 
 -- TODO: unify with `translateExp`
