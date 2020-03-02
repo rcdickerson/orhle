@@ -134,7 +134,7 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
   Definition Monotonic_F {A : Type} (F : (A -> Prop) -> A -> Prop) : Prop :=
     forall (S S' : A -> Prop),
       (forall a, S a -> S' a) -> forall a, F S a -> F S' a.
-  
+
   Lemma LFP_is_FixedPoint {A : Type}
     : forall (F : (A -> Prop) -> A -> Prop)
              (F_Monotone : Monotonic_F F)
@@ -177,7 +177,7 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
   Definition FConsistent {A : Type} (F : (A -> Prop) -> A -> Prop)
              (S : A -> Prop) : Prop :=
     forall a, S a -> F S a.
-  
+
   Definition GFP {A : Type} (F : (A -> Prop) -> A -> Prop) : A -> Prop :=
     fun a => exists S, FConsistent F S /\ S a.
 
@@ -187,7 +187,7 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
   Proof.
     unfold GFP, FConsistent; intros; eauto.
   Qed.
-  
+
   Lemma GFP_is_FClosed {A : Type}
     : forall (F : (A -> Prop) -> A -> Prop)
              (F_Monotone : Monotonic_F F),
@@ -427,9 +427,9 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
           eapply IHc in H.
           eapply H in H3.
           eapply IHn in H3; eauto.
-  Admitted.      *)  
+  Admitted.      *)
 
-  
+
   Hint Resolve wp_is_precondition wp_is_weakest : hoare.
   Hint Unfold wp.
 
