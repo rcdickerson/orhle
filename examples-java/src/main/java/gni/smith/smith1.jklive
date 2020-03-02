@@ -1,0 +1,5 @@
+forall: Smith1[1], Smith1[2];
+exists: Smith1[3];
+
+pre:  (= Smith1!1!secret Smith1!3!secret);
+post: (= Smith1!2!ret Smith1!3!ret);
