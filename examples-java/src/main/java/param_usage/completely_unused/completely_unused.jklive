@@ -1,0 +1,4 @@
+exists: CompletelyUnused[1], CompletelyUnused[2];
+
+pre:  (not (= CompletelyUnused!1!param CompletelyUnused!2!param));
+post: (not (= CompletelyUnused!1!return CompletelyUnused!2!return));
