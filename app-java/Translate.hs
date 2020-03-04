@@ -191,8 +191,19 @@ translateExp (J.BinOp jLhs jOp jRhs) = do
     o      -> throwError ("unsupported arithmetic binary operation: " ++ show o)
   return (op lhs rhs)
 translateExp (J.PreIncrement (J.ExpName (J.Name [J.Ident jUnqualName]))) = do
-  tell [I.SAsgn jUnqualName (I.AAdd (I.AVar jUnqualName) (I.ALit 1))]
-  return (I.AVar jUnqualName)
+  saved <- freshTmpVar
+  tell
+    [ I.SAsgn jUnqualName (I.AAdd (I.AVar jUnqualName) (I.ALit 1))
+    , I.SAsgn saved (I.AVar jUnqualName)
+    ]
+  return (I.AVar saved)
+translateExp (J.PostIncrement (J.ExpName (J.Name [J.Ident jUnqualName]))) = do
+  saved <- freshTmpVar
+  tell
+    [ I.SAsgn saved (I.AVar jUnqualName)
+    , I.SAsgn jUnqualName (I.AAdd (I.AVar jUnqualName) (I.ALit 1))
+    ]
+  return (I.AVar saved)
 translateExp e = throwError ("unsupported expression: " ++ show e)
 
 -- TODO: unify with `translateExp`
