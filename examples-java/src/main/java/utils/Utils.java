@@ -17,4 +17,11 @@ public class Utils {
     public static int randOddInt(int max) {
         return new Random().nextInt(max / 2) * 2 + 1;
     }
+
+    /**
+     * @return either 0 or 1
+     */
+    public static int flipCoin() {
+        return randInt(1);
+    }
 }

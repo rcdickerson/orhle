@@ -1,4 +1,4 @@
-package gni.simple;
+package gni.nondet;
 
 import static utils.Utils.*;
 
