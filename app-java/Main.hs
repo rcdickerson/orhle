@@ -10,6 +10,7 @@ import           Control.Monad.Except           ( ExceptT
 import           Data.Map.Strict                ( (!) )
 import qualified Data.Map.Strict               as Map
 import qualified Data.Set                      as Set
+import qualified Data.Text.IO                  as TIO
 import           System.Environment             ( getArgs
                                                 , getProgName
                                                 )
@@ -19,6 +20,7 @@ import qualified Language.Java.Parser          as JavaParser
 import qualified Language.Java.Syntax          as JavaSyntax
 import           Translate
 import           VerificationTaskParser
+import           ImpPrettyPrint
 
 main :: IO ()
 main = (>>= reportResult) $ runExceptT $ do
@@ -40,7 +42,7 @@ main = (>>= reportResult) $ runExceptT $ do
     in  (,) exec <$> translate mc (javaPrograms ! execProgramName exec)
   forM_ impExecs $ \(name, prog) -> do
     liftIO $ print name
-    liftIO $ print prog
+    liftIO $ TIO.putStrLn $ prettyprint prog
  where
   reportResult (Left  err) = putStrLn $ "Error: " ++ err
   reportResult (Right () ) = return ()
