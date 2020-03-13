@@ -4,12 +4,15 @@ module VerificationTaskParser
   ( VerificationTask(..)
   , Execution(..)
   , parseVerificationTask
+  , parseFunSpecsFile
   )
 where
 
 import           Text.Parsec
 import           Text.Parsec.Language
 import qualified Text.Parsec.Token             as Token
+
+import           Spec                           ( FunSpec(FunSpec) )
 
 type LoopLabel = String
 
@@ -45,8 +48,11 @@ languageDef = Token.LanguageDef { Token.caseSensitive   = True
 
 lexer = Token.makeTokenParser languageDef
 
+parens = Token.parens lexer
+braces = Token.braces lexer
 identifier = Token.identifier lexer
 reserved = Token.reserved lexer
+comma = Token.comma lexer
 whiteSpace = Token.whiteSpace lexer
 
 
@@ -62,12 +68,9 @@ verificationTaskParser = do
   whiteSpace
   eExecs <- option [] $ try $ execs "exists"
   whiteSpace
-  preCond <- optionMaybe $ do
-    reserved "pre" >> whiteSpace >> char ':' >> whiteSpace
-    condition
-  postCond <- optionMaybe $ do
-    reserved "post" >> whiteSpace >> char ':' >> whiteSpace
-    condition
+  preCond <- optionMaybe $ reservedLabel "pre" *> untilSemi
+  whiteSpace
+  postCond <- optionMaybe $ reservedLabel "post" *> untilSemi
   whiteSpace
   loopInvariants <- option [] $ try $ conditionMap "loopInvariants"
   whiteSpace
@@ -92,19 +95,16 @@ loopLabeledCondition = do
   _ <- char '.'
   l <- identifier
   char ':' >> whiteSpace
-  c <- condition
+  c <- untilSemi
+  whiteSpace
   return (e, l, c)
 
-condition :: VTParser String
-condition = do
-  smtStr <- manyTill anyChar (try $ char ';')
-  whiteSpace
-  return smtStr
+untilSemi :: VTParser String
+untilSemi = manyTill anyChar (try $ char ';')
 
 execs :: String -> VTParser [Execution]
 execs keyword = do
-  reserved keyword >> whiteSpace
-  char ':' >> whiteSpace
+  reservedLabel keyword
   list <- exec `sepBy1` (char ',' >> whiteSpace)
   char ';' >> whiteSpace
   return list
@@ -122,3 +122,50 @@ execSubscriptParser = do
   eid <- many1 alphaNum
   whiteSpace >> char ']' >> whiteSpace
   return eid
+
+parseFunSpecsFile
+  :: String
+  -> Either
+       ParseError
+       ([(String, FunSpec String)], [(String, FunSpec String)])
+parseFunSpecsFile = runParser funSpecsFileParser () ""
+
+funSpecsFileParser
+  :: VTParser ([(String, FunSpec String)], [(String, FunSpec String)])
+funSpecsFileParser = do
+  whiteSpace
+  aspecs <- option [] $ try $ funSpecList "aspecs"
+  whiteSpace
+  especs <- option [] $ try $ funSpecList "especs"
+  whiteSpace
+  eof
+  return (aspecs, especs)
+
+funSpecList :: String -> VTParser [(String, FunSpec String)]
+funSpecList t = do
+  reserved t
+  whiteSpace
+  braces (whiteSpace >> many funSpec)
+
+funSpec :: VTParser (String, FunSpec String)
+funSpec = do
+  funName <- identifier
+  params  <- parens (identifier `sepBy` comma)
+  whiteSpace
+  (templateVars, pre, post) <- braces $ do
+    templateVars <- option [] $ do
+      reservedLabel "templateVars"
+      vars <- identifier `sepBy` comma
+      _    <- char ';'
+      return vars
+    whiteSpace
+    pre <- option "true" $ reservedLabel "pre" *> untilSemi
+    whiteSpace
+    post <- option "true" $ reservedLabel "post" *> untilSemi
+    whiteSpace
+    return (templateVars, pre, post)
+  return (funName, FunSpec params templateVars pre post)
+
+
+reservedLabel :: String -> VTParser ()
+reservedLabel l = reserved l >> whiteSpace >> char ':' >> whiteSpace

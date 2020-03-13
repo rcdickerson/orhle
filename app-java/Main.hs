@@ -7,8 +7,8 @@ import           Control.Monad.Except           ( ExceptT
                                                 , runExceptT
                                                 , throwError
                                                 )
-import           Data.Map.Strict                ( (!) )
-import qualified Data.Map.Strict               as Map
+import           Data.Map                       ( (!) )
+import qualified Data.Map                      as Map
 import qualified Data.Set                      as Set
 import qualified Data.Text.IO                  as TIO
 import           System.Environment             ( getArgs
@@ -18,16 +18,21 @@ import           System.FilePath                ( replaceFileName )
 
 import qualified Language.Java.Parser          as JavaParser
 import qualified Language.Java.Syntax          as JavaSyntax
+
+import           ImpPrettyPrint
+import           Spec                           ( stringToASTSpec )
+
 import           Translate
 import           VerificationTaskParser
-import           ImpPrettyPrint
 
 main :: IO ()
 main = (>>= reportResult) $ runExceptT $ do
-  args           <- liftIO getArgs
-  vtFilePath     <- parseArgs args
-  vtFileContents <- liftIO $ readFile vtFilePath
-  verifTask <- liftEither $ left show $ parseVerificationTask vtFileContents
+  args                    <- liftIO getArgs
+  (vtFilePath, specPaths) <- parseArgs args
+  verifTask               <- parseFile parseVerificationTask vtFilePath
+  funSpecsLists           <- mapM (parseFile parseFunSpecsFile) specPaths
+  let (aFunSpecs, eFunSpecs) =
+        both (Map.fromList . concat) (unzip funSpecsLists)
   liftIO $ print verifTask
   let allExecs     = vtForallExecs verifTask ++ vtExistsExecs verifTask
   let programNames = Set.fromList (map execProgramName allExecs)
@@ -43,13 +48,22 @@ main = (>>= reportResult) $ runExceptT $ do
   forM_ impExecs $ \(name, prog) -> do
     liftIO $ print name
     liftIO $ TIO.putStrLn $ prettyprint prog
+  _aZ3FunSpecs <- liftEither $ left show $ stringToASTSpec aFunSpecs
+  _eZ3FunSpecs <- liftEither $ left show $ stringToASTSpec eFunSpecs
+  return ()
  where
   reportResult (Left  err) = putStrLn $ "Error: " ++ err
   reportResult (Right () ) = return ()
 
-parseArgs :: [String] -> ExceptT String IO FilePath
-parseArgs [filePath] = return filePath
-parseArgs _          = liftIO showUsage >> throwError "no filename provided"
+parseArgs :: [String] -> ExceptT String IO (FilePath, [FilePath])
+parseArgs (filePath : specPaths) = return (filePath, specPaths)
+parseArgs [] = liftIO showUsage >> throwError "no filename provided"
+
+parseFile
+  :: (Show e) => (String -> Either e a) -> FilePath -> ExceptT String IO a
+parseFile parser filePath = do
+  fileContents <- liftIO $ readFile filePath
+  liftEither $ left show $ parser fileContents
 
 showUsage :: IO ()
 showUsage = do
@@ -63,3 +77,6 @@ readJavaFile vtFilePath programName = do
   liftEither
     $ left ((("could not parse Java file `" ++ filePath ++ "`:\n") ++) . show)
     $ JavaParser.parser JavaParser.compilationUnit fileContents
+
+both :: (a -> b) -> (a, a) -> (b, b)
+both f (a, b) = (f a, f b)
