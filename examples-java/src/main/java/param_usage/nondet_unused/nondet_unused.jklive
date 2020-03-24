@@ -1,0 +1,14 @@
+exists:
+  NondetUnused[1A], NondetUnused[1B],
+  NondetUnused[2A], NondetUnused[2B];
+
+pre: (and
+        (not (= NondetUnused!1A!param1 NondetUnused!1B!param1))
+        (= NondetUnused!1A!param2 NondetUnused!1B!param2)
+        (= NondetUnused!2A!param1 NondetUnused!2B!param1)
+        (not (= NondetUnused!2A!param2 NondetUnused!2B!param2)));
+
+post: (and
+        (not (= NondetUnused!1A!return NondetUnused!1B!return))
+        (not (= NondetUnused!2A!return NondetUnused!2B!return)));
+

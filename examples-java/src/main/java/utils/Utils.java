@@ -3,12 +3,6 @@ import java.util.Random;
 
 public class Utils {
     /**
-     * Specifies the loop invariant
-     * @param s a SMTLib string
-     */
-    public static void loopInvariant(String s) {}
-
-    /**
      * @param max
      * @return a random integer from 0 until `max`
      */
@@ -22,5 +16,12 @@ public class Utils {
      */
     public static int randOddInt(int max) {
         return new Random().nextInt(max / 2) * 2 + 1;
+    }
+
+    /**
+     * @return either 0 or 1
+     */
+    public static int flipCoin() {
+        return randInt(1);
     }
 }

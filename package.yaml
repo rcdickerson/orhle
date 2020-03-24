@@ -24,6 +24,7 @@ dependencies:
 - parsec
 - text
 - z3 >= 408.0 && < 409
+- prettyprinter
 
 library:
   source-dirs:
@@ -46,6 +47,7 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -Wall
     dependencies:
     - orhle
     - language-java

@@ -1,0 +1,23 @@
+exists:
+  ThreeUsed[1A], ThreeUsed[1B],
+  ThreeUsed[2A], ThreeUsed[2B],
+  ThreeUsed[3A], ThreeUsed[3B];
+
+pre: (and
+        (not (= ThreeUsed!1A!param1 ThreeUsed!1B!param1))
+        (= ThreeUsed!1A!param2 ThreeUsed!1B!param2)
+        (= ThreeUsed!1A!param3 ThreeUsed!1B!param3)
+
+        (= ThreeUsed!2A!param1 ThreeUsed!2B!param1)
+        (not (= ThreeUsed!2A!param2 ThreeUsed!2B!param2))
+        (= ThreeUsed!2A!param3 ThreeUsed!2B!param3)
+
+        (= ThreeUsed!3A!param1 ThreeUsed!3B!param1)
+        (= ThreeUsed!3A!param2 ThreeUsed!3B!param2)
+        (not (= ThreeUsed!3A!param3 ThreeUsed!3B!param3)));
+
+post: (and
+        (not (= ThreeUsed!1A!return ThreeUsed!1B!return))
+        (not (= ThreeUsed!2A!return ThreeUsed!2B!return))
+        (not (= ThreeUsed!3A!return ThreeUsed!3B!return)));
+

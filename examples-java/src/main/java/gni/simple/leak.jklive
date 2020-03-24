@@ -1,0 +1,8 @@
+forall: Leak[1], Leak[2];
+exists: Leak[3];
+
+pre: (and
+       (= Leak!1!high  Leak!3!high)
+       (= Leak!1!low   Leak!2!low)
+       (= Leak!2!low   Leak!3!low));
+post:  (= Leak!2!return Leak!3!return);

@@ -1,0 +1,15 @@
+exists:
+  SemanticallyUnused[1A], SemanticallyUnused[1B],
+  SemanticallyUnused[2A], SemanticallyUnused[2B];
+
+pre: (and
+        (not (= SemanticallyUnused!1A!param1 SemanticallyUnused!1B!param1))
+        (= SemanticallyUnused!1A!param2 SemanticallyUnused!1B!param2)
+
+        (= SemanticallyUnused!2A!param1 SemanticallyUnused!2B!param1)
+        (not (= SemanticallyUnused!2A!param2 SemanticallyUnused!2B!param2)));
+
+post: (and
+        (not (= SemanticallyUnused!1A!return SemanticallyUnused!1B!return))
+        (not (= SemanticallyUnused!2A!return SemanticallyUnused!2B!return)));
+

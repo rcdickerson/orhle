@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-missing-signatures #-}
+
 module VerificationTaskParser
   ( VerificationTask(..)
   , Execution(..)
@@ -5,16 +7,19 @@ module VerificationTaskParser
   )
 where
 
-import qualified Data.Map                      as Map
 import           Text.Parsec
 import           Text.Parsec.Language
 import qualified Text.Parsec.Token             as Token
+
+type LoopLabel = String
 
 data VerificationTask = VerificationTask
   { vtForallExecs :: [Execution]
   , vtExistsExecs :: [Execution]
   , vtPostCond    :: Maybe String
   , vtPreCond     :: Maybe String
+  , vtLoopInvariants :: [(Execution, LoopLabel, String)]
+  , vtLoopVariants :: [(Execution, LoopLabel, String)]
   }
   deriving (Show)
 
@@ -22,7 +27,7 @@ data Execution = Execution
   { execProgramName :: String
   , execSubscript :: Maybe String
   }
-  deriving (Show)
+  deriving (Show, Eq)
 
 languageDef :: LanguageDef ()
 languageDef = Token.LanguageDef { Token.caseSensitive   = True
@@ -42,11 +47,6 @@ lexer = Token.makeTokenParser languageDef
 
 identifier = Token.identifier lexer
 reserved = Token.reserved lexer
-reservedOp = Token.reservedOp lexer
-parens = Token.parens lexer
-integer = Token.integer lexer
-comma = Token.comma lexer
-semi = Token.semi lexer
 whiteSpace = Token.whiteSpace lexer
 
 
@@ -69,7 +69,31 @@ verificationTaskParser = do
     reserved "post" >> whiteSpace >> char ':' >> whiteSpace
     condition
   whiteSpace
-  return $ VerificationTask aExecs eExecs preCond postCond
+  loopInvariants <- option [] $ try $ conditionMap "loopInvariants"
+  whiteSpace
+  loopVariants <- option [] $ try $ conditionMap "loopVariants"
+  whiteSpace
+  eof
+  return $ VerificationTask aExecs
+                            eExecs
+                            preCond
+                            postCond
+                            loopInvariants
+                            loopVariants
+
+conditionMap :: String -> VTParser [(Execution, LoopLabel, String)]
+conditionMap name = do
+  reserved name >> whiteSpace
+  between (char '{') (char '}') (whiteSpace >> many loopLabeledCondition)
+
+loopLabeledCondition :: VTParser (Execution, LoopLabel, String)
+loopLabeledCondition = do
+  e <- exec
+  _ <- char '.'
+  l <- identifier
+  char ':' >> whiteSpace
+  c <- condition
+  return (e, l, c)
 
 condition :: VTParser String
 condition = do
@@ -81,18 +105,16 @@ execs :: String -> VTParser [Execution]
 execs keyword = do
   reserved keyword >> whiteSpace
   char ':' >> whiteSpace
-  execs <-
-    sepBy1
-      (do
-        name <- identifier
-        eid  <- optionMaybe $ try execSubscriptParser
-        whiteSpace
-        return $ Execution name eid
-      )
-    $  char ','
-    >> whiteSpace
+  list <- exec `sepBy1` (char ',' >> whiteSpace)
   char ';' >> whiteSpace
-  return execs
+  return list
+
+exec :: VTParser Execution
+exec = do
+  name <- identifier
+  eid  <- optionMaybe $ try execSubscriptParser
+  whiteSpace
+  return $ Execution name eid
 
 execSubscriptParser :: VTParser String
 execSubscriptParser = do
