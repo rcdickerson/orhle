@@ -124,105 +124,6 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
      - end in a state satisfying the post condition or
      - continue looping *)
 
-  Definition FClosed {A : Type} (F : (A -> Prop) -> A -> Prop)
-             (S : A -> Prop) : Prop :=
-    forall a, F S a -> S a.
-
-  Definition LFP {A : Type} (F : (A -> Prop) -> A -> Prop) : A -> Prop :=
-    fun a => forall S, FClosed F S -> S a.
-
-  Definition Monotonic_F {A : Type} (F : (A -> Prop) -> A -> Prop) : Prop :=
-    forall (S S' : A -> Prop),
-      (forall a, S a -> S' a) -> forall a, F S a -> F S' a.
-
-  Lemma LFP_is_FixedPoint {A : Type}
-    : forall (F : (A -> Prop) -> A -> Prop)
-             (F_Monotone : Monotonic_F F)
-             (a : A),
-      F (LFP F) a <-> LFP F a.
-  Proof.
-    split; intros.
-    - unfold LFP, FClosed; intros.
-      eapply H0.
-      eapply F_Monotone.
-      2: eapply H.
-      firstorder eauto.
-    - unfold LFP, FClosed in H.
-      eapply H; intros.
-      eapply F_Monotone.
-      2: eapply H0.
-      simpl; intros.
-      unfold LFP, FClosed; intros.
-      eapply H2.
-      eapply F_Monotone.
-      2: eapply H1.
-      intros.
-      eapply H2.
-      unfold LFP in H3.
-      eapply H3.
-      unfold FClosed.
-      intros.
-      eapply F_Monotone.
-      2: eapply H4.
-      simpl; eauto.
-  Qed.
-
-  Lemma Ind {A : Type}
-    : forall (F : (A -> Prop) -> A -> Prop) (Ind : A -> Prop),
-      FClosed F Ind -> forall a, LFP F a -> Ind a.
-  Proof.
-    unfold LFP, FClosed; intros; eapply H0; eauto.
-  Qed.
-
-  Definition FConsistent {A : Type} (F : (A -> Prop) -> A -> Prop)
-             (S : A -> Prop) : Prop :=
-    forall a, S a -> F S a.
-
-  Definition GFP {A : Type} (F : (A -> Prop) -> A -> Prop) : A -> Prop :=
-    fun a => exists S, FConsistent F S /\ S a.
-
-  Lemma CoInd {A : Type}
-    : forall (F : (A -> Prop) -> A -> Prop) (Ind : A -> Prop),
-      FConsistent F Ind -> forall a, Ind a -> GFP F a.
-  Proof.
-    unfold GFP, FConsistent; intros; eauto.
-  Qed.
-
-  Lemma GFP_is_FClosed {A : Type}
-    : forall (F : (A -> Prop) -> A -> Prop)
-             (F_Monotone : Monotonic_F F),
-      FClosed F (GFP F).
-  Proof.
-    intros ? ?.
-    exists (F (GFP F)); intros; eauto.
-    split; intros; eauto.
-    unfold FConsistent.
-    intros.
-    eapply F_Monotone.
-    2: eauto.
-    intros.
-    destruct H1 as [S [? ?] ].
-    unfold FConsistent in H1.
-    eapply F_Monotone.
-    2: eapply H1; eauto.
-    intros.
-    unfold GFP; eauto.
-  Qed.
-
-  Lemma GFP_is_FConsistent {A : Type}
-    : forall (F : (A -> Prop) -> A -> Prop)
-             (F_Monotone : Monotonic_F F),
-      FConsistent F (GFP F).
-  Proof.
-    intros ? ? ? ?.
-    destruct H as [S [? ?] ].
-    apply H in H0.
-    eapply F_Monotone.
-    2: eapply H0.
-    intros.
-    eexists; eauto.
-  Qed.
-
   Fixpoint gamma
            (Q : Assertion)
            (c : com)
@@ -284,6 +185,74 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
                            (fun Q st => (bassn b st -> wp_gen' funSpecs c Q st)
                                         /\ (~ bassn b st -> Q st))
     end.
+
+  Fixpoint wp_gen''
+           (funSpecs : total_map funSpec)
+           (c : com)
+           (Q : Assertion) {struct c} : Assertion :=
+    match c with
+    | CSkip => Q
+    | CAss x a => Q [x |-> a]
+    | CCall x f args =>
+      fun st => (forall v,
+                    (funSpecs f).(pre) (aseval st args) /\
+                    (funSpecs f).(post) v (aseval st args) ->
+                           Q[x |-> v] st)
+    | CSeq c1 c2 => wp_gen' funSpecs c1 (wp_gen' funSpecs c2 Q)
+    | CIf b c1 c2 => fun st => (bassn b st -> wp_gen' funSpecs c1 Q st)
+                               /\ (~ bassn b st -> wp_gen' funSpecs c2 Q st)
+    | CWhile b c => gamma' Q c b
+                           (fun Q st => (bassn b st -> wp_gen' funSpecs c Q st)
+                                        /\ (~ bassn b st -> Q st))
+    end.
+
+  Definition succR
+             (Sigma : Env)
+             (b : bexp)
+             (c : com)
+             (Inv : Assertion)
+             (st st' : state) :=
+    Inv st /\ bassn b st /\ Sigma |- st =[ c ]=> st'.
+
+  Inductive succRstar
+            (Sigma : Env)
+            (b : bexp)
+            (c : com)
+            (Inv : Assertion)
+    : state -> state -> Prop :=
+  | succRrefl : forall st, succRstar Sigma b c Inv st st
+  | succRtrans : forall st st' st'',
+      succR Sigma b c Inv st st' ->
+      succRstar Sigma b c Inv st' st'' ->
+      succRstar Sigma b c Inv st st''.
+
+  Lemma succRStar_antisym
+    : forall (Sigma : Env)
+             (b : bexp)
+             (c : com)
+             (Inv : Assertion),
+      (forall st, Inv st ->
+                  bassn b st ->
+                  (forall st', Sigma |- st =[ c ]=> st' -> Inv st')
+                  /\exists st', Sigma |- st =[ c ]=> st') ->
+      forall st st',
+        Inv st ->
+        succRstar Sigma b c Inv st st' ->
+        succRstar Sigma b c Inv st' st ->
+        st = st'.
+  Proof.
+    intros.
+    induction H1; eauto.
+    induction H2; eauto.
+    inversion H1; inversion H2; subst; clear H1 H2.
+    intuition.
+    pose proof (proj1 (H _ H7 H6) _ H9).
+
+    Lemma wp_gen_variant
+        forall (funSpecs : total_map funSpec)
+               (c : com)
+               (Q : Assertion),
+
 
   Lemma wp_gen'_is_monotone
     Sigma

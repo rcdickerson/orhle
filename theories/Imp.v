@@ -320,7 +320,7 @@ Section safe_Execution.
 
   Local Hint Constructors ceval.
   Local Hint Constructors AppearsIn.
-  
+
   Fixpoint unroll_loop (n : nat)
            (b : bexp)
            (c : com)
@@ -329,7 +329,7 @@ Section safe_Execution.
       0 => CWhile b c
     | S n'  => CIf b (c ;; (unroll_loop n' b c)) CSkip
     end.
-  
+
   Lemma unroll_loop_eqv_while Sigma :
     forall n b c st st',
       Sigma |- st =[ CWhile b c ]=> st' <-> Sigma |- st =[unroll_loop n b c ]=> st'.
@@ -347,7 +347,7 @@ Section safe_Execution.
       + inversion H6; subst; econstructor; eauto.
   Qed.
 
-  (* Some standard weakening and strengthing lemmas for evaluation. *)    
+  (* Some standard weakening and strengthing lemmas for evaluation. *)
   Lemma eval_Env_Weaken
     : forall (Sigma : Env)
              (f : funName)

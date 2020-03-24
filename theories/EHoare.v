@@ -77,6 +77,65 @@ Section productive_Execution.
         Included state Q Q' ->
         Productive Sigma c st Q'.
 
+  (*Inductive ProductiveBnd (Sigma : ExEnv) : nat -> com -> state -> Ensemble state -> Prop :=
+    | ProductiveBnd_Skip : forall n st,
+        ProductiveBnd Sigma n SKIP st (Singleton st)
+    | ProductiveBnd_Ass  : forall n st x a,
+        ProductiveBnd Sigma n (x ::= a) st (Singleton (x !-> (aeval st a) ; st))
+    | ProductiveBnd_Seq : forall n c1 c2 st Q Q',
+        ProductiveBnd Sigma n c1 st Q ->
+        (forall st', Q st' -> ProductiveBnd Sigma n c2 st' Q') ->
+         ProductiveBnd Sigma n (c1 ;; c2) st Q'
+    | ProductiveBnd_IfTrue : forall n st Q b c1 c2,
+        beval st b = true ->
+        ProductiveBnd Sigma n c1 st Q ->
+        ProductiveBnd Sigma n (TEST b THEN c1 ELSE c2 FI) st Q
+    | ProductiveBnd_IfFalse : forall n st b c1 c2 Q,
+        beval st b = false ->
+        ProductiveBnd Sigma n c2 st Q ->
+        ProductiveBnd Sigma n (TEST b THEN c1 ELSE c2 FI) st Q
+    | ProductiveBnd_WhileFalse : forall n b st c,
+        beval st b = false ->
+        ProductiveBnd Sigma n (WHILE b DO c END) st (Singleton st)
+    | ProductiveBnd_WhileTrue : forall n st b c Q Q',
+        beval st b = true ->
+        ProductiveBnd Sigma n c st Q ->
+        (forall st', Q st' ->
+                     ProductiveBnd Sigma n (WHILE b DO c END) st' Q') ->
+        ProductiveBnd Sigma (S n) (WHILE b DO c END) st Q'
+    | ProductiveBnd_CallDef :
+        forall n st Q args x f fd,
+          funDefs f = Some fd ->
+          ProductiveBnd Sigma n (funBody fd) (build_total_map (funArgs fd) (aseval st args) 0) Q
+          -> ProductiveBnd Sigma n (x :::= f $ args) st
+                        (fun st' => exists st'', Q st'' /\ st' = (x !-> aeval st'' (funRet fd); st))
+    | ProductiveBnd_CallSpec : forall m st args x f n params,
+        funDefs f = None ->
+        (funExSpecs f).(preEx) params (aseval st args) ->
+        (funExSpecs f).(postEx) n params (aseval st args) ->
+        (funSpecs f).(pre) (aseval st args) ->
+        (funSpecs f).(post) n (aseval st args) ->
+        ProductiveBnd Sigma m (x :::= f $ args) st
+                   (fun st' => exists n, (funExSpecs f).(postEx) n params (aseval st args)
+                                         /\ st' = (x !-> n; st))
+  | ProductiveBnd_Weaken : forall n st c Q Q',
+        ProductiveBnd Sigma n c st Q ->
+        Included state Q Q' ->
+        ProductiveBnd Sigma n c st Q'.
+
+  Require Import Coq.Logic.ChoiceFacts.
+
+  Lemma ProductiveBnd_Eqv (Sigma : ExEnv) :
+    forall (c : com)
+           (st : state)
+           (Q : Assertion),
+      Productive Sigma c st Q ->
+      exists n, ProductiveBnd Sigma n c st Q.
+  Proof.
+    induction 1; intros; try solve [eexists _; econstructor; eauto].
+    - destruct IHProductive.
+      eapply GuardedFunctionalChoice_on in H0. *)
+
   (* Productivity is a *stronger* property than evaluation-- it forces
      a command to evaluate to a final state regardless of how
      nondeterministic choices are made. *)
@@ -115,6 +174,100 @@ Section productive_Execution.
       eapply H0; apply Q_st'.
   Qed.
 
+  Inductive MustEval (Sigma : ExEnv) : state -> com -> state -> Prop :=
+    | MustEval_Skip : forall st,
+        MustEval Sigma st SKIP st
+    | MustEval_Ass  : forall st x a,
+        MustEval Sigma st (x ::= a) (x !-> (aeval st a) ; st)
+    | MustEval_Seq : forall c1 c2 st st' st'',
+        MustEval Sigma st c1 st' ->
+        MustEval Sigma st' c2 st'' ->
+         MustEval Sigma st (c1 ;; c2)  st''
+    | MustEval_IfTrue : forall st st' b c1 c2,
+        beval st b = true ->
+        MustEval Sigma st c1 st' ->
+        MustEval Sigma st (TEST b THEN c1 ELSE c2 FI) st'
+    | MustEval_IfFalse : forall st b c1 c2 st',
+        beval st b = false ->
+        MustEval Sigma st c2 st' ->
+        MustEval Sigma st (TEST b THEN c1 ELSE c2 FI) st'
+    | MustEval_WhileFalse : forall b st c,
+        beval st b = false ->
+        MustEval Sigma st (WHILE b DO c END) st
+    | MustEval_WhileTrue : forall st b c st' st'',
+        beval st b = true ->
+        MustEval Sigma st c st' ->
+        MustEval Sigma st' (WHILE b DO c END) st'' ->
+        MustEval Sigma st (WHILE b DO c END) st''
+    | MustEval_CallDef :
+        forall st args x f fd st',
+          funDefs f = Some fd ->
+          MustEval Sigma (build_total_map (funArgs fd) (aseval st args) 0) (funBody fd) st'
+          -> MustEval Sigma st (x :::= f $ args)
+                     (x !-> aeval st' (funRet fd) ; st)
+    | MustEval_CallSpec : forall st args x f n params,
+        funDefs f = None ->
+        (funExSpecs f).(preEx) params (aseval st args) ->
+        (funExSpecs f).(postEx) n params (aseval st args) ->
+        MustEval Sigma st (x :::= f $ args) (x !-> n; st).
+
+  (* An existential environment is consistent if all of its existential specifications
+     imply their universal counterparts.  *)
+  Definition Consistent_Env (Sigma : ExEnv) : Prop :=
+    forall f,
+      (forall (params args : list nat), preEx (funExSpecs f) params args -> pre (funSpecs f) args)
+      /\ (forall (ret : nat) (params args : list nat),
+             postEx (funExSpecs f) ret params args -> post (funSpecs f) ret args).
+
+  (* MustEval is also a stronger property than Eval *)
+  Theorem MustEval_com_MustEval
+          (Sigma : ExEnv)
+          (SigmaOK : Consistent_Env Sigma)
+    : forall (c : com) (st st' : state),
+      MustEval Sigma st c st' ->
+      AllEnv |- st =[c]=> st'.
+  Proof.
+    induction 1; try solve [econstructor; eauto].
+    eapply E_CallSpec; eauto.
+    eapply SigmaOK; eauto.
+    eapply SigmaOK; eauto.
+  Qed.
+
+  Theorem productive_com_MustEval (Sigma : ExEnv) :
+    forall (c : com) (st : state) (Q : Ensemble state),
+      Productive Sigma c st Q ->
+      exists st' (exe : MustEval Sigma st c st'), Q st'.
+  Proof.
+    induction 1.
+    - assert (MustEval Sigma st SKIP st) by econstructor.
+      eexists _, H; econstructor.
+    - eassert (MustEval Sigma st (x ::= a) _) by (econstructor; eauto).
+      eexists _, H; econstructor.
+    - destruct IHProductive as [st' [exe Q_st'] ].
+      specialize (H0 _ Q_st'); destruct (H1 _ Q_st') as [st'' [exe' Q'_st']].
+      assert (MustEval Sigma st (c1;; c2) st'') by (econstructor; eauto).
+      eauto.
+    - destruct IHProductive as [st' [exe Q_st'] ].
+      assert (MustEval Sigma st (TEST b THEN c1 ELSE c2 FI) st') by (econstructor; eauto).
+      eexists _, H1 ; eauto.
+    - destruct IHProductive as [st' [exe Q_st'] ].
+      assert (MustEval Sigma st (TEST b THEN c1 ELSE c2 FI) st') by (econstructor; eauto).
+      eexists _, H1; eauto.
+    - assert (MustEval Sigma st (WHILE b DO c END) st) by (econstructor; eauto).
+      eexists _, H0; eauto; econstructor.
+    - destruct IHProductive as [st' [exe Q_st'] ].
+      specialize (H1 _ Q_st'); destruct (H2 _ Q_st') as [st'' [exe' Q'_st']].
+      assert (MustEval Sigma st (WHILE b DO c END) st'') by (econstructor; eauto).
+      eauto.
+    - destruct IHProductive as [st' [exe Q_st'] ].
+      eassert (MustEval Sigma st (x :::= f $ args) _) by (eapply (@MustEval_CallDef Sigma); eauto).
+      eexists _, H1; eauto.
+    - eassert (MustEval Sigma st (x :::= f $ args) _) by (eapply (@MustEval_CallSpec Sigma); eauto).
+      eexists _, H4; eauto.
+    - destruct IHProductive as [st' [exe Q_st'] ]; eexists _, exe; eauto.
+      eapply H0; apply Q_st'.
+  Qed.
+
   (* A productive function definition is one that produces at least
      one behavior allowed by its specifiction. *)
   Definition productive_funDef (Sigma : ExEnv)
@@ -132,13 +285,7 @@ Section productive_Execution.
       funDefs f = Some fd ->
       productive_funDef Sigma (funExSpecs f) fd.
 
-  (* An existential environment is consistent if all of its existential specifications
-     imply their universal counterparts.  *)
-  Definition Consistent_Env (Sigma : ExEnv) : Prop :=
-    forall f,
-      (forall (params args : list nat), preEx (funExSpecs f) params args -> pre (funSpecs f) args)
-      /\ (forall (ret : nat) (params args : list nat),
-             postEx (funExSpecs f) ret params args -> post (funSpecs f) ret args).
+
 
   Lemma productive_empty
     : forall Sigs Sigma ESigma,
@@ -269,16 +416,80 @@ Section EHoare.
   where "Sigma |- {[ P ]}  c  {[ Q ]}#" := (ehoare_proof Sigma P c Q) : hoare_spec_scope.
 
   Definition ehoare_triple
-             (Sigma : Env)
+             (ESigma : ExEnv)
              (P : Assertion)
              (c : com)
              (Q : Assertion) : Prop :=
     forall st,
       P st ->
-      exists st' (exe : Sigma |- st =[ c ]=> st'), Q st'.
+      exists st' (exe : MustEval ESigma st c st'), Q st'.
 
-  Notation "Sigma |= {[ P ]}  c  {[ Q ]}#" :=
-    (ehoare_triple Sigma P c Q) (at level 90, c at next level)
+  (*Theorem produces_productive_com (Sigma : ExEnv)
+          (SigmaOK : Consistent_Env Sigma)
+    : forall (c : com) (P Q : Assertion),
+      ehoare_triple funSigs funSpecs funExSpecs P c Q ->
+      forall st, P st ->
+                 Productive
+                   {| AllEnv := {| funSigs := funSigs; funSpecs := funSpecs; funDefs := empty |}; funExSpecs := funExSpecs |}
+                   c st Q.
+  Proof.
+    induction c; unfold ehoare_triple; intros.
+    - edestruct (H empty) as [st' [exe ?] ]; eauto using productive_empty;
+        inversion exe; subst.
+      econstructor.
+      econstructor.
+      unfold Included, In; intros; inversion H2; subst; eauto.
+    - eapply H in H0; eauto using productive_empty; clear H.
+      destruct H0 as [st' [exe ?] ].
+      econstructor.
+      econstructor.
+      unfold Included, In; intros; inversion H0; subst; eauto.
+      inversion exe; subst; eauto.
+    - (*econstructor.
+      eapply (H (f |-> {|funBody := _|}; empty)) in H0.
+      destruct H0 as [st' [exe ?] ].
+      inversion exe.
+      simpl in H4; rewrite update_eq in H4; discriminate.
+      simpl in H6; rewrite update_eq in H6; injections; simpl in *.
+      eapply Productive_CallSpec.
+      reflexivity. *)
+      admit.
+    - eapply (H _ (productive_empty _ _ _)) in H0.
+      destruct H0 as [st' [exe ?] ].
+      inversion exe; subst.
+
+
+      econstructor.
+      eapply IHc1; eauto.
+
+      intros ? ? ? ? ?.
+
+
+
+    - destruct IHProductive as [st' [exe Q_st'] ].
+      assert (AllEnv |- st =[ TEST b THEN c1 ELSE c2 FI ]=> st') by (econstructor; eauto).
+      eexists _, H1 ; eauto.
+    - destruct IHProductive as [st' [exe Q_st'] ].
+      assert (AllEnv |- st =[ TEST b THEN c1 ELSE c2 FI ]=> st') by (econstructor; eauto).
+      eexists _, H1; eauto.
+    - assert (AllEnv |- st =[ WHILE b DO c END ]=> st) by (econstructor; eauto).
+      eexists _, H0; eauto; econstructor.
+    - destruct IHProductive as [st' [exe Q_st'] ].
+      specialize (H1 _ Q_st'); destruct (H2 _ Q_st') as [st'' [exe' Q'_st']].
+      assert (AllEnv |- st =[ WHILE b DO c END ]=> st'') by (econstructor; eauto).
+      eauto.
+    - destruct IHProductive as [st' [exe Q_st'] ].
+      eassert (AllEnv |- st =[ x :::= f $ args ]=> _) by (eapply (@E_CallDef AllEnv); eauto).
+      eexists _, H1; eauto.
+    - eassert (AllEnv |- st =[ x :::= f $ args ]=> _) by (eapply (@E_CallSpec AllEnv); eauto).
+      eexists _, H4; eauto.
+    - destruct IHProductive as [st' [exe Q_st'] ]; eexists _, exe; eauto.
+      eapply H0; apply Q_st'.
+  Qed.
+ *)
+
+  Notation "ESigma |= {[ P ]}  c  {[ Q ]}#" :=
+    (ehoare_triple ESigma P c Q) (at level 90, c at next level)
     : hoare_spec_scope.
 
   Hint Resolve bassn_eval_true bassn_eval_false : hoare.
@@ -341,15 +552,15 @@ Section EHoare.
       productive_Env Sigma ->
       Consistent_Env Sigma ->
       funExSpecs |- {[P]} c {[Q]}# ->
-      AllEnv |= {[P]} c {[Q]}#.
+      Sigma |= {[P]} c {[Q]}#.
   Proof.
-    intros; intros ? ?.
-    eapply productive_com_produces.
+    unfold ehoare_triple; intros.
+    eapply productive_com_MustEval.
     eapply productive_Env_produces; eauto.
     eapply ehoare_proof_produces; eauto.
   Qed.
 
-  Lemma ehoare_while (Sigma : Env)  : forall P M b c,
+  (*Lemma ehoare_while (Sigma : Env)  : forall P M b c,
       (forall n : nat,
           Sigma |= {[fun st => P st /\ bassn b st /\ M n st]} c {[fun st => P st /\ exists n', M n' st /\ n' < n]}#) ->
       Sigma |= {[fun st => P st /\ exists n, M n st]} WHILE b DO c END {[fun st => P st /\ ~ (bassn b st)]}#.
@@ -362,7 +573,7 @@ Section EHoare.
       edestruct IH; eauto. destruct_conjs.
       eauto.
     - repeat econstructor; eauto. firstorder with hoare.
-  Qed.
+  Qed. *)
 
    Lemma Empty_PreCondition :
     forall Sigma c Q,
@@ -396,60 +607,249 @@ Section EHoare.
       econstructor.
   Qed.
 
-  (* Theorem ehoare_proof_sound Sigs Sigma ESigma : forall P c Q,
-      ESigma |- {[P]} c {[Q]}# ->
-      {| AllEnv := {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |};
-         funExSpecs := ESigma |} |= {[P]} c {[Q]}#.
-  Proof.
-    unfold ehoare_triple.
-    intros ? ? ? pf. induction pf; intros st HP.
-    - (* SKIP *)
-      eauto.
-    - (* ::= *)
-      repeat econstructor. eauto.
-    - (* ;; *)
-      firstorder eauto.
-    - (* TEST *)
-      destruct (beval st b) eqn:?.
-      + edestruct IHpf1; firstorder eauto.
-      + edestruct IHpf2; firstorder eauto. firstorder with hoare.
-    - (* WHILE *)
-      eapply ehoare_while; eauto.
-      unfold ehoare_triple; intros; eapply H0; eauto.
-    - (* Conseq *)
-      firstorder eauto.
-    - (* :::= *)
-      destruct_conjs.
-      repeat econstructor; eauto.
-      eapply H1; eauto.
-  Qed. *)
-
-  Definition ewp (ESigma : total_map funExSpec) (c:com) (Q:Assertion) : Assertion :=
-    fun st => forall (Sigma : Env),
-        Consistent_Env {| AllEnv := Sigma; funExSpecs := ESigma |} ->
-        productive_Env {| AllEnv := Sigma; funExSpecs := ESigma |} ->
-        exists st' (exe : Sigma |- st =[ c ]=> st'), Q st'.
+  Definition ewp (ESigma : ExEnv) (c:com) (Q:Assertion) : Assertion :=
+    fun st => exists st' (exe : MustEval ESigma st c st'), Q st'.
 
   Lemma ewp_is_precondition {Sigma : ExEnv}
         (SigmaOK : Consistent_Env Sigma)
         (SigmaOK' : productive_Env Sigma)
     : forall c Q,
-      AllEnv |= {[ewp funExSpecs c Q]} c {[Q]}#.
+      Sigma |= {[ewp Sigma c Q]} c {[Q]}#.
   Proof.
-    intros.
-    destruct Sigma; firstorder.
+    firstorder eauto.
   Qed.
 
-  (*Lemma ewp_is_weakest (Sigma : Env)
-
+  Lemma ewp_is_weakest (Sigma : ExEnv)
     : forall c Q P,
       Sigma |= {[P]} c {[Q]}# -> P ->> ewp Sigma c Q.
   Proof.
     firstorder.
-  Qed. *)
+  Qed.
 
-  Hint Resolve ewp_is_precondition (*ewp_is_weakest *) : hoare.
+  Fixpoint gammaE'
+           (Q : Assertion)
+           (c : com)
+           (b : bexp)
+           (WP : Assertion -> Assertion)
+           (n : nat) : Assertion :=
+    match n with
+    | 0 => fun st => ~ bassn b st /\ Q st
+    | S n' => fun st => bassn b st /\ WP (gammaE' Q c b WP n') st
+    end.
+
+  Fixpoint ewp_gen'
+           (funSpecs : total_map funExSpec)
+           (c : com)
+           (Q : Assertion) {struct c} : Assertion :=
+    match c with
+    | CSkip => Q
+    | CAss x a => Q [x |-> a]
+    | CCall x f args =>
+      fun st => (exists os,
+                      (funSpecs f).(preEx) os (aseval st args) /\
+                      (exists v, (funSpecs f).(postEx) v os (aseval st args)) /\
+                      (forall v, (funSpecs f).(postEx) v os (aseval st args)
+                                 -> Q[x |-> v] st))
+    | CSeq c1 c2 => ewp_gen' funSpecs c1 (ewp_gen' funSpecs c2 Q)
+    | CIf b c1 c2 => fun st => (bassn b st -> ewp_gen' funSpecs c1 Q st)
+                               /\ (~ bassn b st -> ewp_gen' funSpecs c2 Q st)
+    | CWhile b c => fun st => exists n, gammaE' Q c b
+                           (fun Q st => (bassn b st -> ewp_gen' funSpecs c Q st)
+                                        /\ (~ bassn b st -> Q st)) n st
+    end.
+
+  Fixpoint unroll_loop' (n : nat)
+           (b : bexp)
+           (c : com)
+    : com :=
+    match n with
+      0 => CSkip
+    | S n'  => CIf b (c ;; (unroll_loop' n' b c)) CSkip
+    end.
+
+  Lemma unroll_loop_eqv_while Sigma :
+    forall b c st st',
+      MustEval Sigma st (CWhile b c) st' ->
+      ~ bassn b st' /\ exists n, MustEval Sigma st (unroll_loop' n b c) st'.
+  Proof.
+    intros.
+    remember (CWhile b c); revert b c Heqc0; induction H; intros; subst;
+      try solve [inversion Heqc0]; injections; split.
+    - eapply bassn_eval_false; eauto.
+    - exists 0; simpl; econstructor.
+    - destruct (IHMustEval2 _ _ (eq_refl _)) as [? [n' ?] ]; eauto.
+    - destruct (IHMustEval2 _ _ (eq_refl _)) as [? [n' ?] ].
+      eexists (S n'); simpl; eauto.
+      econstructor; eauto.
+      econstructor; eauto.
+  Qed.
+
+  Lemma ewp_gen'_is_monotone
+    Sigma
+    : forall (c : com) (a : state) (S S' : state -> Prop),
+      (forall a0 : state, S a0 -> S' a0) -> ewp_gen' Sigma c S a -> ewp_gen' Sigma c S' a.
+  Proof.
+    induction c; simpl; intros; eauto.
+    - unfold assn_sub; eauto.
+    - unfold assn_sub in *; eauto.
+      destruct H0 as [os [? [ [v ?] ?] ] ].
+      eexists os; intuition eauto.
+    - intuition; eauto.
+    - destruct H0 as [n ?].
+      eexists n.
+      generalize dependent a.
+      induction n; simpl in *; intuition eauto.
+  Qed.
+
+  Hint Resolve ewp_is_precondition ewp_is_weakest : hoare.
   Hint Unfold ehoare_triple ewp.
+
+  Lemma ewp_gen'_is_ewp ESigma
+        (ESigmaOK : productive_Env ESigma)
+    : forall c (Q : Assertion) sigma,
+
+      ewp {| AllEnv := {| funSigs := @funSigs AllEnv;
+                                   funSpecs := @funSpecs AllEnv;
+                                   funDefs := empty |};
+                      funExSpecs := funExSpecs |}
+          c Q sigma
+      -> ewp_gen' (@funExSpecs ESigma) c Q sigma.
+  Proof.
+    induction c; simpl; intros.
+    - destruct H as [? [H ?] ].
+      inversion H; subst; firstorder eauto.
+    - destruct H as [? [H ?] ].
+      inversion H; subst; firstorder eauto.
+    - destruct H as [? [H ?] ].
+       inversion H; subst.
+       + simpl in H6; rewrite apply_empty in H6; discriminate.
+       + eexists params; intuition eauto.         (*remember (CCall x f args).
+      induction H; try discriminate; injections.
+      + clear IHProductive. admit.
+      + eexists params; firstorder eauto.
+      + eapply IHProductive in Heqc; clear IHProductive.
+        destruct Heqc as [params [? [? ?] ] ]; eexists _; firstorder eauto.
+        eapply H0; eapply H3; eauto. *)
+      admit.
+    - destruct H as [? [H ?] ].
+      inversion H; subst.
+      eapply IHc1.
+      eexists _, _; eauto.
+    - destruct H as [? [H ?] ].
+      inversion H; subst.
+      + split; intros.
+        * eapply IHc1; eauto.
+        * eapply bassn_eval_false in H1; congruence.
+      + split; intros.
+        * eapply bassn_eval_false in H6; congruence.
+        * eauto.
+    - destruct H as [? [H ?] ].
+      eapply unroll_loop_eqv_while in H; destruct H as [? [n ?] ].
+      revert IHc Q sigma x H H1 H0.
+      induction n; simpl; intros.
+      + eexists 0; simpl; inversion H1; subst; eauto.
+      + inversion H1; subst; clear H1; eauto.
+        * inversion H8; subst; clear H8.
+          eapply bassn_eval_true in H7.
+          destruct (IHn IHc _ _ _ H H6 H0) as [n' ?].
+          eexists (S n'); simpl.
+          intuition eauto.
+        * inversion H8; subst; intuition eauto.
+          inversion H8; subst; simpl; eexists 0; simpl; eauto.
+          Grab Existential Variables.
+          eauto.
+  Admitted.
+
+  Theorem hoare_proof_ewp' Sigma : forall c Q,
+      Sigma |- {[ewp_gen' Sigma c Q]} c {[Q]}#.
+  Proof.
+    (* Need to pull prophecy vars out somehow... *)
+    induction c; simpl; intros; try solve [econstructor].
+    - admit. (* econstructor.
+      2: { intros.
+           destruct H.
+           exact H.
+      eapply EH_Spec.
+      intros ? [os [? [ [v' ?] ?] ] ].
+
+     firstorder eauto. *)
+    - econstructor; eauto.
+    - econstructor; eauto.
+      + econstructor; firstorder eauto.
+      + econstructor; firstorder eauto.
+    - econstructor.
+      econstructor.
+      2: { intros.
+           simpl; split.
+           exact H.
+           eauto.
+      }
+      intro; revert IHc.
+      2: { simpl; intros.
+           destruct H as [ [n ?] ?].
+           destruct n; simpl in H; intuition eauto.
+      }
+      simpl.
+      destruct n; simpl; intros.
+      + econstructor.
+        eapply Empty_PreCondition.
+        intuition.
+        intros; eapply H.
+      + econstructor.
+      2: intros; destruct H as [_ ?]; eapply H.
+      2: { intros; split;
+           [ eexists n; apply H | ].
+           eexists n; eauto. }
+      econstructor.
+      eapply IHc.
+      2: eauto.
+      intros; intuition.
+  Admitted.
+
+  Theorem ehoare_proof_complete Sigma
+          (Sigma_OK : Consistent_Env Sigma)
+          (Sigma_OK' : productive_Env Sigma)
+    : forall P c Q,
+      {| AllEnv := {| funSigs := @funSigs AllEnv;
+                                   funSpecs := @funSpecs AllEnv;
+                                   funDefs := empty |};
+                      funExSpecs := funExSpecs |} |= {[P]} c {[Q]}# ->
+      funExSpecs |- {[P]} c {[Q]}#.
+  Proof.
+    intros; econstructor.
+    - eapply hoare_proof_ewp'.
+    - intros.
+      eapply ewp_gen'_is_ewp; eauto.
+    - eauto.
+  Qed.
+
+  (* The Productive predicate and the existential hoare rules should
+  be equivalent. This proof will let us prove the soundness of vc
+  generation with respect to the hoare rules. *)
+  Theorem produces_ehoare_proof {Sigma : ExEnv}
+    : forall c (P Q : Assertion),
+      productive_Env Sigma ->
+      Consistent_Env Sigma ->
+      (forall st,
+        P st ->
+        Productive {| AllEnv := {| funSigs := @funSigs AllEnv;
+                                   funSpecs := @funSpecs AllEnv;
+                                   funDefs := empty |};
+                      funExSpecs := funExSpecs |}
+                      c st Q) ->
+        funExSpecs |- {[P]} c {[Q]}#.
+  Proof.
+    intros; econstructor.
+    - eapply hoare_proof_ewp'.
+    - intros.
+      eapply H1 in H2.
+      eapply ewp_gen'_is_ewp; eauto.
+      unfold ewp; intros.
+  Abort.
+(*      eapply (productive_com_produces); eauto.
+      eapply productive_Env_produces; eauto.
+    - eauto.
+  Qed. *)
 
   Definition FClosed {A : Type} (F : (A -> Prop) -> A -> Prop)
              (S : A -> Prop) : Prop :=
@@ -526,20 +926,20 @@ Section EHoare.
            (WP : Assertion -> Assertion)
     : Assertion :=
     @LFP state (fun (G : _ -> _) (st : state) => (~ bassn b st /\ Q st)
-                     \/ (bassn b st /\ WP G st)).
+                                                 \/ (bassn b st /\ WP G st)).
 
-  (* Inductive gammaE''
-            (Q : Assertion)
-            (c : com)
-            (b : bexp)
-            (WP : Assertion -> Assertion)
-    : Assertion :=
-  | Base : forall st,
-      ~ bassn b st -> Q st -> gammaE'' Q c b WP st
-  | Step : forall st,
-      bassn b st ->
-      WP (gammaE'' Q c b WP) st
-      -> gammaE'' Q c b WP st. *)
+  (* (* Inductive gammaE'' *)
+  (*           (Q : Assertion) *)
+  (*           (c : com) *)
+  (*           (b : bexp) *)
+  (*           (WP : Assertion -> Assertion) *)
+  (*   : Assertion := *)
+  (* | Base : forall st, *)
+  (*     ~ bassn b st -> Q st -> gammaE'' Q c b WP st *)
+  (* | Step : forall st, *)
+  (*     bassn b st -> *)
+  (*     WP (gammaE'' Q c b WP) st *)
+  (*     -> gammaE'' Q c b WP st. *) *)
 
   Fixpoint ewp_gen
            (funSpecs : total_map funExSpec)
@@ -562,34 +962,365 @@ Section EHoare.
                                         /\ (~ bassn b st -> Q st))
     end.
 
-  Fixpoint LFPn' {A : Type} (F : (A -> Prop) -> A -> Prop)
-           (n : nat)
-    : A -> Prop :=
-    match n with
-    | 0 => fun _ => False
-    | S n' => F (LFPn' F n')
-    end.
-
-  Definition LFPn {A : Type} (F : (A -> Prop) -> A -> Prop) : A -> Prop :=
-    fun a => exists n, LFPn' F n a.
-
-  Lemma LFPn_is_FConsistent {A : Type}
-    : forall (F : (A -> Prop) -> A -> Prop)
-             (F_Monotone : Monotonic_F F)
-             (a : A),
-      LFPn F a -> F (LFPn F) a.
+  Lemma ewp_gen_is_monotone
+    Sigma
+    : forall (c : com) (a : state) (S S' : state -> Prop),
+      (forall a0 : state, S a0 -> S' a0) -> ewp_gen Sigma c S a -> ewp_gen Sigma c S' a.
   Proof.
-    unfold LFP, FClosed; intros.
-    destruct H as [n ?].
-    induction n.
-    - simpl in H; intuition.
-    - eapply F_Monotone; intros.
-      2: simpl in H; eauto.
-      unfold LFPn.
-      eauto.
+    induction c; simpl; intros; eauto.
+    - unfold assn_sub; eauto.
+    - unfold assn_sub in *; eauto.
+      destruct H0 as [os [? [ [v ?] ?] ] ].
+      eexists os; intuition eauto.
+    - intuition; eauto.
+    - unfold gammaE, LFP, FClosed in *; intros.
+      eapply H0; intuition eauto.
   Qed.
 
-  Lemma LFPn_is_FClosed {A : Type}
+  Definition LoopVariant
+             ESigma
+             (c : com)
+             (b : bexp)
+             (Inv : Assertion)
+             (Q1 Q2 : Assertion)
+    : Prop :=
+    forall st1 st2,
+      Inv st1 ->
+      Inv st2 ->
+      bassn b st1 ->
+      bassn b st2 ->
+      Productive ESigma c st1 Q1 ->
+      Productive ESigma c st2 Q2.
+  (*(gammaE Q1 c b
+                       (fun Q st => (bassn b st -> ewp_gen funSpecs c Q st)
+                                    /\ (~ bassn b st -> Q st)))
+             (gammaE Q2 c b
+                     (fun Q st => (bassn b st -> ewp_gen funSpecs c Q st)
+                                  /\ (~ bassn b st -> Q st))) *)
+
+  Lemma well_founded_gammaE :
+    forall (ESigma : ExEnv)
+           (c : com)
+           (b : bexp)
+           (Q Inv : Assertion)
+           (st : state),
+      Productive ESigma (CWhile b c) st Q ->
+      well_founded (LoopVariant ESigma c b Inv).
+  Proof.
+    intros.
+    remember (CWhile b c); induction H; try discriminate.
+    econstructor.
+    unfold well_founded, LoopVariant; intros.
+    constructor; intros.
+
+
+
+  Lemma ewp_gen_is_ewp
+        Sigs Sigma ESigma'
+        (ESigma :=
+           {| AllEnv := {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |};
+              funExSpecs := ESigma' |})
+    : forall c Q sigma,
+      Productive ESigma c sigma Q
+      -> ewp_gen (@funExSpecs ESigma) c Q sigma.
+  Proof.
+    induction c; simpl; intros.
+    - eapply productive_com_produces in H.
+      destruct H as [? [H ?] ]; inversion H; subst; eauto.
+    - eapply productive_com_produces in H.
+      destruct H as [? [H ?] ]; inversion H; subst; eauto.
+    - remember (CCall x f args).
+      induction H; try discriminate; injections.
+      + eexists params; firstorder eauto.
+      + eapply IHProductive in Heqc; clear IHProductive.
+        destruct Heqc as [params [? [? ?] ] ]; eexists _; firstorder eauto.
+        eapply H0; eapply H3; eauto.
+    - remember (CSeq c1 c2).
+      induction H; try discriminate; injections.
+      + clear IHProductive.
+        eapply IHc1.
+        econstructor; eauto.
+        intros ? ?; unfold In in *.
+        eauto.
+      + eapply ewp_gen_is_monotone; [ | intros; eauto].
+        intros.
+        eapply ewp_gen_is_monotone; eauto.
+    - remember (CIf b c1 c2).
+      induction H; try discriminate; injections.
+      + split; intros.
+        * eapply IHc1; eauto.
+        * eapply bassn_eval_false in H1; congruence.
+      + split; intros.
+        * eapply bassn_eval_false in H; congruence.
+        * eauto.
+      + eapply IHProductive in Heqc; clear IHProductive.
+        intuition; eapply ewp_gen_is_monotone; eauto.
+    - remember (CWhile b c).
+      induction H; try discriminate; injections.
+     + eapply LFP_is_FClosed; intuition eauto.
+       * unfold Monotonic_F; intros; intuition eauto.
+         right; intuition auto.
+         eapply ewp_gen_is_monotone; eauto.
+       * left; intuition.
+         eapply bassn_eval_false; eauto.
+     + eapply LFP_is_FClosed; intuition eauto.
+       * unfold Monotonic_F; intros; intuition eauto.
+         right; intuition auto.
+         eapply ewp_gen_is_monotone; eauto.
+       * right; eapply bassn_eval_true in H; intuition.
+         eapply IHc.
+         econstructor; eauto.
+         unfold Included, In; intros; eapply H2; eauto.
+     + eapply IHProductive in Heqc0; clear IHProductive.
+       eapply Ind; eauto.
+       unfold FClosed; intros.
+       eapply LFP_is_FClosed; intuition eauto.
+       * unfold Monotonic_F; intros; intuition eauto.
+         right; intuition auto.
+         eapply ewp_gen_is_monotone; eauto.
+       * unfold Monotonic_F; intros; intuition eauto.
+         right; intuition auto.
+         eapply ewp_gen_is_monotone; eauto.
+       * firstorder eauto.
+  Qed.
+
+  Theorem hoare_proof_ewp (Sigma : ExEnv) : forall c Q,
+      ehoare_proof funExSpecs (ewp_gen funExSpecs c Q) c Q.
+  Proof.
+    (* Need to pull prophecy vars out somehow... *)
+    induction c; simpl; intros; try solve [econstructor].
+    - admit. (* econstructor.
+      2: { intros.
+           destruct H.
+           exact H.
+      eapply EH_Spec.
+      intros ? [os [? [ [v' ?] ?] ] ].
+
+     firstorder eauto. *)
+    - econstructor; eauto.
+    - econstructor; eauto.
+      + econstructor; firstorder eauto.
+      + econstructor; firstorder eauto.
+    - econstructor.
+      + econstructor.
+        instantiate (2 := gammaE Q c b
+                                   (fun Q st => (bassn b st -> ewp_gen funExSpecs c Q st)
+                                                /\ (~ bassn b st -> Q st))).
+          instantiate (2 := gammaE' Q c b
+                                   (fun Q st => (bassn b st -> ewp_gen funExSpecs c Q st)
+                                                /\ (~ bassn b st -> Q st))).
+          simpl.
+          induction n; simpl.
+          * econstructor.
+            eapply Empty_PreCondition.
+            intuition.
+            intros; eapply H.
+          * econstructor.
+            eapply IHn.
+            -- simpl; intros; intuition.
+               admit.
+            -- simpl; intros.
+               intuition.
+               destruct H1; intuition eauto.
+      + simpl; intros. split; eauto. admit.
+      + intros ? [? ?].
+        eapply LFP_is_FConsistent in H; intuition.
+        unfold Monotonic_F; intros; intuition eauto.
+        right; intuition.
+        eapply ewp_gen_is_monotone; eauto.
+  Admitted.
+
+  (* The Productive predicate and the existential hoare rules should
+  be equivalent. This proof will let us prove the soundness of vc
+  generation with respect to the hoare rules. *)
+  Theorem produces_ehoare_proof {Sigma : ExEnv}
+    : forall c (P Q : Assertion),
+      productive_Env Sigma ->
+      Consistent_Env Sigma ->
+      (forall st,
+        P st ->
+        Productive {| AllEnv := {| funSigs := @funSigs AllEnv;
+                                   funSpecs := @funSpecs AllEnv;
+                                   funDefs := empty |};
+                      funExSpecs := funExSpecs |}
+                      c st Q) ->
+        funExSpecs |- {[P]} c {[Q]}#.
+  Proof.
+    intros; econstructor.
+    - eapply hoare_proof_ewp.
+    - intros.
+      eapply H1 in H2.
+      eapply ewp_gen_is_ewp; eauto.
+    - eauto.
+  Qed.
+
+  Print Assumptions produces_ehoare_proof.
+
+  Inductive ehoare_proof' (Sigma : ExEnv)
+    : Assertion -> com -> Assertion -> Prop :=
+  | EH_Skip' : forall P,
+      Sigma |- {[P]} SKIP {[P]}#
+  | EH_Asgn' : forall Q V a,
+      Sigma |- {[Q[V |-> a]]} V ::= a {[Q]}#
+  | EH_Seq'  : forall P c Q d R,
+      Sigma |- {[P]} c {[Q]}# ->
+      Sigma |- {[Q]} d {[R]}# ->
+      Sigma |- {[P]} c;;d {[R]}#
+  | EH_If' : forall P Q b c1 c2,
+      Sigma |- {[fun st => P st /\ bassn b st]} c1 {[Q]}# ->
+      Sigma |- {[fun st => P st /\ ~(bassn b st)]} c2 {[Q]}# ->
+      Sigma |- {[P]} TEST b THEN c1 ELSE c2 FI {[Q]}#
+  | EH_While' : forall R P b c,
+      well_founded R ->
+      Sigma |- {[fun st => P st /\ bassn b st]} c {[fun st => P st
+                                                              /\ R st st]}# ->
+               Sigma |- {[fun st => P st]} WHILE b DO c END {[fun st => P st
+                                                                        /\ ~ (bassn b st)                                                               ]}#
+  | EH_Consequence'  : forall (P Q P' Q' : Assertion) c,
+      Sigma |- {[P']} c {[Q']}# ->
+      (forall st, P st -> P' st) ->
+      (forall st, Q' st -> Q st) ->
+      Sigma |- {[P]} c {[Q]}#
+
+  | EH_Spec' : forall Q y f xs params,
+      Sigma |- {[fun st =>
+            (funExSpecs f).(preEx) params (aseval st xs) /\
+            (exists v, (funExSpecs  f).(postEx) v params (aseval st xs)) /\
+            forall v, (funExSpecs  f).(postEx) v params (aseval st xs) ->
+                      Q[y |-> v] st]} y :::= f $ xs {[Q]}#
+
+  where "Sigma |- {[ P ]}  c  {[ Q ]}#" := (ehoare_proof' Sigma P c Q) : hoare_spec_scope'.
+
+  Theorem ehoare_proof'_sound {Sigma : ExEnv}
+    : forall (P Q : Assertion) c
+      (consistent_Sigma : Consistent_Env Sigma),
+      productive_Env Sigma ->
+      ehoare_proof' Sigma P c Q ->
+      forall st,
+        P st ->
+        Productive {| AllEnv := {| funSigs := @funSigs AllEnv;
+                                   funSpecs := @funSpecs AllEnv;
+                                   funDefs := empty |};
+                      funExSpecs := funExSpecs |} c st Q.
+  Proof.
+    induction 3; intros; eauto.
+    - eapply Productive_Weaken; try solve [econstructor; eauto].
+      unfold Included, In; intros; inversion H1; subst; eauto.
+    - eapply Productive_Weaken; try solve [econstructor].
+      unfold Included, In; intros; inversion H1; subst; eauto.
+    - eapply Productive_Weaken; try solve [econstructor; eauto].
+      firstorder.
+    - destruct (beval st b) eqn:?.
+      + eapply Productive_Weaken; try solve [econstructor; eauto].
+        firstorder.
+      + eapply Productive_Weaken.
+        * eapply Productive_IfFalse; firstorder eauto.
+          eapply IHehoare_proof'2; firstorder eauto with hoare.
+          eapply bassn_eval_false; eauto.
+        * firstorder.
+    - destruct (beval st b) eqn: ?.
+      2: { eapply Productive_Weaken.
+           eapply Productive_WhileFalse; eauto.
+           unfold Included, In; intros.
+           inversion H2; subst; intuition eauto.
+           eapply bassn_eval_false; eauto. }
+      econstructor; eauto.
+      eapply IHehoare_proof'.
+
+      eapply bassn_eval_true in Heqb0.
+      specialize (IHehoare_proof' _ (conj H1 Heqb0)).
+      econstructor; simpl; eauto; intros.
+      eapply
+      pattern st.
+
+      econstructor; eauto.
+      intros.
+      pattern st'.
+      eapply well_founded_ind; eauto; intros.
+      eapply H5.
+
+      econstructor; eauto; simpl; intros.
+
+      admit.
+    - eapply Productive_Weaken; eauto.
+    - destruct H0 as [? [ [n ?] ?] ] .
+      eapply Productive_Weaken; eauto.
+      + eapply Productive_CallSpec; firstorder eauto.
+      + unfold Included, In; intros.
+        destruct H3 as [n' [? ?] ]; subst.
+        eapply H2; eauto.
+  Admitted.
+
+  Theorem hoare_proof_ewp (Sigma : ExEnv) : forall c Q,
+      ehoare_proof' Sigma (ewp_gen funExSpecs c Q) c Q.
+  Proof.
+    (* Need to pull prophecy vars out somehow... *)
+    induction c; simpl; intros; try solve [econstructor].
+    - admit. (* econstructor.
+      2: { intros.
+           destruct H.
+           exact H.
+      eapply EH_Spec.
+      intros ? [os [? [ [v' ?] ?] ] ].
+
+     firstorder eauto. *)
+    - econstructor; eauto.
+    - econstructor; eauto.
+      + econstructor; firstorder eauto.
+      + econstructor; firstorder eauto.
+    - econstructor.
+      econstructor.
+      (*pose  (fun st st' => Included _
+                                    (gammaE Q c b
+                                            (fun (Q : Assertion) (st : state) => (bassn b st -> ewp_gen funExSpecs c Q st) /\ (~ bassn b st -> Q st)) st')
+                                    (gammaE Q c b
+                                            (fun (Q : Assertion) (st : state) => (bassn b st -> ewp_gen funExSpecs c Q st) /\ (~ bassn b st -> Q st))) st).
+
+      admit. *)
+      2: intros; eapply H.
+      + econstructor; eauto; intros.
+        intuition.
+        eapply LFP_is_FConsistent in H0; intuition.
+        unfold Monotonic_F; intros; intuition eauto.
+        right; intuition.
+        eapply ewp_gen_is_monotone; eauto.
+      + intros; intuition.
+        intuition.
+        eapply LFP_is_FConsistent in H0; intuition.
+        unfold Monotonic_F; intros; intuition eauto.
+        right; intuition.
+        eapply ewp_gen_is_monotone; eauto.
+  Admitted.
+
+
+  (* Fixpoint LFPn' {A : Type} (F : (A -> Prop) -> A -> Prop) *)
+  (*          (n : nat) *)
+  (*   : A -> Prop := *)
+  (*   match n with *)
+  (*   | 0 => fun _ => False *)
+  (*   | S n' => F (LFPn' F n') *)
+  (*   end. *)
+
+  (* Definition LFPn {A : Type} (F : (A -> Prop) -> A -> Prop) : A -> Prop := *)
+  (*   fun a => exists n, LFPn' F n a. *)
+
+  (* Lemma LFPn_is_FConsistent {A : Type} *)
+  (*   : forall (F : (A -> Prop) -> A -> Prop) *)
+  (*            (F_Monotone : Monotonic_F F) *)
+  (*            (a : A), *)
+  (*     LFPn F a -> F (LFPn F) a. *)
+  (* Proof. *)
+  (*   unfold LFP, FClosed; intros. *)
+  (*   destruct H as [n ?]. *)
+  (*   induction n. *)
+  (*   - simpl in H; intuition. *)
+  (*   - eapply F_Monotone; intros. *)
+  (*     2: simpl in H; eauto. *)
+  (*     unfold LFPn. *)
+  (*     eauto. *)
+  (* Qed. *)
+
+  (*Lemma LFPn_is_FClosed {A : Type}
     : forall (F : (A -> Prop) -> A -> Prop)
              (F_Monotone : Monotonic_F F)
              (a : A),
@@ -597,7 +1328,7 @@ Section EHoare.
   Proof.
     unfold LFPn; intros.
     assert (forall (a' : {a | LFPn F a}), exists n, LFPn' F n (proj1_sig a')).
-    (*intros.
+    intros.
     destruct a' as [? [? ?] ].
     ee
     eexists; simpl; eassumption.
@@ -638,6 +1369,7 @@ Section EHoare.
       simpl; intros.
       destruct H0.
       eexists (S x).
+
       simpl.
       apply H0.
   Admitted.
@@ -720,37 +1452,37 @@ Section EHoare.
     - eapply Ind; eauto.
       unfold FClosed; intros. *)
 
-  Fixpoint gammaE'
-           (Q : Assertion)
-           (c : com)
-           (b : bexp)
-           (WP : Assertion -> Assertion)
-           (n : nat) : Assertion :=
-    match n with
-    | 0 => fun st => ~ bassn b st /\ Q st
-    | S n' => fun st => bassn b st /\ WP (gammaE' Q c b WP n') st
-    end.
 
-  Fixpoint ewp_gen'
-           (funSpecs : total_map funExSpec)
-           (c : com)
-           (Q : Assertion) {struct c} : Assertion :=
-    match c with
-    | CSkip => Q
-    | CAss x a => Q [x |-> a]
-    | CCall x f args =>
-      fun st => (exists os,
-                      (funSpecs f).(preEx) os (aseval st args) /\
-                      (exists v, (funSpecs f).(postEx) v os (aseval st args)) /\
-                      (forall v, (funSpecs f).(postEx) v os (aseval st args)
-                                 -> Q[x |-> v] st))
-    | CSeq c1 c2 => ewp_gen' funSpecs c1 (ewp_gen' funSpecs c2 Q)
-    | CIf b c1 c2 => fun st => (bassn b st -> ewp_gen' funSpecs c1 Q st)
-                               /\ (~ bassn b st -> ewp_gen' funSpecs c2 Q st)
-    | CWhile b c => fun st => exists n, gammaE' Q c b
-                           (fun Q st => (bassn b st -> ewp_gen' funSpecs c Q st)
-                                        /\ (~ bassn b st -> Q st)) n st
-    end.
+
+  (*Theorem ehoare_proof_complete' Sigma
+          (Sigma_OK : Consistent_Env Sigma)
+          (Sigma_OK' : productive_Env Sigma)
+    : forall P c Q,
+      ehoare_triple funSigs funSpecs funExSpecs P c Q ->
+      funExSpecs |- {[P]} c {[Q]}#.
+  Proof.
+    intros; econstructor.
+    - eapply hoare_proof_ewp'.
+    - intros.
+      eapply ewp_gen'_is_ewp; eauto.
+      unfold ewp.
+      intros.
+      destruct Sigma0 as [? ? ?]; simpl in *.
+      unfold ehoare_triple in H.
+      eapply H.
+      eapply productive_Env_produces; eauto.
+      unfold ehoare_triple in H.
+      specialize (H _ H0); destruct H as [st' [exe ?] ].
+
+      admit.
+    - eauto.
+      eapply (ewp_is_weakest _ _ _ _ H) in H0.
+      eapply ewp_gen_is_ewp; eauto.
+      unfold Consistent_Env; eauto.
+    - eauto.
+  Qed.
+
+
   (*
   Lemma LFPn_is_FConsistent {A : Type}
     : forall (F : (A -> Prop) -> A -> Prop)
@@ -878,136 +1610,8 @@ Section EHoare.
       unfold gammaE'.
   Admitted.
 
-  Lemma ewp_gen_is_monotone
-    Sigma
-    : forall (c : com) (a : state) (S S' : state -> Prop),
-      (forall a0 : state, S a0 -> S' a0) -> ewp_gen Sigma c S a -> ewp_gen Sigma c S' a.
-  Proof.
-    induction c; simpl; intros; eauto.
-    - unfold assn_sub; eauto.
-    - unfold assn_sub in *; eauto.
-      destruct H0 as [os [? [ [v ?] ?] ] ].
-      eexists os; intuition eauto.
-    - intuition; eauto.
-    - unfold gammaE, LFP, FClosed in *; intros.
-      eapply H0; intuition eauto.
-  Qed.
 
-  Lemma ewp_gen_is_ewp ESigma
-        (ESigmaOK : productive_Env ESigma)
-    : forall c Q sigma,
-      Productive ESigma c sigma Q
-      -> ewp_gen (@funExSpecs ESigma) c Q sigma.
-  Proof.
-    induction c; simpl; intros.
-    - eapply productive_com_produces in H.
-      destruct H as [? [H ?] ]; inversion H; subst; eauto.
-    - eapply productive_com_produces in H.
-      destruct H as [? [H ?] ]; inversion H; subst; eauto.
-    - remember (CCall x f args).
-      induction H; try discriminate; injections.
-      + clear IHProductive. admit.
-      + eexists params; firstorder eauto.
-      + eapply IHProductive in Heqc; clear IHProductive.
-        destruct Heqc as [params [? [? ?] ] ]; eexists _; firstorder eauto.
-        eapply H0; eapply H3; eauto.
-    - remember (CSeq c1 c2).
-      induction H; try discriminate; injections.
-      + clear IHProductive.
-        eapply IHc1.
-        econstructor; eauto.
-        intros ? ?; unfold In in *.
-        eauto.
-      + eapply ewp_gen_is_monotone; [ | intros; eauto].
-        intros.
-        eapply ewp_gen_is_monotone; eauto.
-    - remember (CIf b c1 c2).
-      induction H; try discriminate; injections.
-      + split; intros.
-        * eapply IHc1; eauto.
-        * eapply bassn_eval_false in H1; congruence.
-      + split; intros.
-        * eapply bassn_eval_false in H; congruence.
-        * eauto.
-      + eapply IHProductive in Heqc; clear IHProductive.
-        intuition; eapply ewp_gen_is_monotone; eauto.
-    - remember (CWhile b c).
-      induction H; try discriminate; injections.
-     + eapply LFP_is_FClosed; intuition eauto.
-       * unfold Monotonic_F; intros; intuition eauto.
-         right; intuition auto.
-         eapply ewp_gen_is_monotone; eauto.
-       * left; intuition.
-         eapply bassn_eval_false; eauto.
-     + eapply LFP_is_FClosed; intuition eauto.
-       * unfold Monotonic_F; intros; intuition eauto.
-         right; intuition auto.
-         eapply ewp_gen_is_monotone; eauto.
-       * right; eapply bassn_eval_true in H; intuition.
-         eapply IHc.
-         econstructor; eauto.
-         unfold Included, In; intros; eapply H2; eauto.
-     + eapply IHProductive in Heqc0; clear IHProductive.
-       eapply Ind; eauto.
-       unfold FClosed; intros.
-       eapply LFP_is_FClosed; intuition eauto.
-       * unfold Monotonic_F; intros; intuition eauto.
-         right; intuition auto.
-         eapply ewp_gen_is_monotone; eauto.
-       * unfold Monotonic_F; intros; intuition eauto.
-         right; intuition auto.
-         eapply ewp_gen_is_monotone; eauto.
-       * firstorder eauto.
-  Admitted.
 
-  Theorem hoare_proof_ewp Sigma : forall c Q,
-      Sigma |- {[ewp_gen Sigma c Q]} c {[Q]}#.
-  Proof.
-    (* Need to pull prophecy vars out somehow... *)
-    induction c; simpl; intros; try solve [econstructor].
-    - admit. (* econstructor.
-      2: { intros.
-           destruct H.
-           exact H.
-      eapply EH_Spec.
-      intros ? [os [? [ [v' ?] ?] ] ].
-
-     firstorder eauto. *)
-    - econstructor; eauto.
-    - econstructor; eauto.
-      + econstructor; firstorder eauto.
-      + econstructor; firstorder eauto.
-    - econstructor.
-      econstructor.
-      2: { intros. apply gammaE_eq_gammaE' in H.
-           simpl; split.
-           exact H.
-           instantiate (1 := gammaE' Q c b
-                                     (fun (Q : Assertion) (st : state) => (bassn b st -> ewp_gen Sigma c Q st) /\ (~ bassn b st -> Q st))).
-           eauto.
-           eauto.
-      }
-      intro; revert IHc.
-      2: { simpl; intros.
-           destruct H as [ [n ?] ?].
-           destruct n; simpl in H; intuition eauto.
-      }
-      simpl.
-      destruct n; simpl; intros.
-      + econstructor.
-        eapply Empty_PreCondition.
-        intuition.
-        intros; eapply H.
-      + econstructor.
-      2: intros; destruct H as [_ ?]; eapply H.
-      2: { intros; split;
-           [ eexists n; apply H | ].
-           eexists n; eauto. }
-      econstructor.
-      eapply IHc.
-      2: eauto.
-      intros; intuition.
-  Admitted.
 
   (* The Productive predicate and the existential hoare rules should
   be equivalent. This proof will let us prove the soundness of vc
@@ -1033,222 +1637,23 @@ Section EHoare.
     - eauto.
   Qed.
 
-  Lemma ewp_gen'_is_monotone
-    Sigma
-    : forall (c : com) (a : state) (S S' : state -> Prop),
-      (forall a0 : state, S a0 -> S' a0) -> ewp_gen' Sigma c S a -> ewp_gen' Sigma c S' a.
-  Proof.
-    induction c; simpl; intros; eauto.
-    - unfold assn_sub; eauto.
-    - unfold assn_sub in *; eauto.
-      destruct H0 as [os [? [ [v ?] ?] ] ].
-      eexists os; intuition eauto.
-    - intuition; eauto.
-    - destruct H0 as [n ?].
-      eexists n.
-      generalize dependent a.
-      induction n; simpl in *; intuition eauto.
-  Qed.
-
-  Fixpoint unroll_loop' (n : nat)
-           (b : bexp)
-           (c : com)
-    : com :=
-    match n with
-      0 => CSkip
-    | S n'  => CIf b (c ;; (unroll_loop' n' b c)) CSkip
-    end.
-
-  Lemma unroll_loop_eqv_while Sigma :
-    forall b c st st',
-      Sigma |- st =[ CWhile b c ]=> st' -> ~ bassn b st' /\ exists n, Sigma |- st =[unroll_loop' n b c ]=> st'.
+  Theorem ehoare_proof_link_complete {Sigma : ExEnv}
+    : forall (P Q : Assertion) c,
+      productive_Env Sigma ->
+      Consistent_Env Sigma ->
+      ehoare_triple (@funSigs AllEnv) (@funSpecs AllEnv) funExSpecs P c Q ->
+      funExSpecs |- {[P]} c {[Q]}#.
   Proof.
     intros.
-    remember (CWhile b c); revert b c Heqc0; induction H; intros; subst;
-      try solve [inversion Heqc0]; injections; split.
-    - eapply bassn_eval_false; eauto.
-    - exists 0; eauto.
-    - destruct (IHceval2 _ _ (eq_refl _)) as [? [n' ?] ]; eauto.
-    - destruct (IHceval2 _ _ (eq_refl _)) as [? [n' ?] ].
-      eexists (S n'); simpl; eauto.
-  Qed.
-
-  Lemma ewp_gen'_is_ewp ESigma
-        (ESigmaOK : productive_Env ESigma)
-        (consistent_Sigma : Consistent_Env ESigma)
-    : forall c Q sigma,
-      ewp funExSpecs c Q sigma
-      -> ewp_gen' (@funExSpecs ESigma) c Q sigma.
-  Proof.
-    destruct ESigma; simpl in *.
+    eapply produces_ehoare_proof; eauto.
     intros.
-    specialize (H _ consistent_Sigma ESigmaOK).
-    revert Q sigma H; clear.
-    induction c; simpl; intros.
-    - destruct H as [? [H ?] ].
-      inversion H; subst; firstorder eauto.
-    - destruct H as [? [H ?] ].
-      inversion H; subst; firstorder eauto.
-    - (*remember (CCall x f args).
-      induction H; try discriminate; injections.
-      + clear IHProductive. admit.
-      + eexists params; firstorder eauto.
-      + eapply IHProductive in Heqc; clear IHProductive.
-        destruct Heqc as [params [? [? ?] ] ]; eexists _; firstorder eauto.
-        eapply H0; eapply H3; eauto. *)
-      admit.
-    - destruct H as [? [H ?] ].
-      inversion H; subst.
-      eapply IHc1.
-      eexists _, _; eauto.
-    - destruct H as [? [H ?] ].
-      inversion H; subst.
-      + split; intros.
-        * eapply IHc1; eauto.
-        * eapply bassn_eval_false in H1; congruence.
-      + split; intros.
-        * eapply bassn_eval_false in H6; congruence.
-        * eauto.
-    - destruct H as [? [H ?] ].
-      eapply unroll_loop_eqv_while in H; destruct H as [? [n ?] ].
-      revert IHc Q sigma x H H1 H0.
-      induction n; simpl; intros.
-      + eexists 0; simpl; inversion H1; subst; eauto.
-      + inversion H1; subst; clear H1; eauto.
-        * inversion H8; subst; clear H8.
-          eapply bassn_eval_true in H7.
-          destruct (IHn IHc _ _ _ H H6 H0) as [n' ?].
-          eexists (S n'); simpl.
-          intuition eauto.
-        * inversion H8; subst; intuition eauto.
-          inversion H8; subst; simpl; eexists 0; simpl; eauto.
-          Grab Existential Variables.
-          eauto.
-  Admitted.
+    destruct Sigma as [ [? ? ?] ?].
+    eapply H1 in H2; eauto.
 
-  (*Lemma ewp_gen'_is_ewp ESigma
-        (ESigmaOK : productive_Env ESigma)
-    : forall c Q sigma,
-      Productive ESigma c sigma Q
-      -> ewp_gen' (@funExSpecs ESigma) c Q sigma.
-  Proof.
-    induction c; simpl; intros.
-    - eapply productive_com_produces in H.
-      destruct H as [? [H ?] ]; inversion H; subst; eauto.
-    - eapply productive_com_produces in H.
-      destruct H as [? [H ?] ]; inversion H; subst; eauto.
-    - remember (CCall x f args).
-      induction H; try discriminate; injections.
-      + clear IHProductive. admit.
-      + eexists params; firstorder eauto.
-      + eapply IHProductive in Heqc; clear IHProductive.
-        destruct Heqc as [params [? [? ?] ] ]; eexists _; firstorder eauto.
-        eapply H0; eapply H3; eauto.
-    - remember (CSeq c1 c2).
-      induction H; try discriminate; injections.
-      + clear IHProductive.
-        eapply IHc1.
-        econstructor; eauto.
-        intros ? ?; unfold In in *.
-        eauto.
-      + eapply ewp_gen'_is_monotone; [ | intros; eauto].
-        intros.
-        eapply ewp_gen'_is_monotone; eauto.
-    - remember (CIf b c1 c2).
-      induction H; try discriminate; injections.
-      + split; intros.
-        * eapply IHc1; eauto.
-        * eapply bassn_eval_false in H1; congruence.
-      + split; intros.
-        * eapply bassn_eval_false in H; congruence.
-        * eauto.
-      + eapply IHProductive in Heqc; clear IHProductive.
-        intuition; eapply ewp_gen'_is_monotone; eauto.
-    - remember (CWhile b c).
-      induction H; try discriminate; injections.
-      + exists 0; simpl.
-        intuition.
-        eapply bassn_eval_false; eauto.
-      + eapply H2.
-        clear IHProductive.
-        pose proof (IHc _ _ H0) as H'.
-        generalize (productive_com_produces _ _ _ _ H0); intros [? [? ?] ].
-        destruct (H2 _ H3 (eq_refl _)) as [n ?].
-        eexists (S n).
-        simpl.
-        firstorder eauto.
-        (*eapply IHc.
-        econstructor; eauto.
-        unfold Included, In; intros.
-        eapply ewp_gen'_is_monotone.
-        2: eapply IHc.
-        intros.
-        eapply H6. *)
-        admit.
-        (* eapply LFP_is_FClosed; intuition eauto. *)
-        (* * unfold Monotonic_F; intros; intuition eauto. *)
-        (*   right; intuition auto. *)
-        (*   eapply ewp_gen_is_monotone; eauto. *)
-        (* * right; eapply bassn_eval_true in H; intuition. *)
-        (*   eapply IHc. *)
-        (*   econstructor; eauto. *)
-        (*   unfold Included, In; intros; eapply H2; eauto. *)
-      + eapply IHProductive in Heqc0; clear IHProductive.
-        destruct Heqc0 as [n ?].
-        eexists n.
-        generalize st Q Q' H1 H0; clear; induction n; simpl; intros.
-        * firstorder eauto.
-        * firstorder eauto.
-          eapply ewp_gen'_is_monotone.
-          2: eapply H1.
-          intros; eauto.
-  Admitted. *)
-
-  Theorem hoare_proof_ewp' Sigma : forall c Q,
-      Sigma |- {[ewp_gen' Sigma c Q]} c {[Q]}#.
-  Proof.
-    (* Need to pull prophecy vars out somehow... *)
-    induction c; simpl; intros; try solve [econstructor].
-    - admit. (* econstructor.
-      2: { intros.
-           destruct H.
-           exact H.
-      eapply EH_Spec.
-      intros ? [os [? [ [v' ?] ?] ] ].
-
-     firstorder eauto. *)
-    - econstructor; eauto.
-    - econstructor; eauto.
-      + econstructor; firstorder eauto.
-      + econstructor; firstorder eauto.
-    - econstructor.
-      econstructor.
-      2: { intros.
-           simpl; split.
-           exact H.
-           eauto.
-      }
-      intro; revert IHc.
-      2: { simpl; intros.
-           destruct H as [ [n ?] ?].
-           destruct n; simpl in H; intuition eauto.
-      }
-      simpl.
-      destruct n; simpl; intros.
-      + econstructor.
-        eapply Empty_PreCondition.
-        intuition.
-        intros; eapply H.
-      + econstructor.
-      2: intros; destruct H as [_ ?]; eapply H.
-      2: { intros; split;
-           [ eexists n; apply H | ].
-           eexists n; eauto. }
-      econstructor.
-      eapply IHc.
-      2: eauto.
-      intros; intuition.
-  Admitted.
+    eapply productive_com_produces.
+    eapply productive_Env_produces; eauto.
+    eapply ehoare_proof_produces; eauto.
+  Qed.
 
   (* Restrict Universal Specs to required behavior. *)
   (*Lemma ewp_gen_is_ewp Sigs Sigma ESigma
@@ -1406,26 +1811,6 @@ Section EHoare.
     - eapply f8.
       eapply Productive_ind'; eauto.
   Defined.
-
-  (*Theorem ehoare_proof_complete' Sigma
-          (Sigma_OK : Consistent_Env Sigma)
-    : forall P c Q,
-      {| funSigs := funSigs; funSpecs := funSpecs; funDefs := empty |} |= {[P]} c {[Q]}# ->
-
-      funExSpecs |- {[P]} c {[Q]}#.
-  Proof.
-    intros; econstructor.
-    - eapply hoare_proof_ewp.
-    - intros.
-      eapply ewp_gen_is_ewp.
-      admit.
-      admit.
-    - eauto.
-      eapply (ewp_is_weakest _ _ _ _ H) in H0.
-      eapply ewp_gen_is_ewp; eauto.
-      unfold Consistent_Env; eauto.
-    - eauto.
-  Qed.
 
   Theorem ehoare_proof_complete Sigma
           (Sigma_OK : Consistent_Env Sigma)
