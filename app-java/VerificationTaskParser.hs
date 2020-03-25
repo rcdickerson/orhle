@@ -19,8 +19,8 @@ type LoopLabel = String
 data VerificationTask = VerificationTask
   { vtForallExecs :: [Execution]
   , vtExistsExecs :: [Execution]
-  , vtPostCond    :: Maybe String
-  , vtPreCond     :: Maybe String
+  , vtPreCond     :: String
+  , vtPostCond    :: String
   , vtLoopInvariants :: [(Execution, LoopLabel, String)]
   , vtLoopVariants :: [(Execution, LoopLabel, String)]
   }
@@ -30,7 +30,7 @@ data Execution = Execution
   { execProgramName :: String
   , execSubscript :: Maybe String
   }
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 languageDef :: LanguageDef ()
 languageDef = Token.LanguageDef { Token.caseSensitive   = True
@@ -68,9 +68,9 @@ verificationTaskParser = do
   whiteSpace
   eExecs <- option [] $ try $ execs "exists"
   whiteSpace
-  preCond <- optionMaybe $ reservedLabel "pre" *> untilSemi
+  preCond <- option "true" $ reservedLabel "pre" *> untilSemi
   whiteSpace
-  postCond <- optionMaybe $ reservedLabel "post" *> untilSemi
+  postCond <- option "true" $ reservedLabel "post" *> untilSemi
   whiteSpace
   loopInvariants <- option [] $ try $ conditionMap "loopInvariants"
   whiteSpace
