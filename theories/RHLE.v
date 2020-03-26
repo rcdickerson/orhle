@@ -223,11 +223,13 @@ Section RHLE.
       intros; destruct (Fin.eq_dec i i0); subst.
       + rewrite H0; econstructor; eauto.
         specialize (exe' i0); rewrite vector_nth_replace in exe'; eauto.
+        admit.
       + specialize (exe' i0); rewrite vector_nth_replace' in exe'; eauto.
         rewrite H; eauto.
         Grab Existential Variables.
+        admit.
         intros; eauto.
-  Qed.
+  Admitted.
 
   Inductive RelProductive
             (Sigma : ExEnv)

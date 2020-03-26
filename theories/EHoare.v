@@ -5,7 +5,11 @@ Require Import
         Coq.Logic.Classical
         Coq.Program.Tactics.
 
-Require Import Maps Imp HoareCommon.
+Require Import
+        Maps
+        Imp
+        HoareCommon
+        Fixpoints.
 
 Section productive_Execution.
 
@@ -535,14 +539,14 @@ Section EHoare.
       + econstructor; eauto; intros.
         destruct H2 as [P_st' [n' [M_n' lt_n'] ] ]; eauto.
       + eapply Productive_Weaken; eauto using Productive_WhileFalse.
-        unfold Included, In; intros.
+        unfold Included, Ensembles.In; intros.
         inversion H2; subst; intuition.
         eapply bassn_eval_false; eauto.
     - eapply Productive_Weaken; eauto.
     - destruct H0 as [? [ [n ?] ?] ] .
       eapply Productive_Weaken; eauto.
       + eapply Productive_CallSpec; firstorder eauto.
-      + unfold Included, In; intros.
+      + unfold Included, Ensembles.In; intros.
         destruct H3 as [n' [? ?] ]; subst.
         eapply H2; eauto.
   Qed.
@@ -998,7 +1002,7 @@ Section EHoare.
                      (fun Q st => (bassn b st -> ewp_gen funSpecs c Q st)
                                   /\ (~ bassn b st -> Q st))) *)
 
-  Lemma well_founded_gammaE :
+  (*Lemma well_founded_gammaE :
     forall (ESigma : ExEnv)
            (c : com)
            (b : bexp)
@@ -1011,8 +1015,7 @@ Section EHoare.
     remember (CWhile b c); induction H; try discriminate.
     econstructor.
     unfold well_founded, LoopVariant; intros.
-    constructor; intros.
-
+    constructor; intros. *)
 
 
   Lemma ewp_gen_is_ewp
@@ -1040,7 +1043,7 @@ Section EHoare.
       + clear IHProductive.
         eapply IHc1.
         econstructor; eauto.
-        intros ? ?; unfold In in *.
+        intros ? ?; unfold Ensembles.In in *.
         eauto.
       + eapply ewp_gen_is_monotone; [ | intros; eauto].
         intros.
@@ -1154,7 +1157,7 @@ Section EHoare.
     - eauto.
   Qed.
 
-  Print Assumptions produces_ehoare_proof.
+  (*Print Assumptions produces_ehoare_proof.
 
   Inductive ehoare_proof' (Sigma : ExEnv)
     : Assertion -> com -> Assertion -> Prop :=
@@ -1221,12 +1224,12 @@ Section EHoare.
     - destruct (beval st b) eqn: ?.
       2: { eapply Productive_Weaken.
            eapply Productive_WhileFalse; eauto.
-           unfold Included, In; intros.
-           inversion H2; subst; intuition eauto.
+           unfold Included, Ensembles.In; intros.
+           inversion H3; subst; intuition eauto.
            eapply bassn_eval_false; eauto. }
       econstructor; eauto.
+      (*intros.
       eapply IHehoare_proof'.
-
       eapply bassn_eval_true in Heqb0.
       specialize (IHehoare_proof' _ (conj H1 Heqb0)).
       econstructor; simpl; eauto; intros.
@@ -2233,7 +2236,7 @@ Section EHoare.
         induction H1; try congruence; injections.
         * econstructor.
         * eapply H0; apply IHProductive; eauto.
-  Admitted. *)
+  Admitted. *) *) *)
 
 End EHoare.
 
