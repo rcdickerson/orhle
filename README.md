@@ -26,4 +26,4 @@ may be run with stack:
 stack test
 ```
 
-The test suite is also a good source for basic examples of valid and invalid triples.
+See the examples directory for example encodings.
