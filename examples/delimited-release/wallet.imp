@@ -1,0 +1,32 @@
+// From https://www.cs.cornell.edu/andru/papers/isss03.pdf
+
+expected: valid;
+
+forall: spend[1], spend[2];
+exists: spend[3];
+
+// High:
+//   funds
+// Low:
+//   spent
+//   cost
+//   funds >= cost
+
+pre: (and
+       (= spend!1!funds spend!3!funds)
+       (= (>= spend!1!funds spend!1!cost) (>= spend!2!funds spend!2!cost))
+       (= spend!1!spent spend!2!spent)
+       (= spend!1!cost spend!2!cost)
+       (= (>= spend!2!funds spend!2!cost) (>= spend!3!funds spend!3!cost))
+       (= spend!2!spent spend!3!spent)
+       (= spend!2!cost spend!3!cost));
+post:  (= spend!2!spent spend!3!spent);
+
+prog spend(funds, spent, cost):
+  if (funds >= cost) then
+    funds := funds - cost;
+    spent := spent + cost;
+  else
+    skip;
+  end
+endp
