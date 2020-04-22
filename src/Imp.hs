@@ -77,7 +77,7 @@ aexpToZ3 aexp =
     ADiv aexp1 aexp2 -> do
       dividend <- aexpToZ3 aexp1
       divisor  <- aexpToZ3 aexp2
-      mkMod dividend divisor
+      mkDiv dividend divisor
     AMod aexp1 aexp2 -> do
       dividend <- aexpToZ3 aexp1
       divisor  <- aexpToZ3 aexp2
