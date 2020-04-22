@@ -3,14 +3,8 @@ expected: invalid;
 forall: calc_avg[1], calc_avg[2];
 exists: calc_avg[3];
 
-// There are three salaraies that must not be leaked,
-// but anything that leaks their sum is OK.
-// High:
-//   salary1
-//   salary2
-//   salary3
-// Low:
-//   salary1 + salary2 + salary3
+// There are three salaraies that must not be leaked in
+// any way, even via their sum or average.
 
 pre: (and
        (= calc_avg!1!salary1 calc_avg!3!salary1)
