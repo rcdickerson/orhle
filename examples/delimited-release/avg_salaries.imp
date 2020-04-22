@@ -1,0 +1,32 @@
+expected: valid;
+
+forall: calc_avg[1], calc_avg[2];
+exists: calc_avg[3];
+
+// There are three salaraies that must not be leaked,
+// but anything that leaks their sum is OK.
+// High:
+//   salary1
+//   salary2
+//   salary3
+// Low:
+//   salary1 + salary2 + salary3
+
+pre: (and
+       (= calc_avg!1!salary1 calc_avg!3!salary1)
+       (= calc_avg!1!salary2 calc_avg!3!salary2)
+       (= calc_avg!1!salary3 calc_avg!3!salary3)
+       (= (+ calc_avg!1!salary1 calc_avg!1!salary2 calc_avg!1!salary3)
+          (+ calc_avg!2!salary1 calc_avg!2!salary2 calc_avg!2!salary3))
+       (= (+ calc_avg!2!salary1 calc_avg!2!salary2 calc_avg!2!salary3)
+          (+ calc_avg!3!salary1 calc_avg!3!salary2 calc_avg!3!salary3)));
+post:  (= calc_avg!2!ret  calc_avg!3!ret);
+
+prog calc_avg(salary1, salary2, salary3):
+  sum := 0;
+  sum := sum + salary1;
+  sum := sum + salary2;
+  sum := sum + salary3;
+  avg := sum / 3;
+  ret := avg;
+endp
