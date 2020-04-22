@@ -32,7 +32,7 @@ languageDef = Token.LanguageDef
                             , "@inv", "@var"
                             , "local"
                             ]
-  , Token.reservedOpNames = [ "+", "-", "*", "/", "%"
+  , Token.reservedOpNames = [ "+", "-", "*", "/", "%", "^"
                             , "==", "!=", "<=", ">=", "<", ">"
                             , "&&", "||", "!"
                             , ":="
@@ -156,7 +156,8 @@ aExpression = buildExpressionParser aOperators aTerm
 bExpression :: ImpParser BExp
 bExpression = buildExpressionParser bOperators bTerm
 
-aOperators = [ [Infix  (reservedOp "*" >> return AMul) AssocLeft,
+aOperators = [ [Infix  (reservedOp "^" >> return APow) AssocLeft]
+             , [Infix  (reservedOp "*" >> return AMul) AssocLeft,
                 Infix  (reservedOp "/" >> return ADiv) AssocLeft,
                 Infix  (reservedOp "%" >> return AMod) AssocLeft]
              , [Infix  (reservedOp "+" >> return AAdd) AssocLeft,

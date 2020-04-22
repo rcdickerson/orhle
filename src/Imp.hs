@@ -39,6 +39,7 @@ data AExp
   | AMul AExp AExp
   | ADiv AExp AExp
   | AMod AExp AExp
+  | APow AExp AExp
   deriving (Eq, Ord, Show)
 
 asubst :: AExp -> Var -> AExp -> AExp
@@ -51,6 +52,7 @@ asubst aexp var repl =
     AMul lhs rhs -> AMul (asubst lhs var repl) (asubst rhs var repl)
     ADiv lhs rhs -> ADiv (asubst lhs var repl) (asubst rhs var repl)
     AMod lhs rhs -> AMod (asubst lhs var repl) (asubst rhs var repl)
+    APow lhs rhs -> APow (asubst lhs var repl) (asubst rhs var repl)
 
 avars :: AExp -> Set.Set Var
 avars aexp =
@@ -62,6 +64,7 @@ avars aexp =
     AMul lhs rhs -> Set.union (avars lhs) (avars rhs)
     ADiv lhs rhs -> Set.union (avars lhs) (avars rhs)
     AMod lhs rhs -> Set.union (avars lhs) (avars rhs)
+    APow lhs rhs -> Set.union (avars lhs) (avars rhs)
 
 aexpToZ3 :: AExp -> Z3 AST
 aexpToZ3 aexp =
@@ -79,6 +82,10 @@ aexpToZ3 aexp =
       dividend <- aexpToZ3 aexp1
       divisor  <- aexpToZ3 aexp2
       mkMod dividend divisor
+    APow aexp1 aexp2 -> do
+      base <- aexpToZ3 aexp1
+      power <- aexpToZ3 aexp2
+      mkPower base power
 
 subVar :: AST -> Var -> Var -> Z3 AST
 subVar ast var repl = subAexp ast (AVar var) (AVar repl)
@@ -106,6 +113,7 @@ prefixAExpVars pre aexp =
     AMul lhs rhs -> AMul (prefix lhs) (prefix rhs)
     ADiv lhs rhs -> ADiv (prefix lhs) (prefix rhs)
     AMod lhs rhs -> AMod (prefix lhs) (prefix rhs)
+    APow lhs rhs -> APow (prefix lhs) (prefix rhs)
   where prefix = prefixAExpVars pre
 
 

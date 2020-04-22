@@ -1,6 +1,6 @@
 // From https://www.cs.cornell.edu/andru/papers/isss03.pdf
 
-expected: valid;
+expected: invalid;
 
 forall: buy[1], buy[2];
 exists: buy[3];

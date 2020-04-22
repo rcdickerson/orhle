@@ -2,8 +2,8 @@
 
 expected: valid;
 
-forall: spend[1], spend[2];
-exists: spend[3];
+forall: buy[1], buy[2];
+exists: buy[3];
 
 // High:
 //   funds
@@ -13,16 +13,16 @@ exists: spend[3];
 //   funds >= cost
 
 pre: (and
-       (= spend!1!funds spend!3!funds)
-       (= (>= spend!1!funds spend!1!cost) (>= spend!2!funds spend!2!cost))
-       (= spend!1!spent spend!2!spent)
-       (= spend!1!cost spend!2!cost)
-       (= (>= spend!2!funds spend!2!cost) (>= spend!3!funds spend!3!cost))
-       (= spend!2!spent spend!3!spent)
-       (= spend!2!cost spend!3!cost));
-post:  (= spend!2!spent spend!3!spent);
+       (= buy!1!funds buy!3!funds)
+       (= (>= buy!1!funds buy!1!cost) (>= buy!2!funds buy!2!cost))
+       (= buy!1!spent buy!2!spent)
+       (= buy!1!cost buy!2!cost)
+       (= (>= buy!2!funds buy!2!cost) (>= buy!3!funds buy!3!cost))
+       (= buy!2!spent buy!3!spent)
+       (= buy!2!cost buy!3!cost));
+post:  (= buy!2!spent buy!3!spent);
 
-prog spend(funds, spent, cost):
+prog buy(funds, spent, cost):
   if (funds >= cost) then
     funds := funds - cost;
     spent := spent + cost;

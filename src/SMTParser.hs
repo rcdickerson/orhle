@@ -62,6 +62,7 @@ data SMTFunc = SMTAdd
              | SMTSub
              | SMTMul
              | SMTDiv
+             | SMTPow
              | SMTAnd
              | SMTEq
              | SMTImp
@@ -217,6 +218,7 @@ funcDecl =     funcParser "+" SMTAdd
            <|> funcParser "-" SMTSub
            <|> funcParser "*" SMTMul
            <|> funcParser "/" SMTDiv
+           <|> funcParser "^" SMTPow
            <|> (try $ funcParser ">="  SMTGTE)
            <|> (try $ funcParser "<="  SMTLTE)
            <|> (try $ funcParser "=>"  SMTImp)
@@ -236,6 +238,7 @@ smtApply SMTAdd ops = mkAdd ops
 smtApply SMTSub ops = mkSub ops
 smtApply SMTMul ops = mkMul ops
 smtApply SMTDiv (lhs:rhs:[]) = mkDiv lhs rhs
+smtApply SMTPow (base:pow:[]) = mkPower base pow
 smtApply SMTAnd ops = mkAnd ops
 smtApply SMTEq  (lhs:rhs:[]) = mkEq lhs rhs
 smtApply SMTGT  (lhs:rhs:[]) = mkGt lhs rhs
@@ -246,7 +249,8 @@ smtApply SMTLTE (lhs:rhs:[]) = mkLe lhs rhs
 smtApply SMTMod (lhs:rhs:[]) = mkMod lhs rhs
 smtApply SMTNot (expr:[]) = mkNot expr
 smtApply SMTOr ops = mkOr ops
-smtApply SMTDiv  _ = fail "divide takes exactly two arguments"
+smtApply SMTDiv _ = fail "divide takes exactly two arguments"
+smtApply SMTPow _ = fail "exponentiation takes exactly two arguments"
 smtApply SMTEq  _ = fail "equals takes exactly two arguments"
 smtApply SMTGT  _ = fail "> takes exactly two arguments"
 smtApply SMTGTE _ = fail ">= takes exactly two arguments"
