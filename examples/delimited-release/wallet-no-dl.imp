@@ -10,7 +10,6 @@ exists: buy[3];
 // Low:
 //   spent
 //   cost
-//   funds >= cost
 
 pre: (and
        (= buy!1!funds buy!3!funds)
