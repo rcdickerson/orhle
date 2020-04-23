@@ -1,0 +1,58 @@
+*******************************************
+****               ORHLE               ****
+**** k-Liveness Hyperproperty Verifier ****
+*******************************************
+
+:: Executions
+  cond[1] (forall)
+  cond[2] (forall)
+  cond[3] (exists)
+
+:: Verification Conditions
+  (=> (and (= cond!1!h1 cond!3!h1)
+           (= cond!1!h2 cond!3!h2)
+           (= cond!1!l cond!2!l)
+           (= cond!2!l cond!3!l)
+           (=> (= cond!1!l 0)
+               (and (= (mod cond!1!h1 2) (mod cond!2!h1 2))
+                    (= (mod cond!2!h1 2) (mod cond!3!h1 2))))
+           (=> (not (= cond!1!l 0))
+               (and (= (mod cond!1!h2 2) (mod cond!2!h2 2))
+                    (= (mod cond!2!h2 2) (mod cond!3!h2 2)))))
+      (and (=> (= cond!2!l 0)
+               (and (or (not (= cond!1!l 0))
+                        (and (or (not (= cond!3!l 0))
+                                 (= (mod cond!2!h1 2) (mod cond!3!h1 2)))
+                             (or (= cond!3!l 0)
+                                 (= (mod cond!2!h1 2) (mod cond!3!h1 2)))))
+                    (or (= cond!1!l 0)
+                        (and (or (not (= cond!3!l 0))
+                                 (= (mod cond!2!h1 2) (mod cond!3!h1 2)))
+                             (or (= cond!3!l 0)
+                                 (= (mod cond!2!h1 2) (mod cond!3!h1 2)))))))
+           (=> (not (= cond!2!l 0))
+               (and (or (not (= cond!1!l 0))
+                        (and (or (not (= cond!3!l 0))
+                                 (= (mod cond!2!h1 2) (mod cond!3!h1 2)))
+                             (or (= cond!3!l 0)
+                                 (= (mod cond!2!h1 2) (mod cond!3!h1 2)))))
+                    (or (= cond!1!l 0)
+                        (and (or (not (= cond!3!l 0))
+                                 (= (mod cond!2!h1 2) (mod cond!3!h1 2)))
+                             (or (= cond!3!l 0)
+                                 (= (mod cond!2!h1 2) (mod cond!3!h1 2)))))))))
+
+Invalid. Model:
+  cond!1!h1 -> 0
+  cond!1!h2 -> 0
+  cond!1!l -> 3
+  cond!2!h1 -> 1
+  cond!2!h2 -> 0
+  cond!2!l -> 3
+  cond!3!h1 -> 0
+  cond!3!h2 -> 0
+  cond!3!l -> 3
+
+real	0m0.187s
+user	0m0.160s
+sys	0m0.043s

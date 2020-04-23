@@ -1,0 +1,5 @@
+bin/run-all-examples.sh: line 45:  1381 Segmentation fault      (core dumped) stack exec klive-exe ./examples/$ex.imp
+
+real	0m0.253s
+user	0m0.202s
+sys	0m0.019s

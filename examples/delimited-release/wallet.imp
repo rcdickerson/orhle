@@ -1,4 +1,7 @@
-// From https://www.cs.cornell.edu/andru/papers/isss03.pdf
+// From:
+//   Sabelfeld, Andrei & Myers, Andrew. (2004).
+//   A Model for Delimited Information Release.
+//   Lecture Notes in Computer Science. 10.1007/978-3-540-37621-7_9.
 
 expected: valid;
 
