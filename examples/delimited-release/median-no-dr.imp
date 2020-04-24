@@ -3,7 +3,7 @@
 //   Knowledge inference for optimizing secure multi-party computation.
 //   3-14. 10.1145/2465106.2465117.
 
-expected: valid;
+expected: invalid;
 
 forall: median[1], median[2];
 exists: median[3];
