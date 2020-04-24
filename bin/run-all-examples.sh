@@ -47,11 +47,11 @@ do
   echo -n "$ex... "
   start=$(($(date +%s%N)/1000000))
   if (time stack exec klive-exe ./examples/$ex.imp) > ./example-output/$ex.out 2>&1;
-  end=$(($(date +%s%N)/1000000))
   then
      echo -ne "\xE2\x9C\x94"
   else
      echo -ne "\xE2\x9D\x8C"
   fi
+  end=$(($(date +%s%N)/1000000))
   echo "  ($((end-start)) ms)"
 done
