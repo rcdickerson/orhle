@@ -27,6 +27,6 @@ Invalid. Model:
   calc_avg!3!salary2 -> 0
   calc_avg!3!salary3 -> 0
 
-real	0m0.187s
-user	0m0.190s
-sys	0m0.009s
+real	0m0.209s
+user	0m0.209s
+sys	0m0.014s

@@ -14,10 +14,14 @@ exists: parity[3];
 //   l
 
 pre: (and
+       // High
        (= parity!1!h parity!3!h)
+       // Low
        (= parity!1!l parity!2!l)
        (= parity!2!l parity!3!l));
-post:  (= parity!2!l parity!3!l);
+
+post: (= parity!2!l parity!3!l);
+
 
 prog parity():
   h := h % 2;

@@ -50,6 +50,6 @@ Invalid. Model:
   buy!3!funds -> 0
   buy!3!spent -> 2
 
-real	0m0.183s
-user	0m0.175s
-sys	0m0.019s
+real	0m0.209s
+user	0m0.225s
+sys	0m0.037s

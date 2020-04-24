@@ -14,18 +14,22 @@ exists: calc_avg[3];
 //   salary1
 //   salary2
 //   salary3
-// Low:
+// Delimited Release:
 //   salary1 + salary2 + salary3
 
 pre: (and
+       // High
        (= calc_avg!1!salary1 calc_avg!3!salary1)
        (= calc_avg!1!salary2 calc_avg!3!salary2)
        (= calc_avg!1!salary3 calc_avg!3!salary3)
+
+       // Delimited Release
        (= (+ calc_avg!1!salary1 calc_avg!1!salary2 calc_avg!1!salary3)
           (+ calc_avg!2!salary1 calc_avg!2!salary2 calc_avg!2!salary3))
        (= (+ calc_avg!2!salary1 calc_avg!2!salary2 calc_avg!2!salary3)
           (+ calc_avg!3!salary1 calc_avg!3!salary2 calc_avg!3!salary3)));
-post:  (= calc_avg!2!ret  calc_avg!3!ret);
+
+post: (= calc_avg!2!ret  calc_avg!3!ret);
 
 prog calc_avg(salary1, salary2, salary3):
   sum := 0;

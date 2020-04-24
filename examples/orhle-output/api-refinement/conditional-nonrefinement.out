@@ -37,6 +37,6 @@
 Invalid. Model:
   refinement!r -> 1
 
-real	0m0.207s
-user	0m0.190s
-sys	0m0.025s
+real	0m0.192s
+user	0m0.192s
+sys	0m0.008s

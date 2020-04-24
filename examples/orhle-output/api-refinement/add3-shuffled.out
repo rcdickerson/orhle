@@ -83,6 +83,6 @@ Invalid. Model:
   refinement!shuffled_1 -> (- 1)
   refinement!shuffled_2 -> 0
 
-real	0m0.212s
-user	0m0.252s
-sys	0m0.021s
+real	0m0.198s
+user	0m0.216s
+sys	0m0.014s

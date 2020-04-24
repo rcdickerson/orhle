@@ -30,6 +30,6 @@ Invalid. Model:
   smith!2!secret -> 1
   smith!3!secret -> 0
 
-real	0m0.207s
-user	0m0.285s
-sys	0m0.006s
+real	0m0.208s
+user	0m0.192s
+sys	0m0.024s

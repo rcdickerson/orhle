@@ -53,6 +53,6 @@ Invalid. Model:
   cond!3!h2 -> 0
   cond!3!l -> 3
 
-real	0m0.187s
-user	0m0.160s
-sys	0m0.043s
+real	0m0.204s
+user	0m0.200s
+sys	0m0.013s

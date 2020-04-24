@@ -12,8 +12,8 @@
   (let ((a!1 (exists ((run!3!p!0 Int)) (= run!3!p!0 (mod run!3!h 2)))))
     (=> (and (= run!1!h run!3!h)
              (= run!1!l run!2!l)
-             (= (mod run!1!h 2) (mod run!2!h 2))
              (= run!2!l run!3!l)
+             (= (mod run!1!h 2) (mod run!2!h 2))
              (= (mod run!2!h 2) (mod run!3!h 2)))
         (and true
              (=> (= run!2!p (mod run!2!h 2))
@@ -64,6 +64,6 @@
 
 Valid.
 
-real	0m0.212s
-user	0m0.183s
-sys	0m0.039s
+real	0m0.215s
+user	0m0.214s
+sys	0m0.024s

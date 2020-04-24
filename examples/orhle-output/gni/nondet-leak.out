@@ -57,6 +57,6 @@ Invalid. Model:
   leak!3!high -> 1751
   leak!3!low -> (- 1)
 
-real	0m2.890s
-user	0m27.735s
-sys	0m1.195s
+real	0m3.354s
+user	0m32.245s
+sys	0m1.244s

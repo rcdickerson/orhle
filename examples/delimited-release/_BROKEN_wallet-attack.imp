@@ -21,6 +21,7 @@ exists: attack[3];
 // Low:
 //   spent
 //   cost
+// Delimited Release:
 //   funds >= cost
 //
 // NB: low values are over the initial state; whether or not funds >= cost
@@ -28,14 +29,20 @@ exists: attack[3];
 // program execution.
 
 pre: (and
+       // High
        (= attack!1!funds attack!3!funds)
-       (= (>= attack!1!funds attack!1!cost) (>= attack!2!funds attack!2!cost))
+
+       // Low
        (= attack!1!spent attack!2!spent)
        (= attack!1!cost attack!2!cost)
-       (= (>= attack!2!funds attack!2!cost) (>= attack!3!funds attack!3!cost))
        (= attack!2!spent attack!3!spent)
-       (= attack!2!cost attack!3!cost));
-post:  (= attack!2!spent attack!3!spent);
+       (= attack!2!cost attack!3!cost)
+
+       // Delimited Release
+       (= (>= attack!1!funds attack!1!cost) (>= attack!2!funds attack!2!cost))
+       (= (>= attack!2!funds attack!2!cost) (>= attack!3!funds attack!3!cost)));
+
+post: (= attack!2!spent attack!3!spent);
 
 // Leaks the (high) value of 'funds' one bit at a time into 'spent'.
 prog attack(funds, spent, cost):

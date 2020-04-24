@@ -11,8 +11,8 @@
 :: Verification Conditions
   (=> (and (= parity!1!h parity!3!h)
            (= parity!1!l parity!2!l)
-           (= (mod parity!1!h 2) (mod parity!2!h 2))
            (= parity!2!l parity!3!l)
+           (= (mod parity!1!h 2) (mod parity!2!h 2))
            (= (mod parity!2!h 2) (mod parity!3!h 2)))
       (and (=> (= (mod parity!2!h 2) 1)
                (and (or (not (= (mod parity!1!h 2) 1))
@@ -31,6 +31,6 @@
 
 Valid.
 
-real	0m0.183s
-user	0m0.179s
-sys	0m0.017s
+real	0m0.196s
+user	0m0.192s
+sys	0m0.018s

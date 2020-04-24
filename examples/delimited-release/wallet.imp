@@ -13,17 +13,25 @@ exists: buy[3];
 // Low:
 //   spent
 //   cost
+// Delimited Release:
 //   funds >= cost
 
 pre: (and
+       // High
        (= buy!1!funds buy!3!funds)
-       (= (>= buy!1!funds buy!1!cost) (>= buy!2!funds buy!2!cost))
+
+       // Low
        (= buy!1!spent buy!2!spent)
-       (= buy!1!cost buy!2!cost)
-       (= (>= buy!2!funds buy!2!cost) (>= buy!3!funds buy!3!cost))
        (= buy!2!spent buy!3!spent)
-       (= buy!2!cost buy!3!cost));
-post:  (= buy!2!spent buy!3!spent);
+       (= buy!1!cost buy!2!cost)
+       (= buy!2!cost buy!3!cost)
+
+       // Delimited Release
+       (= (>= buy!1!funds buy!1!cost) (>= buy!2!funds buy!2!cost))
+       (= (>= buy!2!funds buy!2!cost) (>= buy!3!funds buy!3!cost)));
+
+post: (= buy!2!spent buy!3!spent);
+
 
 prog buy(funds, spent, cost):
   if (funds >= cost) then

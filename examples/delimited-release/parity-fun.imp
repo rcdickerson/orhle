@@ -12,15 +12,22 @@ exists: run[3];
 //   h
 // Low:
 //   l
+// Delimited Release:
 //   h mod 2
 
 pre: (and
+       // High
        (= run!1!h run!3!h)
+
+       // Low
        (= run!1!l run!2!l)
-       (= (mod run!1!h 2) (mod run!2!h 2))
        (= run!2!l run!3!l)
+
+       // Delimited Release
+       (= (mod run!1!h 2) (mod run!2!h 2))
        (= (mod run!2!h 2) (mod run!3!h 2)));
-post:  (= run!2!l run!3!l);
+
+post: (= run!2!l run!3!l);
 
 aspecs:
   parity(val) {

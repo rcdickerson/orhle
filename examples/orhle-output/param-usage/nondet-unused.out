@@ -79,6 +79,6 @@ Invalid. Model:
   unused!2B!param1 -> 5
   unused!2B!param2 -> 7
 
-real	0m0.252s
-user	0m0.274s
-sys	0m0.005s
+real	0m0.245s
+user	0m0.247s
+sys	0m0.027s

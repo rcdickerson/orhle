@@ -12,15 +12,23 @@ exists: parity[3];
 //   h
 // Low:
 //   l
+// Delimited Release:
 //   h mod 2
 
 pre: (and
+       // High
        (= parity!1!h parity!3!h)
+
+       // Low
        (= parity!1!l parity!2!l)
-       (= (mod parity!1!h 2) (mod parity!2!h 2))
        (= parity!2!l parity!3!l)
+
+       // Delimited Release
+       (= (mod parity!1!h 2) (mod parity!2!h 2))
        (= (mod parity!2!h 2) (mod parity!3!h 2)));
-post:  (= parity!2!l parity!3!l);
+
+post: (= parity!2!l parity!3!l);
+
 
 prog parity():
   if (h % 2 == 1) then

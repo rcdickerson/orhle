@@ -1,6 +1,6 @@
 // A non-deterministic program that uses both of its parameters.
 
-expected: invalid;
+expected: valid;
 
 exists:
   used[1A], used[1B],

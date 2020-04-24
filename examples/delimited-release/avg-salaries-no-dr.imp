@@ -10,6 +10,10 @@ exists: calc_avg[3];
 
 // There are three salaraies that must not be leaked in
 // any way, even via their sum or average.
+// High:
+//   salary1
+//   salary2
+//   salary3
 
 pre: (and
        (= calc_avg!1!salary1 calc_avg!3!salary1)

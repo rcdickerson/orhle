@@ -15,11 +15,14 @@ exists: cond[3];
 //   l
 
 pre: (and
+       // High
        (= cond!1!h1 cond!3!h1)
        (= cond!1!h2 cond!3!h2)
+       // Low
        (= cond!1!l cond!2!l)
        (= cond!2!l cond!3!l));
-post:  (= cond!2!ret cond!3!ret);
+
+post: (= cond!2!ret cond!3!ret);
 
 prog cond():
   if (l == 0) then
