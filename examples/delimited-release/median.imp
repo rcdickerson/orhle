@@ -20,7 +20,7 @@ exists: median[2];
 // in terms of a variable's *final* state can make the
 // release easier to express, but has the disadvantage of
 // obscuring the parts of the *initial* state that may be
-// leaked.
+// exposed.
 
 pre: (and
        // Low
