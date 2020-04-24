@@ -5,8 +5,8 @@
 
 expected: invalid;
 
-forall: median[1], median[2];
-exists: median[3];
+forall: median[1];
+exists: median[2];
 
 // High:
 //   b1
@@ -15,20 +15,22 @@ exists: median[3];
 //   a1
 //   a2
 
-pre: (and
-       // High
-       (= median!1!b1 median!3!b1)
-       (= median!1!b2 median!3!b2)
+// This example accomplishes delimited release by adding
+// a predicate to the postcondition. Specifying a release
+// in terms of a variable's *final* state can make the
+// release easier to express, but has the disadvantage of
+// obscuring the parts of the *initial* state that may be
+// leaked.
 
+pre: (and
        // Low
        (= median!1!a1 median!2!a1)
        (= median!1!a2 median!2!a2)
-       (= median!2!a1 median!3!a1)
-       (= median!2!a2 median!3!a2)
 
        // Program Preconditions (ordered and distinct).
        (< median!1!a1 median!1!a2)
        (< median!1!b1 median!1!b2)
+       (< median!2!b1 median!2!b2)
 
        (not (= median!1!a1 median!1!a2))
        (not (= median!1!a1 median!1!b1))
@@ -42,16 +44,9 @@ pre: (and
        (not (= median!2!a1 median!2!b2))
        (not (= median!2!a2 median!2!b1))
        (not (= median!2!a2 median!2!b2))
-       (not (= median!2!b1 median!2!b2))
+       (not (= median!2!b1 median!2!b2)));
 
-       (not (= median!3!a1 median!3!a2))
-       (not (= median!3!a1 median!3!b1))
-       (not (= median!3!a1 median!3!b2))
-       (not (= median!3!a2 median!3!b1))
-       (not (= median!3!a2 median!3!b2))
-       (not (= median!3!b1 median!3!b2)));
-
-post: (= median!2!ret median!3!ret);
+post: (= median!1!ret median!2!ret);
 
 
 prog median(a1, a2, b1, b2):
