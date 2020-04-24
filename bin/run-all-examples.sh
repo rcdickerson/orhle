@@ -37,15 +37,21 @@ examples=( \
 )
 
 stack build
-mkdir -p ./examples/orhle-output
+mkdir -p ./example-output/api-refinement
+mkdir -p ./example-output/delimited-release
+mkdir -p ./example-output/gni
+mkdir -p ./example-output/param-usage
 
 for ex in "${examples[@]}"
 do
   echo -n "$ex... "
+  start=$(($(date +%s%N)/1000000))
   if (time stack exec klive-exe ./examples/$ex.imp) > ./example-output/$ex.out 2>&1;
+  end=$(($(date +%s%N)/1000000))
   then
-     echo -e "\xE2\x9C\x94"
+     echo -ne "\xE2\x9C\x94"
   else
-     echo -e "\xE2\x9D\x8C"
+     echo -ne "\xE2\x9D\x8C"
   fi
+  echo "  ($((end-start)) ms)"
 done
