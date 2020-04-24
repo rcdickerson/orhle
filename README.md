@@ -23,7 +23,7 @@ bin/run-example.sh api-refinement add3-shuffled
 ```
 
 will run `examples/api-refinement/add3-shuffled.imp` and write output to the
-console, as well as to `examples/orhle-output/api-refinement/add3-shuffled.out`.
+console, as well as to `example-output/api-refinement/add3-shuffled.out`.
 
 Saying:
 
@@ -31,4 +31,4 @@ Saying:
 bin/run-all-examples.sh
 ```
 
-will run all examples, writing output to `examples/orhle-output`.
+will run all examples, writing output to the `example-output` directory.
