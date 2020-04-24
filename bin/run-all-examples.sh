@@ -42,7 +42,7 @@ mkdir -p ./examples/orhle-output
 for ex in "${examples[@]}"
 do
   echo -n "$ex... "
-  if (time stack exec klive-exe ./examples/$ex.imp) > ./examples/orhle-output/$ex.out 2>&1;
+  if (time stack exec klive-exe ./examples/$ex.imp) > ./example-output/$ex.out 2>&1;
   then
      echo -e "\xE2\x9C\x94"
   else
