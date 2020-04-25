@@ -1,4 +1,4 @@
-expected: invalid;
+expected: valid;
 
 forall: bet[1];
 exists: bet[2];
