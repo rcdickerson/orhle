@@ -28,7 +28,7 @@ runKLive :: String -> IO (String, Bool)
 runKLive klive = do
   putStrLn "*******************************************"
   putStrLn "****               ORHLE               ****"
-  putStrLn "**** k-Liveness Hyperproperty Verifier ****"
+  putStrLn "****     The Oracular RHLE Verifier    ****"
   putStrLn "*******************************************"
   putStrLn ""
   case parseKLive klive of
