@@ -1,0 +1,53 @@
+// From:
+//   Sabelfeld, Andrei & Myers, Andrew. (2004).
+//   A Model for Delimited Information Release.
+//   Lecture Notes in Computer Science. 10.1007/978-3-540-37621-7_9.
+
+expected: valid;
+
+forall: run[1], run[2];
+exists: run[3];
+
+// High:
+//   h
+// Low:
+//   l
+// Delimited Release:
+//   h mod 2
+
+pre: (and
+       // High
+       (= run!1!h run!3!h)
+
+       // Low
+       (= run!1!l run!2!l)
+       (= run!2!l run!3!l)
+
+       // Delimited Release
+       (= (mod run!1!h 2) (mod run!2!h 2))
+       (= (mod run!2!h 2) (mod run!3!h 2)));
+
+post: (= run!2!l run!3!l);
+
+aspecs:
+  parity(val) {
+    pre: true;
+    post: (= ret! (mod val 2));
+  }
+
+especs:
+  parity(val) {
+    pre: true;
+    post: (= ret! (mod val 2));
+  }
+
+prog run():
+  p := call parity(h);
+  if (p == 1) then
+    l := 1;
+    h := 1;
+  else
+    l := 0;
+    h := 0;
+  end
+endp

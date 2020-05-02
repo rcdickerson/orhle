@@ -1,0 +1,36 @@
+*******************************************
+****               ORHLE               ****
+**** k-Liveness Hyperproperty Verifier ****
+*******************************************
+
+:: Executions
+  parity[1] (forall)
+  parity[2] (forall)
+  parity[3] (exists)
+
+:: Verification Conditions
+  (=> (and (= parity!1!h parity!3!h)
+           (= parity!1!l parity!2!l)
+           (= parity!2!l parity!3!l)
+           (= (mod parity!1!h 2) (mod parity!2!h 2))
+           (= (mod parity!2!h 2) (mod parity!3!h 2)))
+      (and (=> (= (mod parity!2!h 2) 1)
+               (and (or (not (= (mod parity!1!h 2) 1))
+                        (and (or (not (= (mod parity!3!h 2) 1)) (= 1 1))
+                             (or (= 1 0) (= (mod parity!3!h 2) 1))))
+                    (or (= (mod parity!1!h 2) 1)
+                        (and (or (not (= (mod parity!3!h 2) 1)) (= 1 1))
+                             (or (= 1 0) (= (mod parity!3!h 2) 1))))))
+           (=> (not (= (mod parity!2!h 2) 1))
+               (and (or (not (= (mod parity!1!h 2) 1))
+                        (and (or (not (= (mod parity!3!h 2) 1)) (= 0 1))
+                             (or (= 0 0) (= (mod parity!3!h 2) 1))))
+                    (or (= (mod parity!1!h 2) 1)
+                        (and (or (not (= (mod parity!3!h 2) 1)) (= 0 1))
+                             (or (= 0 0) (= (mod parity!3!h 2) 1))))))))
+
+Valid.
+
+real	0m0.196s
+user	0m0.192s
+sys	0m0.018s

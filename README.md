@@ -1,7 +1,7 @@
-# RHLE Verifier
+# ORHLE
 
-A proof-of-concept implementation of an existential relational hoare logic verification algorithm.
-This project is still in an extremely nascent state.
+ORHLE is an automatic existential relational Hoare logic (RHLE) verifier. A
+draft of the RHLE paper is currently on arXiv: https://arxiv.org/abs/2002.02904
 
 ### Building
 
@@ -9,21 +9,26 @@ Build, test, and run using [Stack](https://docs.haskellstack.org/en/stable/READM
 
 ```bash
 stack build
-stack exec rhle-verifier-exe
+stack exec klive-exe
 ```
 
-Executing as above will run the example hardcoded in `app/Main.hs`. To try other examples,
-edit `Main.hs` or experiment in ghci by saying:
+### Examples
+
+Example encodings live in the `examples` directory.
+
+You can run single examples using the `bin/run-example.sh` script. For example:
 
 ```bash
-stack ghci
+bin/run-example.sh api-refinement add3-shuffled
 ```
 
-There is also a (currently somewhat minimal) test suite in the `test` directory. Tests
-may be run with stack:
+will run `examples/api-refinement/add3-shuffled.imp` and write output to the
+console, as well as to `example-output/api-refinement/add3-shuffled.out`.
+
+Saying:
 
 ```bash
-stack test
+bin/run-all-examples.sh
 ```
 
-The test suite is also a good source for basic examples of valid and invalid triples.
+will run all examples, writing output to the `example-output` directory.

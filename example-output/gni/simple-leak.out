@@ -1,0 +1,27 @@
+*******************************************
+****               ORHLE               ****
+**** k-Liveness Hyperproperty Verifier ****
+*******************************************
+
+:: Executions
+  leak[1] (forall)
+  leak[2] (forall)
+  leak[3] (exists)
+
+:: Verification Conditions
+  (=> (and (= leak!1!high leak!3!high)
+           (= leak!1!low leak!2!low)
+           (= leak!2!low leak!3!low))
+      (and (= (+ leak!2!high leak!2!low) (+ leak!3!high leak!3!low))))
+
+Invalid. Model:
+  leak!1!high -> 0
+  leak!1!low -> 2
+  leak!2!high -> (- 1)
+  leak!2!low -> 2
+  leak!3!high -> 0
+  leak!3!low -> 2
+
+real	0m0.200s
+user	0m0.178s
+sys	0m0.030s

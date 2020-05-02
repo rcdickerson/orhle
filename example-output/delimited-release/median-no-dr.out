@@ -1,0 +1,743 @@
+*******************************************
+****               ORHLE               ****
+**** k-Liveness Hyperproperty Verifier ****
+*******************************************
+
+:: Executions
+  median[1] (forall)
+  median[2] (exists)
+
+:: Verification Conditions
+  (=> (and (= median!1!a1 median!2!a1)
+           (= median!1!a2 median!2!a2)
+           (< median!1!a1 median!1!a2)
+           (< median!1!b1 median!1!b2)
+           (< median!2!b1 median!2!b2)
+           (not (= median!1!a1 median!1!a2))
+           (not (= median!1!a1 median!1!b1))
+           (not (= median!1!a1 median!1!b2))
+           (not (= median!1!a2 median!1!b1))
+           (not (= median!1!a2 median!1!b2))
+           (not (= median!1!b1 median!1!b2))
+           (not (= median!2!a1 median!2!a2))
+           (not (= median!2!a1 median!2!b1))
+           (not (= median!2!a1 median!2!b2))
+           (not (= median!2!a2 median!2!b1))
+           (not (= median!2!a2 median!2!b2))
+           (not (= median!2!b1 median!2!b2)))
+      (and (=> (<= median!1!a1 median!1!b1)
+               (and (=> (= 1 1)
+                        (and (=> (= 1 1)
+                                 (and (=> (<= median!1!a2 median!1!b1)
+                                          (and (=> (= 1 1)
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!a2
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!a2
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!a2
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!a2
+                                                                        median!2!b2))))))
+                                               (=> (not (= 1 1))
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!b1
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!b1
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!b1
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!b1
+                                                                        median!2!b2))))))))
+                                      (=> (not (<= median!1!a2 median!1!b1))
+                                          (and (=> (= 0 1)
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!a2
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!a2
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!a2
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!a2
+                                                                        median!2!b2))))))
+                                               (=> (not (= 0 1))
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!b1
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!b1
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!b1
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!b1
+                                                                        median!2!b2))))))))))
+                             (=> (not (= 1 1))
+                                 (and (=> (<= median!1!a2 median!1!b2)
+                                          (and (=> (= 1 1)
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!a2
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!a2
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!a2
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!a2
+                                                                        median!2!b2))))))
+                                               (=> (not (= 1 1))
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!b2
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!b2
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!b2
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!b2
+                                                                        median!2!b2))))))))
+                                      (=> (not (<= median!1!a2 median!1!b2))
+                                          (and (=> (= 0 1)
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!a2
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!a2
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!a2
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!a2
+                                                                        median!2!b2))))))
+                                               (=> (not (= 0 1))
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!b2
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!b2
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!b2
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!b2
+                                                                        median!2!b2))))))))))))
+                    (=> (not (= 1 1))
+                        (and (=> (= 1 1)
+                                 (and (=> (<= median!1!a1 median!1!b1)
+                                          (and (=> (= 1 1)
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!a1
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!a1
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!a1
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!a1
+                                                                        median!2!b2))))))
+                                               (=> (not (= 1 1))
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!b1
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!b1
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!b1
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!b1
+                                                                        median!2!b2))))))))
+                                      (=> (not (<= median!1!a1 median!1!b1))
+                                          (and (=> (= 0 1)
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!a1
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!a1
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!a1
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!a1
+                                                                        median!2!b2))))))
+                                               (=> (not (= 0 1))
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!b1
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!b1
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!b1
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!b1
+                                                                        median!2!b2))))))))))
+                             (=> (not (= 1 1))
+                                 (and (=> (<= median!1!a1 median!1!b2)
+                                          (and (=> (= 1 1)
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!a1
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!a1
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!a1
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!a1
+                                                                        median!2!b2))))))
+                                               (=> (not (= 1 1))
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!b2
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!b2
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!b2
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!b2
+                                                                        median!2!b2))))))))
+                                      (=> (not (<= median!1!a1 median!1!b2))
+                                          (and (=> (= 0 1)
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!a1
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!a1
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!a1
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!a1
+                                                                        median!2!b2))))))
+                                               (=> (not (= 0 1))
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!b2
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!b2
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!b2
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!b2
+                                                                        median!2!b2))))))))))))))
+           (=> (not (<= median!1!a1 median!1!b1))
+               (and (=> (= 0 1)
+                        (and (=> (= 0 1)
+                                 (and (=> (<= median!1!a2 median!1!b1)
+                                          (and (=> (= 1 1)
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!a2
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!a2
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!a2
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!a2
+                                                                        median!2!b2))))))
+                                               (=> (not (= 1 1))
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!b1
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!b1
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!b1
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!b1
+                                                                        median!2!b2))))))))
+                                      (=> (not (<= median!1!a2 median!1!b1))
+                                          (and (=> (= 0 1)
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!a2
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!a2
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!a2
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!a2
+                                                                        median!2!b2))))))
+                                               (=> (not (= 0 1))
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!b1
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!b1
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!b1
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!b1
+                                                                        median!2!b2))))))))))
+                             (=> (not (= 0 1))
+                                 (and (=> (<= median!1!a2 median!1!b2)
+                                          (and (=> (= 1 1)
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!a2
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!a2
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!a2
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!a2
+                                                                        median!2!b2))))))
+                                               (=> (not (= 1 1))
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!b2
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!b2
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!b2
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!b2
+                                                                        median!2!b2))))))))
+                                      (=> (not (<= median!1!a2 median!1!b2))
+                                          (and (=> (= 0 1)
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!a2
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!a2
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!a2
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!a2
+                                                                        median!2!b2))))))
+                                               (=> (not (= 0 1))
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!b2
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!b2
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!b2
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!b2
+                                                                        median!2!b2))))))))))))
+                    (=> (not (= 0 1))
+                        (and (=> (= 0 1)
+                                 (and (=> (<= median!1!a1 median!1!b1)
+                                          (and (=> (= 1 1)
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!a1
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!a1
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!a1
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!a1
+                                                                        median!2!b2))))))
+                                               (=> (not (= 1 1))
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!b1
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!b1
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!b1
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!b1
+                                                                        median!2!b2))))))))
+                                      (=> (not (<= median!1!a1 median!1!b1))
+                                          (and (=> (= 0 1)
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!a1
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!a1
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!a1
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!a1
+                                                                        median!2!b2))))))
+                                               (=> (not (= 0 1))
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!b1
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!b1
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!b1
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!b1
+                                                                        median!2!b2))))))))))
+                             (=> (not (= 0 1))
+                                 (and (=> (<= median!1!a1 median!1!b2)
+                                          (and (=> (= 1 1)
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!a1
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!a1
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!a1
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!a1
+                                                                        median!2!b2))))))
+                                               (=> (not (= 1 1))
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!b2
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!b2
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!b2
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!b2
+                                                                        median!2!b2))))))))
+                                      (=> (not (<= median!1!a1 median!1!b2))
+                                          (and (=> (= 0 1)
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!a1
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!a1
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!a1
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!a1
+                                                                        median!2!b2))))))
+                                               (=> (not (= 0 1))
+                                                   (and (or (not (<= median!2!a1
+                                                                     median!2!b1))
+                                                            (and (or (not (<= median!2!a2
+                                                                              median!2!b1))
+                                                                     (= median!1!b2
+                                                                        median!2!a2))
+                                                                 (or (<= median!2!a2
+                                                                         median!2!b1)
+                                                                     (= median!1!b2
+                                                                        median!2!b1))))
+                                                        (or (<= median!2!a1
+                                                                median!2!b1)
+                                                            (and (or (not (<= median!2!a1
+                                                                              median!2!b2))
+                                                                     (= median!1!b2
+                                                                        median!2!a1))
+                                                                 (or (<= median!2!a1
+                                                                         median!2!b2)
+                                                                     (= median!1!b2
+                                                                        median!2!b2))))))))))))))))
+
+Invalid. Model:
+  median!1!a1 -> (- 1)
+  median!1!a2 -> 1
+  median!1!b1 -> (- 3)
+  median!1!b2 -> (- 2)
+  median!2!a1 -> (- 1)
+  median!2!a2 -> 1
+  median!2!b1 -> 0
+  median!2!b2 -> 2
+
+real	0m0.209s
+user	0m0.266s
+sys	0m0.057s

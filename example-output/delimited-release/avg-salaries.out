@@ -1,0 +1,27 @@
+*******************************************
+****               ORHLE               ****
+**** k-Liveness Hyperproperty Verifier ****
+*******************************************
+
+:: Executions
+  calc_avg[1] (forall)
+  calc_avg[2] (forall)
+  calc_avg[3] (exists)
+
+:: Verification Conditions
+  (=> (and (= calc_avg!1!salary1 calc_avg!3!salary1)
+           (= calc_avg!1!salary2 calc_avg!3!salary2)
+           (= calc_avg!1!salary3 calc_avg!3!salary3)
+           (= (+ calc_avg!1!salary1 calc_avg!1!salary2 calc_avg!1!salary3)
+              (+ calc_avg!2!salary1 calc_avg!2!salary2 calc_avg!2!salary3))
+           (= (+ calc_avg!2!salary1 calc_avg!2!salary2 calc_avg!2!salary3)
+              (+ calc_avg!3!salary1 calc_avg!3!salary2 calc_avg!3!salary3)))
+      (and (= (div (+ 0 calc_avg!2!salary1 calc_avg!2!salary2 calc_avg!2!salary3)
+                   3)
+              (div (+ calc_avg!3!salary1 calc_avg!3!salary2 calc_avg!3!salary3) 3))))
+
+Valid.
+
+real	0m0.201s
+user	0m0.221s
+sys	0m0.008s

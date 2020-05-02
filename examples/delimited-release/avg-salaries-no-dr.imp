@@ -1,0 +1,31 @@
+// From:
+//   Sabelfeld, Andrei & Myers, Andrew. (2004).
+//   A Model for Delimited Information Release.
+//   Lecture Notes in Computer Science. 10.1007/978-3-540-37621-7_9.
+
+expected: invalid;
+
+forall: calc_avg[1], calc_avg[2];
+exists: calc_avg[3];
+
+// There are three salaraies that must not be leaked in
+// any way, even via their sum or average.
+// High:
+//   salary1
+//   salary2
+//   salary3
+
+pre: (and
+       (= calc_avg!1!salary1 calc_avg!3!salary1)
+       (= calc_avg!1!salary2 calc_avg!3!salary2)
+       (= calc_avg!1!salary3 calc_avg!3!salary3));
+post:  (= calc_avg!2!ret  calc_avg!3!ret);
+
+prog calc_avg(salary1, salary2, salary3):
+  sum := 0;
+  sum := sum + salary1;
+  sum := sum + salary2;
+  sum := sum + salary3;
+  avg := sum / 3;
+  ret := avg;
+endp

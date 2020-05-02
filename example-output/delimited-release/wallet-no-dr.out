@@ -1,0 +1,55 @@
+*******************************************
+****               ORHLE               ****
+**** k-Liveness Hyperproperty Verifier ****
+*******************************************
+
+:: Executions
+  buy[1] (forall)
+  buy[2] (forall)
+  buy[3] (exists)
+
+:: Verification Conditions
+  (=> (and (= buy!1!funds buy!3!funds)
+           (= buy!1!spent buy!2!spent)
+           (= buy!1!cost buy!2!cost)
+           (= buy!2!spent buy!3!spent)
+           (= buy!2!cost buy!3!cost))
+      (and (=> (>= buy!2!funds buy!2!cost)
+               (and (or (not (>= buy!1!funds buy!1!cost))
+                        (and (or (not (>= buy!3!funds buy!3!cost))
+                                 (= (+ buy!2!spent buy!2!cost)
+                                    (+ buy!3!spent buy!3!cost)))
+                             (or (= (+ buy!2!spent buy!2!cost) buy!3!spent)
+                                 (>= buy!3!funds buy!3!cost))))
+                    (or (>= buy!1!funds buy!1!cost)
+                        (and (or (not (>= buy!3!funds buy!3!cost))
+                                 (= (+ buy!2!spent buy!2!cost)
+                                    (+ buy!3!spent buy!3!cost)))
+                             (or (= (+ buy!2!spent buy!2!cost) buy!3!spent)
+                                 (>= buy!3!funds buy!3!cost))))))
+           (=> (not (>= buy!2!funds buy!2!cost))
+               (and (or (not (>= buy!1!funds buy!1!cost))
+                        (and (or (not (>= buy!3!funds buy!3!cost))
+                                 (= buy!2!spent (+ buy!3!spent buy!3!cost)))
+                             (or (= buy!2!spent buy!3!spent)
+                                 (>= buy!3!funds buy!3!cost))))
+                    (or (>= buy!1!funds buy!1!cost)
+                        (and (or (not (>= buy!3!funds buy!3!cost))
+                                 (= buy!2!spent (+ buy!3!spent buy!3!cost)))
+                             (or (= buy!2!spent buy!3!spent)
+                                 (>= buy!3!funds buy!3!cost))))))))
+
+Invalid. Model:
+  buy!1!cost -> (- 1)
+  buy!1!funds -> 0
+  buy!1!spent -> 2
+  buy!2!cost -> (- 1)
+  buy!2!funds -> (- 2)
+  buy!2!spent -> 2
+  buy!3!cost -> (- 1)
+  buy!3!funds -> 0
+  buy!3!spent -> 2
+
+real	0m0.209s
+user	0m0.225s
+sys	0m0.037s
