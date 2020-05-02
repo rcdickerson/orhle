@@ -342,6 +342,15 @@ where "Sigma |- [[ P ]]  c  [[ Q ]]" := (hoare_total_proof Sigma P c Q) : hoare_
                                         /\ (~ bassn b st -> Q st))
     end.
 
+  Definition wp_while
+             (Sigma : total_map funSpec)
+             (Q : Assertion)
+             (c : com)
+             (b : bexp) :=
+    gamma' Q c b
+           (fun (Q : Assertion) (st : state) =>
+              (bassn b st -> wp_gen' Sigma c Q st) /\ ((bassn b st -> False) -> Q st)).
+
   Lemma wp_gen'_is_monotone
         Sigma
     : forall (c : com) (a : state) (S S' : state -> Prop),
@@ -436,6 +445,49 @@ where "Sigma |- [[ P ]]  c  [[ Q ]]" := (hoare_total_proof Sigma P c Q) : hoare_
       succRstar Sigma b c Inv st' st'' ->
       succRstar Sigma b c Inv st st''.
 
+  Lemma Acc_succRStar
+    : forall (Sigma : Env)
+             (b : bexp)
+             (c : com)
+             (Inv : Assertion),
+      (forall st, Inv st ->
+                  (bassn b st -> forall st', Sigma |- st =[ c ]=> st' -> Inv st')
+                  /\ strongly_terminates Sigma (CWhile b c) st) ->
+      forall st,
+        Inv st ->
+        strongly_terminates Sigma (CWhile b c) st ->
+        Acc (fun st' st => succRstar Sigma b c Inv st st') st.
+  Proof.
+    intros.
+    revert H1 H H0.
+    remember (WHILE b DO c END)%imp.
+    induction 1; intros; try discriminate.
+    - econstructor; intros.
+      injections.
+      induction H2.
+      + unfold succR in H2; intuition.
+        eapply bassn_eval_true in H2; congruence.
+      + unfold succR in H2; intuition.
+        eapply bassn_eval_true in H2; congruence.
+    - injections.
+      econstructor; intro.
+      intro.
+      revert H5 H3 H2 H4; clear. induction 1; intros.
+      * unfold succR in H.
+        apply (H2 st'); intuition eauto.
+        eapply H3; eauto.
+      * unfold succR in H; intuition.
+        assert (Inv st') as Inv_st' by (eapply H3; eauto).
+        (* Invariant preservation; Acc fact; Invarant *)
+        eapply H1; intros; eauto.
+        eapply H2 in H6; eauto.
+        inversion H6; eapply H10.
+        econstructor; unfold succR.
+        intuition.
+        revert H5; clear; intros.
+        induction H5; unfold succR in *; intuition.
+  Qed.
+
   Lemma well_founded_succRStar
     : forall (Sigma : Env)
              (b : bexp)
@@ -450,37 +502,10 @@ where "Sigma |- [[ P ]]  c  [[ Q ]]" := (hoare_total_proof Sigma P c Q) : hoare_
     constructor; intros.
     induction H0.
     - destruct H0 as [? [? ?] ].
-      pose proof (H _ H0).
-      destruct H3.
-      specialize (H3 H1 _ H2).
-      inversion H4; subst; try congruence.
-      specialize (H10 _ H2).
-      revert H10 H H3; clear.
-      remember (WHILE b DO c END)%imp.
-      induction 1; intros; try discriminate.
-      + econstructor; intros.
-        injections.
-        induction H1.
-        * unfold succR in H1; intuition.
-          eapply bassn_eval_true in H1; congruence.
-        * unfold succR in H1; intuition.
-          eapply bassn_eval_true in H1; congruence.
-      + injections.
-        econstructor; intro.
-        intro.
-        revert H4 H2 H1 H3; clear. induction 1; intros.
-        * unfold succR in H.
-          apply (H1 st'); intuition eauto.
-          eapply H2; eauto.
-        * unfold succR in H; intuition.
-          assert (Inv st') as Inv_st' by (eapply H2; eauto).
-          eapply H1 in H6; eauto.
-          eapply H5; intros; eauto.
-          inversion H6; eapply H10.
-          econstructor; unfold succR.
-          intuition.
-          revert H4; clear; intros.
-          induction H4; unfold succR in *; intuition.
+      eapply Acc_succRStar; eauto.
+      + eapply H; eauto.
+      + eapply H; eauto.
+        eapply H; eauto.
     - assumption.
   Qed.
 
@@ -498,72 +523,52 @@ where "Sigma |- [[ P ]]  c  [[ Q ]]" := (hoare_total_proof Sigma P c Q) : hoare_
       + econstructor; firstorder eauto.
     - econstructor.
       eapply HT_While with (M := eq) (P := gamma' Q c b _).
-        * eapply (well_founded_succRStar {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |}
+      * eapply (well_founded_succRStar {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |}
                                        b c
-                                       (gamma' Q c b
-                                               (fun (Q : Assertion) (st : state) =>
-                                                  (bassn b st -> wp_gen' Sigma c Q st) /\ ((bassn b st -> False) -> Q st)))).
-          split; intros.
-          -- eapply @LFP_is_FConsistent in H; unfold In in H;
-               intuition eauto using wp_gen'_CWhile_is_monotone.
-             eapply hoare_proof_safe in H3.
-             2: eapply IHc.
-             2: eassumption.
-             eapply H3.
-          -- unfold gamma' in H.
-             pattern st.
-             eapply Ind; try eassumption.
-             unfold FClosed, Subset, In; intros.
-             intuition.
-             ++ econstructor; eauto.
-                eapply bassn_eval_false; eauto.
-             ++ eapply ST_WhileTrue; eauto.
-             2: intros; eapply hoare_proof_safe in H2; [ | eapply IHc | eassumption ]; eauto.
-             eapply hoare_proof_terminates in H2; eauto.
-        * intros; simpl.
-          destruct (beval a b) eqn: ?.
-          2: { econstructor.
-               eapply IHc.
-               intros.
-               intuition eauto.
-               eapply bassn_eval_false in Heqb0; subst; intuition.
-               intros; eapply H.
-          }
-          econstructor.
-          -- eapply IHc with (Q := fun st => gamma' Q c b
-                                       (fun (Q0 : Assertion) (st0 : state) =>
-                                          (bassn b st0 -> wp_gen' Sigma c Q0 st0) /\ ((bassn b st0 -> False) -> Q0 st0)) st
+                                       (wp_while Sigma Q c b)).
+        split; intros.
+        -- eapply @LFP_is_FConsistent in H; unfold In in H;
+             intuition eauto using wp_gen'_CWhile_is_monotone.
+           eapply hoare_proof_safe in H3.
+           2: eapply IHc.
+           2: eassumption.
+           eapply H3.
+        -- unfold gamma' in H.
+           pattern st.
+           eapply Ind; try eassumption.
+           unfold FClosed, Subset, In; intros.
+           intuition.
+           ++ econstructor; eauto.
+              eapply bassn_eval_false; eauto.
+           ++ eapply ST_WhileTrue; eauto.
+              2: intros; eapply hoare_proof_safe in H2; [ | eapply IHc | eassumption ]; eauto.
+              eapply hoare_proof_terminates in H2; eauto.
+      * intros; simpl.
+        econstructor.
+        -- eapply IHc with (Q := fun st =>
+                                   wp_while Sigma Q c b st
                                    /\ succR {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |} b c
-      (gamma' Q c b
-         (fun (Q0 : Assertion) (st0 : state) =>
-          (bassn b st0 -> wp_gen' Sigma c Q0 st0) /\ ((bassn b st0 -> False) -> Q0 st0))) a st).
-          -- instantiate (1:= (fun Q st => (bassn b st -> wp_gen' Sigma c Q st)
-                                             /\ (~ bassn b st -> Q st))).
-             intros; intuition; subst.
-             generalize H0; intro H'; eapply @LFP_is_FConsistent in H'; unfold In in H';
-               intuition.
-             2: { unfold Monotone_F, Subset, In; intros.
-                  eapply wp_gen'_CWhile_is_monotone; eauto.  }
-             unfold succR.
-             eapply wp_gen'_is_monotone.
-             instantiate (1 := fun a0 => _ a0 /\ _ a0); intros.
-             split.
-             apply (proj1 H1).
-             repeat split; try eassumption.
-             eapply (proj2 H1).
-             eapply wp_gen_is_wp; unfold wp; split; intros.
-             intuition eauto.
-             2: eapply hoare_proof_terminates; eauto.
-             eapply hoare_proof_sound; eauto.
-          -- simpl; intros; split.
-             eapply H.
-             eexists _; split; eauto.
-             econstructor.
-             eapply H.
-        * intros; simpl; split; [eapply H | eauto].
-        * intros; simpl in H; intuition.
-          eapply @LFP_is_FConsistent in H0; unfold In in H0; intuition.
-          eapply wp_gen'_CWhile_is_monotone.
+                                            (wp_while Sigma Q c b) a st).
+        -- instantiate (1:= (fun Q st => (bassn b st -> wp_gen' Sigma c Q st)
+                                         /\ (~ bassn b st -> Q st))).
+           intros; intuition; subst.
+           generalize H0; intro H'; eapply @LFP_is_FConsistent in H'; unfold In in H';
+             intuition.
+           2: { unfold Monotone_F, Subset, In; intros.
+                eapply wp_gen'_CWhile_is_monotone; eauto.  }
+           eapply wp_gen_is_wp; unfold wp, succR; split; intros.
+           intuition eauto.
+           eapply hoare_proof_sound; eauto.
+           eapply hoare_proof_terminates; eauto.
+        -- simpl; intros; split.
+           eapply H.
+           eexists _; split; eauto.
+           econstructor.
+           eapply H.
+      * intros; simpl; split; [eapply H | eauto].
+      * intros; simpl in H; intuition.
+        eapply @LFP_is_FConsistent in H0; unfold In in H0; intuition.
+        eapply wp_gen'_CWhile_is_monotone.
   Qed.
 
   Theorem hoare_proof_complete' Sigs Sigma : forall P c Q,
