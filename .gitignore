@@ -1,3 +1,3 @@
 .stack-work/
-rhle-verifier.cabal
+*.cabal
 *~
