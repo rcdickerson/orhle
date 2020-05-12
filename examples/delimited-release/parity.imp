@@ -5,8 +5,8 @@
 
 expected: valid;
 
-forall: parity[1], parity[2];
-exists: parity[3];
+forall: parity[1];
+exists: parity[2];
 
 // High:
 //   h
@@ -16,18 +16,12 @@ exists: parity[3];
 //   h mod 2
 
 pre: (and
-       // High
-       (= parity!1!h parity!3!h)
+        (= parity!1!l parity!2!l)
 
-       // Low
-       (= parity!1!l parity!2!l)
-       (= parity!2!l parity!3!l)
+        // Delimited Release
+        (= (mod parity!1!h 2) (mod parity!2!h 2)));
 
-       // Delimited Release
-       (= (mod parity!1!h 2) (mod parity!2!h 2))
-       (= (mod parity!2!h 2) (mod parity!3!h 2)));
-
-post: (= parity!2!l parity!3!l);
+post: (= parity!1!l parity!2!l);
 
 
 prog parity():
