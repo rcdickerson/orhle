@@ -109,11 +109,20 @@ generateVCs stmt post quant specs = case stmt of
                    =<< mkImplies ncondAndInv post
         return [inv, loopVC, endVC]
       VCExistential -> do
-        bodyVCs <- generateVCs body inv quant specs
-        loopVC  <- mkForallConst [] progVars
-                   =<< mkImplies condAndInv =<< mkAnd bodyVCs
-        endVC   <- mkForallConst [] progVars
-                   =<< mkImplies ncondAndInv post
+        frProgVarASTs  <- mkFreshIntVars progVarStrs
+        frProgVarStrs  <- mapM astToString frProgVarASTs
+        frProgVars     <- stringsToApps frProgVarStrs
+        let freshen ast = substituteByName ast progVarStrs frProgVarStrs
+        frCondAndInv   <- freshen condAndInv
+        frVar          <- freshen var
+        varCond        <- mkLt frVar var
+        bodyPost       <- mkAnd [inv, varCond]
+        bodyVCs        <- generateVCs body bodyPost quant specs
+        frBodyVCs      <- mapM freshen bodyVCs
+        loopVC <- mkExistsConst [] frProgVars
+                  =<< mkImplies frCondAndInv =<< mkAnd frBodyVCs
+        endVC  <- mkExistsConst [] progVars
+                  =<< mkAnd [ncondAndInv, post]
         return [inv, loopVC, endVC]
   SCall assignees cparams funName -> do
     spec <- specAtCallsite assignees cparams funName specs
