@@ -22,6 +22,6 @@ Invalid. Model:
   parity!2!h -> 1
   parity!2!l -> 3
 
-real	0m0.087s
-user	0m0.092s
-sys	0m0.031s
+real	0m0.085s
+user	0m0.060s
+sys	0m0.049s

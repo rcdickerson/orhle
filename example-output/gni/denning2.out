@@ -1,6 +1,6 @@
 *******************************************
 ****               ORHLE               ****
-**** k-Liveness Hyperproperty Verifier ****
+****     The Oracular RHLE Verifier    ****
 *******************************************
 
 :: Executions
@@ -28,27 +28,28 @@
                     (denningA2!n Int)
                     (denningA2!sum Int)
                     (denningA2!x Int))
-             (=> (and (<= denningA2!i 100)
-                      (and (= denningA1!f1_L denningE!f1_L)
-                           (= denningA1!f2_L denningE!f2_L)
-                           (= denningA1!f1_L denningA2!f1_L)
-                           (= denningA2!f1_L denningE!f1_L)
-                           (=> (> denningA2!i 1)
-                               (= denningA2!f1_L denningA2!f2_L))))
-                 (and (=> (not (= denningA2!f1_L 0))
-                          (and (and (= denningA1!f1_L denningE!f1_L)
-                                    (= denningA1!f2_L denningE!f2_L)
-                                    (= denningA1!f1_L denningA2!f1_L)
-                                    (= denningA2!f1_L denningE!f1_L)
-                                    (=> (> (+ denningA2!i 1) 1)
-                                        (= denningA2!f1_L denningA2!f1_L)))))
-                      (=> (not (not (= denningA2!f1_L 0)))
-                          (and (= denningA1!f1_L denningE!f1_L)
-                               (= denningA1!f2_L denningE!f2_L)
-                               (= denningA1!f1_L denningA2!f1_L)
-                               (= denningA2!f1_L denningE!f1_L)
-                               (=> (> (+ denningA2!i 1) 1)
-                                   (= denningA2!f1_L denningA2!f1_L)))))))
+             (! (=> (and (<= denningA2!i 100)
+                         (and (= denningA1!f1_L denningE!f1_L)
+                              (= denningA1!f2_L denningE!f2_L)
+                              (= denningA1!f1_L denningA2!f1_L)
+                              (= denningA2!f1_L denningE!f1_L)
+                              (=> (> denningA2!i 1)
+                                  (= denningA2!f1_L denningA2!f2_L))))
+                    (and (=> (not (= denningA2!f1_L 0))
+                             (and (and (= denningA1!f1_L denningE!f1_L)
+                                       (= denningA1!f2_L denningE!f2_L)
+                                       (= denningA1!f1_L denningA2!f1_L)
+                                       (= denningA2!f1_L denningE!f1_L)
+                                       (=> (> (+ denningA2!i 1) 1)
+                                           (= denningA2!f1_L denningA2!f1_L)))))
+                         (=> (not (not (= denningA2!f1_L 0)))
+                             (and (= denningA1!f1_L denningE!f1_L)
+                                  (= denningA1!f2_L denningE!f2_L)
+                                  (= denningA1!f1_L denningA2!f1_L)
+                                  (= denningA2!f1_L denningE!f1_L)
+                                  (=> (> (+ denningA2!i 1) 1)
+                                      (= denningA2!f1_L denningA2!f1_L))))))
+                :weight 0))
            (forall ((denningA2!f1_L Int)
                     (denningA2!f2_L Int)
                     (denningA2!f3_H Int)
@@ -57,304 +58,247 @@
                     (denningA2!n Int)
                     (denningA2!sum Int)
                     (denningA2!x Int))
-             (=> (and (not (<= denningA2!i 100))
-                      (and (= denningA1!f1_L denningE!f1_L)
-                           (= denningA1!f2_L denningE!f2_L)
-                           (= denningA1!f1_L denningA2!f1_L)
-                           (= denningA2!f1_L denningE!f1_L)
-                           (=> (> denningA2!i 1)
-                               (= denningA2!f1_L denningA2!f2_L))))
-                 (and (= (+ denningA2!n
-                            denningA2!sum
-                            (div denningA2!sum denningA2!n))
-                         (+ denningA2!n
-                            denningA2!sum
-                            (div denningA2!sum denningA2!n)))
-                      (= (+ denningA2!n
-                            denningA2!sum
-                            (div denningA2!sum denningA2!n))
-                         denningA1!f1_L)
-                      (= denningA1!f1_L
-                         (+ denningA2!n
-                            denningA2!sum
-                            (div denningA2!sum denningA2!n)))
-                      (= (+ denningA2!n
-                            denningA2!sum
-                            (div denningA2!sum denningA2!n))
-                         denningE!f1_L)
-                      (forall ((denningA1!f1_L Int)
-                               (denningA1!f2_L Int)
-                               (denningA1!i Int))
-                        (or (not (and (<= denningA1!i 100)
-                                      (= (+ denningA2!n
-                                            denningA2!sum
-                                            (div denningA2!sum denningA2!n))
-                                         (+ denningA2!n
-                                            denningA2!sum
-                                            (div denningA2!sum denningA2!n)))
-                                      (= (+ denningA2!n
-                                            denningA2!sum
-                                            (div denningA2!sum denningA2!n))
-                                         denningA1!f1_L)
-                                      (= denningA1!f1_L
-                                         (+ denningA2!n
-                                            denningA2!sum
-                                            (div denningA2!sum denningA2!n)))
-                                      (= (+ denningA2!n
-                                            denningA2!sum
-                                            (div denningA2!sum denningA2!n))
-                                         denningE!f1_L)
-                                      (or (<= denningA1!i 1)
-                                          (= denningA1!f1_L denningA1!f2_L))))
-                            (and (or (= denningA1!f1_L 0)
-                                     (and (= (+ denningA2!n
-                                                denningA2!sum
-                                                (div denningA2!sum denningA2!n))
-                                             (+ denningA2!n
-                                                denningA2!sum
-                                                (div denningA2!sum denningA2!n)))
-                                          (= (+ denningA2!n
-                                                denningA2!sum
-                                                (div denningA2!sum denningA2!n))
-                                             denningA1!f1_L)
-                                          (= denningA1!f1_L
-                                             (+ denningA2!n
-                                                denningA2!sum
-                                                (div denningA2!sum denningA2!n)))
-                                          (= (+ denningA2!n
-                                                denningA2!sum
-                                                (div denningA2!sum denningA2!n))
-                                             denningE!f1_L)))
-                                 (or (not (= denningA1!f1_L 0))
-                                     (and (= (+ denningA2!n
-                                                denningA2!sum
-                                                (div denningA2!sum denningA2!n))
-                                             (+ denningA2!n
-                                                denningA2!sum
-                                                (div denningA2!sum denningA2!n)))
-                                          (= (+ denningA2!n
-                                                denningA2!sum
-                                                (div denningA2!sum denningA2!n))
-                                             denningA1!f1_L)
-                                          (= denningA1!f1_L
-                                             (+ denningA2!n
-                                                denningA2!sum
-                                                (div denningA2!sum denningA2!n)))
-                                          (= (+ denningA2!n
-                                                denningA2!sum
-                                                (div denningA2!sum denningA2!n))
-                                             denningE!f1_L))))))
-                      (forall ((denningA1!f1_L Int)
-                               (denningA1!f2_L Int)
-                               (denningA1!i Int)
-                               (denningA1!n Int)
-                               (denningA1!sum Int))
-                        (or (not (and (not (<= denningA1!i 100))
-                                      (= (+ denningA2!n
-                                            denningA2!sum
-                                            (div denningA2!sum denningA2!n))
-                                         (+ denningA2!n
-                                            denningA2!sum
-                                            (div denningA2!sum denningA2!n)))
-                                      (= (+ denningA2!n
-                                            denningA2!sum
-                                            (div denningA2!sum denningA2!n))
-                                         denningA1!f1_L)
-                                      (= denningA1!f1_L
-                                         (+ denningA2!n
-                                            denningA2!sum
-                                            (div denningA2!sum denningA2!n)))
-                                      (= (+ denningA2!n
-                                            denningA2!sum
-                                            (div denningA2!sum denningA2!n))
-                                         denningE!f1_L)
-                                      (or (<= denningA1!i 1)
-                                          (= denningA1!f1_L denningA1!f2_L))))
-                            (and (= (+ denningA2!n
-                                       denningA2!sum
-                                       (div denningA2!sum denningA2!n))
-                                    (+ denningA2!n
-                                       denningA2!sum
-                                       (div denningA2!sum denningA2!n)))
-                                 (= (+ denningA1!n
-                                       denningA1!sum
-                                       (div denningA1!sum denningA1!n))
-                                    (+ denningA2!n
-                                       denningA2!sum
-                                       (div denningA2!sum denningA2!n)))
-                                 (= (+ denningA2!n
-                                       denningA2!sum
-                                       (div denningA2!sum denningA2!n))
-                                    denningE!f1_L)
-                                 (forall ((denningE!f1_L Int)
-                                          (denningE!f2_L Int)
-                                          (denningE!i Int))
-                                   (or (not (and (<= denningE!i 100)
-                                                 (= (+ denningA2!n
-                                                       denningA2!sum
-                                                       (div denningA2!sum
-                                                            denningA2!n))
-                                                    (+ denningA2!n
-                                                       denningA2!sum
-                                                       (div denningA2!sum
-                                                            denningA2!n)))
-                                                 (= (+ denningA1!n
-                                                       denningA1!sum
-                                                       (div denningA1!sum
-                                                            denningA1!n))
-                                                    (+ denningA2!n
-                                                       denningA2!sum
-                                                       (div denningA2!sum
-                                                            denningA2!n)))
-                                                 (= (+ denningA2!n
-                                                       denningA2!sum
-                                                       (div denningA2!sum
-                                                            denningA2!n))
-                                                    denningE!f1_L)
-                                                 (or (<= denningE!i 1)
-                                                     (and (= (+ denningA2!n
-                                                                denningA2!sum
-                                                                (div denningA2!sum
-                                                                     denningA2!n))
-                                                             denningE!f1_L)
-                                                          (= (+ denningA2!n
-                                                                denningA2!sum
-                                                                (div denningA2!sum
-                                                                     denningA2!n))
-                                                             denningE!f2_L)
-                                                          (= denningE!f1_L
-                                                             denningE!f2_L)))))
-                                       (and (or (= denningE!f1_L 0)
-                                                (and (= (+ denningA2!n
-                                                           denningA2!sum
-                                                           (div denningA2!sum
-                                                                denningA2!n))
-                                                        (+ denningA2!n
-                                                           denningA2!sum
-                                                           (div denningA2!sum
-                                                                denningA2!n)))
-                                                     (= (+ denningA1!n
-                                                           denningA1!sum
-                                                           (div denningA1!sum
-                                                                denningA1!n))
-                                                        (+ denningA2!n
-                                                           denningA2!sum
-                                                           (div denningA2!sum
-                                                                denningA2!n)))
-                                                     (= (+ denningA2!n
-                                                           denningA2!sum
-                                                           (div denningA2!sum
-                                                                denningA2!n))
-                                                        denningE!f1_L)
-                                                     (or (<= denningE!i 0)
-                                                         (and (= (+ denningA2!n
-                                                                    denningA2!sum
-                                                                    (div denningA2!sum
-                                                                         denningA2!n))
-                                                                 denningE!f1_L)
-                                                              (= (+ denningA2!n
-                                                                    denningA2!sum
-                                                                    (div denningA2!sum
-                                                                         denningA2!n))
-                                                                 denningE!f1_L)))))
-                                            (or (not (= denningE!f1_L 0))
-                                                (and (= (+ denningA2!n
-                                                           denningA2!sum
-                                                           (div denningA2!sum
-                                                                denningA2!n))
-                                                        (+ denningA2!n
-                                                           denningA2!sum
-                                                           (div denningA2!sum
-                                                                denningA2!n)))
-                                                     (= (+ denningA1!n
-                                                           denningA1!sum
-                                                           (div denningA1!sum
-                                                                denningA1!n))
-                                                        (+ denningA2!n
-                                                           denningA2!sum
-                                                           (div denningA2!sum
-                                                                denningA2!n)))
-                                                     (= (+ denningA2!n
-                                                           denningA2!sum
-                                                           (div denningA2!sum
-                                                                denningA2!n))
-                                                        denningE!f1_L)
-                                                     (or (<= denningE!i 0)
-                                                         (and (= (+ denningA2!n
-                                                                    denningA2!sum
-                                                                    (div denningA2!sum
-                                                                         denningA2!n))
-                                                                 denningE!f1_L)
-                                                              (= (+ denningA2!n
-                                                                    denningA2!sum
-                                                                    (div denningA2!sum
-                                                                         denningA2!n))
-                                                                 denningE!f1_L))))))))
-                                 (forall ((denningE!f1_L Int)
-                                          (denningE!f2_L Int)
-                                          (denningE!i Int)
-                                          (denningE!n Int)
-                                          (denningE!sum Int))
-                                   (or (not (and (not (<= denningE!i 100))
-                                                 (= (+ denningA2!n
-                                                       denningA2!sum
-                                                       (div denningA2!sum
-                                                            denningA2!n))
-                                                    (+ denningA2!n
-                                                       denningA2!sum
-                                                       (div denningA2!sum
-                                                            denningA2!n)))
-                                                 (= (+ denningA1!n
-                                                       denningA1!sum
-                                                       (div denningA1!sum
-                                                            denningA1!n))
-                                                    (+ denningA2!n
-                                                       denningA2!sum
-                                                       (div denningA2!sum
-                                                            denningA2!n)))
-                                                 (= (+ denningA2!n
-                                                       denningA2!sum
-                                                       (div denningA2!sum
-                                                            denningA2!n))
-                                                    denningE!f1_L)
-                                                 (or (<= denningE!i 1)
-                                                     (and (= (+ denningA2!n
-                                                                denningA2!sum
-                                                                (div denningA2!sum
-                                                                     denningA2!n))
-                                                             denningE!f1_L)
-                                                          (= (+ denningA2!n
-                                                                denningA2!sum
-                                                                (div denningA2!sum
-                                                                     denningA2!n))
-                                                             denningE!f2_L)
-                                                          (= denningE!f1_L
-                                                             denningE!f2_L)))))
-                                       (and (= (+ denningA2!n
-                                                  denningA2!sum
-                                                  (div denningA2!sum denningA2!n))
-                                               (+ denningE!n
-                                                  denningE!sum
-                                                  (div denningE!sum denningE!n)))
+             (! (=> (and (not (<= denningA2!i 100))
+                         (and (= denningA1!f1_L denningE!f1_L)
+                              (= denningA1!f2_L denningE!f2_L)
+                              (= denningA1!f1_L denningA2!f1_L)
+                              (= denningA2!f1_L denningE!f1_L)
+                              (=> (> denningA2!i 1)
+                                  (= denningA2!f1_L denningA2!f2_L))))
+                    (and (= (+ denningA2!n
+                               denningA2!sum
+                               (div denningA2!sum denningA2!n))
+                            (+ denningA2!n
+                               denningA2!sum
+                               (div denningA2!sum denningA2!n)))
+                         (= (+ denningA2!n
+                               denningA2!sum
+                               (div denningA2!sum denningA2!n))
+                            denningA1!f1_L)
+                         (= denningA1!f1_L
+                            (+ denningA2!n
+                               denningA2!sum
+                               (div denningA2!sum denningA2!n)))
+                         (= (+ denningA2!n
+                               denningA2!sum
+                               (div denningA2!sum denningA2!n))
+                            denningE!f1_L)
+                         (forall ((denningA1!f1_L Int)
+                                  (denningA1!f2_L Int)
+                                  (denningA1!i Int))
+                           (! (or (not (and (<= denningA1!i 100)
                                             (= (+ denningA2!n
                                                   denningA2!sum
                                                   (div denningA2!sum denningA2!n))
-                                               (+ denningE!n
-                                                  denningE!sum
-                                                  (div denningE!sum denningE!n))))))))))))))
+                                               (+ denningA2!n
+                                                  denningA2!sum
+                                                  (div denningA2!sum denningA2!n)))
+                                            (= (+ denningA2!n
+                                                  denningA2!sum
+                                                  (div denningA2!sum denningA2!n))
+                                               denningA1!f1_L)
+                                            (= denningA1!f1_L
+                                               (+ denningA2!n
+                                                  denningA2!sum
+                                                  (div denningA2!sum denningA2!n)))
+                                            (= (+ denningA2!n
+                                                  denningA2!sum
+                                                  (div denningA2!sum denningA2!n))
+                                               denningE!f1_L)
+                                            (or (<= denningA1!i 1)
+                                                (= denningA1!f1_L denningA1!f2_L))))
+                                  (and (or (= denningA1!f1_L 0)
+                                           (and (= (+ denningA2!n
+                                                      denningA2!sum
+                                                      (div denningA2!sum
+                                                           denningA2!n))
+                                                   (+ denningA2!n
+                                                      denningA2!sum
+                                                      (div denningA2!sum
+                                                           denningA2!n)))
+                                                (= (+ denningA2!n
+                                                      denningA2!sum
+                                                      (div denningA2!sum
+                                                           denningA2!n))
+                                                   denningA1!f1_L)
+                                                (= denningA1!f1_L
+                                                   (+ denningA2!n
+                                                      denningA2!sum
+                                                      (div denningA2!sum
+                                                           denningA2!n)))
+                                                (= (+ denningA2!n
+                                                      denningA2!sum
+                                                      (div denningA2!sum
+                                                           denningA2!n))
+                                                   denningE!f1_L)))
+                                       (or (not (= denningA1!f1_L 0))
+                                           (and (= (+ denningA2!n
+                                                      denningA2!sum
+                                                      (div denningA2!sum
+                                                           denningA2!n))
+                                                   (+ denningA2!n
+                                                      denningA2!sum
+                                                      (div denningA2!sum
+                                                           denningA2!n)))
+                                                (= (+ denningA2!n
+                                                      denningA2!sum
+                                                      (div denningA2!sum
+                                                           denningA2!n))
+                                                   denningA1!f1_L)
+                                                (= denningA1!f1_L
+                                                   (+ denningA2!n
+                                                      denningA2!sum
+                                                      (div denningA2!sum
+                                                           denningA2!n)))
+                                                (= (+ denningA2!n
+                                                      denningA2!sum
+                                                      (div denningA2!sum
+                                                           denningA2!n))
+                                                   denningE!f1_L)))))
+                              :weight 0))
+                         (forall ((denningA1!f1_L Int)
+                                  (denningA1!f2_L Int)
+                                  (denningA1!i Int)
+                                  (denningA1!n Int)
+                                  (denningA1!sum Int))
+                           (! (or (not (and (not (<= denningA1!i 100))
+                                            (= (+ denningA2!n
+                                                  denningA2!sum
+                                                  (div denningA2!sum denningA2!n))
+                                               (+ denningA2!n
+                                                  denningA2!sum
+                                                  (div denningA2!sum denningA2!n)))
+                                            (= (+ denningA2!n
+                                                  denningA2!sum
+                                                  (div denningA2!sum denningA2!n))
+                                               denningA1!f1_L)
+                                            (= denningA1!f1_L
+                                               (+ denningA2!n
+                                                  denningA2!sum
+                                                  (div denningA2!sum denningA2!n)))
+                                            (= (+ denningA2!n
+                                                  denningA2!sum
+                                                  (div denningA2!sum denningA2!n))
+                                               denningE!f1_L)
+                                            (or (<= denningA1!i 1)
+                                                (= denningA1!f1_L denningA1!f2_L))))
+                                  (and (= (+ denningA2!n
+                                             denningA2!sum
+                                             (div denningA2!sum denningA2!n))
+                                          (+ denningA2!n
+                                             denningA2!sum
+                                             (div denningA2!sum denningA2!n)))
+                                       (= (+ denningA1!n
+                                             denningA1!sum
+                                             (div denningA1!sum denningA1!n))
+                                          (+ denningA2!n
+                                             denningA2!sum
+                                             (div denningA2!sum denningA2!n)))
+                                       (= (+ denningA2!n
+                                             denningA2!sum
+                                             (div denningA2!sum denningA2!n))
+                                          denningE!f1_L)
+                                       (exists ((denningE!f1_L!0 Int)
+                                                (denningE!f2_L!1 Int)
+                                                (denningE!i!4 Int))
+                                         (! (not (and (<= denningE!i!4 100)
+                                                      (= (+ denningA2!n
+                                                            denningA2!sum
+                                                            (div denningA2!sum
+                                                                 denningA2!n))
+                                                         (+ denningA2!n
+                                                            denningA2!sum
+                                                            (div denningA2!sum
+                                                                 denningA2!n)))
+                                                      (= (+ denningA1!n
+                                                            denningA1!sum
+                                                            (div denningA1!sum
+                                                                 denningA1!n))
+                                                         (+ denningA2!n
+                                                            denningA2!sum
+                                                            (div denningA2!sum
+                                                                 denningA2!n)))
+                                                      (= (+ denningA2!n
+                                                            denningA2!sum
+                                                            (div denningA2!sum
+                                                                 denningA2!n))
+                                                         denningE!f1_L!0)
+                                                      (or (<= denningE!i!4 1)
+                                                          (and (= (+ denningA2!n
+                                                                     denningA2!sum
+                                                                     (div denningA2!sum
+                                                                          denningA2!n))
+                                                                  denningE!f1_L!0)
+                                                               (= (+ denningA2!n
+                                                                     denningA2!sum
+                                                                     (div denningA2!sum
+                                                                          denningA2!n))
+                                                                  denningE!f2_L!1)
+                                                               (= denningE!f1_L!0
+                                                                  denningE!f2_L!1)))))
+                                            :weight 0))
+                                       (exists ((denningE!f1_L Int)
+                                                (denningE!f2_L Int)
+                                                (denningE!i Int)
+                                                (denningE!n Int)
+                                                (denningE!sum Int))
+                                         (! (and (not (<= denningE!i 100))
+                                                 (= (+ denningA2!n
+                                                       denningA2!sum
+                                                       (div denningA2!sum
+                                                            denningA2!n))
+                                                    (+ denningA2!n
+                                                       denningA2!sum
+                                                       (div denningA2!sum
+                                                            denningA2!n)))
+                                                 (= (+ denningA1!n
+                                                       denningA1!sum
+                                                       (div denningA1!sum
+                                                            denningA1!n))
+                                                    (+ denningA2!n
+                                                       denningA2!sum
+                                                       (div denningA2!sum
+                                                            denningA2!n)))
+                                                 (= (+ denningA2!n
+                                                       denningA2!sum
+                                                       (div denningA2!sum
+                                                            denningA2!n))
+                                                    denningE!f1_L)
+                                                 (or (<= denningE!i 1)
+                                                     (and (= (+ denningA2!n
+                                                                denningA2!sum
+                                                                (div denningA2!sum
+                                                                     denningA2!n))
+                                                             denningE!f1_L)
+                                                          (= (+ denningA2!n
+                                                                denningA2!sum
+                                                                (div denningA2!sum
+                                                                     denningA2!n))
+                                                             denningE!f2_L)
+                                                          (= denningE!f1_L
+                                                             denningE!f2_L)))
+                                                 (= (+ denningA2!n
+                                                       denningA2!sum
+                                                       (div denningA2!sum
+                                                            denningA2!n))
+                                                    (+ denningE!n
+                                                       denningE!sum
+                                                       (div denningE!sum
+                                                            denningE!n)))
+                                                 (= (+ denningA2!n
+                                                       denningA2!sum
+                                                       (div denningA2!sum
+                                                            denningA2!n))
+                                                    (+ denningE!n
+                                                       denningE!sum
+                                                       (div denningE!sum
+                                                            denningE!n))))
+                                            :weight 0))))
+                              :weight 0))))
+                :weight 0))))
 
-Invalid. Model:
-  denningA1!f1_L -> (- 2)
-  denningA1!f2_L -> 4
-  denningA1!f3_H -> 2
-  denningA1!f4_H -> 3
-  denningA2!f1_L -> (- 2)
-  denningA2!f2_L -> 4
-  denningE!f1_L -> (- 2)
-  denningE!f2_L -> 4
-  denningE!f3_H -> 2
-  denningE!f4_H -> 3
+Valid.
 
-real	0m0.229s
-user	0m0.261s
-sys	0m0.031s
+real	0m0.121s
+user	0m0.106s
+sys	0m0.069s

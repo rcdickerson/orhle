@@ -1,48 +1,29 @@
 *******************************************
 ****               ORHLE               ****
-**** k-Liveness Hyperproperty Verifier ****
+****     The Oracular RHLE Verifier    ****
 *******************************************
 
 :: Executions
   buy[1] (forall)
-  buy[2] (forall)
-  buy[3] (exists)
+  buy[2] (exists)
 
 :: Verification Conditions
-  (=> (and (= buy!1!funds buy!3!funds)
-           (= buy!1!spent buy!2!spent)
-           (= buy!2!spent buy!3!spent)
+  (=> (and (= buy!1!spent buy!2!spent)
            (= buy!1!cost buy!2!cost)
-           (= buy!2!cost buy!3!cost)
            (= (>= buy!1!funds buy!1!cost) (>= buy!2!funds buy!2!cost))
            (= (>= buy!2!funds buy!2!cost) (>= buy!3!funds buy!3!cost)))
-      (and (=> (>= buy!2!funds buy!2!cost)
-               (and (or (not (>= buy!1!funds buy!1!cost))
-                        (and (or (not (>= buy!3!funds buy!3!cost))
-                                 (= (+ buy!2!spent buy!2!cost)
-                                    (+ buy!3!spent buy!3!cost)))
-                             (or (= (+ buy!2!spent buy!2!cost) buy!3!spent)
-                                 (>= buy!3!funds buy!3!cost))))
-                    (or (>= buy!1!funds buy!1!cost)
-                        (and (or (not (>= buy!3!funds buy!3!cost))
-                                 (= (+ buy!2!spent buy!2!cost)
-                                    (+ buy!3!spent buy!3!cost)))
-                             (or (= (+ buy!2!spent buy!2!cost) buy!3!spent)
-                                 (>= buy!3!funds buy!3!cost))))))
-           (=> (not (>= buy!2!funds buy!2!cost))
-               (and (or (not (>= buy!1!funds buy!1!cost))
-                        (and (or (not (>= buy!3!funds buy!3!cost))
-                                 (= buy!2!spent (+ buy!3!spent buy!3!cost)))
-                             (or (= buy!2!spent buy!3!spent)
-                                 (>= buy!3!funds buy!3!cost))))
-                    (or (>= buy!1!funds buy!1!cost)
-                        (and (or (not (>= buy!3!funds buy!3!cost))
-                                 (= buy!2!spent (+ buy!3!spent buy!3!cost)))
-                             (or (= buy!2!spent buy!3!spent)
-                                 (>= buy!3!funds buy!3!cost))))))))
+      (and (=> (>= buy!1!funds buy!1!cost)
+               (and (or (not (>= buy!2!funds buy!2!cost))
+                        (= (+ buy!1!spent buy!1!cost) (+ buy!2!spent buy!2!cost)))
+                    (or (= (+ buy!1!spent buy!1!cost) buy!2!spent)
+                        (>= buy!2!funds buy!2!cost))))
+           (=> (not (>= buy!1!funds buy!1!cost))
+               (and (or (not (>= buy!2!funds buy!2!cost))
+                        (= buy!1!spent (+ buy!2!spent buy!2!cost)))
+                    (or (= buy!1!spent buy!2!spent) (>= buy!2!funds buy!2!cost))))))
 
 Valid.
 
-real	0m0.209s
-user	0m0.200s
-sys	0m0.017s
+real	0m0.077s
+user	0m0.089s
+sys	0m0.035s

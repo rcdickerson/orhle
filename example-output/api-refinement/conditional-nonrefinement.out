@@ -1,6 +1,6 @@
 *******************************************
 ****               ORHLE               ****
-**** k-Liveness Hyperproperty Verifier ****
+****     The Oracular RHLE Verifier    ****
 *******************************************
 
 :: Executions
@@ -13,30 +13,38 @@
            (=> (or (= refinement!r 0) (= refinement!r 1))
                (and (=> (= refinement!r 0)
                         (and (exists ((original!n Int))
-                               (let ((a!1 (exists ((original!r!0 Int))
-                                            (= original!r!0 original!n))))
-                                 (and (or (= original!n 0) (= original!n 1))
-                                      a!1
-                                      (forall ((original!r!0 Int))
-                                        (or (not (= original!r!0 original!n))
-                                            (and (or (not (= original!r!0 0))
-                                                     (= 10 10))
-                                                 (or (= 20 10) (= original!r!0 0))))))))))
+                               (! (let ((a!1 (exists ((original!r!0 Int))
+                                               (! (= original!r!0 original!n)
+                                                  :weight 0))))
+                                    (and (or (= original!n 0) (= original!n 1))
+                                         a!1
+                                         (forall ((original!r!0 Int))
+                                           (! (or (not (= original!r!0 original!n))
+                                                  (and (or (not (= original!r!0 0))
+                                                           (= 10 10))
+                                                       (or (= 20 10)
+                                                           (= original!r!0 0))))
+                                              :weight 0))))
+                                  :weight 0))))
                     (=> (not (= refinement!r 0))
                         (and (exists ((original!n Int))
-                               (let ((a!1 (exists ((original!r!0 Int))
-                                            (= original!r!0 original!n))))
-                                 (and (or (= original!n 0) (= original!n 1))
-                                      a!1
-                                      (forall ((original!r!0 Int))
-                                        (or (not (= original!r!0 original!n))
-                                            (and (or (not (= original!r!0 0))
-                                                     (= 10 30))
-                                                 (or (= 20 30) (= original!r!0 0))))))))))))))
+                               (! (let ((a!1 (exists ((original!r!0 Int))
+                                               (! (= original!r!0 original!n)
+                                                  :weight 0))))
+                                    (and (or (= original!n 0) (= original!n 1))
+                                         a!1
+                                         (forall ((original!r!0 Int))
+                                           (! (or (not (= original!r!0 original!n))
+                                                  (and (or (not (= original!r!0 0))
+                                                           (= 10 30))
+                                                       (or (= 20 30)
+                                                           (= original!r!0 0))))
+                                              :weight 0))))
+                                  :weight 0))))))))
 
 Invalid. Model:
   refinement!r -> 1
 
-real	0m0.192s
-user	0m0.192s
-sys	0m0.008s
+real	0m0.090s
+user	0m0.078s
+sys	0m0.033s

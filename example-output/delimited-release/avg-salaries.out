@@ -1,6 +1,6 @@
 *******************************************
 ****               ORHLE               ****
-**** k-Liveness Hyperproperty Verifier ****
+****     The Oracular RHLE Verifier    ****
 *******************************************
 
 :: Executions
@@ -22,6 +22,6 @@
 
 Valid.
 
-real	0m0.201s
-user	0m0.221s
-sys	0m0.008s
+real	0m0.116s
+user	0m0.130s
+sys	0m0.042s

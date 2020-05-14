@@ -1,6 +1,6 @@
 *******************************************
 ****               ORHLE               ****
-**** k-Liveness Hyperproperty Verifier ****
+****     The Oracular RHLE Verifier    ****
 *******************************************
 
 :: Executions
@@ -10,32 +10,36 @@
 
 :: Verification Conditions
   (let ((a!1 (exists ((nonleak!3!n Int))
-               (let ((a!1 (exists ((nonleak!3!r!0 Int))
-                            (= nonleak!3!r!0 nonleak!3!n))))
-                 (and (>= nonleak!3!n 0)
-                      (not (<= 100 nonleak!3!n))
-                      a!1
-                      (forall ((nonleak!3!r!0 Int))
-                        (or (not (= nonleak!3!r!0 nonleak!3!n))
-                            (and (or (not (= nonleak!3!r!0 5000))
-                                     (= (+ nonleak!2!high nonleak!2!low)
-                                        (+ nonleak!3!high nonleak!3!low)))
-                                 (or (= (+ nonleak!2!high nonleak!2!low)
-                                        nonleak!3!low)
-                                     (= nonleak!3!r!0 5000)))))))))
+               (! (let ((a!1 (exists ((nonleak!3!r!0 Int))
+                               (! (= nonleak!3!r!0 nonleak!3!n) :weight 0))))
+                    (and (>= nonleak!3!n 0)
+                         (not (<= 100 nonleak!3!n))
+                         a!1
+                         (forall ((nonleak!3!r!0 Int))
+                           (! (or (not (= nonleak!3!r!0 nonleak!3!n))
+                                  (and (or (not (= nonleak!3!r!0 5000))
+                                           (= (+ nonleak!2!high nonleak!2!low)
+                                              (+ nonleak!3!high nonleak!3!low)))
+                                       (or (= (+ nonleak!2!high nonleak!2!low)
+                                              nonleak!3!low)
+                                           (= nonleak!3!r!0 5000))))
+                              :weight 0))))
+                  :weight 0)))
         (a!2 (exists ((nonleak!3!n Int))
-               (let ((a!1 (exists ((nonleak!3!r!0 Int))
-                            (= nonleak!3!r!0 nonleak!3!n))))
-                 (and (>= nonleak!3!n 0)
-                      (not (<= 100 nonleak!3!n))
-                      a!1
-                      (forall ((nonleak!3!r!0 Int))
-                        (or (not (= nonleak!3!r!0 nonleak!3!n))
-                            (and (or (not (= nonleak!3!r!0 5000))
-                                     (= nonleak!2!low
-                                        (+ nonleak!3!high nonleak!3!low)))
-                                 (or (= nonleak!2!low nonleak!3!low)
-                                     (= nonleak!3!r!0 5000))))))))))
+               (! (let ((a!1 (exists ((nonleak!3!r!0 Int))
+                               (! (= nonleak!3!r!0 nonleak!3!n) :weight 0))))
+                    (and (>= nonleak!3!n 0)
+                         (not (<= 100 nonleak!3!n))
+                         a!1
+                         (forall ((nonleak!3!r!0 Int))
+                           (! (or (not (= nonleak!3!r!0 nonleak!3!n))
+                                  (and (or (not (= nonleak!3!r!0 5000))
+                                           (= nonleak!2!low
+                                              (+ nonleak!3!high nonleak!3!low)))
+                                       (or (= nonleak!2!low nonleak!3!low)
+                                           (= nonleak!3!r!0 5000))))
+                              :weight 0))))
+                  :weight 0))))
     (=> (and (= nonleak!1!high nonleak!3!high)
              (= nonleak!1!low nonleak!2!low)
              (= nonleak!2!low nonleak!3!low))
@@ -54,6 +58,6 @@
 
 Valid.
 
-real	0m0.232s
-user	0m0.231s
-sys	0m0.014s
+real	0m0.088s
+user	0m0.076s
+sys	0m0.033s

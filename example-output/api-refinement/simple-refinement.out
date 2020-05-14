@@ -1,6 +1,6 @@
 *******************************************
 ****               ORHLE               ****
-**** k-Liveness Hyperproperty Verifier ****
+****     The Oracular RHLE Verifier    ****
 *******************************************
 
 :: Executions
@@ -14,15 +14,18 @@
                     (< refinement!x 20)
                     (= (mod refinement!x 2) 1))
                (exists ((original!n Int))
-                 (and (>= original!n 0)
-                      (not (<= 20 original!n))
-                      (exists ((original!x!0 Int)) (= original!x!0 original!n))
-                      (forall ((original!x!0 Int))
-                        (or (not (= original!x!0 original!n))
-                            (= original!x!0 refinement!x))))))))
+                 (! (and (>= original!n 0)
+                         (not (<= 20 original!n))
+                         (exists ((original!x!0 Int))
+                           (! (= original!x!0 original!n) :weight 0))
+                         (forall ((original!x!0 Int))
+                           (! (or (not (= original!x!0 original!n))
+                                  (= original!x!0 refinement!x))
+                              :weight 0)))
+                    :weight 0)))))
 
 Valid.
 
-real	0m0.212s
-user	0m0.189s
-sys	0m0.025s
+real	0m0.111s
+user	0m0.119s
+sys	0m0.021s

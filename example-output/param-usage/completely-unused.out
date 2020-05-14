@@ -1,6 +1,6 @@
 *******************************************
 ****               ORHLE               ****
-**** k-Liveness Hyperproperty Verifier ****
+****     The Oracular RHLE Verifier    ****
 *******************************************
 
 :: Executions
@@ -14,6 +14,6 @@ Invalid. Model:
   unused!1!param -> 0
   unused!2!param -> 1
 
-real	0m0.191s
-user	0m0.175s
-sys	0m0.017s
+real	0m0.088s
+user	0m0.069s
+sys	0m0.042s
