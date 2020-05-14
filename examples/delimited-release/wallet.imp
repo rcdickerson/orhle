@@ -21,8 +21,7 @@ pre: (and
        (= buy!1!cost buy!2!cost)
 
        // Delimited Release
-       (= (>= buy!1!funds buy!1!cost) (>= buy!2!funds buy!2!cost))
-       (= (>= buy!2!funds buy!2!cost) (>= buy!3!funds buy!3!cost)));
+       (= (>= buy!1!funds buy!1!cost) (>= buy!2!funds buy!2!cost)));
 
 post: (= buy!1!spent buy!2!spent);
 

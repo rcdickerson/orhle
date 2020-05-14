@@ -10,8 +10,7 @@
 :: Verification Conditions
   (=> (and (= buy!1!spent buy!2!spent)
            (= buy!1!cost buy!2!cost)
-           (= (>= buy!1!funds buy!1!cost) (>= buy!2!funds buy!2!cost))
-           (= (>= buy!2!funds buy!2!cost) (>= buy!3!funds buy!3!cost)))
+           (= (>= buy!1!funds buy!1!cost) (>= buy!2!funds buy!2!cost)))
       (and (=> (>= buy!1!funds buy!1!cost)
                (and (or (not (>= buy!2!funds buy!2!cost))
                         (= (+ buy!1!spent buy!1!cost) (+ buy!2!spent buy!2!cost)))
@@ -24,6 +23,6 @@
 
 Valid.
 
-real	0m0.077s
-user	0m0.089s
-sys	0m0.035s
+real	0m0.078s
+user	0m0.063s
+sys	0m0.041s
