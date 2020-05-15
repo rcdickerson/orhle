@@ -94,36 +94,30 @@ generateVCs stmt post quant specs = case stmt of
     vc     <- mkAnd [vcIf, vcElse]
     return [vc]
   loop@(SWhile c body (inv, var, _)) -> do
-    let progVarStrs = Set.toList $ svars loop
-    progVars            <- stringsToApps progVarStrs
-    cond                <- bexpToZ3 c
-    ncond               <- mkNot cond
-    condAndInv          <- mkAnd [cond,  inv]
-    ncondAndInv         <- mkAnd [ncond, inv]
-    case quant of
-      VCUniversal -> do
-        bodyVCs <- generateVCs body inv quant specs
-        loopVC  <- mkForallConst [] progVars
-                   =<< mkImplies condAndInv =<< mkAnd bodyVCs
-        endVC   <- mkForallConst [] progVars
-                   =<< mkImplies ncondAndInv post
-        return [inv, loopVC, endVC]
-      VCExistential -> do
-        originalStateASTs <- mkFreshIntVars progVarStrs
-        originalStateVars <- mapM astToString originalStateASTs
-        originalStateApps <- stringsToApps originalStateVars
-        let original ast   = substituteByName ast progVarStrs originalStateVars
+    let progVarStrs    = Set.toList $ svars loop
+    originalStateASTs <- mkFreshIntVars progVarStrs
+    originalStateVars <- mapM astToString originalStateASTs
+    originalStateApps <- stringsToApps originalStateVars
+    let original ast   = substituteByName ast progVarStrs originalStateVars
 
+    cond        <- bexpToZ3 c
+    ncond       <- mkNot cond
+    condAndInv  <- mkAnd [cond,  inv]
+    ncondAndInv <- mkAnd [ncond, inv]
+    bodyVCs <- (case quant of
+      VCUniversal -> do
+        generateVCs body inv quant specs
+      VCExistential -> do
         originalVar <- original var
         varCond     <- mkLt var originalVar
         bodyPost    <- mkAnd [inv, varCond]
-        bodyVCs     <- generateVCs body bodyPost quant specs
+        generateVCs body bodyPost quant specs)
+    loopVC <- mkForallConst [] originalStateApps
+              =<< original =<< mkImplies condAndInv =<< mkAnd bodyVCs
+    endVC  <- mkForallConst [] originalStateApps
+               =<< original =<< mkImplies ncondAndInv post
+    return [inv, loopVC, endVC]
 
-        loopVC <- mkForallConst [] originalStateApps
-                  =<< original =<< mkImplies condAndInv =<< mkAnd bodyVCs
-        endVC  <- mkForallConst [] originalStateApps
-                  =<< original =<< mkImplies ncondAndInv post
-        return [inv, loopVC, endVC]
   SCall assignees cparams funName -> do
     spec <- specAtCallsite assignees cparams funName specs
     case spec of
