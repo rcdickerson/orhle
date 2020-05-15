@@ -12,6 +12,8 @@ stack build
 stack exec klive-exe
 ```
 
+Requires z3, libz3-dev
+
 ### Examples
 
 Example encodings live in the `examples` directory.

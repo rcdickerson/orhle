@@ -1,36 +1,23 @@
 *******************************************
 ****               ORHLE               ****
-**** k-Liveness Hyperproperty Verifier ****
+****     The Oracular RHLE Verifier    ****
 *******************************************
 
 :: Executions
   parity[1] (forall)
-  parity[2] (forall)
-  parity[3] (exists)
+  parity[2] (exists)
 
 :: Verification Conditions
-  (=> (and (= parity!1!h parity!3!h)
-           (= parity!1!l parity!2!l)
-           (= parity!2!l parity!3!l)
-           (= (mod parity!1!h 2) (mod parity!2!h 2))
-           (= (mod parity!2!h 2) (mod parity!3!h 2)))
-      (and (=> (= (mod parity!2!h 2) 1)
-               (and (or (not (= (mod parity!1!h 2) 1))
-                        (and (or (not (= (mod parity!3!h 2) 1)) (= 1 1))
-                             (or (= (mod parity!3!h 2) 1) (= 1 0))))
-                    (or (= (mod parity!1!h 2) 1)
-                        (and (or (not (= (mod parity!3!h 2) 1)) (= 1 1))
-                             (or (= (mod parity!3!h 2) 1) (= 1 0))))))
-           (=> (not (= (mod parity!2!h 2) 1))
-               (and (or (not (= (mod parity!1!h 2) 1))
-                        (and (or (not (= (mod parity!3!h 2) 1)) (= 0 1))
-                             (or (= (mod parity!3!h 2) 1) (= 0 0))))
-                    (or (= (mod parity!1!h 2) 1)
-                        (and (or (not (= (mod parity!3!h 2) 1)) (= 0 1))
-                             (or (= (mod parity!3!h 2) 1) (= 0 0))))))))
+  (=> (and (= parity!1!l parity!2!l) (= (mod parity!1!h 2) (mod parity!2!h 2)))
+      (and (=> (= (mod parity!1!h 2) 1)
+               (and (or (not (= (mod parity!2!h 2) 1)) (= 1 1))
+                    (or (= (mod parity!2!h 2) 1) (= 1 0))))
+           (=> (not (= (mod parity!1!h 2) 1))
+               (and (or (not (= (mod parity!2!h 2) 1)) (= 0 1))
+                    (or (= (mod parity!2!h 2) 1) (= 0 0))))))
 
 Valid.
 
-real	0m0.201s
-user	0m0.197s
-sys	0m0.017s
+real	0m0.083s
+user	0m0.079s
+sys	0m0.033s

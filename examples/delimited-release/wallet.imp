@@ -5,8 +5,8 @@
 
 expected: valid;
 
-forall: buy[1], buy[2];
-exists: buy[3];
+forall: buy[1];
+exists: buy[2];
 
 // High:
 //   funds
@@ -17,20 +17,13 @@ exists: buy[3];
 //   funds >= cost
 
 pre: (and
-       // High
-       (= buy!1!funds buy!3!funds)
-
-       // Low
        (= buy!1!spent buy!2!spent)
-       (= buy!2!spent buy!3!spent)
        (= buy!1!cost buy!2!cost)
-       (= buy!2!cost buy!3!cost)
 
        // Delimited Release
-       (= (>= buy!1!funds buy!1!cost) (>= buy!2!funds buy!2!cost))
-       (= (>= buy!2!funds buy!2!cost) (>= buy!3!funds buy!3!cost)));
+       (= (>= buy!1!funds buy!1!cost) (>= buy!2!funds buy!2!cost)));
 
-post: (= buy!2!spent buy!3!spent);
+post: (= buy!1!spent buy!2!spent);
 
 
 prog buy(funds, spent, cost):

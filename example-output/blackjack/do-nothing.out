@@ -4,16 +4,15 @@
 *******************************************
 
 :: Executions
-  unused[1] (exists)
-  unused[2] (exists)
+  play (exists)
 
 :: Verification Conditions
-  (=> (not (= unused!1!param unused!2!param)) (and false))
+  (=> (and (>= play!handValue 2) (<= play!handValue 20))
+      (and (= play!handValue 21)))
 
 Invalid. Model:
-  unused!1!param -> 0
-  unused!2!param -> 1
+  play!handValue -> 2
 
-real	0m0.088s
-user	0m0.069s
+real	0m0.076s
+user	0m0.056s
 sys	0m0.042s

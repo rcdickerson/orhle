@@ -5,8 +5,8 @@
 
 expected: valid;
 
-forall: run[1], run[2];
-exists: run[3];
+forall: run[1];
+exists: run[2];
 
 // High:
 //   h
@@ -16,18 +16,12 @@ exists: run[3];
 //   h mod 2
 
 pre: (and
-       // High
-       (= run!1!h run!3!h)
+        (= run!1!l run!2!l)
 
-       // Low
-       (= run!1!l run!2!l)
-       (= run!2!l run!3!l)
+        // Delimited Release
+        (= (mod run!1!h 2) (mod run!2!h 2)));
 
-       // Delimited Release
-       (= (mod run!1!h 2) (mod run!2!h 2))
-       (= (mod run!2!h 2) (mod run!3!h 2)));
-
-post: (= run!2!l run!3!l);
+post: (= parity!1!l parity!2!l);
 
 aspecs:
   parity(val) {

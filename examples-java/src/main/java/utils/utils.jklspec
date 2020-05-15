@@ -1,0 +1,34 @@
+aspecs {
+  flipCoin() {
+    pre: true;
+    post: (or (= ret! 0) (= ret! 1));
+  }
+
+  randInt(max) {
+    post: (and (<= 0 ret!) (< ret! max));
+  }
+
+  randOddInt(max) {
+    post: (and (<= 0 ret!) (< ret! max) (= (mod ret! 2) 1));
+  }
+}
+
+especs {
+  flipCoin() {
+    templateVars: n;
+    pre: (or (= n 0) (= n 1));
+    post: (= ret! n);
+  }
+
+  randInt(max) {
+    templateVars: n;
+    pre:  (and (<= 0 n) (< n max));
+    post: (= ret! n);
+  }
+
+  randOddInt(max) {
+    templateVars: n;
+    pre:  (and (<= 0 n) (< n max) (= (mod n 2) 1));
+    post: (= ret! n);
+  }
+}

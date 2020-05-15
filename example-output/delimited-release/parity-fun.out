@@ -1,69 +1,46 @@
 *******************************************
 ****               ORHLE               ****
-**** k-Liveness Hyperproperty Verifier ****
+****     The Oracular RHLE Verifier    ****
 *******************************************
 
 :: Executions
   run[1] (forall)
-  run[2] (forall)
-  run[3] (exists)
+  run[2] (exists)
 
 :: Verification Conditions
-  (let ((a!1 (exists ((run!3!p!0 Int)) (= run!3!p!0 (mod run!3!h 2)))))
-    (=> (and (= run!1!h run!3!h)
-             (= run!1!l run!2!l)
-             (= run!2!l run!3!l)
-             (= (mod run!1!h 2) (mod run!2!h 2))
-             (= (mod run!2!h 2) (mod run!3!h 2)))
-        (and true
-             (=> (= run!2!p (mod run!2!h 2))
-                 (and (=> (= run!2!p 1)
-                          (and (or (not (= run!1!p (mod run!1!h 2)))
-                                   (and (or (not (= run!1!p 1))
-                                            (and a!1
-                                                 (forall ((run!3!p!0 Int))
-                                                   (or (not (= run!3!p!0
-                                                               (mod run!3!h 2)))
-                                                       (and (or (not (= run!3!p!0
-                                                                        1))
-                                                                (= 1 1))
-                                                            (or (= 1 0)
-                                                                (= run!3!p!0 1)))))))
-                                        (or (= run!1!p 1)
-                                            (and a!1
-                                                 (forall ((run!3!p!0 Int))
-                                                   (or (not (= run!3!p!0
-                                                               (mod run!3!h 2)))
-                                                       (and (or (not (= run!3!p!0
-                                                                        1))
-                                                                (= 1 1))
-                                                            (or (= 1 0)
-                                                                (= run!3!p!0 1)))))))))))
-                      (=> (not (= run!2!p 1))
-                          (and (or (not (= run!1!p (mod run!1!h 2)))
-                                   (and (or (not (= run!1!p 1))
-                                            (and a!1
-                                                 (forall ((run!3!p!0 Int))
-                                                   (or (not (= run!3!p!0
-                                                               (mod run!3!h 2)))
-                                                       (and (or (not (= run!3!p!0
-                                                                        1))
-                                                                (= 0 1))
-                                                            (or (= 0 0)
-                                                                (= run!3!p!0 1)))))))
-                                        (or (= run!1!p 1)
-                                            (and a!1
-                                                 (forall ((run!3!p!0 Int))
-                                                   (or (not (= run!3!p!0
-                                                               (mod run!3!h 2)))
-                                                       (and (or (not (= run!3!p!0
-                                                                        1))
-                                                                (= 0 1))
-                                                            (or (= 0 0)
-                                                                (= run!3!p!0 1))))))))))))))))
+  (=> (and (= run!1!l run!2!l) (= (mod run!1!h 2) (mod run!2!h 2)))
+      (and true
+           (=> (= run!1!p (mod run!1!h 2))
+               (and (=> (= run!1!p 1)
+                        (and (exists ((run!2!p!0 Int))
+                               (! (= run!2!p!0 (mod run!2!h 2)) :weight 0))
+                             (forall ((run!2!p!0 Int))
+                               (! (or (not (= run!2!p!0 (mod run!2!h 2)))
+                                      (and (or (not (= run!2!p!0 1))
+                                               (= parity!1!l parity!2!l))
+                                           (or (= parity!1!l parity!2!l)
+                                               (= run!2!p!0 1))))
+                                  :weight 0))))
+                    (=> (not (= run!1!p 1))
+                        (and (exists ((run!2!p!0 Int))
+                               (! (= run!2!p!0 (mod run!2!h 2)) :weight 0))
+                             (forall ((run!2!p!0 Int))
+                               (! (or (not (= run!2!p!0 (mod run!2!h 2)))
+                                      (and (or (not (= run!2!p!0 1))
+                                               (= parity!1!l parity!2!l))
+                                           (or (= parity!1!l parity!2!l)
+                                               (= run!2!p!0 1))))
+                                  :weight 0))))))))
 
-Valid.
+Invalid. Model:
+  parity!1!l -> 4
+  parity!2!l -> 5
+  run!1!h -> 1
+  run!1!l -> 8
+  run!1!p -> 1
+  run!2!h -> 1
+  run!2!l -> 8
 
-real	0m0.215s
-user	0m0.214s
-sys	0m0.024s
+real	0m0.248s
+user	0m0.273s
+sys	0m0.071s

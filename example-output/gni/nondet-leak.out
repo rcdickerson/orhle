@@ -1,6 +1,6 @@
 *******************************************
 ****               ORHLE               ****
-**** k-Liveness Hyperproperty Verifier ****
+****     The Oracular RHLE Verifier    ****
 *******************************************
 
 :: Executions
@@ -10,27 +10,36 @@
 
 :: Verification Conditions
   (let ((a!1 (exists ((leak!3!n Int))
-               (let ((a!1 (exists ((leak!3!r!0 Int)) (= leak!3!r!0 leak!3!n))))
-                 (and (>= leak!3!n 0)
-                      (not (<= 100 leak!3!n))
-                      a!1
-                      (forall ((leak!3!r!0 Int))
-                        (or (not (= leak!3!r!0 leak!3!n))
-                            (and (or (not (= leak!3!r!0 50))
-                                     (= (+ leak!2!high leak!2!low)
-                                        (+ leak!3!high leak!3!low)))
-                                 (or (= (+ leak!2!high leak!2!low) leak!3!low)
-                                     (= leak!3!r!0 50)))))))))
+               (! (let ((a!1 (exists ((leak!3!r!0 Int))
+                               (! (= leak!3!r!0 leak!3!n) :weight 0))))
+                    (and (>= leak!3!n 0)
+                         (not (<= 100 leak!3!n))
+                         a!1
+                         (forall ((leak!3!r!0 Int))
+                           (! (or (not (= leak!3!r!0 leak!3!n))
+                                  (and (or (not (= leak!3!r!0 50))
+                                           (= (+ leak!2!high leak!2!low)
+                                              (+ leak!3!high leak!3!low)))
+                                       (or (= (+ leak!2!high leak!2!low)
+                                              leak!3!low)
+                                           (= leak!3!r!0 50))))
+                              :weight 0))))
+                  :weight 0)))
         (a!2 (exists ((leak!3!n Int))
-               (let ((a!1 (exists ((leak!3!r!0 Int)) (= leak!3!r!0 leak!3!n))))
-                 (and (>= leak!3!n 0)
-                      (not (<= 100 leak!3!n))
-                      a!1
-                      (forall ((leak!3!r!0 Int))
-                        (or (not (= leak!3!r!0 leak!3!n))
-                            (and (or (not (= leak!3!r!0 50))
-                                     (= leak!2!low (+ leak!3!high leak!3!low)))
-                                 (or (= leak!2!low leak!3!low) (= leak!3!r!0 50))))))))))
+               (! (let ((a!1 (exists ((leak!3!r!0 Int))
+                               (! (= leak!3!r!0 leak!3!n) :weight 0))))
+                    (and (>= leak!3!n 0)
+                         (not (<= 100 leak!3!n))
+                         a!1
+                         (forall ((leak!3!r!0 Int))
+                           (! (or (not (= leak!3!r!0 leak!3!n))
+                                  (and (or (not (= leak!3!r!0 50))
+                                           (= leak!2!low
+                                              (+ leak!3!high leak!3!low)))
+                                       (or (= leak!2!low leak!3!low)
+                                           (= leak!3!r!0 50))))
+                              :weight 0))))
+                  :weight 0))))
     (=> (and (= leak!1!high leak!3!high)
              (= leak!1!low leak!2!low)
              (= leak!2!low leak!3!low))
@@ -48,15 +57,15 @@
                                         (or (= leak!1!r 50) a!2))))))))))
 
 Invalid. Model:
-  leak!1!high -> 1751
-  leak!1!low -> (- 1)
-  leak!1!r -> 49
-  leak!2!high -> 1651
-  leak!2!low -> (- 1)
+  leak!1!high -> 13
+  leak!1!low -> (- 7954)
+  leak!1!r -> 50
+  leak!2!high -> (- 22)
+  leak!2!low -> (- 7954)
   leak!2!r -> 50
-  leak!3!high -> 1751
-  leak!3!low -> (- 1)
+  leak!3!high -> 13
+  leak!3!low -> (- 7954)
 
-real	0m3.354s
-user	0m32.245s
-sys	0m1.244s
+real	0m1.599s
+user	0m9.107s
+sys	0m0.485s

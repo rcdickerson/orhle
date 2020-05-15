@@ -21,9 +21,9 @@ especs:
 prog play():
   while (handValue < 21) do
     @inv { (<= play!handValue 21) }
-    @var { (- 30 play!handValue) }
+    @var { (- 30 handValue) }
 
     card := call draw();
-    handValue := handValue + c;
+    handValue := handValue + card;
   end
 endp

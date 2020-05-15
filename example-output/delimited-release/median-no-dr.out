@@ -1,6 +1,6 @@
 *******************************************
 ****               ORHLE               ****
-**** k-Liveness Hyperproperty Verifier ****
+****     The Oracular RHLE Verifier    ****
 *******************************************
 
 :: Executions
@@ -738,6 +738,6 @@ Invalid. Model:
   median!2!b1 -> 0
   median!2!b2 -> 2
 
-real	0m0.209s
-user	0m0.266s
-sys	0m0.057s
+real	0m0.108s
+user	0m0.162s
+sys	0m0.033s

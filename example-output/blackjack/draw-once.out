@@ -1,0 +1,27 @@
+*******************************************
+****               ORHLE               ****
+****     The Oracular RHLE Verifier    ****
+*******************************************
+
+:: Executions
+  play (exists)
+
+:: Verification Conditions
+  (=> (and (>= play!handValue 2) (<= play!handValue 20))
+      (and (exists ((play!c Int))
+             (! (and (>= play!c 1)
+                     (<= play!c 10)
+                     (exists ((play!card!0 Int))
+                       (! (= play!card!0 play!c) :weight 0))
+                     (forall ((play!card!0 Int))
+                       (! (or (not (= play!card!0 play!c))
+                              (= (+ play!handValue play!card!0) 21))
+                          :weight 0)))
+                :weight 0))))
+
+Invalid. Model:
+  play!handValue -> 10
+
+real	0m0.087s
+user	0m0.072s
+sys	0m0.037s

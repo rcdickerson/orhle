@@ -1,0 +1,30 @@
+*******************************************
+****               ORHLE               ****
+****     The Oracular RHLE Verifier    ****
+*******************************************
+
+:: Executions
+  run[1] (forall)
+  run[2] (exists)
+
+:: Verification Conditions
+  (=> (= run!1!low run!2!low)
+      (and true
+           (=> (and (>= 0 run!1!r) (< run!1!r run!1!high))
+               (and (exists ((run!2!n Int))
+                      (! (and (>= 0 run!2!n)
+                              (not (<= run!2!high run!2!n))
+                              (exists ((run!2!r!0 Int))
+                                (! (= run!2!r!0 run!2!n) :weight 0))
+                              (forall ((run!2!r!0 Int))
+                                (! (or (not (= run!2!r!0 run!2!n))
+                                       (= (+ run!1!high run!1!r)
+                                          (+ run!2!high run!2!r!0)))
+                                   :weight 0)))
+                         :weight 0))))))
+
+Valid.
+
+real	0m3.698s
+user	0m25.115s
+sys	0m1.525s

@@ -20,5 +20,5 @@ especs:
 
 prog play():
   card := call draw();
-  handValue := handValue + c;
+  handValue := handValue + card;
 endp
