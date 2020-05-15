@@ -102,7 +102,6 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
     simpl in H4; rewrite apply_empty in H4; discriminate.
   Qed.
 
-
   (* The weakest precondition for an assertion [Q] and command [c] is
      the set of initial states from which [c] always either fails to
      terminate, or ends in a final state satisfying [Q]. *)

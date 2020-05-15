@@ -287,7 +287,8 @@ Section productive_Execution.
              (fd : funDef) : Prop :=
     forall inits,
       fs.(preEx) inits ->
-      RelProductive _ Sigma (Vector.map (fun args => build_total_map (fd.(funArgs)) args 0) inits) (Vector.const fd.(funBody) _)
+      RelProductive _ Sigma (Vector.map (fun args => build_total_map (fd.(funArgs)) args 0) inits)
+                    (Vector.const fd.(funBody) _)
                     (fun finals => fs.(postEx) inits (Vector.map (fun st => aeval st fd.(funRet)) finals)).
 
   (* An environment is productive if all of its function definitions are
@@ -503,7 +504,7 @@ Section productive_Execution.
     unfold update, t_update in H4; find_if_inside; subst.
     - injections.
       unfold productive_funDef in *; intros.
-      eapply H3 in H4. 
+      eapply H3 in H4.
       admit.
       (*eexists Q, (productive_Weaken _ _ _ _ _ _ H2 H1 x); eauto. *)
     - pose proof (H _ _ H4).
@@ -511,7 +512,7 @@ Section productive_Execution.
       eapply H5 in H6.
       admit.
       (*eexists Q, (productive_Weaken _ _ _ _ _ _ (H1 _ _ H4) H1 x); eauto. *)
-  Admitted. 
+  Admitted.
 
 End productive_Execution.
 
@@ -587,6 +588,71 @@ Section EHoare.
 
   Hint Constructors Productive : hoare.
 
+  Inductive ehoare_proof' (Sigma : total_map funExSpec)
+    : Assertion -> com -> Assertion -> Prop :=
+  | EH_Skip' : forall P,
+      Sigma |- {[P]} SKIP {[P]}#
+  | EH_Asgn' : forall Q V a,
+      Sigma |- {[Q[V |-> a]]} V ::= a {[Q]}#
+  | EH_Seq'  : forall P c Q d R,
+      Sigma |- {[P]} c {[Q]}# ->
+      Sigma |- {[Q]} d {[R]}# ->
+      Sigma |- {[P]} c;;d {[R]}#
+  | EH_If' : forall P Q b c1 c2,
+      Sigma |- {[fun st => P st /\ bassn b st]} c1 {[Q]}# ->
+      Sigma |- {[fun st => P st /\ ~(bassn b st)]} c2 {[Q]}# ->
+               Sigma |- {[P]} TEST b THEN c1 ELSE c2 FI {[Q]}#
+  | EH_While' : forall {A : Type} (R : A -> A -> Prop) M P b c,
+      well_founded R ->
+      (forall (a : A),
+          Sigma |- {[fun st => P st /\ bassn b st /\ M a st]} c {[fun st => P st /\ exists a', M a' st /\ R a' a]}#) ->
+      Sigma |- {[fun st => P st /\ exists a, M a st]} WHILE b DO c END {[fun st => P st /\ ~ (bassn b st)]}#
+  | EH_Consequence'  : forall (P Q P' Q' : Assertion) c,
+      Sigma |- {[P']} c {[Q']}# ->
+      (forall st, P st -> P' st) ->
+      (forall st, Q' st -> Q st) ->
+      Sigma |- {[P]} c {[Q]}#
+
+  | EH_Spec' : forall Q y f xs,
+      Sigma |- {[fun st =>
+                   exists i,
+                   (exists inits,
+                       exists returns,
+                         (Sigma f).(preEx) (Vector.replace inits i (aseval st xs)) /\
+                         (Sigma f).(postEx) (Vector.replace inits i (aseval st xs))
+                                                         returns) /\
+                   forall inits returns,
+                     (Sigma f).(preEx) (Vector.replace inits i (aseval st xs)) ->
+                     (Sigma f).(postEx) (Vector.replace inits i (aseval st xs))
+                                                        returns ->
+                               Q[y |-> Vector.nth returns i] st]} y :::= f $ xs {[Q]}#
+  | EH_SpecK'
+    : forall Q y f xs i,
+      Sigma |- {[fun st =>
+                   (exists inits,
+                       exists returns,
+                         (Sigma f).(preEx) (Vector.replace inits i (aseval st xs)) /\
+                         (Sigma f).(postEx) (Vector.replace inits i (aseval st xs))
+                                            returns) /\
+                   forall inits returns,
+                     (Sigma f).(preEx) (Vector.replace inits i (aseval st xs)) ->
+                     (Sigma f).(postEx) (Vector.replace inits i (aseval st xs))
+                                        returns ->
+                     Q[y |-> Vector.nth returns i] st]} y :::= f $ xs {[Q]}#
+  where "Sigma |- {[ P ]}  c  {[ Q ]}#" := (ehoare_proof' Sigma P c Q) : hoare_spec'_scope.
+
+  Lemma EH_SpecK'_Admissible Sigma :
+    forall P c Q,
+      ehoare_proof Sigma P c Q <-> ehoare_proof' Sigma P c Q.
+  Proof.
+    split; induction 1; try solve [econstructor; eauto].
+    eapply EH_Consequence.
+    eapply EH_Spec.
+    2: eauto.
+    simpl; intros.
+    eexists i; eauto.
+  Qed.
+
   Theorem ehoare_proof_produces {Sigma : ExEnv}
     : forall (P Q : Assertion) c
       (consistent_Sigma : Consistent_Env Sigma),
@@ -623,7 +689,7 @@ Section EHoare.
       + eapply Productive_Weaken; eauto using Productive_WhileFalse.
         unfold Included, Ensembles.In; intros.
         inversion H3; subst; intuition.
-        eapply bassn_eval_false; eauto. 
+        eapply bassn_eval_false; eauto.
     - eapply Productive_Weaken; eauto.
     - destruct H0 as [i [ [inits [returns [? ?] ] ] ? ] ].
       eapply Productive_Weaken; eauto.
@@ -751,7 +817,7 @@ Section EHoare.
       simpl; intuition eauto.
       simpl; intuition eauto.
   Qed.
-  
+
   Definition ewp (ESigma : ExEnv) (c:com) (Q:Assertion) : Assertion :=
     fun st =>
       Productive ESigma c st Q.
@@ -780,7 +846,7 @@ Section EHoare.
     : Assertion :=
     @LFP state (fun (G : _ -> _) (st : state) => (~ bassn b st /\ Q st)
                                                  \/ (bassn b st /\ WP G st)).
- 
+
   Fixpoint ewp_gen
            (funSpecs : total_map funExSpec)
            (c : com)
@@ -823,7 +889,7 @@ Section EHoare.
     - unfold gammaE, LFP, FClosed, Subset, In in *; intros.
       eapply H0; intuition eauto.
   Qed.
-  
+
   Lemma ewp_gen_is_ewp
         Sigs Sigma ESigma'
         (ESigma :=
@@ -903,7 +969,7 @@ Section EHoare.
       + econstructor; firstorder eauto.
     - econstructor.
       + econstructor.
-        * admit.      
+        * admit.
         * admit.
       + admit.
       + admit.
@@ -933,7 +999,7 @@ Section EHoare.
     - eauto.
   Qed.
 
-  (* This "nicer" version of weakest precondition generation uses 
+  (* This "nicer" version of weakest precondition generation uses
      a bounded fixpoint. *)
   Fixpoint gammaE'
            (Q : Assertion)
@@ -945,7 +1011,7 @@ Section EHoare.
     | 0 => fun st => ~ bassn b st /\ Q st
     | S n' => fun st => bassn b st /\ WP (gammaE' Q c b WP n') st
     end.
-  
+
   Fixpoint ewp_gen'
            (funSpecs : total_map funExSpec)
            (c : com)
@@ -1032,9 +1098,9 @@ Section EHoare.
           eapply H5.
         * intros; intuition; eauto.
   Qed.
-  
+
   (* Everything after this point is scratch work.
-  
+
   (*Fixpoint gammaE'
            (Q : Assertion)
            (c : com)
@@ -1113,7 +1179,7 @@ Section EHoare.
         (forall st', Q st' ->
                      exists m', m <= m' /\ ProductiveB Sigma c2 st' Q' m) ->
          ProductiveB Sigma (c1 ;; c2) st Q' (S (n + m))
-    | ProductiveB_IfTrue : forall st Q b c1 c2 n, 
+    | ProductiveB_IfTrue : forall st Q b c1 c2 n,
         beval st b = true ->
         ProductiveB Sigma c1 st Q n ->
         ProductiveB Sigma (TEST b THEN c1 ELSE c2 FI) st Q (S n)
@@ -1169,7 +1235,7 @@ Section EHoare.
     - destruct IHProductive as [? [? [? ?] ] ]; eauto.
       eexists x, x0; firstorder eauto.
   Admitted.
-    
+
     Lemma ewp_gen'_is_ewp ESigma
         (ESigmaOK : productive_Env ESigma)
     : forall c (Q : Assertion) sigma,
