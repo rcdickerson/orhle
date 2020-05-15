@@ -1,0 +1,61 @@
+*******************************************
+****               ORHLE               ****
+****     The Oracular RHLE Verifier    ****
+*******************************************
+
+:: Executions
+  run[1] (forall)
+  run[2] (exists)
+
+:: Verification Conditions
+  (=> (= run!1!low run!2!low)
+      (and true
+           (=> (or (= run!1!flip 0) (= run!1!flip 1))
+               (and (=> (= run!1!flip 0)
+                        (and (exists ((run!2!n Int))
+                               (! (let ((a!1 (exists ((run!2!flip!0 Int))
+                                               (! (= run!2!flip!0 run!2!n)
+                                                  :weight 0))))
+                                    (and (or (= run!2!n 0) (= run!2!n 1))
+                                         a!1
+                                         (forall ((run!2!flip!0 Int))
+                                           (! (or (not (= run!2!flip!0 run!2!n))
+                                                  (and (or (not (= run!2!flip!0 0))
+                                                           (= (+ run!1!high
+                                                                 run!1!low)
+                                                              (+ run!2!high
+                                                                 run!2!low)))
+                                                       (or (= (+ run!1!high
+                                                                 run!1!low)
+                                                              run!2!low)
+                                                           (= run!2!flip!0 0))))
+                                              :weight 0))))
+                                  :weight 0))))
+                    (=> (not (= run!1!flip 0))
+                        (and (exists ((run!2!n Int))
+                               (! (let ((a!1 (exists ((run!2!flip!0 Int))
+                                               (! (= run!2!flip!0 run!2!n)
+                                                  :weight 0))))
+                                    (and (or (= run!2!n 0) (= run!2!n 1))
+                                         a!1
+                                         (forall ((run!2!flip!0 Int))
+                                           (! (or (not (= run!2!flip!0 run!2!n))
+                                                  (and (or (not (= run!2!flip!0 0))
+                                                           (= run!1!low
+                                                              (+ run!2!high
+                                                                 run!2!low)))
+                                                       (or (= run!1!low run!2!low)
+                                                           (= run!2!flip!0 0))))
+                                              :weight 0))))
+                                  :weight 0))))))))
+
+Invalid. Model:
+  run!1!flip -> 0
+  run!1!high -> (- 1)
+  run!1!low -> 2
+  run!2!high -> 0
+  run!2!low -> 2
+
+real	0m0.091s
+user	0m0.086s
+sys	0m0.021s
