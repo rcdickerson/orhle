@@ -9,40 +9,40 @@ module Triples
 
 import Imp
 import SMTParser
-import Z3.Monad
+import qualified SMTMonad as S
 
 data HLTrip = HLTrip
-  { hlPre  :: AST
+  { hlPre  :: S.Expr
   , hlProg :: Prog
-  , hlPost :: AST
+  , hlPost :: S.Expr
   } deriving (Show)
 
-mkHLTrip :: String -> Prog -> String -> Z3 HLTrip
+mkHLTrip :: String -> Prog -> String -> S.SMT HLTrip
 mkHLTrip pre prog post = do
   preAST  <- parseSMTOrError pre
   postAST <- parseSMTOrError post
   return $ HLTrip preAST prog postAST
 
 data HLETrip = HLETrip
-  { hlePre  :: AST
+  { hlePre  :: S.Expr
   , hleProg :: Prog
-  , hlePost :: AST
+  , hlePost :: S.Expr
   } deriving (Show)
 
-mkHLETrip :: String -> Prog -> String -> Z3 HLETrip
+mkHLETrip :: String -> Prog -> String -> S.SMT HLETrip
 mkHLETrip pre prog post = do
   preAST  <- parseSMTOrError pre
   postAST <- parseSMTOrError post
   return $ HLETrip preAST prog postAST
 
 data RHLETrip = RHLETrip
-  { rhlePre    :: AST
+  { rhlePre    :: S.Expr
   , rhleAProgs :: [Prog]
   , rhleEProgs :: [Prog]
-  , rhlePost   :: AST
+  , rhlePost   :: S.Expr
   } deriving (Show)
 
-mkRHLETrip :: String -> [Prog] -> [Prog] -> String -> Z3 RHLETrip
+mkRHLETrip :: String -> [Prog] -> [Prog] -> String -> S.SMT RHLETrip
 mkRHLETrip pre aProgs eProgs post = do
   preAST  <- parseSMTOrError pre
   postAST <- parseSMTOrError post

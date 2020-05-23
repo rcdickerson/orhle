@@ -44,4 +44,4 @@ import Spec
 import Triples
 import Verifier
 import VerifierTrace
-import Z3Util
+import SMTMonad

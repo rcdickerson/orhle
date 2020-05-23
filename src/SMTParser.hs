@@ -13,7 +13,8 @@ import Text.Parsec
 import Text.Parsec.Error
 import Text.Parsec.Language
 import qualified Text.Parsec.Token as Token
-import Z3.Monad
+import qualified SMTMonad as S
+import qualified SMTLib2 as S
 
 languageDef :: LanguageDef ()
 languageDef = Token.LanguageDef
@@ -56,7 +57,7 @@ whitespace = Token.whiteSpace lexer
 type ParsedStmt = AbsStmt String
 type ParsedProg = ParsedStmt
 
-type SMTParser a = Parsec String () (Z3 a)
+type SMTParser a = Parsec String () (S.SMT a)
 
 data SMTFunc = SMTAdd
              | SMTSub
@@ -74,16 +75,16 @@ data SMTFunc = SMTAdd
              | SMTNot
              | SMTOr
 
-parseSMT :: String -> Either ParseError (Z3 AST)
+parseSMT :: String -> Either ParseError (S.SMT S.Expr)
 parseSMT smt = runParser smtParser () "" smt
 
-parseSMTOrError :: String -> Z3 AST
+parseSMTOrError :: String -> S.SMT S.Expr
 parseSMTOrError smt =
   case parseSMT smt of
     Left  err -> error $ "SMT parse error: " ++ (show err) ++ "\nOn input: " ++ smt
     Right ast -> ast
 
-parseLoopSpecs :: ParsedProg -> Either ParseError (Z3 Prog)
+parseLoopSpecs :: ParsedProg -> Either ParseError (S.SMT Prog)
 parseLoopSpecs pprog =
   case pprog of
     SSkip                -> Right . return $ SSkip
@@ -104,10 +105,10 @@ parseLoopSpecs pprog =
                           body'' <- body'
                           return $ SWhile cond body'' (invAST, varAST, local))
 
-mergeZ3Parse :: Either ParseError (Z3 a)
-             -> Either ParseError (Z3 a)
-             -> (a -> a -> Z3 b)
-             -> Either ParseError (Z3 b)
+mergeZ3Parse :: Either ParseError (S.SMT a)
+             -> Either ParseError (S.SMT a)
+             -> (a -> a -> S.SMT b)
+             -> Either ParseError (S.SMT b)
 mergeZ3Parse errOrRes1 errOrRes2 mergeRes =
   case (errOrRes1, errOrRes2) of
     (Left err1, Left err2) -> Left $ mergeError err1 err2
@@ -118,36 +119,36 @@ mergeZ3Parse errOrRes1 errOrRes2 mergeRes =
       r2' <- r2
       mergeRes r1' r2'
 
-smtParser :: SMTParser AST
+smtParser :: SMTParser S.Expr
 smtParser = whitespace >> smtExpr
 
-smtExpr :: SMTParser AST
+smtExpr :: SMTParser S.Expr
 smtExpr = try smtSexpr <|> smtLit
 
-smtLit :: SMTParser AST
+smtLit :: SMTParser S.Expr
 smtLit = smtInt <|> smtIdent
 
-smtInt :: SMTParser AST
+smtInt :: SMTParser S.Expr
 smtInt = do
   n <- many1 digit
   whitespace
-  return $ mkInteger (read n)
+  return $ S.mkInteger (read n)
 
-smtIdent :: SMTParser AST
+smtIdent :: SMTParser S.Expr
 smtIdent = do
   start <- letter
   rest  <- many $ alphaNum <|> char '!' <|> char '_'
   let id = start:rest
   whitespace
   return $ case id of
-    "true"  -> mkTrue
-    "false" -> mkFalse
-    _       -> mkStringSymbol id >>= mkIntVar
+    "true"  -> S.mkTrue
+    "false" -> S.mkFalse
+    _       -> S.mkStringSymbol id >>= S.mkIntVar
 
-smtSexpr :: SMTParser AST
+smtSexpr :: SMTParser S.Expr
 smtSexpr = try smtForall <|> try smtExists <|> smtApp
 
-smtForall :: SMTParser AST
+smtForall :: SMTParser S.Expr
 smtForall = do
   char '(' >> whitespace
   reserved "forall"
@@ -156,7 +157,7 @@ smtForall = do
   char ')' >> whitespace
   return $ constructForall vars body
 
-smtExists :: SMTParser AST
+smtExists :: SMTParser S.Expr
 smtExists = do
   char '(' >> whitespace
   reserved "exists"
@@ -174,36 +175,35 @@ smtQuantVar = do
   char ')' >> whitespace
   return $ return (name, sort)
 
-constructQuantVars :: [(String, String)] -> Z3 ([Symbol], [Sort])
+constructQuantVars :: [(String, String)] -> S.SMT [S.Binder]
 constructQuantVars varDecls  = do
-  vars <- sequence $ map mkQuantVar varDecls
-  return $ unzip vars
+  sequence $ map mkQuantVar varDecls
   where
-    mkQuantVar :: (String, String) -> Z3 (Symbol, Sort)
+    mkQuantVar :: (String, String) -> S.SMT S.Binder
     mkQuantVar (symbName, sortName) = do
-      symb     <- mkStringSymbol symbName
-      sort     <- sortFromString sortName
-      return (symb, sort)
+      (S.Symbol symb) <- S.mkStringSymbol symbName
+      sort <- sortFromString sortName
+      return (S.Bind symb sort)
 
-sortFromString :: String -> Z3 Sort
-sortFromString "Bool" = mkBoolSort
-sortFromString "Int"  = mkIntSort
-sortFromString "Real" = mkRealSort
+sortFromString :: String -> S.SMT S.Type
+sortFromString "Bool" = S.mkBoolSort
+sortFromString "Int"  = S.mkIntSort
+sortFromString "Real" = S.mkRealSort
 sortFromString s = do
-  sortSymb <- mkStringSymbol s
-  mkUninterpretedSort sortSymb
+  sortSymb <- S.mkStringSymbol s
+  S.mkUninterpretedSort sortSymb
 
-constructForall :: [Z3 (String, String)] -> (Z3 AST) -> Z3 AST
+constructForall :: [S.SMT (String, String)] -> (S.SMT S.Expr) -> S.SMT S.Expr
 constructForall decls body = do
-  (symbs, sorts) <- constructQuantVars =<< sequence decls
-  mkForall [] symbs sorts =<< body
+  binders <- constructQuantVars =<< sequence decls
+  return . S.Quant S.Forall binders =<< body
 
-constructExists :: [Z3 (String, String)] -> (Z3 AST) -> Z3 AST
+constructExists :: [S.SMT (String, String)] -> (S.SMT S.Expr) -> S.SMT S.Expr
 constructExists decls body = do
-  (symbs, sorts) <- constructQuantVars =<< sequence decls
-  mkExists [] symbs sorts =<< body
+  binders <- constructQuantVars =<< sequence decls
+  return . S.Quant S.Exists binders =<< body
 
-smtApp :: SMTParser AST
+smtApp :: SMTParser S.Expr
 smtApp = do
   char '(' >> whitespace
   func <- funcDecl
@@ -233,22 +233,22 @@ funcDecl =     funcParser "+" SMTAdd
 funcParser :: String -> SMTFunc -> SMTParser SMTFunc
 funcParser str func = reserved str >> (return $ return func)
 
-smtApply :: SMTFunc -> [AST] -> Z3 AST
-smtApply SMTAdd ops = mkAdd ops
-smtApply SMTSub ops = mkSub ops
-smtApply SMTMul ops = mkMul ops
-smtApply SMTDiv (lhs:rhs:[]) = mkDiv lhs rhs
-smtApply SMTPow (base:pow:[]) = mkPower base pow
-smtApply SMTAnd ops = mkAnd ops
-smtApply SMTEq  (lhs:rhs:[]) = mkEq lhs rhs
-smtApply SMTGT  (lhs:rhs:[]) = mkGt lhs rhs
-smtApply SMTGTE (lhs:rhs:[]) = mkGe lhs rhs
-smtApply SMTImp (lhs:rhs:[]) = mkImplies lhs rhs
-smtApply SMTLT  (lhs:rhs:[]) = mkLt lhs rhs
-smtApply SMTLTE (lhs:rhs:[]) = mkLe lhs rhs
-smtApply SMTMod (lhs:rhs:[]) = mkMod lhs rhs
-smtApply SMTNot (expr:[]) = mkNot expr
-smtApply SMTOr ops = mkOr ops
+smtApply :: SMTFunc -> [S.Expr] -> S.SMT S.Expr
+smtApply SMTAdd ops = S.mkAdd ops
+smtApply SMTSub ops = S.mkSub ops
+smtApply SMTMul ops = S.mkMul ops
+smtApply SMTDiv (lhs:rhs:[]) = S.mkDiv lhs rhs
+smtApply SMTPow (base:pow:[]) = S.mkPower base pow
+smtApply SMTAnd ops = S.mkAnd ops
+smtApply SMTEq  (lhs:rhs:[]) = S.mkEq lhs rhs
+smtApply SMTGT  (lhs:rhs:[]) = S.mkGt lhs rhs
+smtApply SMTGTE (lhs:rhs:[]) = S.mkGe lhs rhs
+smtApply SMTImp (lhs:rhs:[]) = S.mkImplies lhs rhs
+smtApply SMTLT  (lhs:rhs:[]) = S.mkLt lhs rhs
+smtApply SMTLTE (lhs:rhs:[]) = S.mkLe lhs rhs
+smtApply SMTMod (lhs:rhs:[]) = S.mkMod lhs rhs
+smtApply SMTNot (expr:[]) = S.mkNot expr
+smtApply SMTOr ops = S.mkOr ops
 smtApply SMTDiv _ = fail "divide takes exactly two arguments"
 smtApply SMTPow _ = fail "exponentiation takes exactly two arguments"
 smtApply SMTEq  _ = fail "equals takes exactly two arguments"

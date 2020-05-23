@@ -18,8 +18,7 @@ import qualified Data.Map as Map
 import Imp
 import Data.List (isPrefixOf)
 import SMTParser
-import Z3.Monad
-import Z3Util
+import qualified SMTMonad as S
 
 data FunSpec a = FunSpec { params        :: [Var]
                          , templateVars  :: [Var]
@@ -29,7 +28,7 @@ data FunSpec a = FunSpec { params        :: [Var]
 
 type FunSpecMap a     = Map.Map String (FunSpec a)
 type StringFunSpecMap = FunSpecMap String
-type ASTFunSpecMap    = FunSpecMap AST
+type ASTFunSpecMap    = FunSpecMap S.Expr
 
 data FunSpecMaps = FunSpecMaps
   { aspecs :: ASTFunSpecMap
@@ -45,13 +44,13 @@ addFunSpec = Map.insert
 lookupFunSpec :: String -> FunSpecMap a -> Maybe (FunSpec a)
 lookupFunSpec = Map.lookup
 
-specAtCallsite :: [Var] -> [Var] -> String -> ASTFunSpecMap -> Z3 (Maybe ([Var], AST, AST))
+specAtCallsite :: [Var] -> [Var] -> String -> ASTFunSpecMap -> S.SMT (Maybe ([Var], S.Expr, S.Expr))
 specAtCallsite assignees cparams funName funSpecs = do
   case Map.lookup funName funSpecs of
     Nothing -> return Nothing
     Just (FunSpec fparams tvars pre post) -> do
       let rets = retVars $ length assignees
-      let bind ast = substituteByName ast (rets ++ fparams) (assignees ++ cparams)
+      let bind ast = S.substituteByName ast (rets ++ fparams) (assignees ++ cparams)
       boundPre  <- bind pre
       boundPost <- bind post
       return . Just $ (tvars, boundPre, boundPost)
@@ -61,7 +60,7 @@ retVars 0   = []
 retVars 1   = ["ret!"]
 retVars len = map (\i -> "ret!" ++ (show i)) [0..len-1]
 
-prefixSpec :: String -> ASTFunSpecMap -> Z3 ASTFunSpecMap
+prefixSpec :: String -> ASTFunSpecMap -> S.SMT ASTFunSpecMap
 prefixSpec prefix spec = traverse (\v -> prefixSpecs v)
                          $ Map.mapKeys (\k -> prefixFun k) spec
   where
@@ -73,23 +72,23 @@ prefixSpec prefix spec = traverse (\v -> prefixSpecs v)
       prefixedPost <- prefixAST post
       return (FunSpec prefixedFParams prefixedTVars prefixedPre prefixedPost)
     prefixAST ast = do
-      freeVars <- astFreeVars ast
+      let freeVars = S.exprFreeVars ast
       foldr subSymbol (return ast) freeVars
     subSymbol symbol z3AST = do
       ast  <- z3AST
-      name <- getSymbolString symbol
+      name <- S.getSymbolString symbol
       if ("ret!" `isPrefixOf ` name)
         then return ast
-        else substituteByName ast [name] [prefix ++ name]
+        else S.substituteByName ast [name] [prefix ++ name]
 
 funList :: FunSpecMap a -> [String]
 funList = Map.keys
 
-stringToASTSpec :: StringFunSpecMap -> Either ParseError (Z3 ASTFunSpecMap)
+stringToASTSpec :: StringFunSpecMap -> Either ParseError (S.SMT ASTFunSpecMap)
 stringToASTSpec = Map.foldrWithKey parse $ Right (return emptyFunSpec)
   where
-    parse :: String -> (FunSpec String) -> Either ParseError (Z3 ASTFunSpecMap)
-          -> Either ParseError (Z3 ASTFunSpecMap)
+    parse :: String -> (FunSpec String) -> Either ParseError (S.SMT ASTFunSpecMap)
+          -> Either ParseError (S.SMT ASTFunSpecMap)
     parse fName (FunSpec fparams tvars preStr postStr) z3SpecOrError =
       case z3SpecOrError of
         l@(Left _)   -> l
