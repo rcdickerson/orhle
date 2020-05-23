@@ -1,7 +1,7 @@
 # ORHLE
 
-ORHLE is an automatic existential relational Hoare logic (RHLE) verifier. A
-draft of the RHLE paper is currently on arXiv: https://arxiv.org/abs/2002.02904
+ORHLE is an automatic existential relational Hoare logic (RHLE) verifier.
+
 
 ### Building
 
@@ -12,7 +12,13 @@ stack build
 stack exec klive-exe
 ```
 
-Requires z3, libz3-dev
+Building requires Z3 4.8.7 and its development headers. These packages are
+available:
+  * In many Debian-based Linux distributions as packages called `z3` and
+    `libz3-dev`
+  * As binaries from [the Z3 releases site](https://github.com/Z3Prover/z3/releases). Alternately
+  * To build and install Z3 directly from [source](https://github.com/Z3Prover/z3).
+
 
 ### Examples
 
@@ -34,3 +40,4 @@ bin/run-all-examples.sh
 ```
 
 will run all examples, writing output to the `example-output` directory.
+
