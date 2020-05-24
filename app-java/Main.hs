@@ -26,9 +26,6 @@ import           System.Environment             ( getArgs
                                                 , getProgName
                                                 )
 import           System.FilePath                ( replaceFileName )
-import           Z3.Monad                       ( Z3
-                                                , evalZ3
-                                                )
 
 import qualified Language.Java.Parser          as JavaParser
 import qualified Language.Java.Syntax          as JavaSyntax
@@ -47,6 +44,7 @@ import           Orhle                          ( AbsStmt(..)
                                                 , rhleVerifier
                                                 , stringToASTSpec
                                                 )
+import qualified SMTMonad                      as S
 
 import           Translate
 import           VerificationTaskParser
@@ -83,15 +81,18 @@ main = (>>= reportResult) $ runExceptT $ do
     z3prog <- liftEitherShow $ parseLoopSpecs prog
     return $ prefixProgVars (execution2prefix name) =<< z3prog
 
-  (result, trace) <- liftIO $ evalZ3 $ do
-    funSpecMaps <- uncurry (liftM2 FunSpecMaps) z3FunSpecs
-    trip        <- liftM4 RHLETrip
-                          z3PreCond
-                          (sequence z3AProgs)
-                          (sequence z3EProgs)
-                          z3PostCond
-    (result, trace) <- rhleVerifier funSpecMaps trip
-    traceStr        <- ppVTrace trace
+  (result, trace) <- liftIO $ do
+    let funSpecMaps_trip = liftM2
+          (,)
+          (uncurry (liftM2 FunSpecMaps) z3FunSpecs)
+          (liftM4 RHLETrip
+                  z3PreCond
+                  (sequence z3AProgs)
+                  (sequence z3EProgs)
+                  z3PostCond
+          )
+    (result, trace) <- rhleVerifier funSpecMaps_trip
+    let traceStr = ppVTrace trace
 
     return (result, traceStr)
   liftIO $ case result of
@@ -163,7 +164,7 @@ execution2prefix (Execution name Nothing   ) = name ++ "!"
 execution2prefix (Execution name (Just sub)) = name ++ "!" ++ sub ++ "!"
 
 -- TODO: duplicated from KLiveParser
-prefixProgVars :: String -> Prog -> Z3 Prog
+prefixProgVars :: String -> Prog -> S.SMT Prog
 prefixProgVars pre prog = case prog of
   SSkip          -> return SSkip
   SAsgn var aexp -> return $ SAsgn (pre ++ var) (prefixA aexp)

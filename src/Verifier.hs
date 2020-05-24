@@ -12,13 +12,12 @@ import Imp
 import Spec
 import Triples
 import VerifierTrace
-import Z3.Monad
-import Z3Util
+import qualified SMTMonad as S
 
 type ErrorMsg = String
 type SuccessMsg = String
 
-type Verifier       = FunSpecMaps -> RHLETrip -> Z3 VerifierResult
+type Verifier       = S.SMT (FunSpecMaps, RHLETrip) -> IO VerifierResult
 type VerifierResult = (Either ErrorMsg SuccessMsg, [VerifierTrace])
 
 data VCQuant = VCUniversal | VCExistential deriving Show
@@ -28,16 +27,14 @@ runVerifier :: Verifier
                -> String -> [Prog] -> [Prog] -> String
                -> IO String
 runVerifier verifier specs pre aProgs eProgs post = do
-  (_, result) <- evalZ3 . runWriterT $ do
+  (_, result) <- runWriterT $ do
     tell "------------------------------------------------\n"
     tell $ "Universal Programs:\n" ++ (show aProgs) ++   "\n"
     tell "------------------------------------------------\n"
     tell $ "Existential Programs:\n" ++ (show eProgs) ++ "\n"
     tell "------------------------------------------------\n"
-    trip            <- lift $ mkRHLETrip pre aProgs eProgs post
-    (result, trace) <- lift $ verifier specs trip
-    traceStr        <- lift $ ppVTrace trace
-    tell $ "Verification Trace:\n" ++ traceStr ++ "\n"
+    (result, trace) <- lift $ verifier $ (,) specs <$> mkRHLETrip pre aProgs eProgs post
+    tell $ "Verification Trace:\n" ++ ppVTrace trace ++ "\n"
     tell "------------------------------------------------\n"
     case result of
       Right message -> tell $ "VALID. " ++ message ++ "\n"
@@ -46,76 +43,77 @@ runVerifier verifier specs pre aProgs eProgs post = do
   return result
 
 rhleVerifier :: Verifier
-rhleVerifier specs (RHLETrip pre aProgs eProgs post) = runWriterT $ do
-  vcsE    <- lift $ generateVCList eProgs post VCExistential $ especs specs
-  post'   <- lift $ simplify =<< mkAnd vcsE
-  vcsA    <- lift $ generateVCList aProgs post' VCUniversal $ aspecs specs
-  vcsConj <- lift $ mkAnd vcsA
-  vcs     <- lift $ mkImplies pre vcsConj
-  vcsStr  <- lift $ astToString vcs
-  logMsg  $ "Verification Conditions\n" ++ (indent vcsStr) ++ "\n"
-  (valid, model) <- lift $ checkValid vcs
-  if valid
-    then return.Right $ ""
-    else do
-      modelStr <- lift $ maybeModelToString model
-      return.Left $ "Model:\n" ++ (sortAndIndent $ modelStr)
+rhleVerifier specs_trip = runWriterT $ do
+  let vcs = S.packageSmt $ do
+        (specs, RHLETrip pre aProgs eProgs post) <- specs_trip
+        vcsE    <- generateVCList eProgs post VCExistential $ especs specs
+        post'   <- S.simplify =<< S.mkAnd vcsE
+        vcsA    <- generateVCList aProgs post' VCUniversal $ aspecs specs
+        vcsConj <- S.mkAnd vcsA
+        S.mkImplies pre vcsConj
+  logMsg  $ "Verification Conditions\n" ++ (indent (S.dumpExpr vcs)) ++ "\n"
+  (maybeModel) <- lift $ S.checkValid vcs
+  case maybeModel of
+    Nothing -> return.Right $ ""
+    Just model ->
+      let modelStr = S.modelToString model
+      in return.Left $ "Model:\n" ++ (sortAndIndent $ modelStr)
   where
     indent = intercalate "\n" . (map $ \l -> "  " ++ l) . lines
     sortAndIndent = intercalate "\n" . (map $ \l -> "  " ++ l) . sort . lines
 
-generateVCList :: [Prog] -> AST -> VCQuant -> ASTFunSpecMap
-               -> Z3 [AST]
+generateVCList :: [Prog] -> S.Expr -> VCQuant -> ASTFunSpecMap
+               -> S.SMT [S.Expr]
 generateVCList progs post quant funSpec =
   foldM vcFolder [post] progs
   where
     vcFolder vcs prog = do
-      post' <- simplify =<< mkAnd vcs
+      post' <- S.simplify =<< S.mkAnd vcs
       generateVCs prog post' quant funSpec
 
-generateVCs :: Stmt -> AST -> VCQuant -> ASTFunSpecMap
-            -> Z3 [AST]
+generateVCs :: Stmt -> S.Expr -> VCQuant -> ASTFunSpecMap
+            -> S.SMT [S.Expr]
 generateVCs stmt post quant specs = case stmt of
   SSkip       -> return [post]
   SSeq []     -> generateVCs SSkip post quant specs
   SSeq (s:ss) -> do
-    post' <- generateVCs (SSeq ss) post quant specs >>= mkAnd
+    post' <- generateVCs (SSeq ss) post quant specs >>= S.mkAnd
     generateVCs s post' quant specs
   SAsgn lhs rhs -> do
-    subPost <- subAexp post (AVar lhs) rhs
+    subPost <- subAexp post lhs rhs
     return [subPost]
   SIf b s1 s2 -> do
     cond   <- bexpToZ3 b
-    ncond  <- mkNot cond
+    ncond  <- S.mkNot cond
     vcs1   <- generateVCs s1 post quant specs
     vcs2   <- generateVCs s2 post quant specs
-    vcIf   <- mkImplies cond  =<< mkAnd vcs1
-    vcElse <- mkImplies ncond =<< mkAnd vcs2
-    vc     <- mkAnd [vcIf, vcElse]
+    vcIf   <- S.mkImplies cond  =<< S.mkAnd vcs1
+    vcElse <- S.mkImplies ncond =<< S.mkAnd vcs2
+    vc     <- S.mkAnd [vcIf, vcElse]
     return [vc]
   loop@(SWhile c body (inv, var, _)) -> do
     let progVarStrs    = Set.toList $ svars loop
-    originalStateASTs <- mkFreshIntVars progVarStrs
-    originalStateVars <- mapM astToString originalStateASTs
-    originalStateApps <- stringsToApps originalStateVars
-    let original ast   = substituteByName ast progVarStrs originalStateVars
+    originalStateASTs <- S.mkFreshIntVars progVarStrs
+    let originalStateVars = map S.exprToString originalStateASTs
+    originalStateApps <- S.stringsToApps originalStateVars
+    let original ast   = S.substituteByName ast progVarStrs originalStateVars
 
     cond        <- bexpToZ3 c
-    ncond       <- mkNot cond
-    condAndInv  <- mkAnd [cond,  inv]
-    ncondAndInv <- mkAnd [ncond, inv]
+    ncond       <- S.mkNot cond
+    condAndInv  <- S.mkAnd [cond,  inv]
+    ncondAndInv <- S.mkAnd [ncond, inv]
     bodyVCs <- (case quant of
       VCUniversal -> do
         generateVCs body inv quant specs
       VCExistential -> do
         originalVar <- original var
-        varCond     <- mkLt var originalVar
-        bodyPost    <- mkAnd [inv, varCond]
+        varCond     <- S.mkLt var originalVar
+        bodyPost    <- S.mkAnd [inv, varCond]
         generateVCs body bodyPost quant specs)
-    loopVC <- mkForallConst [] originalStateApps
-              =<< original =<< mkImplies condAndInv =<< mkAnd bodyVCs
-    endVC  <- mkForallConst [] originalStateApps
-               =<< original =<< mkImplies ncondAndInv post
+    loopVC <- S.mkForallConst originalStateApps
+              =<< original =<< S.mkImplies condAndInv =<< S.mkAnd bodyVCs
+    endVC  <- S.mkForallConst originalStateApps
+               =<< original =<< S.mkImplies ncondAndInv post
     return [inv, loopVC, endVC]
 
   SCall assignees cparams funName -> do
@@ -126,21 +124,20 @@ generateVCs stmt post quant specs = case stmt of
       Just (tvars, fPre, fPost) ->
         case quant of
           VCUniversal -> do
-            postImp <- mkImplies fPost post
-            vc      <- mkAnd [fPre, postImp]
+            postImp <- S.mkImplies fPost post
+            vc      <- S.mkAnd [fPre, postImp]
             return [vc]
           VCExistential -> do
-            asgnAsts     <- mapM (\a -> do mkIntVar =<< mkStringSymbol a) assignees
-            frAsgnAsts   <- mapM mkFreshIntVar assignees
-            frAsgnApps   <- mapM toApp frAsgnAsts
-            frPost       <- substitute post asgnAsts frAsgnAsts
-            frFPost      <- substitute fPost asgnAsts frAsgnAsts
-            existsPost   <- mkExistsConst [] frAsgnApps frFPost
-            forallPost   <- mkForallConst [] frAsgnApps =<< mkImplies frFPost frPost
+            frAsgnAsts   <- mapM S.mkFreshIntVar assignees
+            frAsgnApps   <- mapM S.toApp frAsgnAsts
+            frPost       <- S.substitute post assignees frAsgnAsts
+            frFPost      <- S.substitute fPost assignees frAsgnAsts
+            existsPost   <- S.mkExistsConst frAsgnApps frFPost
+            forallPost   <- S.mkForallConst frAsgnApps =<< S.mkImplies frFPost frPost
             let vcs = [fPre, existsPost, forallPost]
-            stringsToApps tvars >>= \tvarApps ->
+            S.stringsToApps tvars >>= \tvarApps ->
               case tvarApps of
                 [] -> return vcs
                 _  -> do
-                  quantVcs <- mkExistsConst [] tvarApps =<< mkAnd vcs
+                  quantVcs <- S.mkExistsConst tvarApps =<< S.mkAnd vcs
                   return [quantVcs]

@@ -12,14 +12,14 @@ import Orhle
 import Text.Parsec
 import Text.Parsec.Language
 import qualified Text.Parsec.Token as Token
-import Z3.Monad
+import qualified SMTMonad as S
 
 data KLQuery = KLQuery
                { klSpecs       :: FunSpecMaps
-               , klPreCond     :: AST
+               , klPreCond     :: S.Expr
                , klForallProgs :: [Prog]
                , klExistsProgs :: [Prog]
-               , klPostCond    :: AST
+               , klPostCond    :: S.Expr
                }
 
 data QExec = QEForall String QExecId | QEExists String QExecId
@@ -60,10 +60,10 @@ whiteSpace = Token.whiteSpace lexer
 
 type KLiveParser a = Parsec String () a
 
-parseKLive :: String -> Either ParseError ([QExec], Z3 KLQuery, KLExpectedResult)
+parseKLive :: String -> Either ParseError ([QExec], S.SMT KLQuery, KLExpectedResult)
 parseKLive str = runParser kliveParser () "" str
 
-kliveParser :: KLiveParser ([QExec], Z3 KLQuery, KLExpectedResult)
+kliveParser :: KLiveParser ([QExec], S.SMT KLQuery, KLExpectedResult)
 kliveParser = do
   whiteSpace
   expectedResult <- try expectedValid <|> expectedInvalid; whiteSpace
@@ -71,11 +71,11 @@ kliveParser = do
   aExecs  <- option [] $ try $ execs "forall" QEForall; whiteSpace
   eExecs  <- option [] $ try $ execs "exists" QEExists; whiteSpace
 
-  preCond <- option mkTrue $ do
+  preCond <- option S.mkTrue $ do
     reserved "pre" >> whiteSpace >> char ':' >> whiteSpace
     condition
   whiteSpace
-  postCond <- option mkTrue $ do
+  postCond <- option S.mkTrue $ do
     reserved "post" >> whiteSpace >> char ':' >> whiteSpace
     condition
   whiteSpace
@@ -107,7 +107,7 @@ kliveParser = do
   let query = liftM5 KLQuery specs preCond (sequence aProgs) (sequence eProgs) postCond
   return $ ((aExecs ++ eExecs), query, expectedResult)
 
-prefixProgram :: ParsedProg -> QExec -> KLiveParser (Z3 Prog)
+prefixProgram :: ParsedProg -> QExec -> KLiveParser (S.SMT Prog)
 prefixProgram prog exec = do
   case parseLoopSpecs prog of
         Left parseError -> error  $ show parseError
@@ -121,7 +121,7 @@ execPrefix exec = case (getExecId exec) of
 untilSemi :: KLiveParser String
 untilSemi = manyTill anyChar (try $ char ';')
 
-condition :: KLiveParser (Z3 AST)
+condition :: KLiveParser (S.SMT S.Expr)
 condition = do
   smtStr <- untilSemi
   whiteSpace
@@ -164,7 +164,7 @@ execId = do
   whiteSpace >> char ']' >> whiteSpace
   return eid
 
-specification :: KLiveParser (Z3 ASTFunSpecMap)
+specification :: KLiveParser (S.SMT ASTFunSpecMap)
 specification = do
   name   <- identifier
   params <- (liftM concat) . parens $ sepBy varArray comma
@@ -229,7 +229,7 @@ getExecId :: QExec -> Maybe String
 getExecId (QEForall _ eid) = eid
 getExecId (QEExists _ eid) = eid
 
-prefixProgVars :: String -> Prog -> Z3 Prog
+prefixProgVars :: String -> Prog -> S.SMT Prog
 prefixProgVars pre prog =
   case prog of
     SSkip          -> return $ SSkip

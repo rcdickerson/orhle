@@ -4,7 +4,7 @@ import KLiveParser
 import Orhle
 import System.Environment
 import System.Exit
-import Z3.Monad
+import qualified SMTMonad as S
 
 main :: IO ()
 main = do
@@ -37,7 +37,7 @@ runKLive klive = do
       putStrLn ":: Executions"
       mapM_ printQExec execs
       putStrLn ""
-      (output, success) <- evalZ3 $ runKLQuery query
+      (output, success) <- runKLQuery query
       let didAsExpected = if success
                             then expected == KLSuccess
                             else expected == KLFailure
@@ -51,12 +51,13 @@ eidStr :: QExecId -> String
 eidStr Nothing = ""
 eidStr (Just eid) = "[" ++ eid ++ "]"
 
-runKLQuery :: Z3 KLQuery -> Z3 (String, Bool)
+runKLQuery :: S.SMT KLQuery -> IO (String, Bool)
 runKLQuery query = do
-  KLQuery specs pre forall exists post <- query
-  let trip = RHLETrip pre forall exists post
-  (result, trace) <- rhleVerifier specs trip
-  traceStr <- ppVTrace trace
+  let specs_trip = do
+        KLQuery specs pre forall exists post <- query
+        return $ (specs, RHLETrip pre forall exists post)
+  (result, trace) <- rhleVerifier specs_trip
+  let traceStr = ppVTrace trace
   return $ case result of
       Left  reason -> (traceStr ++ "Invalid. " ++ reason, False)
       Right _      -> (traceStr ++ "Valid.", True)

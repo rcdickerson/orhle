@@ -23,8 +23,10 @@ dependencies:
 - mtl
 - parsec
 - text
-- z3 >= 408.0 && < 409
 - prettyprinter
+- simple-smt
+- smtLib
+- pretty
 
 library:
   source-dirs:

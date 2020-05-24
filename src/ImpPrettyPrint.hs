@@ -1,16 +1,25 @@
 module ImpPrettyPrint
         ( prettyprint
+        , prettyprintAExp
+        , prettyprintBExp
         )
 where
 
 import           Data.Text.Prettyprint.Doc
 import           Data.Text.Prettyprint.Doc.Render.Text
+import           Data.Text.Prettyprint.Doc.Render.String
 import           Data.Text                      ( Text )
 
 import           Imp
 
 prettyprint :: AbsStmt String -> Text
 prettyprint = renderStrict . layoutPretty defaultLayoutOptions . prettyStmt
+
+prettyprintAExp :: AExp -> String
+prettyprintAExp = renderString . layoutPretty defaultLayoutOptions . prettyAExp
+
+prettyprintBExp :: BExp -> String
+prettyprintBExp = renderString . layoutPretty defaultLayoutOptions . prettyBExp
 
 prettyStmt :: AbsStmt String -> Doc ()
 prettyStmt SSkip       = pretty "skip" <> semi

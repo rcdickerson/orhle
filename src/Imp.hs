@@ -22,7 +22,7 @@ module Imp
     ) where
 
 import qualified Data.Set as Set
-import Z3.Monad
+import qualified SMTMonad as S
 
 type Var = String
 
@@ -66,42 +66,41 @@ avars aexp =
     AMod lhs rhs -> Set.union (avars lhs) (avars rhs)
     APow lhs rhs -> Set.union (avars lhs) (avars rhs)
 
-aexpToZ3 :: AExp -> Z3 AST
+aexpToZ3 :: AExp -> S.SMT S.Expr
 aexpToZ3 aexp =
   case aexp of
-    ALit i   -> mkIntNum i
-    AVar var -> mkIntVar =<< mkStringSymbol var
-    AAdd aexp1 aexp2 -> mkAdd =<< mapM aexpToZ3 [aexp1, aexp2]
-    ASub aexp1 aexp2 -> mkSub =<< mapM aexpToZ3 [aexp1, aexp2]
-    AMul aexp1 aexp2 -> mkMul =<< mapM aexpToZ3 [aexp1, aexp2]
+    ALit i   -> S.mkIntNum i
+    AVar var -> S.mkIntVar =<< S.mkStringSymbol var
+    AAdd aexp1 aexp2 -> S.mkAdd =<< mapM aexpToZ3 [aexp1, aexp2]
+    ASub aexp1 aexp2 -> S.mkSub =<< mapM aexpToZ3 [aexp1, aexp2]
+    AMul aexp1 aexp2 -> S.mkMul =<< mapM aexpToZ3 [aexp1, aexp2]
     ADiv aexp1 aexp2 -> do
       dividend <- aexpToZ3 aexp1
       divisor  <- aexpToZ3 aexp2
-      mkDiv dividend divisor
+      S.mkDiv dividend divisor
     AMod aexp1 aexp2 -> do
       dividend <- aexpToZ3 aexp1
       divisor  <- aexpToZ3 aexp2
-      mkMod dividend divisor
+      S.mkMod dividend divisor
     APow aexp1 aexp2 -> do
       base <- aexpToZ3 aexp1
       power <- aexpToZ3 aexp2
-      mkPower base power
+      S.mkPower base power
 
-subVar :: AST -> Var -> Var -> Z3 AST
-subVar ast var repl = subAexp ast (AVar var) (AVar repl)
+subVar :: S.Expr -> Var -> Var -> S.SMT S.Expr
+subVar ast var repl = subAexp ast var (AVar repl)
 
-subAexp :: AST -> AExp -> AExp -> Z3 AST
-subAexp ast expr repl = do
-  z3Expr <- aexpToZ3 $ expr
+subAexp :: S.Expr -> Var -> AExp -> S.SMT S.Expr
+subAexp ast var repl = do
   z3Repl <- aexpToZ3 $ repl
-  substitute ast [z3Expr] [z3Repl]
+  S.substitute ast [var] [z3Repl]
 
-assignPost :: Var -> AExp -> AST -> Z3 AST
+assignPost :: Var -> AExp -> S.Expr -> S.SMT S.Expr
 assignPost var aexp post = do
   z3Var   <- aexpToZ3 $ AVar var
   z3Aexp  <- aexpToZ3 aexp
-  eq      <- mkEq z3Var z3Aexp
-  mkAnd [eq, post]
+  eq      <- S.mkEq z3Var z3Aexp
+  S.mkAnd [eq, post]
 
 prefixAExpVars :: String -> AExp -> AExp
 prefixAExpVars pre aexp =
@@ -165,38 +164,38 @@ bvars bexp =
     BLt  lhs rhs -> Set.union (avars lhs) (avars rhs)
     BGt  lhs rhs -> Set.union (avars lhs) (avars rhs)
 
-bexpToZ3 :: BExp -> Z3 AST
+bexpToZ3 :: BExp -> S.SMT S.Expr
 bexpToZ3 bexp =
   case bexp of
-    BTrue        -> mkTrue
-    BFalse       -> mkFalse
-    BNot b       -> mkNot =<< bexpToZ3 b
-    BAnd b1  b2  -> mkAnd =<< mapM bexpToZ3 [b1, b2]
-    BOr  b1  b2  -> mkOr  =<< mapM bexpToZ3 [b1, b2]
+    BTrue        -> S.mkTrue
+    BFalse       -> S.mkFalse
+    BNot b       -> S.mkNot =<< bexpToZ3 b
+    BAnd b1  b2  -> S.mkAnd =<< mapM bexpToZ3 [b1, b2]
+    BOr  b1  b2  -> S.mkOr  =<< mapM bexpToZ3 [b1, b2]
     BEq  lhs rhs -> do
       lhsAST <- aexpToZ3 lhs
       rhsAST <- aexpToZ3 rhs
-      mkEq lhsAST rhsAST
+      S.mkEq lhsAST rhsAST
     BNe  lhs rhs -> do
       lhsAST <- aexpToZ3 lhs
       rhsAST <- aexpToZ3 rhs
-      mkNot =<< mkEq lhsAST rhsAST
+      S.mkNot =<< S.mkEq lhsAST rhsAST
     BLe  lhs rhs -> do
       lhsAST <- aexpToZ3 lhs
       rhsAST <- aexpToZ3 rhs
-      mkLe lhsAST rhsAST
+      S.mkLe lhsAST rhsAST
     BGe  lhs rhs -> do
       lhsAST <- aexpToZ3 lhs
       rhsAST <- aexpToZ3 rhs
-      mkGe lhsAST rhsAST
+      S.mkGe lhsAST rhsAST
     BGt  lhs rhs -> do
       lhsAST <- aexpToZ3 lhs
       rhsAST <- aexpToZ3 rhs
-      mkGt lhsAST rhsAST
+      S.mkGt lhsAST rhsAST
     BLt  lhs rhs -> do
       lhsAST <- aexpToZ3 lhs
       rhsAST <- aexpToZ3 rhs
-      mkLt lhsAST rhsAST
+      S.mkLt lhsAST rhsAST
 
 prefixBExpVars :: String -> BExp -> BExp
 prefixBExpVars pre bexp =
@@ -226,7 +225,7 @@ data SFun = SFun
   , fParams   :: [Var]
   } deriving (Eq, Ord, Show)
 
-fsubst :: SFun -> Var -> Var -> Z3 SFun
+fsubst :: SFun -> Var -> Var -> S.SMT SFun
 fsubst (SFun name params) var repl = do
   let params' = map (\p -> if p == var then repl else p) params
   return $ SFun name params'
@@ -250,7 +249,7 @@ data AbsStmt a
   | SCall  [Var] [Var] String
   deriving (Eq, Ord, Show)
 
-type Stmt       = AbsStmt AST
+type Stmt       = AbsStmt S.Expr
 type Prog       = Stmt
 
 svars :: AbsStmt a -> Set.Set Var
