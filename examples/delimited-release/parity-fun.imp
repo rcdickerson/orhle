@@ -21,7 +21,7 @@ pre: (and
         // Delimited Release
         (= (mod run!1!h 2) (mod run!2!h 2)));
 
-post: (= parity!1!l parity!2!l);
+post: (= run!1!l run!2!l);
 
 aspecs:
   parity(val) {
