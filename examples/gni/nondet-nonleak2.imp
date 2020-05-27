@@ -1,5 +1,5 @@
-// A program that sometimes (but not
-// always) leaks high-security state.
+// A program that never leaks high-
+// security state.
 
 expected: valid;
 
