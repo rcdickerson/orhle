@@ -23,10 +23,16 @@ especs:
   }
 
 prog run(high, low):
+  if (low < high) then
+    low := 0;
+  else
+    low := 1;
+  end
+
   flip := call flipCoin();
   if (flip == 0) then
-    if (low < high) then low := 0; else low := 1; end
+    low := 1 - low;  // Flip low.
   else
-    if (low < high) then low := 1; else low := 0; end
+    skip;
   end
 endp
