@@ -10,19 +10,23 @@ pre:  (= run!1!low run!2!low);
 post: (= run!1!low run!2!low);
 
 aspecs:
-  randBnd(max) {
+  flipCoin() {
     pre:  true;
-    post: (and (>= 0 ret!) (< ret! max));
+    post: (or (= ret! 0) (= ret! 1));
   }
 
 especs:
-  randBnd(max) {
+  flipCoin() {
     templateVars: n;
-    pre:  (and (>= 0 n) (< n max));
+    pre:  (or (= n 0) (= n 1));
     post: (= ret! n);
   }
 
 prog run(high, low):
-  r := call randBnd(high);
-  low := high + r;
+  flip := call flipCoin();
+  if (flip == 0) then
+    if (low < high) then low := 0; else low := 1; end
+  else
+    if (low < high) then low := 1; else low := 0; end
+  end
 endp

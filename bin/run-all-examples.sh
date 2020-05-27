@@ -23,7 +23,9 @@ examples=( \
   "delimited-release/wallet-no-dr" \
   "delimited-release/wallet" \
   "gni/nondet-leak" \
+  "gni/nondet-leak2" \
   "gni/nondet-nonleak" \
+  "gni/nondet-nonleak2" \
   "gni/simple-leak" \
   "gni/simple-nonleak" \
   "gni/smith1" \

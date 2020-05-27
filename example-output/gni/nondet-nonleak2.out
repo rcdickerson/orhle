@@ -9,22 +9,141 @@
 
 :: Verification Conditions
   (=> (= run!1!low run!2!low)
-      (and true
-           (=> (and (>= 0 run!1!r) (< run!1!r run!1!high))
-               (and (exists ((run!2!n Int))
-                      (! (and (>= 0 run!2!n)
-                              (not (<= run!2!high run!2!n))
-                              (exists ((run!2!r!0 Int))
-                                (! (= run!2!r!0 run!2!n) :weight 0))
-                              (forall ((run!2!r!0 Int))
-                                (! (or (not (= run!2!r!0 run!2!n))
-                                       (= (+ run!1!high run!1!r)
-                                          (+ run!2!high run!2!r!0)))
-                                   :weight 0)))
-                         :weight 0))))))
+      (and (and true
+                (=> (or (= run!1!flip 0) (= run!1!flip 1))
+                    (and (and (=> (= run!1!flip 0)
+                                  (and (and (=> (< run!1!low run!1!high)
+                                                (and (and (and (and (and (and (exists ((run!2!n Int))
+                                                                                 (and (or (= run!2!n
+                                                                                             0)
+                                                                                          (= run!2!n
+                                                                                             1))
+                                                                                      (exists ((run!2!flip0 Int))
+                                                                                         (= run!2!flip0
+                                                                                            run!2!n))
+                                                                                      (forall ((run!2!flip0 Int))
+                                                                                         (=> (= run!2!flip0
+                                                                                                run!2!n)
+                                                                                             (and (and (=> (= run!2!flip0
+                                                                                                              0)
+                                                                                                           (and (and (=> (< run!2!low
+                                                                                                                            run!2!high)
+                                                                                                                         (and (and (and (and (and (= 0
+                                                                                                                                                     0)))))))
+                                                                                                                     (=> (not (< run!2!low
+                                                                                                                                 run!2!high))
+                                                                                                                         (and (and (and (and (and (= 0
+                                                                                                                                                     1))))))))))
+                                                                                                       (=> (not (= run!2!flip0
+                                                                                                                   0))
+                                                                                                           (and (and (=> (< run!2!low
+                                                                                                                            run!2!high)
+                                                                                                                         (and (and (and (and (and (= 0
+                                                                                                                                                     1)))))))
+                                                                                                                     (=> (not (< run!2!low
+                                                                                                                                 run!2!high))
+                                                                                                                         (and (and (and (and (and (= 0
+                                                                                                                                                     0)))))))))))))))))))))))
+                                            (=> (not (< run!1!low run!1!high))
+                                                (and (and (and (and (and (and (exists ((run!2!n Int))
+                                                                                 (and (or (= run!2!n
+                                                                                             0)
+                                                                                          (= run!2!n
+                                                                                             1))
+                                                                                      (exists ((run!2!flip0 Int))
+                                                                                         (= run!2!flip0
+                                                                                            run!2!n))
+                                                                                      (forall ((run!2!flip0 Int))
+                                                                                         (=> (= run!2!flip0
+                                                                                                run!2!n)
+                                                                                             (and (and (=> (= run!2!flip0
+                                                                                                              0)
+                                                                                                           (and (and (=> (< run!2!low
+                                                                                                                            run!2!high)
+                                                                                                                         (and (and (and (and (and (= 1
+                                                                                                                                                     0)))))))
+                                                                                                                     (=> (not (< run!2!low
+                                                                                                                                 run!2!high))
+                                                                                                                         (and (and (and (and (and (= 1
+                                                                                                                                                     1))))))))))
+                                                                                                       (=> (not (= run!2!flip0
+                                                                                                                   0))
+                                                                                                           (and (and (=> (< run!2!low
+                                                                                                                            run!2!high)
+                                                                                                                         (and (and (and (and (and (= 1
+                                                                                                                                                     1)))))))
+                                                                                                                     (=> (not (< run!2!low
+                                                                                                                                 run!2!high))
+                                                                                                                         (and (and (and (and (and (= 1
+                                                                                                                                                     0))))))))))))))))))))))))))
+                              (=> (not (= run!1!flip 0))
+                                  (and (and (=> (< run!1!low run!1!high)
+                                                (and (and (and (and (and (and (exists ((run!2!n Int))
+                                                                                 (and (or (= run!2!n
+                                                                                             0)
+                                                                                          (= run!2!n
+                                                                                             1))
+                                                                                      (exists ((run!2!flip0 Int))
+                                                                                         (= run!2!flip0
+                                                                                            run!2!n))
+                                                                                      (forall ((run!2!flip0 Int))
+                                                                                         (=> (= run!2!flip0
+                                                                                                run!2!n)
+                                                                                             (and (and (=> (= run!2!flip0
+                                                                                                              0)
+                                                                                                           (and (and (=> (< run!2!low
+                                                                                                                            run!2!high)
+                                                                                                                         (and (and (and (and (and (= 1
+                                                                                                                                                     0)))))))
+                                                                                                                     (=> (not (< run!2!low
+                                                                                                                                 run!2!high))
+                                                                                                                         (and (and (and (and (and (= 1
+                                                                                                                                                     1))))))))))
+                                                                                                       (=> (not (= run!2!flip0
+                                                                                                                   0))
+                                                                                                           (and (and (=> (< run!2!low
+                                                                                                                            run!2!high)
+                                                                                                                         (and (and (and (and (and (= 1
+                                                                                                                                                     1)))))))
+                                                                                                                     (=> (not (< run!2!low
+                                                                                                                                 run!2!high))
+                                                                                                                         (and (and (and (and (and (= 1
+                                                                                                                                                     0)))))))))))))))))))))))
+                                            (=> (not (< run!1!low run!1!high))
+                                                (and (and (and (and (and (and (exists ((run!2!n Int))
+                                                                                 (and (or (= run!2!n
+                                                                                             0)
+                                                                                          (= run!2!n
+                                                                                             1))
+                                                                                      (exists ((run!2!flip0 Int))
+                                                                                         (= run!2!flip0
+                                                                                            run!2!n))
+                                                                                      (forall ((run!2!flip0 Int))
+                                                                                         (=> (= run!2!flip0
+                                                                                                run!2!n)
+                                                                                             (and (and (=> (= run!2!flip0
+                                                                                                              0)
+                                                                                                           (and (and (=> (< run!2!low
+                                                                                                                            run!2!high)
+                                                                                                                         (and (and (and (and (and (= 0
+                                                                                                                                                     0)))))))
+                                                                                                                     (=> (not (< run!2!low
+                                                                                                                                 run!2!high))
+                                                                                                                         (and (and (and (and (and (= 0
+                                                                                                                                                     1))))))))))
+                                                                                                       (=> (not (= run!2!flip0
+                                                                                                                   0))
+                                                                                                           (and (and (=> (< run!2!low
+                                                                                                                            run!2!high)
+                                                                                                                         (and (and (and (and (and (= 0
+                                                                                                                                                     1)))))))
+                                                                                                                     (=> (not (< run!2!low
+                                                                                                                                 run!2!high))
+                                                                                                                         (and (and (and (and (and (= 0
+                                                                                                                                                     0))))))))))))))))))))))))))))))))
 
 Valid.
 
-real	0m3.698s
-user	0m25.115s
-sys	0m1.525s
+real	0m0.099s
+user	0m0.090s
+sys	0m0.038s
