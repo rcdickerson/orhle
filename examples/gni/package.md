@@ -1,3 +1,0 @@
-# Generalized Noninterference (GNI)
-
-TODO
