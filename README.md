@@ -13,7 +13,7 @@ stack exec klive-exe
 ```
 
 Building requires Z3 4.8.7 and its development headers. Some ways of getting this:
-  * In many Debian-based Linux distributions the packages called `z3` and
+  * In many Debian-based Linux distributions there are packages called `z3` and
     `libz3-dev` (so, `apt-get install z3 libz3-dev`)
   * Get the binaries from [the Z3 releases site](https://github.com/Z3Prover/z3/releases)
   * Build and install Z3 directly from [source](https://github.com/Z3Prover/z3)
