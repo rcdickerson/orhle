@@ -1,7 +1,7 @@
 module Main where
 
-import KLiveParser
 import Orhle
+import OrhleAppParser
 import System.Environment
 import System.Exit
 import qualified SMTMonad as S
@@ -25,13 +25,13 @@ showUsage =
   putStrLn "Usage: klive <filename>"
 
 runKLive :: String -> IO (String, Bool)
-runKLive klive = do
+runKLive orhle = do
   putStrLn "*******************************************"
   putStrLn "****               ORHLE               ****"
   putStrLn "****     The Oracular RHLE Verifier    ****"
   putStrLn "*******************************************"
   putStrLn ""
-  case parseKLive klive of
+  case parseOrhleApp orhle of
     Left  err -> return $ ((show err) ++ "\n", False)
     Right (execs, query, expected) -> do
       putStrLn ":: Executions"
@@ -39,22 +39,22 @@ runKLive klive = do
       putStrLn ""
       (output, success) <- runKLQuery query
       let didAsExpected = if success
-                            then expected == KLSuccess
-                            else expected == KLFailure
+                            then expected == OASuccess
+                            else expected == OAFailure
       return (output, didAsExpected)
 
-printQExec :: QExec -> IO ()
-printQExec (QEForall name eid) = putStrLn $ "  " ++ name ++ (eidStr eid) ++ " (forall)"
-printQExec (QEExists name eid) = putStrLn $ "  " ++ name ++ (eidStr eid) ++ " (exists)"
+printQExec :: OAExec -> IO ()
+printQExec (OAForall name eid) = putStrLn $ "  " ++ name ++ (eidStr eid) ++ " (forall)"
+printQExec (OAExists name eid) = putStrLn $ "  " ++ name ++ (eidStr eid) ++ " (exists)"
 
-eidStr :: QExecId -> String
+eidStr :: OAExecId -> String
 eidStr Nothing = ""
 eidStr (Just eid) = "[" ++ eid ++ "]"
 
-runKLQuery :: S.SMT KLQuery -> IO (String, Bool)
+runKLQuery :: S.SMT OAQuery -> IO (String, Bool)
 runKLQuery query = do
   let specs_trip = do
-        KLQuery specs pre forall exists post <- query
+        OAQuery specs pre forall exists post <- query
         return $ (specs, RHLETrip pre forall exists post)
   (result, trace) <- rhleVerifier specs_trip
   let traceStr = ppVTrace trace

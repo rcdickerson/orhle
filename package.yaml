@@ -33,9 +33,9 @@ library:
     - src
 
 executables:
-  klive-exe:
+  orhle-exe:
     main:                Main.hs
-    source-dirs:         app-klive
+    source-dirs:         app-orhle
     ghc-options:
     - -threaded
     - -rtsopts

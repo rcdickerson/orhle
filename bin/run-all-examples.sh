@@ -48,7 +48,7 @@ for ex in "${examples[@]}"
 do
   echo -n "$ex... "
   start=$(($(date +%s%N)/1000000))
-  if (time stack exec klive-exe ./examples/$ex.imp) > ./example-output/$ex.out 2>&1;
+  if (time stack exec orhle-exe ./examples/$ex.imp) > ./example-output/$ex.out 2>&1;
   then
      echo -ne "\xE2\x9C\x94"
   else

@@ -1,9 +1,9 @@
-module KLiveParser
-  ( KLExpectedResult(..)
-  , KLQuery(..)
-  , QExec(..)
-  , QExecId
-  , parseKLive
+module OrhleAppParser
+  ( OAExpectedResult(..)
+  , OAQuery(..)
+  , OAExec(..)
+  , OAExecId
+  , parseOrhleApp
   ) where
 
 import Control.Monad
@@ -14,19 +14,19 @@ import Text.Parsec.Language
 import qualified Text.Parsec.Token as Token
 import qualified SMTMonad as S
 
-data KLQuery = KLQuery
-               { klSpecs       :: FunSpecMaps
-               , klPreCond     :: S.Expr
-               , klForallProgs :: [Prog]
-               , klExistsProgs :: [Prog]
-               , klPostCond    :: S.Expr
-               }
+data OAQuery = OAQuery
+             { oaSpecs       :: FunSpecMaps
+             , oaPreCond     :: S.Expr
+             , oaForallProgs :: [Prog]
+             , oaExistsProgs :: [Prog]
+             , oaPostCond    :: S.Expr
+             }
 
-data QExec = QEForall String QExecId | QEExists String QExecId
-type QExecId = Maybe String
+data OAExec = OAForall String OAExecId | OAExists String OAExecId
+type OAExecId = Maybe String
 type NamedProg = (String, ParsedProg)
 
-data KLExpectedResult = KLSuccess | KLFailure
+data OAExpectedResult = OASuccess | OAFailure
   deriving (Eq, Show)
 
 languageDef :: LanguageDef()
@@ -58,18 +58,18 @@ comma      = Token.comma      lexer
 semi       = Token.semi       lexer
 whiteSpace = Token.whiteSpace lexer
 
-type KLiveParser a = Parsec String () a
+type OrhleAppParser a = Parsec String () a
 
-parseKLive :: String -> Either ParseError ([QExec], S.SMT KLQuery, KLExpectedResult)
-parseKLive str = runParser kliveParser () "" str
+parseOrhleApp :: String -> Either ParseError ([OAExec], S.SMT OAQuery, OAExpectedResult)
+parseOrhleApp str = runParser orhleAppParser () "" str
 
-kliveParser :: KLiveParser ([QExec], S.SMT KLQuery, KLExpectedResult)
-kliveParser = do
+orhleAppParser :: OrhleAppParser ([OAExec], S.SMT OAQuery, OAExpectedResult)
+orhleAppParser = do
   whiteSpace
   expectedResult <- try expectedValid <|> expectedInvalid; whiteSpace
 
-  aExecs  <- option [] $ try $ execs "forall" QEForall; whiteSpace
-  eExecs  <- option [] $ try $ execs "exists" QEExists; whiteSpace
+  aExecs  <- option [] $ try $ execs "forall" OAForall; whiteSpace
+  eExecs  <- option [] $ try $ execs "exists" OAExists; whiteSpace
 
   preCond <- option S.mkTrue $ do
     reserved "pre" >> whiteSpace >> char ':' >> whiteSpace
@@ -104,24 +104,24 @@ kliveParser = do
           Just prog -> prefixProgram prog exec
   aProgs <- mapM lookupAndPrefix aExecs
   eProgs <- mapM lookupAndPrefix eExecs
-  let query = liftM5 KLQuery specs preCond (sequence aProgs) (sequence eProgs) postCond
+  let query = liftM5 OAQuery specs preCond (sequence aProgs) (sequence eProgs) postCond
   return $ ((aExecs ++ eExecs), query, expectedResult)
 
-prefixProgram :: ParsedProg -> QExec -> KLiveParser (S.SMT Prog)
+prefixProgram :: ParsedProg -> OAExec -> OrhleAppParser (S.SMT Prog)
 prefixProgram prog exec = do
   case parseLoopSpecs prog of
         Left parseError -> error  $ show parseError
         Right z3Prog    -> return $ prefixProgVars (execPrefix exec) =<< z3Prog
 
-execPrefix :: QExec -> String
+execPrefix :: OAExec -> String
 execPrefix exec = case (getExecId exec) of
                     Nothing  -> (getExecName exec) ++ "!"
                     Just eid -> (getExecName exec) ++ "!" ++ eid ++ "!"
 
-untilSemi :: KLiveParser String
+untilSemi :: OrhleAppParser String
 untilSemi = manyTill anyChar (try $ char ';')
 
-condition :: KLiveParser (S.SMT S.Expr)
+condition :: OrhleAppParser (S.SMT S.Expr)
 condition = do
   smtStr <- untilSemi
   whiteSpace
@@ -129,23 +129,23 @@ condition = do
     Left err  -> fail $ show err
     Right ast -> return ast
 
-expectedValid :: KLiveParser KLExpectedResult
+expectedValid :: OrhleAppParser OAExpectedResult
 expectedValid = do
   reserved "expected" >> whiteSpace
   char ':' >> whiteSpace
   reserved "valid" >> whiteSpace
   semi >> whiteSpace
-  return KLSuccess
+  return OASuccess
 
-expectedInvalid :: KLiveParser KLExpectedResult
+expectedInvalid :: OrhleAppParser OAExpectedResult
 expectedInvalid = do
   reserved "expected" >> whiteSpace
   char ':' >> whiteSpace
   reserved "invalid" >> whiteSpace
   semi >> whiteSpace
-  return KLFailure
+  return OAFailure
 
-execs :: String -> (String -> QExecId -> QExec) -> KLiveParser [QExec]
+execs :: String -> (String -> OAExecId -> OAExec) -> OrhleAppParser [OAExec]
 execs keyword quant = do
   reserved keyword >> whiteSpace
   char ':' >> whiteSpace
@@ -157,14 +157,14 @@ execs keyword quant = do
   char ';' >> whiteSpace
   return execs
 
-execId :: KLiveParser String
+execId :: OrhleAppParser String
 execId = do
   whiteSpace >> char '[' >> whiteSpace
   eid <- many1 alphaNum
   whiteSpace >> char ']' >> whiteSpace
   return eid
 
-specification :: KLiveParser (S.SMT ASTFunSpecMap)
+specification :: OrhleAppParser (S.SMT ASTFunSpecMap)
 specification = do
   name   <- identifier
   params <- (liftM concat) . parens $ sepBy varArray comma
@@ -194,7 +194,7 @@ specification = do
     post <- z3Post
     return $ addFunSpec name (FunSpec params templateVars pre post) emptyFunSpec
 
-varArray :: KLiveParser [String]
+varArray :: OrhleAppParser [String]
 varArray = do
   (vars, num) <- try (do
                          var <- identifier
@@ -207,7 +207,7 @@ varArray = do
              then [vars]
              else map (\n -> vars ++ "_" ++ (show n)) [0..(num-1)]
 
-program :: KLiveParser NamedProg
+program :: OrhleAppParser NamedProg
 program = do
   reserved "prog"
   name <- identifier
@@ -221,13 +221,13 @@ program = do
     Left err ->   fail $ show err
     Right prog -> return (name, prog)
 
-getExecName :: QExec -> String
-getExecName (QEForall name _) = name
-getExecName (QEExists name _) = name
+getExecName :: OAExec -> String
+getExecName (OAForall name _) = name
+getExecName (OAExists name _) = name
 
-getExecId :: QExec -> Maybe String
-getExecId (QEForall _ eid) = eid
-getExecId (QEExists _ eid) = eid
+getExecId :: OAExec -> Maybe String
+getExecId (OAForall _ eid) = eid
+getExecId (OAExists _ eid) = eid
 
 prefixProgVars :: String -> Prog -> S.SMT Prog
 prefixProgVars pre prog =

@@ -9,7 +9,7 @@ Build, test, and run using [Stack](https://docs.haskellstack.org/en/stable/READM
 
 ```bash
 stack build
-stack exec klive-exe
+stack exec orhle-exe <path-to-imp-file>
 ```
 
 Building requires Z3 4.8.7 and its development headers. Some ways of getting this:
@@ -39,4 +39,3 @@ bin/run-all-examples.sh
 ```
 
 will run all examples, writing output to the `example-output` directory.
-

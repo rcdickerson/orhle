@@ -1,5 +1,276 @@
-bin/run-all-examples.sh: line 49: 54892 Segmentation fault      (core dumped) stack exec klive-exe ./examples/$ex.imp
+*******************************************
+****               ORHLE               ****
+****     The Oracular RHLE Verifier    ****
+*******************************************
 
-real	0m0.135s
-user	0m0.055s
-sys	0m0.056s
+:: Executions
+  denningA1 (forall)
+  denningA2 (forall)
+  denningE (exists)
+
+:: Verification Conditions
+  (=> (and (= denningA1!f3_H denningE!f3_H)
+           (= denningA1!f4_H denningE!f4_H) (= denningA1!f1_L denningA2!f1_L)
+           (= denningA1!f2_L denningA2!f2_L) (= denningA2!f1_L denningE!f1_L)
+           (= denningA2!f2_L denningE!f2_L))
+      (and (and (and (and (and (= denningA1!f1_L denningE!f1_L)
+                               (= denningA1!f2_L denningE!f2_L) (= denningA1!f1_L denningA2!f1_L)
+                               (= denningA2!f1_L denningE!f1_L)
+                               (=> (> 1 1) (= denningA2!f1_L denningA2!f2_L)))
+                          (forall ((denningA2!f1_L16 Int) (denningA2!f2_L17 Int)
+                                   (denningA2!f3_H18 Int) (denningA2!flag19 Int) (denningA2!i20 Int)
+                                   (denningA2!n21 Int) (denningA2!sum22 Int) (denningA2!x23 Int))
+                             (=> (and (<= denningA2!i20 100)
+                                      (and (= denningA1!f1_L denningE!f1_L)
+                                           (= denningA1!f2_L denningE!f2_L)
+                                           (= denningA1!f1_L denningA2!f1_L16)
+                                           (= denningA2!f1_L16 denningE!f1_L)
+                                           (=> (> denningA2!i20 1)
+                                               (= denningA2!f1_L16 denningA2!f2_L17))))
+                                 (and (and (and (and (and (=> (not (= denningA2!f1_L16 0))
+                                                              (and (and (and (and (and (and (= denningA1!f1_L
+                                                                                               denningE!f1_L)
+                                                                                            (= denningA1!f2_L
+                                                                                               denningE!f2_L)
+                                                                                            (= denningA1!f1_L
+                                                                                               denningA2!f1_L16)
+                                                                                            (= denningA2!f1_L16
+                                                                                               denningE!f1_L)
+                                                                                            (=> (> (+ denningA2!i20
+                                                                                                      1)
+                                                                                                   1)
+                                                                                                (= denningA2!f1_L16
+                                                                                                   denningA2!f1_L16)))))))))
+                                                          (=> (not (not (= denningA2!f1_L16 0)))
+                                                              (and (and (and (and (and (= denningA1!f1_L
+                                                                                          denningE!f1_L)
+                                                                                       (= denningA1!f2_L
+                                                                                          denningE!f2_L)
+                                                                                       (= denningA1!f1_L
+                                                                                          denningA2!f1_L16)
+                                                                                       (= denningA2!f1_L16
+                                                                                          denningE!f1_L)
+                                                                                       (=> (> (+ denningA2!i20
+                                                                                                 1)
+                                                                                              1)
+                                                                                           (= denningA2!f1_L16
+                                                                                              denningA2!f1_L16)))))))))))))))
+                          (forall ((denningA2!f1_L16 Int) (denningA2!f2_L17 Int)
+                                   (denningA2!f3_H18 Int) (denningA2!flag19 Int) (denningA2!i20 Int)
+                                   (denningA2!n21 Int) (denningA2!sum22 Int) (denningA2!x23 Int))
+                             (=> (and (not (<= denningA2!i20 100))
+                                      (and (= denningA1!f1_L denningE!f1_L)
+                                           (= denningA1!f2_L denningE!f2_L)
+                                           (= denningA1!f1_L denningA2!f1_L16)
+                                           (= denningA2!f1_L16 denningE!f1_L)
+                                           (=> (> denningA2!i20 1)
+                                               (= denningA2!f1_L16 denningA2!f2_L17))))
+                                 (and (and (and (and (and (and (and (= denningA2!f1_L16
+                                                                       denningA2!f2_L17)
+                                                                    (= denningA2!f1_L16
+                                                                       denningA1!f1_L)
+                                                                    (= denningA1!f1_L
+                                                                       denningA2!f1_L16)
+                                                                    (= denningA2!f1_L16 denningE!f1_L)
+                                                                    (=> (> 1 1)
+                                                                        (= denningA1!f1_L
+                                                                           denningA1!f2_L)))
+                                                               (forall ((denningA1!f1_L8 Int)
+                                                                        (denningA1!f2_L9 Int)
+                                                                        (denningA1!f3_H10 Int)
+                                                                        (denningA1!flag11 Int)
+                                                                        (denningA1!i12 Int)
+                                                                        (denningA1!n13 Int)
+                                                                        (denningA1!sum14 Int)
+                                                                        (denningA1!x15 Int))
+                                                                  (=> (and (<= denningA1!i12 100)
+                                                                           (and (= denningA2!f1_L16
+                                                                                   denningA2!f2_L17)
+                                                                                (= denningA2!f1_L16
+                                                                                   denningA1!f1_L8)
+                                                                                (= denningA1!f1_L8
+                                                                                   denningA2!f1_L16)
+                                                                                (= denningA2!f1_L16
+                                                                                   denningE!f1_L)
+                                                                                (=> (> denningA1!i12
+                                                                                       1)
+                                                                                    (= denningA1!f1_L8
+                                                                                       denningA1!f2_L9))))
+                                                                      (and (and (and (and (and (=> (not (= denningA1!f1_L8
+                                                                                                           0))
+                                                                                                   (and (and (and (and (and (and (= denningA2!f1_L16
+                                                                                                                                    denningA2!f2_L17)
+                                                                                                                                 (= denningA2!f1_L16
+                                                                                                                                    denningA1!f1_L8)
+                                                                                                                                 (= denningA1!f1_L8
+                                                                                                                                    denningA2!f1_L16)
+                                                                                                                                 (= denningA2!f1_L16
+                                                                                                                                    denningE!f1_L)
+                                                                                                                                 (=> (> (+ denningA1!i12
+                                                                                                                                           1)
+                                                                                                                                        1)
+                                                                                                                                     (= denningA1!f1_L8
+                                                                                                                                        denningA1!f1_L8)))))))))
+                                                                                               (=> (not (not (= denningA1!f1_L8
+                                                                                                                0)))
+                                                                                                   (and (and (and (and (and (= denningA2!f1_L16
+                                                                                                                               denningA2!f2_L17)
+                                                                                                                            (= denningA2!f1_L16
+                                                                                                                               denningA1!f1_L8)
+                                                                                                                            (= denningA1!f1_L8
+                                                                                                                               denningA2!f1_L16)
+                                                                                                                            (= denningA2!f1_L16
+                                                                                                                               denningE!f1_L)
+                                                                                                                            (=> (> (+ denningA1!i12
+                                                                                                                                      1)
+                                                                                                                                   1)
+                                                                                                                                (= denningA1!f1_L8
+                                                                                                                                   denningA1!f1_L8)))))))))))))))
+                                                               (forall ((denningA1!f1_L8 Int)
+                                                                        (denningA1!f2_L9 Int)
+                                                                        (denningA1!f3_H10 Int)
+                                                                        (denningA1!flag11 Int)
+                                                                        (denningA1!i12 Int)
+                                                                        (denningA1!n13 Int)
+                                                                        (denningA1!sum14 Int)
+                                                                        (denningA1!x15 Int))
+                                                                  (=> (and (not (<= denningA1!i12
+                                                                                    100))
+                                                                           (and (= denningA2!f1_L16
+                                                                                   denningA2!f2_L17)
+                                                                                (= denningA2!f1_L16
+                                                                                   denningA1!f1_L8)
+                                                                                (= denningA1!f1_L8
+                                                                                   denningA2!f1_L16)
+                                                                                (= denningA2!f1_L16
+                                                                                   denningE!f1_L)
+                                                                                (=> (> denningA1!i12
+                                                                                       1)
+                                                                                    (= denningA1!f1_L8
+                                                                                       denningA1!f2_L9))))
+                                                                      (and (and (and (and (and (and (and (and (= denningA2!f1_L16
+                                                                                                                 denningA2!f2_L17)
+                                                                                                              (= denningA1!f1_L8
+                                                                                                                 denningA1!f2_L9)
+                                                                                                              (= denningA1!f1_L8
+                                                                                                                 denningA2!f1_L16)
+                                                                                                              (= denningA2!f1_L16
+                                                                                                                 denningE!f1_L)
+                                                                                                              (=> (> 1
+                                                                                                                     1)
+                                                                                                                  (and (= denningA2!f1_L16
+                                                                                                                          denningE!f1_L)
+                                                                                                                       (= denningA2!f2_L17
+                                                                                                                          denningE!f2_L)
+                                                                                                                       (= denningE!f1_L
+                                                                                                                          denningE!f2_L))))
+                                                                                                         (forall ((denningE!f1_L0 Int)
+                                                                                                                  (denningE!f2_L1 Int)
+                                                                                                                  (denningE!f3_H2 Int)
+                                                                                                                  (denningE!flag3 Int)
+                                                                                                                  (denningE!i4 Int)
+                                                                                                                  (denningE!n5 Int)
+                                                                                                                  (denningE!sum6 Int)
+                                                                                                                  (denningE!x7 Int))
+                                                                                                            (=> (and (<= denningE!i4
+                                                                                                                         100)
+                                                                                                                     (and (= denningA2!f1_L16
+                                                                                                                             denningA2!f2_L17)
+                                                                                                                          (= denningA1!f1_L8
+                                                                                                                             denningA1!f2_L9)
+                                                                                                                          (= denningA1!f1_L8
+                                                                                                                             denningA2!f1_L16)
+                                                                                                                          (= denningA2!f1_L16
+                                                                                                                             denningE!f1_L0)
+                                                                                                                          (=> (> denningE!i4
+                                                                                                                                 1)
+                                                                                                                              (and (= denningA2!f1_L16
+                                                                                                                                      denningE!f1_L0)
+                                                                                                                                   (= denningA2!f2_L17
+                                                                                                                                      denningE!f2_L1)
+                                                                                                                                   (= denningE!f1_L0
+                                                                                                                                      denningE!f2_L1)))))
+                                                                                                                (and (and (and (and (and (=> (not (= denningE!f1_L0
+                                                                                                                                                     0))
+                                                                                                                                             (and (and (and (and (and (and (and (= denningA2!f1_L16
+                                                                                                                                                                                   denningA2!f2_L17)
+                                                                                                                                                                                (= denningA1!f1_L8
+                                                                                                                                                                                   denningA1!f2_L9)
+                                                                                                                                                                                (= denningA1!f1_L8
+                                                                                                                                                                                   denningA2!f1_L16)
+                                                                                                                                                                                (= denningA2!f1_L16
+                                                                                                                                                                                   denningE!f1_L0)
+                                                                                                                                                                                (=> (> (+ denningE!i4
+                                                                                                                                                                                          1)
+                                                                                                                                                                                       1)
+                                                                                                                                                                                    (and (= denningA2!f1_L16
+                                                                                                                                                                                            denningE!f1_L0)
+                                                                                                                                                                                         (= denningA2!f2_L17
+                                                                                                                                                                                            denningE!f1_L0)
+                                                                                                                                                                                         (= denningE!f1_L0
+                                                                                                                                                                                            denningE!f1_L0))))
+                                                                                                                                                                           (< (- 100
+                                                                                                                                                                                 (+ denningE!i4
+                                                                                                                                                                                    1))
+                                                                                                                                                                              (- 100
+                                                                                                                                                                                 denningE!i4)))))))))
+                                                                                                                                         (=> (not (not (= denningE!f1_L0
+                                                                                                                                                          0)))
+                                                                                                                                             (and (and (and (and (and (and (= denningA2!f1_L16
+                                                                                                                                                                              denningA2!f2_L17)
+                                                                                                                                                                           (= denningA1!f1_L8
+                                                                                                                                                                              denningA1!f2_L9)
+                                                                                                                                                                           (= denningA1!f1_L8
+                                                                                                                                                                              denningA2!f1_L16)
+                                                                                                                                                                           (= denningA2!f1_L16
+                                                                                                                                                                              denningE!f1_L0)
+                                                                                                                                                                           (=> (> (+ denningE!i4
+                                                                                                                                                                                     1)
+                                                                                                                                                                                  1)
+                                                                                                                                                                               (and (= denningA2!f1_L16
+                                                                                                                                                                                       denningE!f1_L0)
+                                                                                                                                                                                    (= denningA2!f2_L17
+                                                                                                                                                                                       denningE!f1_L0)
+                                                                                                                                                                                    (= denningE!f1_L0
+                                                                                                                                                                                       denningE!f1_L0))))
+                                                                                                                                                                      (< (- 100
+                                                                                                                                                                            (+ denningE!i4
+                                                                                                                                                                               1))
+                                                                                                                                                                         (- 100
+                                                                                                                                                                            denningE!i4)))))))))))))))
+                                                                                                         (forall ((denningE!f1_L0 Int)
+                                                                                                                  (denningE!f2_L1 Int)
+                                                                                                                  (denningE!f3_H2 Int)
+                                                                                                                  (denningE!flag3 Int)
+                                                                                                                  (denningE!i4 Int)
+                                                                                                                  (denningE!n5 Int)
+                                                                                                                  (denningE!sum6 Int)
+                                                                                                                  (denningE!x7 Int))
+                                                                                                            (=> (and (not (<= denningE!i4
+                                                                                                                              100))
+                                                                                                                     (and (= denningA2!f1_L16
+                                                                                                                             denningA2!f2_L17)
+                                                                                                                          (= denningA1!f1_L8
+                                                                                                                             denningA1!f2_L9)
+                                                                                                                          (= denningA1!f1_L8
+                                                                                                                             denningA2!f1_L16)
+                                                                                                                          (= denningA2!f1_L16
+                                                                                                                             denningE!f1_L0)
+                                                                                                                          (=> (> denningE!i4
+                                                                                                                                 1)
+                                                                                                                              (and (= denningA2!f1_L16
+                                                                                                                                      denningE!f1_L0)
+                                                                                                                                   (= denningA2!f2_L17
+                                                                                                                                      denningE!f2_L1)
+                                                                                                                                   (= denningE!f1_L0
+                                                                                                                                      denningE!f2_L1)))))
+                                                                                                                (and (and (and (and (= denningA2!f1_L16
+                                                                                                                                       denningE!f1_L0)
+                                                                                                                                    (= denningA2!f2_L17
+                                                                                                                                       denningE!f2_L1)))))))))))))))))))))))))))))
+
+Valid.
+
+real	0m0.165s
+user	0m0.185s
+sys	0m0.029s
