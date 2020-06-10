@@ -1,6 +1,6 @@
 # ORHLE
 
-ORHLE is an automatic existential relational Hoare logic (RHLE) verifier.
+ORHLE is an automatic existential relational Hoare logic (RHLE) verifier. The most recent draft of the RHLE paper is [available on arXiv](https://arxiv.org/abs/2002.02904).
 
 
 ### Building
