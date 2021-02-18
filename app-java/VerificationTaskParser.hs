@@ -152,9 +152,9 @@ funSpec = do
   funName <- identifier
   params  <- parens (identifier `sepBy` comma)
   whiteSpace
-  (templateVars, pre, post) <- braces $ do
-    templateVars <- option [] $ do
-      reservedLabel "templateVars"
+  (choiceVars, pre, post) <- braces $ do
+    choiceVars <- option [] $ do
+      reservedLabel "choiceVars"
       vars <- identifier `sepBy` comma
       _    <- char ';'
       return vars
@@ -163,8 +163,8 @@ funSpec = do
     whiteSpace
     post <- option "true" $ reservedLabel "post" *> untilSemi
     whiteSpace
-    return (templateVars, pre, post)
-  return (funName, FunSpec params templateVars pre post)
+    return (choiceVars, pre, post)
+  return (funName, FunSpec params choiceVars pre post)
 
 
 reservedLabel :: String -> VTParser ()

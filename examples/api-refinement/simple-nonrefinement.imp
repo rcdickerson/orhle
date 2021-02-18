@@ -15,7 +15,7 @@ aspecs:
 
 especs:
   originalRand() {
-      templateVars: n;
+      choiceVars: n;
       pre:  (and (>= n 0) (< n 20));
       post: (= ret! n);
   }

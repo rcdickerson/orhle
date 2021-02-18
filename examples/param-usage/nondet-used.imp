@@ -18,7 +18,7 @@ post: (and
 
 especs:
   flip() {
-    templateVars: n;
+    choiceVars: n;
     pre: (or (= n 0) (= n 1));
     post: (= ret! n);
   }

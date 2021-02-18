@@ -41,7 +41,7 @@ aspecs:
 
 especs:
   originalGetValues() {
-    templateVars: n0, n1, n2;
+    choiceVars: n0, n1, n2;
     pre: (and (<= n0 n1) (<= n1 n2));
     post: (and (= ret!0 n0) (= ret!1 n1) (= ret!2 n2));
   }

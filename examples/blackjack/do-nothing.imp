@@ -13,7 +13,7 @@ post: (= play!handValue 21);
 
 especs:
   draw() {
-    templateVars: c;
+    choiceVars: c;
     pre: (and (>= c 1) (<= c 10));
     post: (= ret! c);
   }

@@ -36,7 +36,7 @@ aspecs:
 
 especs:
   sort(list[3]) {
-    templateVars: n0, n1, n2;
+    choiceVars: n0, n1, n2;
     pre: (and (<= n0 n1)
               (<= n1 n2)
               (or (and (= n0 list_0)

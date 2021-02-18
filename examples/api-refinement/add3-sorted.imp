@@ -38,7 +38,7 @@ aspecs:
 
 especs:
   shuffle(list) {
-    templateVars: n0, n1, n2;
+    choiceVars: n0, n1, n2;
     pre: (or (and (= n0 list_0)
                   (= n1 list_1)
                   (= n2 list_2))

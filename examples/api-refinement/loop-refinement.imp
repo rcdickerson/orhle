@@ -14,7 +14,7 @@ aspecs:
 
 especs:
   rand() {
-    templateVars: n;
+    choiceVars: n;
     pre:  (and (<= 0 n) (< n 10));
     post: (= ret! n);
   }

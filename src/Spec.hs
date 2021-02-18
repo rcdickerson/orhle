@@ -21,7 +21,7 @@ import SMTParser
 import qualified SMTMonad as S
 
 data FunSpec a = FunSpec { params        :: [Var]
-                         , templateVars  :: [Var]
+                         , choiceVars    :: [Var]
                          , preCondition  :: a
                          , postCondition :: a
                          }

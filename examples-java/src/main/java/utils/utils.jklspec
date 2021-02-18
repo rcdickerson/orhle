@@ -15,19 +15,19 @@ aspecs {
 
 especs {
   flipCoin() {
-    templateVars: n;
+    choiceVars: n;
     pre: (or (= n 0) (= n 1));
     post: (= ret! n);
   }
 
   randInt(max) {
-    templateVars: n;
+    choiceVars: n;
     pre:  (and (<= 0 n) (< n max));
     post: (= ret! n);
   }
 
   randOddInt(max) {
-    templateVars: n;
+    choiceVars: n;
     pre:  (and (<= 0 n) (< n max) (= (mod n 2) 1));
     post: (= ret! n);
   }

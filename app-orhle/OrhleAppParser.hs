@@ -41,7 +41,7 @@ languageDef = Token.LanguageDef
   , Token.opStart         = Token.opLetter languageDef
   , Token.opLetter        = oneOf ""
   , Token.reservedNames   = [ "aspecs", "especs"
-                            , "pre", "post", "templateVars"
+                            , "pre", "post", "choiceVars"
                             , "prog", "endp"
                             , "expected", "invalid", "valid" ]
   , Token.reservedOpNames = [ ]
@@ -169,8 +169,8 @@ specification = do
   name   <- identifier
   params <- (liftM concat) . parens $ sepBy varArray comma
   whiteSpace >> char '{' >> whiteSpace
-  templateVars <- option [] $ do
-    reserved "templateVars" >> whiteSpace >> char ':' >> whiteSpace
+  choiceVars <- option [] $ do
+    reserved "choiceVars" >> whiteSpace >> char ':' >> whiteSpace
     vars <- sepBy identifier comma
     whiteSpace >> char ';' >> whiteSpace
     return vars
@@ -192,7 +192,7 @@ specification = do
   return $ do
     pre <- z3Pre
     post <- z3Post
-    return $ addFunSpec name (FunSpec params templateVars pre post) emptyFunSpec
+    return $ addFunSpec name (FunSpec params choiceVars pre post) emptyFunSpec
 
 varArray :: OrhleAppParser [String]
 varArray = do

@@ -20,7 +20,7 @@ aspecs:
 
 especs:
   randInt() {
-    templateVars: n;
+    choiceVars: n;
     pre: (and (>= n 0) (< n 100));
     post: (= ret! n);
   }
