@@ -15,12 +15,12 @@ module VerifierTrace
   , ppVTrace
   ) where
 
-import Control.Monad.Writer
-import Data.List
-import Imp
-import ImpPrettyPrint
-import Triples
-import qualified SMTMonad as S
+import           Control.Monad.Writer
+import qualified Data.List            as List
+import           Imp
+import           ImpPrettyPrint
+import           Triples
+import qualified SMTMonad as SMT
 
 data VerifierTrace = VTRhle RHLETrip
                    | VTHle  HLETrip
@@ -79,12 +79,12 @@ ppVTrace' indent (t:ts) =
     VTRhle (RHLETrip pre aProgs eProgs post) ->
       let progStr = ppStmtsStart aProgs
           rest    = ppVTrace' indent ts
-          preStr  = S.exprToString pre
+          preStr  = SMT.exprToString pre
       in start ++ "A " ++ preStr ++ " :: " ++ progStr ++ "\n" ++ rest
     VTHle  (HLETrip  pre progE post) ->
       let progStr = ppStmtStart progE
           rest    = ppVTrace' indent ts
-          preStr  = S.exprToString pre
+          preStr  = SMT.exprToString pre
       in start ++ "E " ++ preStr ++ " :: " ++ progStr ++ "\n" ++ rest
     VTAbduction sat interpLines pre post ->
       let rest    = ppVTrace' indent ts
@@ -135,8 +135,8 @@ ppStmtStart stmt =
           bodyStr = ppStmtStart body
       in "while " ++ condStr ++ " do " ++ bodyStr ++ " end"
     SCall assignees cparams fname ->
-      let astr = "(" ++ (intercalate ", " assignees) ++ ")"
-      in astr ++ " := " ++ fname ++ "(" ++ (intercalate ", " cparams) ++ ")"
+      let astr = "(" ++ (List.intercalate ", " assignees) ++ ")"
+      in astr ++ " := " ++ fname ++ "(" ++ (List.intercalate ", " cparams) ++ ")"
 
 kindStr :: VTKind -> String
 kindStr VTKindA = "A"

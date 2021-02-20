@@ -1,0 +1,25 @@
+expected: invalid;
+
+forall: A;
+exists: E;
+
+pre: true;
+post: (= A!y E!y);
+
+prog A():
+  x := 3;
+  if x == 3 then
+    y := 3;
+  else
+    y := 300;
+  end
+endp
+
+prog E():
+  x := 3;
+  if x == 3 then
+    y := 300;
+  else
+    y := 3;
+  end
+endp

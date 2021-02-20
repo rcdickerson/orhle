@@ -64,5 +64,7 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - directory
+    - filepath
     - orhle
     - HUnit

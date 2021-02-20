@@ -1,16 +1,13 @@
 module Main where
 
-import RHLEVerifier
+import System.Exit
 import Test.HUnit
-import Z3.Monad
-
-import AbductionTests
-import Verifier1Tests
-import Verifier2Tests
+import VerifierTests
 
 main :: IO Counts
-main = runTestTT $ TestList
-  [ abductionTests
-  --, verifier1Tests
-  --, verifier2Tests
-  ]
+main = do
+  verifierTests <- buildVerifierTests
+  results       <- runTestTT verifierTests
+  if (errors results + failures results == 0)
+    then exitWith ExitSuccess
+    else exitWith (ExitFailure 1)

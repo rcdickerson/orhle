@@ -5,6 +5,10 @@ module Orhle
     , BExp(..)
     , HLTrip(..)
     , HLETrip(..)
+    , OAExpectedResult(..)
+    , OAQuery(..)
+    , OAExec(..)
+    , OAExecId
     , ParsedProg
     , ParsedStmt
     , Prog
@@ -25,6 +29,7 @@ module Orhle
     , mkRHLETrip
     , parseImp
     , parseLoopSpecs
+    , parseOrhleApp
     , parseSMT
     , prefixAExpVars
     , prefixASTVars
@@ -39,6 +44,7 @@ module Orhle
 
 import Imp
 import ImpParser
+import OrhleAppParser
 import SMTParser
 import Spec
 import Triples

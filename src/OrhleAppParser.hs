@@ -6,20 +6,24 @@ module OrhleAppParser
   , parseOrhleApp
   ) where
 
-import Control.Monad
-import qualified Data.Map as Map
-import Orhle
-import Text.Parsec
-import Text.Parsec.Language
-import qualified Text.Parsec.Token as Token
-import qualified SMTMonad as S
+import           Control.Monad
+import qualified Data.Map             as Map
+import           Imp
+import           ImpParser
+import           Text.Parsec
+import           Text.Parsec.Language
+import qualified Text.Parsec.Token    as Token
+import           SMTMonad              ( SMT )
+import qualified SMTMonad             as SMT
+import           SMTParser
+import           Spec
 
 data OAQuery = OAQuery
              { oaSpecs       :: FunSpecMaps
-             , oaPreCond     :: S.Expr
+             , oaPreCond     :: SMT.Expr
              , oaForallProgs :: [Prog]
              , oaExistsProgs :: [Prog]
-             , oaPostCond    :: S.Expr
+             , oaPostCond    :: SMT.Expr
              }
 
 data OAExec = OAForall String OAExecId | OAExists String OAExecId
@@ -60,10 +64,10 @@ whiteSpace = Token.whiteSpace lexer
 
 type OrhleAppParser a = Parsec String () a
 
-parseOrhleApp :: String -> Either ParseError ([OAExec], S.SMT OAQuery, OAExpectedResult)
+parseOrhleApp :: String -> Either ParseError ([OAExec], SMT OAQuery, OAExpectedResult)
 parseOrhleApp str = runParser orhleAppParser () "" str
 
-orhleAppParser :: OrhleAppParser ([OAExec], S.SMT OAQuery, OAExpectedResult)
+orhleAppParser :: OrhleAppParser ([OAExec], SMT OAQuery, OAExpectedResult)
 orhleAppParser = do
   whiteSpace
   expectedResult <- try expectedValid <|> expectedInvalid; whiteSpace
@@ -71,11 +75,11 @@ orhleAppParser = do
   aExecs  <- option [] $ try $ execs "forall" OAForall; whiteSpace
   eExecs  <- option [] $ try $ execs "exists" OAExists; whiteSpace
 
-  preCond <- option S.mkTrue $ do
+  preCond <- option SMT.mkTrue $ do
     reserved "pre" >> whiteSpace >> char ':' >> whiteSpace
     condition
   whiteSpace
-  postCond <- option S.mkTrue $ do
+  postCond <- option SMT.mkTrue $ do
     reserved "post" >> whiteSpace >> char ':' >> whiteSpace
     condition
   whiteSpace
@@ -107,7 +111,7 @@ orhleAppParser = do
   let query = liftM5 OAQuery specs preCond (sequence aProgs) (sequence eProgs) postCond
   return $ ((aExecs ++ eExecs), query, expectedResult)
 
-prefixProgram :: ParsedProg -> OAExec -> OrhleAppParser (S.SMT Prog)
+prefixProgram :: ParsedProg -> OAExec -> OrhleAppParser (SMT Prog)
 prefixProgram prog exec = do
   case parseLoopSpecs prog of
         Left parseError -> error  $ show parseError
@@ -121,7 +125,7 @@ execPrefix exec = case (getExecId exec) of
 untilSemi :: OrhleAppParser String
 untilSemi = manyTill anyChar (try $ char ';')
 
-condition :: OrhleAppParser (S.SMT S.Expr)
+condition :: OrhleAppParser (SMT SMT.Expr)
 condition = do
   smtStr <- untilSemi
   whiteSpace
@@ -164,7 +168,7 @@ execId = do
   whiteSpace >> char ']' >> whiteSpace
   return eid
 
-specification :: OrhleAppParser (S.SMT ASTFunSpecMap)
+specification :: OrhleAppParser (SMT ASTFunSpecMap)
 specification = do
   name   <- identifier
   params <- (liftM concat) . parens $ sepBy varArray comma
@@ -229,7 +233,7 @@ getExecId :: OAExec -> Maybe String
 getExecId (OAForall _ eid) = eid
 getExecId (OAExists _ eid) = eid
 
-prefixProgVars :: String -> Prog -> S.SMT Prog
+prefixProgVars :: String -> Prog -> SMT Prog
 prefixProgVars pre prog =
   case prog of
     SSkip          -> return $ SSkip
@@ -242,8 +246,8 @@ prefixProgVars pre prog =
       ps2 <- prefixProgVars pre s2
       return $ SIf (prefixB cond) ps1 ps2
     SWhile cond body (inv, var, local) -> do
-      pinv  <- prefixASTVars pre inv
-      pvar  <- prefixASTVars pre var
+      pinv  <- SMT.prefixASTVars pre inv
+      pvar  <- SMT.prefixASTVars pre var
       pbody <- prefixProgVars pre body
       return $ if local then SWhile (prefixB cond) pbody (pinv, pvar, local)
                         else SWhile (prefixB cond) pbody (inv,  pvar, local)
