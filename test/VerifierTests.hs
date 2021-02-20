@@ -6,9 +6,6 @@ import System.Directory (getDirectoryContents)
 import System.FilePath
 import Test.HUnit
 
-testDir :: FilePath
-testDir = "test" </> "imp"
-
 assertVerifierResultMatches :: OAExpectedResult -> VerifierResult -> Assertion
 assertVerifierResultMatches expected (result, trace) =
   case (expected, result) of
@@ -34,7 +31,7 @@ readImpFiles :: FilePath -> IO [(String, String)]
 readImpFiles dirName = do
   fileNames <- getDirectoryContents dirName
   let impFiles = filter (\f -> "imp" `isSuffixOf` f) fileNames
-  contents <- mapM (\f -> readFile $ testDir </> f) impFiles
+  contents <- mapM (\f -> readFile $ dirName </> f) impFiles
   return $ zip impFiles contents
 
 buildTestCases :: FilePath -> IO Test
@@ -44,4 +41,4 @@ buildTestCases dirName = do
   return . TestList $ map buildTestCase impFiles
 
 buildVerifierTests :: IO Test
-buildVerifierTests = buildTestCases testDir
+buildVerifierTests = buildTestCases $ "test" </> "imp"
