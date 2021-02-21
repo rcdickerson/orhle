@@ -1,8 +1,8 @@
-module OrhleAppParser
-  ( OAExpectedResult(..)
-  , OAQuery(..)
-  , OAExec(..)
-  , OAExecId
+module OrhleParser
+  ( OPExpectedResult(..)
+  , OPQuery(..)
+  , OPExec(..)
+  , OPExecId
   , parseOrhleApp
   ) where
 
@@ -18,7 +18,7 @@ import qualified SMTMonad             as SMT
 import           SMTParser
 import           Spec
 
-data OAQuery = OAQuery
+data OPQuery = OPQuery
              { oaSpecs       :: FunSpecMaps
              , oaPreCond     :: SMT.Expr
              , oaForallProgs :: [Prog]
@@ -26,11 +26,11 @@ data OAQuery = OAQuery
              , oaPostCond    :: SMT.Expr
              }
 
-data OAExec = OAForall String OAExecId | OAExists String OAExecId
-type OAExecId = Maybe String
+data OPExec = OPForall String OPExecId | OPExists String OPExecId
+type OPExecId = Maybe String
 type NamedProg = (String, ParsedProg)
 
-data OAExpectedResult = OASuccess | OAFailure
+data OPExpectedResult = OPSuccess | OPFailure
   deriving (Eq, Show)
 
 languageDef :: LanguageDef()
@@ -64,16 +64,16 @@ whiteSpace = Token.whiteSpace lexer
 
 type OrhleAppParser a = Parsec String () a
 
-parseOrhleApp :: String -> Either ParseError ([OAExec], SMT OAQuery, OAExpectedResult)
+parseOrhleApp :: String -> Either ParseError ([OPExec], SMT OPQuery, OPExpectedResult)
 parseOrhleApp str = runParser orhleAppParser () "" str
 
-orhleAppParser :: OrhleAppParser ([OAExec], SMT OAQuery, OAExpectedResult)
+orhleAppParser :: OrhleAppParser ([OPExec], SMT OPQuery, OPExpectedResult)
 orhleAppParser = do
   whiteSpace
   expectedResult <- try expectedValid <|> expectedInvalid; whiteSpace
 
-  aExecs  <- option [] $ try $ execs "forall" OAForall; whiteSpace
-  eExecs  <- option [] $ try $ execs "exists" OAExists; whiteSpace
+  aExecs  <- option [] $ try $ execs "forall" OPForall; whiteSpace
+  eExecs  <- option [] $ try $ execs "exists" OPExists; whiteSpace
 
   preCond <- option SMT.mkTrue $ do
     reserved "pre" >> whiteSpace >> char ':' >> whiteSpace
@@ -108,16 +108,16 @@ orhleAppParser = do
           Just prog -> prefixProgram prog exec
   aProgs <- mapM lookupAndPrefix aExecs
   eProgs <- mapM lookupAndPrefix eExecs
-  let query = liftM5 OAQuery specs preCond (sequence aProgs) (sequence eProgs) postCond
+  let query = liftM5 OPQuery specs preCond (sequence aProgs) (sequence eProgs) postCond
   return $ ((aExecs ++ eExecs), query, expectedResult)
 
-prefixProgram :: ParsedProg -> OAExec -> OrhleAppParser (SMT Prog)
+prefixProgram :: ParsedProg -> OPExec -> OrhleAppParser (SMT Prog)
 prefixProgram prog exec = do
   case parseLoopSpecs prog of
         Left parseError -> error  $ show parseError
         Right z3Prog    -> return $ prefixProgVars (execPrefix exec) =<< z3Prog
 
-execPrefix :: OAExec -> String
+execPrefix :: OPExec -> String
 execPrefix exec = case (getExecId exec) of
                     Nothing  -> (getExecName exec) ++ "!"
                     Just eid -> (getExecName exec) ++ "!" ++ eid ++ "!"
@@ -133,23 +133,23 @@ condition = do
     Left err  -> fail $ show err
     Right ast -> return ast
 
-expectedValid :: OrhleAppParser OAExpectedResult
+expectedValid :: OrhleAppParser OPExpectedResult
 expectedValid = do
   reserved "expected" >> whiteSpace
   char ':' >> whiteSpace
   reserved "valid" >> whiteSpace
   semi >> whiteSpace
-  return OASuccess
+  return OPSuccess
 
-expectedInvalid :: OrhleAppParser OAExpectedResult
+expectedInvalid :: OrhleAppParser OPExpectedResult
 expectedInvalid = do
   reserved "expected" >> whiteSpace
   char ':' >> whiteSpace
   reserved "invalid" >> whiteSpace
   semi >> whiteSpace
-  return OAFailure
+  return OPFailure
 
-execs :: String -> (String -> OAExecId -> OAExec) -> OrhleAppParser [OAExec]
+execs :: String -> (String -> OPExecId -> OPExec) -> OrhleAppParser [OPExec]
 execs keyword quant = do
   reserved keyword >> whiteSpace
   char ':' >> whiteSpace
@@ -225,13 +225,13 @@ program = do
     Left err ->   fail $ show err
     Right prog -> return (name, prog)
 
-getExecName :: OAExec -> String
-getExecName (OAForall name _) = name
-getExecName (OAExists name _) = name
+getExecName :: OPExec -> String
+getExecName (OPForall name _) = name
+getExecName (OPExists name _) = name
 
-getExecId :: OAExec -> Maybe String
-getExecId (OAForall _ eid) = eid
-getExecId (OAExists _ eid) = eid
+getExecId :: OPExec -> Maybe String
+getExecId (OPForall _ eid) = eid
+getExecId (OPExists _ eid) = eid
 
 prefixProgVars :: String -> Prog -> SMT Prog
 prefixProgVars pre prog =

@@ -1,7 +1,6 @@
 module Main where
 
 import Orhle
-import OrhleAppParser
 import System.Environment
 import System.Exit
 import qualified SMTMonad as S
@@ -39,22 +38,22 @@ runKLive orhle = do
       putStrLn ""
       (output, success) <- runKLQuery query
       let didAsExpected = if success
-                            then expected == OASuccess
-                            else expected == OAFailure
+                            then expected == OPSuccess
+                            else expected == OPFailure
       return (output, didAsExpected)
 
-printQExec :: OAExec -> IO ()
-printQExec (OAForall name eid) = putStrLn $ "  " ++ name ++ (eidStr eid) ++ " (forall)"
-printQExec (OAExists name eid) = putStrLn $ "  " ++ name ++ (eidStr eid) ++ " (exists)"
+printQExec :: OPExec -> IO ()
+printQExec (OPForall name eid) = putStrLn $ "  " ++ name ++ (eidStr eid) ++ " (forall)"
+printQExec (OPExists name eid) = putStrLn $ "  " ++ name ++ (eidStr eid) ++ " (exists)"
 
-eidStr :: OAExecId -> String
+eidStr :: OPExecId -> String
 eidStr Nothing = ""
 eidStr (Just eid) = "[" ++ eid ++ "]"
 
-runKLQuery :: S.SMT OAQuery -> IO (String, Bool)
+runKLQuery :: S.SMT OPQuery -> IO (String, Bool)
 runKLQuery query = do
   let specs_trip = do
-        OAQuery specs pre forall exists post <- query
+        OPQuery specs pre forall exists post <- query
         return $ (specs, RHLETrip pre forall exists post)
   (result, trace) <- rhleVerifier specs_trip
   let traceStr = ppVTrace trace
