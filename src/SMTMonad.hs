@@ -21,11 +21,9 @@ import           SimpleSMT                      ( Result(..)
                                                 , assert
                                                 , check
                                                 , command
-                                                , declare
                                                 , newLogger
                                                 , newSolver
                                                 , showsSExpr
-                                                , stop
                                                 )
 import           SMTLib2
 import           SMTLib2.Core

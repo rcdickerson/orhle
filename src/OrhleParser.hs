@@ -19,11 +19,11 @@ import           SMTParser
 import           Spec
 
 data OPQuery = OPQuery
-             { oaSpecs       :: FunSpecMaps
-             , oaPreCond     :: SMT.Expr
-             , oaForallProgs :: [Prog]
-             , oaExistsProgs :: [Prog]
-             , oaPostCond    :: SMT.Expr
+             { opSpecs       :: FunSpecMaps
+             , opPreCond     :: SMT.Expr
+             , opForallProgs :: [Prog]
+             , opExistsProgs :: [Prog]
+             , opPostCond    :: SMT.Expr
              }
 
 data OPExec = OPForall String OPExecId | OPExists String OPExecId
