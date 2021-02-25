@@ -20,7 +20,6 @@ import qualified Data.List            as List
 import           Imp
 import           ImpPrettyPrint
 import           Triples
-import qualified SMTMonad as SMT
 
 data VerifierTrace = VTRhle RHLETrip
                    | VTHle  HLETrip
@@ -79,13 +78,11 @@ ppVTrace' indent (t:ts) =
     VTRhle (RHLETrip pre aProgs eProgs post) ->
       let progStr = ppStmtsStart aProgs
           rest    = ppVTrace' indent ts
-          preStr  = SMT.exprToString pre
-      in start ++ "A " ++ preStr ++ " :: " ++ progStr ++ "\n" ++ rest
+      in start ++ "A " ++ (show pre) ++ " :: " ++ progStr ++ "\n" ++ rest
     VTHle  (HLETrip  pre progE post) ->
       let progStr = ppStmtStart progE
           rest    = ppVTrace' indent ts
-          preStr  = SMT.exprToString pre
-      in start ++ "E " ++ preStr ++ " :: " ++ progStr ++ "\n" ++ rest
+      in start ++ "E " ++ (show pre) ++ " :: " ++ progStr ++ "\n" ++ rest
     VTAbduction sat interpLines pre post ->
       let rest    = ppVTrace' indent ts
       in start ++ (if sat then "O " else "X ")

@@ -1,36 +1,43 @@
 module OrhleParser
-  ( OPExpectedResult(..)
-  , OPQuery(..)
-  , OPExec(..)
-  , OPExecId
+  ( ExpectedResult(..)
+  , Query(..)
+  , Exec(..)
+  , ExecId
   , parseOrhleApp
   ) where
 
+import           Assertion             ( Assertion )
+import qualified Assertion            as A
+import           AssertionParser       ( parseAssertion )
 import           Control.Monad
 import qualified Data.Map             as Map
 import           Imp
 import           ImpParser
+import qualified MapNames             as Names
 import           Text.Parsec
 import           Text.Parsec.Language
 import qualified Text.Parsec.Token    as Token
 import           SMTMonad              ( SMT )
 import qualified SMTMonad             as SMT
-import           SMTParser
-import           Spec
+import           Spec                  ( Spec(..)
+                                       , SpecMap
+                                       , SpecMaps(..)
+                                       )
+import qualified Spec                 as S
 
-data OPQuery = OPQuery
-             { opSpecs       :: FunSpecMaps
-             , opPreCond     :: SMT.Expr
-             , opForallProgs :: [Prog]
-             , opExistsProgs :: [Prog]
-             , opPostCond    :: SMT.Expr
+data Query = Query
+             { qSpecs       :: SpecMaps
+             , qPreCond     :: Assertion
+             , qForallProgs :: [Stmt]
+             , qExistsProgs :: [Stmt]
+             , qPostCond    :: Assertion
              }
 
-data OPExec = OPForall String OPExecId | OPExists String OPExecId
-type OPExecId = Maybe String
-type NamedProg = (String, ParsedProg)
+data Exec = Forall String ExecId | Exists String ExecId
+type ExecId = Maybe String
+type NamedProg = (String, Stmt)
 
-data OPExpectedResult = OPSuccess | OPFailure
+data ExpectedResult = Success | Failure
   deriving (Eq, Show)
 
 languageDef :: LanguageDef()
@@ -64,60 +71,47 @@ whiteSpace = Token.whiteSpace lexer
 
 type OrhleAppParser a = Parsec String () a
 
-parseOrhleApp :: String -> Either ParseError ([OPExec], SMT OPQuery, OPExpectedResult)
+parseOrhleApp :: String -> Either ParseError ([Exec], Query, ExpectedResult)
 parseOrhleApp str = runParser orhleAppParser () "" str
 
-orhleAppParser :: OrhleAppParser ([OPExec], SMT OPQuery, OPExpectedResult)
+orhleAppParser :: OrhleAppParser ([Exec], Query, ExpectedResult)
 orhleAppParser = do
   whiteSpace
   expectedResult <- try expectedValid <|> expectedInvalid; whiteSpace
 
-  aExecs  <- option [] $ try $ execs "forall" OPForall; whiteSpace
-  eExecs  <- option [] $ try $ execs "exists" OPExists; whiteSpace
+  aExecs  <- option [] $ try $ execs "forall" Forall; whiteSpace
+  eExecs  <- option [] $ try $ execs "exists" Exists; whiteSpace
 
-  preCond <- option SMT.mkTrue $ do
-    reserved "pre" >> whiteSpace >> char ':' >> whiteSpace
-    condition
-  whiteSpace
-  postCond <- option SMT.mkTrue $ do
-    reserved "post" >> whiteSpace >> char ':' >> whiteSpace
-    condition
-  whiteSpace
+  pre  <- option A.ATrue $ labeledAssertion "pre"
+  post <- option A.ATrue $ labeledAssertion "post"
 
-  aSpecList <- option [] $ do
+  aSpecs <- option S.emptySpecMap $ do
     reserved "aspecs" >> whiteSpace >> char ':' >> whiteSpace
-    many specification
-  eSpecList <- option [] $ do
+    specs <- many specification
+    return $ Map.unions specs
+  eSpecs <- option S.emptySpecMap $ do
     reserved "especs" >> whiteSpace >> char ':' >> whiteSpace
-    many specification
-  let union specList = sequence specList >>= return . Map.unions
-  let aSpecs = union aSpecList
-  let eSpecs = union eSpecList
-  let prefixSpecs z3Specs execs = do
-        specs    <- z3Specs
-        prefixed <- sequence $ map (\exec -> prefixSpec (execPrefix exec) specs) execs
-        return $ Map.unions prefixed
-  let prefixedASpecs = prefixSpecs aSpecs aExecs
-  let prefixedESpecs = prefixSpecs eSpecs eExecs
-  let specs = liftM2 FunSpecMaps prefixedASpecs prefixedESpecs
+    specs <- many specification
+    return $ Map.unions specs
 
-  progs  <- many program
-  let lookupAndPrefix exec =
-        case lookup (getExecName exec) progs of
-          Nothing   -> error $ "Program definition not found: " ++ (getExecName exec)
-          Just prog -> prefixProgram prog exec
+  let prefixExecId specMap exec = S.prefixSpecs (execPrefix exec) specMap
+  let prefixedASpecs = Map.unions $ map (prefixExecId aSpecs) aExecs
+  let prefixedESpecs = Map.unions $ map (prefixExecId eSpecs) eExecs
+  let specs = SpecMaps prefixedASpecs prefixedESpecs
+
+  progs <- many program
+  let lookupAndPrefix exec = case lookup (getExecName exec) progs of
+        Nothing   -> fail $ "Program definition not found: " ++ (getExecName exec)
+        Just prog -> return $ prefixProgram prog exec
   aProgs <- mapM lookupAndPrefix aExecs
   eProgs <- mapM lookupAndPrefix eExecs
-  let query = liftM5 OPQuery specs preCond (sequence aProgs) (sequence eProgs) postCond
+  let query = Query specs pre aProgs eProgs post
   return $ ((aExecs ++ eExecs), query, expectedResult)
 
-prefixProgram :: ParsedProg -> OPExec -> OrhleAppParser (SMT Prog)
-prefixProgram prog exec = do
-  case parseLoopSpecs prog of
-        Left parseError -> error  $ show parseError
-        Right z3Prog    -> return $ prefixProgVars (execPrefix exec) =<< z3Prog
+prefixProgram :: Stmt -> Exec -> Stmt
+prefixProgram prog exec = Names.prefix (execPrefix exec) prog
 
-execPrefix :: OPExec -> String
+execPrefix :: Exec -> String
 execPrefix exec = case (getExecId exec) of
                     Nothing  -> (getExecName exec) ++ "!"
                     Just eid -> (getExecName exec) ++ "!" ++ eid ++ "!"
@@ -125,31 +119,31 @@ execPrefix exec = case (getExecId exec) of
 untilSemi :: OrhleAppParser String
 untilSemi = manyTill anyChar (try $ char ';')
 
-condition :: OrhleAppParser (SMT SMT.Expr)
-condition = do
-  smtStr <- untilSemi
-  whiteSpace
-  case parseSMT smtStr of
-    Left err  -> fail $ show err
-    Right ast -> return ast
+-- condition :: OrhleAppParser (SMT SMT.Expr)
+-- condition = do
+--   smtStr <- untilSemi
+--   whiteSpace
+--   case parseSMT smtStr of
+--     Left err  -> fail $ show err
+--     Right ast -> return ast
 
-expectedValid :: OrhleAppParser OPExpectedResult
+expectedValid :: OrhleAppParser ExpectedResult
 expectedValid = do
   reserved "expected" >> whiteSpace
   char ':' >> whiteSpace
   reserved "valid" >> whiteSpace
   semi >> whiteSpace
-  return OPSuccess
+  return Success
 
-expectedInvalid :: OrhleAppParser OPExpectedResult
+expectedInvalid :: OrhleAppParser ExpectedResult
 expectedInvalid = do
   reserved "expected" >> whiteSpace
   char ':' >> whiteSpace
   reserved "invalid" >> whiteSpace
   semi >> whiteSpace
-  return OPFailure
+  return Failure
 
-execs :: String -> (String -> OPExecId -> OPExec) -> OrhleAppParser [OPExec]
+execs :: String -> (String -> ExecId -> Exec) -> OrhleAppParser [Exec]
 execs keyword quant = do
   reserved keyword >> whiteSpace
   char ':' >> whiteSpace
@@ -168,7 +162,7 @@ execId = do
   whiteSpace >> char ']' >> whiteSpace
   return eid
 
-specification :: OrhleAppParser (SMT ASTFunSpecMap)
+specification :: OrhleAppParser SpecMap
 specification = do
   name   <- identifier
   params <- (liftM concat) . parens $ sepBy varArray comma
@@ -177,26 +171,20 @@ specification = do
     reserved "choiceVars" >> whiteSpace >> char ':' >> whiteSpace
     vars <- sepBy identifier comma
     whiteSpace >> char ';' >> whiteSpace
-    return vars
-  pre <- option "true" $ do
-    reserved "pre" >> whiteSpace >> char ':' >> whiteSpace
-    untilSemi
-  whiteSpace
-  let z3Pre = case parseSMT pre of
-        Left error -> fail $ show error
-        Right smt  -> smt
-  post <- option "true" $ do
-    reserved "post" >> whiteSpace >> char ':' >> whiteSpace
-    untilSemi
-  whiteSpace
-  let z3Post = case parseSMT post of
-        Left error -> fail $ show error
-        Right smt  -> smt
+    return $ map (\v -> A.Ident v A.Int) vars
+  pre  <- option A.ATrue $ labeledAssertion "pre"
+  post <- option A.ATrue $ labeledAssertion "post"
   whiteSpace >> char '}' >> whiteSpace
-  return $ do
-    pre <- z3Pre
-    post <- z3Post
-    return $ addFunSpec name (FunSpec params choiceVars pre post) emptyFunSpec
+  return $ S.addSpec name (Spec params choiceVars pre post) S.emptySpecMap
+
+labeledAssertion :: String -> OrhleAppParser Assertion
+labeledAssertion label = do
+  reserved label >> whiteSpace >> char ':' >> whiteSpace
+  str <- untilSemi
+  whiteSpace
+  case parseAssertion str of
+    Left error      -> fail $ show error
+    Right assertion -> return assertion
 
 varArray :: OrhleAppParser [String]
 varArray = do
@@ -225,34 +213,10 @@ program = do
     Left err ->   fail $ show err
     Right prog -> return (name, prog)
 
-getExecName :: OPExec -> String
-getExecName (OPForall name _) = name
-getExecName (OPExists name _) = name
+getExecName :: Exec -> String
+getExecName (Forall name _) = name
+getExecName (Exists name _) = name
 
-getExecId :: OPExec -> Maybe String
-getExecId (OPForall _ eid) = eid
-getExecId (OPExists _ eid) = eid
-
-prefixProgVars :: String -> Prog -> SMT Prog
-prefixProgVars pre prog =
-  case prog of
-    SSkip          -> return $ SSkip
-    SAsgn var aexp -> return $ SAsgn  (pre ++ var) (prefixA aexp)
-    SSeq  stmts    -> do
-      pstmts <- mapM (prefixProgVars pre) stmts
-      return $ SSeq pstmts
-    SIf cond s1 s2 -> do
-      ps1 <- prefixProgVars pre s1
-      ps2 <- prefixProgVars pre s2
-      return $ SIf (prefixB cond) ps1 ps2
-    SWhile cond body (inv, var, local) -> do
-      pinv  <- SMT.prefixASTVars pre inv
-      pvar  <- SMT.prefixASTVars pre var
-      pbody <- prefixProgVars pre body
-      return $ if local then SWhile (prefixB cond) pbody (pinv, pvar, local)
-                        else SWhile (prefixB cond) pbody (inv,  pvar, local)
-    SCall rets params fname -> return $ SCall (map prefix rets) (map prefix params) (prefix fname)
-  where
-    prefix s = pre ++ s
-    prefixA = prefixAExpVars pre
-    prefixB = prefixBExpVars pre
+getExecId :: Exec -> Maybe String
+getExecId (Forall _ eid) = eid
+getExecId (Exists _ eid) = eid

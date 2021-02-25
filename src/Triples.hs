@@ -7,43 +7,43 @@ module Triples
   , mkRHLETrip
   ) where
 
+import Assertion
+import AssertionParser
 import Imp
-import SMTParser
-import qualified SMTMonad as S
 
 data HLTrip = HLTrip
-  { hlPre  :: S.Expr
-  , hlProg :: Prog
-  , hlPost :: S.Expr
+  { hlPre  :: Assertion
+  , hlProg :: Stmt
+  , hlPost :: Assertion
   } deriving (Show)
 
-mkHLTrip :: String -> Prog -> String -> S.SMT HLTrip
+mkHLTrip :: String -> Stmt -> String -> Either ParseError HLTrip
 mkHLTrip pre prog post = do
-  preAST  <- parseSMTOrError pre
-  postAST <- parseSMTOrError post
+  preAST  <- parseAssertion pre
+  postAST <- parseAssertion post
   return $ HLTrip preAST prog postAST
 
 data HLETrip = HLETrip
-  { hlePre  :: S.Expr
-  , hleProg :: Prog
-  , hlePost :: S.Expr
+  { hlePre  :: Assertion
+  , hleProg :: Stmt
+  , hlePost :: Assertion
   } deriving (Show)
 
-mkHLETrip :: String -> Prog -> String -> S.SMT HLETrip
+mkHLETrip :: String -> Stmt -> String -> Either ParseError HLETrip
 mkHLETrip pre prog post = do
-  preAST  <- parseSMTOrError pre
-  postAST <- parseSMTOrError post
+  preAST  <- parseAssertion pre
+  postAST <- parseAssertion post
   return $ HLETrip preAST prog postAST
 
 data RHLETrip = RHLETrip
-  { rhlePre    :: S.Expr
-  , rhleAProgs :: [Prog]
-  , rhleEProgs :: [Prog]
-  , rhlePost   :: S.Expr
+  { rhlePre    :: Assertion
+  , rhleAProgs :: [Stmt]
+  , rhleEProgs :: [Stmt]
+  , rhlePost   :: Assertion
   } deriving (Show)
 
-mkRHLETrip :: String -> [Prog] -> [Prog] -> String -> S.SMT RHLETrip
+mkRHLETrip :: String -> [Stmt] -> [Stmt] -> String -> Either ParseError RHLETrip
 mkRHLETrip pre aProgs eProgs post = do
-  preAST  <- parseSMTOrError pre
-  postAST <- parseSMTOrError post
+  preAST  <- parseAssertion pre
+  postAST <- parseAssertion post
   return $ RHLETrip preAST aProgs eProgs postAST

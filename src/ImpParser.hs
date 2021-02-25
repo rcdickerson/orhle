@@ -2,12 +2,12 @@
 -- Based on https://wiki.haskell.org/Parsing_a_simple_imperative_language
 
 module ImpParser
-    ( ParsedProg
-    , ParsedStmt
-    , impParser
+    ( impParser
     , parseImp
     ) where
 
+import Assertion
+import AssertionParser
 import Control.Monad
 import Imp
 import Text.Parsec
@@ -51,28 +51,26 @@ comma      = Token.comma      lexer
 semi       = Token.semi       lexer
 whiteSpace = Token.whiteSpace lexer
 
-type ParsedStmt = AbsStmt String
-type ParsedProg = ParsedStmt
-
 type ImpParser a = Parsec String () a
+type StmtParser  = ImpParser Stmt
 
-parseImp :: String -> Either ParseError ParsedProg
+parseImp :: String -> Either ParseError Stmt
 parseImp = runParser impParser () ""
 
-impParser :: ImpParser ParsedProg
+impParser :: StmtParser
 impParser = do
   whiteSpace
   prog <- program
   return prog
 
-program :: ImpParser ParsedProg
+program :: StmtParser
 program = do
   stmts <- many1 $ statement
   case length stmts of
     1 -> return $ head stmts
     _ -> return $ SSeq  stmts
 
-statement :: ImpParser ParsedStmt
+statement :: StmtParser
 statement =   ifStmt
           <|> whileStmt
           <|> skipStmt
@@ -80,7 +78,7 @@ statement =   ifStmt
           <|> assignStmt
           <|> parens statement
 
-ifStmt :: ImpParser ParsedStmt
+ifStmt :: StmtParser
 ifStmt = do
   reserved "if"
   cond  <- bExpression
@@ -91,20 +89,25 @@ ifStmt = do
   reserved "end"
   return $ SIf cond (SSeq tbranch) (SSeq ebranch)
 
-whileStmt :: ImpParser ParsedStmt
+whileStmt :: StmtParser
 whileStmt = do
   reserved "while"
   cond  <- bExpression
   whiteSpace
   reserved "do"
-  (inv, local) <- option ("true", True) $ do
+  (inv, local) <- option (ATrue, True) $ do
     reserved "@inv"
-    local <- option False $ do reserved "local"; return True
-    inv <- braces $ many $ noneOf "{}"
-    return (inv, local)
-  var <- option "true" $ do
+    local  <- option False $ do reserved "local"; return True
+    invStr <- braces $ many $ noneOf "{}"
+    case parseAssertion invStr of
+      Left err  -> fail (show err)
+      Right inv -> return (inv, local)
+  var <- option (Num 0) $ do
     reserved "@var"
-    braces $ many $ noneOf "{}"
+    varStr <- braces $ many $ noneOf "{}"
+    case parseArith varStr of
+      Left err  -> fail (show err)
+      Right var -> return var
   whiteSpace
   body  <- many1 $ try statement
   whiteSpace
@@ -115,7 +118,7 @@ whileStmt = do
   let while = SWhile cond bodySeq (inv, var, local)
   return while
 
-assignStmt :: ImpParser ParsedStmt
+assignStmt :: StmtParser
 assignStmt = do
   var  <- identifier
   reservedOp ":="
@@ -123,7 +126,7 @@ assignStmt = do
   semi
   return $ SAsgn var expr
 
-funcStmt :: ImpParser ParsedStmt
+funcStmt :: StmtParser
 funcStmt = do
   assignees <- varArray
   reservedOp ":="
@@ -147,7 +150,7 @@ varArray = do
              then [vars]
              else map (\n -> vars ++ "_" ++ (show n)) [0..(num-1)]
 
-skipStmt :: ImpParser ParsedStmt
+skipStmt :: StmtParser
 skipStmt = reserved "skip" >> semi >> return SSkip
 
 aExpression :: ImpParser AExp

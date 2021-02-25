@@ -1,31 +1,26 @@
 module Imp
-    ( AbsStmt(..)
-    , AExp(..)
+    ( AExp(..)
     , BExp(..)
-    , Prog
     , SFun(..)
-    , Stmt
+    , Stmt(..)
     , Var
-    , aexpToZ3
-    , assignPost
-    , asubst
+    , aexpToArith
+    , aexpToSmt
     , avars
-    , bexpToZ3
-    , bsubst
+    , bexpToAssertion
+    , bexpToSmt
     , bvars
-    , fsubst
-    , prefixAExpVars
-    , prefixBExpVars
-    , subAexp
-    , subVar
     , svars
     ) where
 
-import qualified Data.Set as Set
-import qualified SMTMonad as S
+import           Assertion  ( Assertion)
+import qualified Assertion as A
+import qualified Data.Set  as Set
+import           MapNames
+import qualified SMTMonad  as S
+
 
 type Var = String
-
 
 ----------------------------
 -- Arithmetic Expressions --
@@ -42,78 +37,66 @@ data AExp
   | APow AExp AExp
   deriving (Eq, Ord, Show)
 
-asubst :: AExp -> Var -> AExp -> AExp
-asubst aexp var repl =
-  case aexp of
-    ALit i -> ALit i
-    AVar v -> if (v == var) then repl else aexp
-    AAdd lhs rhs -> AAdd (asubst lhs var repl) (asubst rhs var repl)
-    ASub lhs rhs -> ASub (asubst lhs var repl) (asubst rhs var repl)
-    AMul lhs rhs -> AMul (asubst lhs var repl) (asubst rhs var repl)
-    ADiv lhs rhs -> ADiv (asubst lhs var repl) (asubst rhs var repl)
-    AMod lhs rhs -> AMod (asubst lhs var repl) (asubst rhs var repl)
-    APow lhs rhs -> APow (asubst lhs var repl) (asubst rhs var repl)
+instance MappableNames AExp where
+  mapNames _ (ALit i)       = ALit i
+  mapNames f (AVar v)       = AVar (f v)
+  mapNames f (AAdd lhs rhs) = AAdd (mapNames f lhs) (mapNames f rhs)
+  mapNames f (ASub lhs rhs) = ASub (mapNames f lhs) (mapNames f rhs)
+  mapNames f (AMul lhs rhs) = AMul (mapNames f lhs) (mapNames f rhs)
+  mapNames f (ADiv lhs rhs) = ADiv (mapNames f lhs) (mapNames f rhs)
+  mapNames f (AMod lhs rhs) = AMod (mapNames f lhs) (mapNames f rhs)
+  mapNames f (APow lhs rhs) = APow (mapNames f lhs) (mapNames f rhs)
 
 avars :: AExp -> Set.Set Var
-avars aexp =
-  case aexp of
-    ALit _ -> Set.empty
-    AVar v -> Set.singleton v
-    AAdd lhs rhs -> Set.union (avars lhs) (avars rhs)
-    ASub lhs rhs -> Set.union (avars lhs) (avars rhs)
-    AMul lhs rhs -> Set.union (avars lhs) (avars rhs)
-    ADiv lhs rhs -> Set.union (avars lhs) (avars rhs)
-    AMod lhs rhs -> Set.union (avars lhs) (avars rhs)
-    APow lhs rhs -> Set.union (avars lhs) (avars rhs)
+avars aexp = case aexp of
+  ALit _ -> Set.empty
+  AVar v -> Set.singleton v
+  AAdd lhs rhs -> Set.union (avars lhs) (avars rhs)
+  ASub lhs rhs -> Set.union (avars lhs) (avars rhs)
+  AMul lhs rhs -> Set.union (avars lhs) (avars rhs)
+  ADiv lhs rhs -> Set.union (avars lhs) (avars rhs)
+  AMod lhs rhs -> Set.union (avars lhs) (avars rhs)
+  APow lhs rhs -> Set.union (avars lhs) (avars rhs)
 
-aexpToZ3 :: AExp -> S.SMT S.Expr
-aexpToZ3 aexp =
-  case aexp of
-    ALit i   -> S.mkIntNum i
-    AVar var -> S.mkIntVar =<< S.mkStringSymbol var
-    AAdd aexp1 aexp2 -> S.mkAdd =<< mapM aexpToZ3 [aexp1, aexp2]
-    ASub aexp1 aexp2 -> S.mkSub =<< mapM aexpToZ3 [aexp1, aexp2]
-    AMul aexp1 aexp2 -> S.mkMul =<< mapM aexpToZ3 [aexp1, aexp2]
-    ADiv aexp1 aexp2 -> do
-      dividend <- aexpToZ3 aexp1
-      divisor  <- aexpToZ3 aexp2
-      S.mkDiv dividend divisor
-    AMod aexp1 aexp2 -> do
-      dividend <- aexpToZ3 aexp1
-      divisor  <- aexpToZ3 aexp2
-      S.mkMod dividend divisor
-    APow aexp1 aexp2 -> do
-      base <- aexpToZ3 aexp1
-      power <- aexpToZ3 aexp2
-      S.mkPower base power
+aexpToArith :: AExp -> A.Arith
+aexpToArith aexp = case aexp of
+  ALit i           -> A.Num i
+  AVar var         -> A.Var (A.Ident var A.Int)
+  AAdd aexp1 aexp2 -> A.Add [aexpToArith aexp1, aexpToArith aexp2]
+  ASub aexp1 aexp2 -> A.Sub [aexpToArith aexp1, aexpToArith aexp2]
+  AMul aexp1 aexp2 -> A.Mul [aexpToArith aexp1, aexpToArith aexp2]
+  ADiv aexp1 aexp2 -> let
+    dividend = aexpToArith aexp1
+    divisor  = aexpToArith aexp2
+    in A.Div dividend divisor
+  AMod aexp1 aexp2 -> let
+    dividend = aexpToArith aexp1
+    divisor  = aexpToArith aexp2
+    in A.Mod dividend divisor
+  APow aexp1 aexp2 -> let
+    base  = aexpToArith aexp1
+    power = aexpToArith aexp2
+    in A.Pow base power
 
-subVar :: S.Expr -> Var -> Var -> S.SMT S.Expr
-subVar ast var repl = subAexp ast var (AVar repl)
-
-subAexp :: S.Expr -> Var -> AExp -> S.SMT S.Expr
-subAexp ast var repl = do
-  z3Repl <- aexpToZ3 $ repl
-  S.substitute ast [var] [z3Repl]
-
-assignPost :: Var -> AExp -> S.Expr -> S.SMT S.Expr
-assignPost var aexp post = do
-  z3Var   <- aexpToZ3 $ AVar var
-  z3Aexp  <- aexpToZ3 aexp
-  eq      <- S.mkEq z3Var z3Aexp
-  S.mkAnd [eq, post]
-
-prefixAExpVars :: String -> AExp -> AExp
-prefixAExpVars pre aexp =
-  case aexp of
-    ALit i -> ALit i
-    AVar v -> AVar $ pre ++ v
-    AAdd lhs rhs -> AAdd (prefix lhs) (prefix rhs)
-    ASub lhs rhs -> ASub (prefix lhs) (prefix rhs)
-    AMul lhs rhs -> AMul (prefix lhs) (prefix rhs)
-    ADiv lhs rhs -> ADiv (prefix lhs) (prefix rhs)
-    AMod lhs rhs -> AMod (prefix lhs) (prefix rhs)
-    APow lhs rhs -> APow (prefix lhs) (prefix rhs)
-  where prefix = prefixAExpVars pre
+aexpToSmt :: AExp -> S.SMT S.Expr
+aexpToSmt aexp = case aexp of
+  ALit i   -> S.mkIntNum i
+  AVar var -> S.mkIntVar =<< S.mkStringSymbol var
+  AAdd aexp1 aexp2 -> S.mkAdd =<< mapM aexpToSmt [aexp1, aexp2]
+  ASub aexp1 aexp2 -> S.mkSub =<< mapM aexpToSmt [aexp1, aexp2]
+  AMul aexp1 aexp2 -> S.mkMul =<< mapM aexpToSmt [aexp1, aexp2]
+  ADiv aexp1 aexp2 -> do
+    dividend <- aexpToSmt aexp1
+    divisor  <- aexpToSmt aexp2
+    S.mkDiv dividend divisor
+  AMod aexp1 aexp2 -> do
+    dividend <- aexpToSmt aexp1
+    divisor  <- aexpToSmt aexp2
+    S.mkMod dividend divisor
+  APow aexp1 aexp2 -> do
+    base <- aexpToSmt aexp1
+    power <- aexpToSmt aexp2
+    S.mkPower base power
 
 
 -------------------------
@@ -134,86 +117,78 @@ data BExp
   | BGt  AExp AExp
   deriving (Eq, Ord, Show)
 
-bsubst :: BExp -> Var -> AExp -> BExp
-bsubst bexp var aexp =
-  case bexp of
-    BTrue        -> BTrue
-    BFalse       -> BFalse
-    BNot b       -> BNot (bsubst b var aexp)
-    BAnd b1  b2  -> BAnd (bsubst b1 var aexp)  (bsubst b2 var aexp)
-    BOr  b1  b2  -> BOr  (bsubst b1 var aexp)  (bsubst b2 var aexp)
-    BEq  lhs rhs -> BEq  (asubst lhs var aexp) (asubst rhs var aexp)
-    BNe  lhs rhs -> BNe  (asubst lhs var aexp) (asubst rhs var aexp)
-    BLe  lhs rhs -> BLe  (asubst lhs var aexp) (asubst rhs var aexp)
-    BGe  lhs rhs -> BGe  (asubst lhs var aexp) (asubst rhs var aexp)
-    BLt  lhs rhs -> BLt  (asubst lhs var aexp) (asubst rhs var aexp)
-    BGt  lhs rhs -> BGt  (asubst lhs var aexp) (asubst rhs var aexp)
+instance MappableNames BExp where
+  mapNames _ BTrue        = BTrue
+  mapNames _ BFalse       = BFalse
+  mapNames f (BNot b)     = BNot $ mapNames f b
+  mapNames f (BAnd b1 b2) = BAnd (mapNames f b1) (mapNames f b2)
+  mapNames f (BOr b1 b2)  = BOr (mapNames f b1) (mapNames f b2)
+  mapNames f (BEq a1 a2)  = BEq (mapNames f a1) (mapNames f a2)
+  mapNames f (BNe a1 a2)  = BNe (mapNames f a1) (mapNames f a2)
+  mapNames f (BLe a1 a2)  = BLe (mapNames f a1) (mapNames f a2)
+  mapNames f (BGe a1 a2)  = BGe (mapNames f a1) (mapNames f a2)
+  mapNames f (BLt a1 a2)  = BLt (mapNames f a1) (mapNames f a2)
+  mapNames f (BGt a1 a2)  = BGt (mapNames f a1) (mapNames f a2)
 
 bvars :: BExp -> Set.Set Var
-bvars bexp =
-  case bexp of
-    BTrue        -> Set.empty
-    BFalse       -> Set.empty
-    BNot b       -> bvars b
-    BAnd b1  b2  -> Set.union (bvars b1)  (bvars b2)
-    BOr  b1  b2  -> Set.union (bvars b1)  (bvars b2)
-    BEq  lhs rhs -> Set.union (avars lhs) (avars rhs)
-    BNe  lhs rhs -> Set.union (avars lhs) (avars rhs)
-    BLe  lhs rhs -> Set.union (avars lhs) (avars rhs)
-    BGe  lhs rhs -> Set.union (avars lhs) (avars rhs)
-    BLt  lhs rhs -> Set.union (avars lhs) (avars rhs)
-    BGt  lhs rhs -> Set.union (avars lhs) (avars rhs)
+bvars bexp = case bexp of
+  BTrue        -> Set.empty
+  BFalse       -> Set.empty
+  BNot b       -> bvars b
+  BAnd b1  b2  -> Set.union (bvars b1)  (bvars b2)
+  BOr  b1  b2  -> Set.union (bvars b1)  (bvars b2)
+  BEq  lhs rhs -> Set.union (avars lhs) (avars rhs)
+  BNe  lhs rhs -> Set.union (avars lhs) (avars rhs)
+  BLe  lhs rhs -> Set.union (avars lhs) (avars rhs)
+  BGe  lhs rhs -> Set.union (avars lhs) (avars rhs)
+  BLt  lhs rhs -> Set.union (avars lhs) (avars rhs)
+  BGt  lhs rhs -> Set.union (avars lhs) (avars rhs)
 
-bexpToZ3 :: BExp -> S.SMT S.Expr
-bexpToZ3 bexp =
-  case bexp of
-    BTrue        -> S.mkTrue
-    BFalse       -> S.mkFalse
-    BNot b       -> S.mkNot =<< bexpToZ3 b
-    BAnd b1  b2  -> S.mkAnd =<< mapM bexpToZ3 [b1, b2]
-    BOr  b1  b2  -> S.mkOr  =<< mapM bexpToZ3 [b1, b2]
-    BEq  lhs rhs -> do
-      lhsAST <- aexpToZ3 lhs
-      rhsAST <- aexpToZ3 rhs
-      S.mkEq lhsAST rhsAST
-    BNe  lhs rhs -> do
-      lhsAST <- aexpToZ3 lhs
-      rhsAST <- aexpToZ3 rhs
-      S.mkNot =<< S.mkEq lhsAST rhsAST
-    BLe  lhs rhs -> do
-      lhsAST <- aexpToZ3 lhs
-      rhsAST <- aexpToZ3 rhs
-      S.mkLe lhsAST rhsAST
-    BGe  lhs rhs -> do
-      lhsAST <- aexpToZ3 lhs
-      rhsAST <- aexpToZ3 rhs
-      S.mkGe lhsAST rhsAST
-    BGt  lhs rhs -> do
-      lhsAST <- aexpToZ3 lhs
-      rhsAST <- aexpToZ3 rhs
-      S.mkGt lhsAST rhsAST
-    BLt  lhs rhs -> do
-      lhsAST <- aexpToZ3 lhs
-      rhsAST <- aexpToZ3 rhs
-      S.mkLt lhsAST rhsAST
+bexpToAssertion :: BExp -> Assertion
+bexpToAssertion bexp = case bexp of
+  BTrue      -> A.ATrue
+  BFalse     -> A.AFalse
+  BNot b     -> A.Not $ bexpToAssertion b
+  BAnd b1 b2 -> A.And [bexpToAssertion b1, bexpToAssertion b2]
+  BOr  b1 b2 -> A.Or  [bexpToAssertion b1, bexpToAssertion b2]
+  BEq  a1 a2 -> A.Eq  (aexpToArith a1) (aexpToArith a2)
+  BNe  a1 a2 -> A.Not $ A.Eq (aexpToArith a1) (aexpToArith a2)
+  BLe  a1 a2 -> A.Lte (aexpToArith a1) (aexpToArith a2)
+  BGe  a1 a2 -> A.Gte (aexpToArith a1) (aexpToArith a2)
+  BGt  a1 a2 -> A.Gt  (aexpToArith a1) (aexpToArith a2)
+  BLt  a1 a2 -> A.Lt  (aexpToArith a1) (aexpToArith a2)
 
-prefixBExpVars :: String -> BExp -> BExp
-prefixBExpVars pre bexp =
-  case bexp of
-    BTrue        -> BTrue
-    BFalse       -> BFalse
-    BNot b       -> BNot $ prefixB b
-    BAnd b1  b2  -> BAnd (prefixB b1)  (prefixB b2)
-    BOr  b1  b2  -> BOr  (prefixB b1)  (prefixB b2)
-    BEq  lhs rhs -> BEq  (prefixA lhs) (prefixA rhs)
-    BNe  lhs rhs -> BNe  (prefixA lhs) (prefixA rhs)
-    BLe  lhs rhs -> BLe  (prefixA lhs) (prefixA rhs)
-    BGe  lhs rhs -> BGe  (prefixA lhs) (prefixA rhs)
-    BLt  lhs rhs -> BLt  (prefixA lhs) (prefixA rhs)
-    BGt  lhs rhs -> BGt  (prefixA lhs) (prefixA rhs)
-  where
-    prefixA = prefixAExpVars pre
-    prefixB = prefixBExpVars pre
+bexpToSmt :: BExp -> S.SMT S.Expr
+bexpToSmt bexp = case bexp of
+  BTrue        -> S.mkTrue
+  BFalse       -> S.mkFalse
+  BNot b       -> S.mkNot =<< bexpToSmt b
+  BAnd b1  b2  -> S.mkAnd =<< mapM bexpToSmt [b1, b2]
+  BOr  b1  b2  -> S.mkOr  =<< mapM bexpToSmt [b1, b2]
+  BEq  lhs rhs -> do
+    lhsAST <- aexpToSmt lhs
+    rhsAST <- aexpToSmt rhs
+    S.mkEq lhsAST rhsAST
+  BNe  lhs rhs -> do
+    lhsAST <- aexpToSmt lhs
+    rhsAST <- aexpToSmt rhs
+    S.mkNot =<< S.mkEq lhsAST rhsAST
+  BLe  lhs rhs -> do
+    lhsAST <- aexpToSmt lhs
+    rhsAST <- aexpToSmt rhs
+    S.mkLe lhsAST rhsAST
+  BGe  lhs rhs -> do
+    lhsAST <- aexpToSmt lhs
+    rhsAST <- aexpToSmt rhs
+    S.mkGe lhsAST rhsAST
+  BGt  lhs rhs -> do
+    lhsAST <- aexpToSmt lhs
+    rhsAST <- aexpToSmt rhs
+    S.mkGt lhsAST rhsAST
+  BLt  lhs rhs -> do
+    lhsAST <- aexpToSmt lhs
+    rhsAST <- aexpToSmt rhs
+    S.mkLt lhsAST rhsAST
 
 
 ---------------
@@ -225,34 +200,33 @@ data SFun = SFun
   , fParams   :: [Var]
   } deriving (Eq, Ord, Show)
 
-fsubst :: SFun -> Var -> Var -> S.SMT SFun
-fsubst (SFun name params) var repl = do
-  let params' = map (\p -> if p == var then repl else p) params
-  return $ SFun name params'
+instance MappableNames SFun where
+  mapNames f (SFun name params) = SFun (f name) (map f params)
 
 
----------------------------
--- Statements / Programs --
----------------------------
-
--- Parameterized over the type of loop specs.
--- This allows the parser to return SMT strings
--- instead of conflating Z3 interaction with
--- parsing to construct Z3 ASTs at parse time.
-
-data AbsStmt a
+----------------
+-- Statements --
+----------------
+data Stmt
   = SSkip
   | SAsgn  Var AExp
-  | SSeq   [AbsStmt a]
-  | SIf    BExp (AbsStmt a) (AbsStmt a)
-  | SWhile BExp (AbsStmt a) (a, a, Bool)
+  | SSeq   [Stmt]
+  | SIf    BExp Stmt Stmt
+  | SWhile BExp Stmt (Assertion, A.Arith, Bool)
   | SCall  [Var] [Var] String
   deriving (Eq, Ord, Show)
 
-type Stmt       = AbsStmt S.Expr
-type Prog       = Stmt
+instance MappableNames Stmt where
+  mapNames _ SSkip          = SSkip
+  mapNames f (SAsgn v aexp) = SAsgn (f v) (mapNames f aexp)
+  mapNames f (SSeq stmts)   = SSeq $ map (mapNames f) stmts
+  mapNames f (SIf b t e)    = SIf (mapNames f b) (mapNames f t) (mapNames f e)
+  mapNames f (SWhile cond body (inv, var, local)) =
+    SWhile (mapNames f cond) (mapNames f body) ((mapNames f inv), (mapNames f var), local)
+  mapNames f (SCall as ps name) =
+    SCall (map f as) (map f ps) (f name)
 
-svars :: AbsStmt a -> Set.Set Var
+svars :: Stmt -> Set.Set Var
 svars stmt = case stmt of
   SSkip                      -> Set.empty
   SAsgn  var aexp            -> Set.insert var $ avars aexp

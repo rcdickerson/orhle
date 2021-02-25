@@ -5,14 +5,15 @@ module ImpPrettyPrint
         )
 where
 
-import           Data.Text.Prettyprint.Doc
-import           Data.Text.Prettyprint.Doc.Render.Text
-import           Data.Text.Prettyprint.Doc.Render.String
-import           Data.Text                      ( Text )
+import Assertion ( Assertion
+                 , Arith )
+import Data.Text.Prettyprint.Doc
+import Data.Text.Prettyprint.Doc.Render.Text
+import Data.Text.Prettyprint.Doc.Render.String
+import Data.Text ( Text )
+import Imp
 
-import           Imp
-
-prettyprint :: AbsStmt String -> Text
+prettyprint :: Stmt -> Text
 prettyprint = renderStrict . layoutPretty defaultLayoutOptions . prettyStmt
 
 prettyprintAExp :: AExp -> String
@@ -21,7 +22,7 @@ prettyprintAExp = renderString . layoutPretty defaultLayoutOptions . prettyAExp
 prettyprintBExp :: BExp -> String
 prettyprintBExp = renderString . layoutPretty defaultLayoutOptions . prettyBExp
 
-prettyStmt :: AbsStmt String -> Doc ()
+prettyStmt :: Stmt -> Doc ()
 prettyStmt SSkip       = pretty "skip" <> semi
 prettyStmt (SAsgn v a) = pretty v <+> pretty ":=" <+> prettyAExp a <> semi
 prettyStmt (SSeq ss  ) = vsep (map prettyStmt ss)
@@ -35,13 +36,12 @@ prettyStmt (SIf c t e) = vsep
 prettyStmt (SWhile c b (i, v, _)) = vsep
         [ pretty "while" <+> prettyBExp c <+> pretty "do"
         , indent 2 $ vsep
-                [ pretty "@inv" <+> braces (pretty i)
-                , pretty "@var" <+> braces (pretty v)
+                [ pretty "@inv" <+> braces (prettyAssertion i)
+                , pretty "@var" <+> braces (prettyArith v)
                 , prettyStmt b
                 ]
         , pretty "end"
         ]
--- TODO: what's going on with arrays??
 prettyStmt (SCall ls rs n) =
         hsep (punctuate comma (map pretty ls))
                 <+> pretty ":="
@@ -65,6 +65,7 @@ prettyAExp = go 0
         go p (AMul l r) = parenPrec p 2 $ go 2 l <+> pretty "*" <+> go 3 r
         go p (ADiv l r) = parenPrec p 2 $ go 2 l <+> pretty "/" <+> go 3 r
         go p (AMod l r) = parenPrec p 2 $ go 2 l <+> pretty "%" <+> go 3 r
+        go p (APow l r) = parenPrec p 2 $ go 2 l <+> pretty "^" <+> go 3 r
 
 prettyBExp :: BExp -> Doc ()
 prettyBExp = go 0
@@ -81,3 +82,9 @@ prettyBExp = go 0
         go _ (BGe  l r) = prettyAExp l <+> pretty ">=" <+> prettyAExp r
         go _ (BLt  l r) = prettyAExp l <+> pretty "<" <+> prettyAExp r
         go _ (BGt  l r) = prettyAExp l <+> pretty ">" <+> prettyAExp r
+
+prettyAssertion :: Assertion -> Doc ()
+prettyAssertion assertion = pretty $ show assertion
+
+prettyArith :: Arith -> Doc ()
+prettyArith arith = pretty $ show arith

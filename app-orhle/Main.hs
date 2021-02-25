@@ -11,7 +11,7 @@ main = do
   case parseArgs args of
      Nothing   -> showUsage
      Just path -> do
-       (output, didAsExpected) <- readFile path >>= runKLive
+       (output, didAsExpected) <- readFile path >>= run
        putStrLn output
        if didAsExpected then exitSuccess else exitFailure
 
@@ -23,8 +23,8 @@ showUsage :: IO ()
 showUsage =
   putStrLn "Usage: klive <filename>"
 
-runKLive :: String -> IO (String, Bool)
-runKLive orhle = do
+run :: String -> IO (String, Bool)
+run orhle = do
   putStrLn "*******************************************"
   putStrLn "****               ORHLE               ****"
   putStrLn "****     The Oracular RHLE Verifier    ****"
@@ -42,6 +42,25 @@ runKLive orhle = do
                             else expected == OPFailure
       return (output, didAsExpected)
 
+-- runVerifier :: Verifier
+--             -> SpecMaps
+--             -> String -> [Stmt] -> [Stmt] -> String
+--             -> IO String
+-- runVerifier verifier specs pre aProgs eProgs post = do
+--   print "------------------------------------------------\n"
+--   print $ "Universal Programs:\n" ++ (show aProgs) ++   "\n"
+--   print "------------------------------------------------\n"
+--   print $ "Existential Programs:\n" ++ (show eProgs) ++ "\n"
+--   print "------------------------------------------------\n"
+--   (result, trace) <- verifier $ (specs, mkRHLETrip pre aProgs eProgs post)
+--   print $ "Verification Trace:\n" ++ ppVTrace trace ++ "\n"
+--   print "------------------------------------------------\n"
+--   case result of
+--     Right message -> print $ "VALID. " ++ message ++ "\n"
+--     Left  reason  -> print $ "INVALID. " ++ reason ++ "\n"
+--   print "------------------------------------------------\n"
+
+
 printQExec :: OPExec -> IO ()
 printQExec (OPForall name eid) = putStrLn $ "  " ++ name ++ (eidStr eid) ++ " (forall)"
 printQExec (OPExists name eid) = putStrLn $ "  " ++ name ++ (eidStr eid) ++ " (exists)"
@@ -50,8 +69,8 @@ eidStr :: OPExecId -> String
 eidStr Nothing = ""
 eidStr (Just eid) = "[" ++ eid ++ "]"
 
-runKLQuery :: S.SMT OPQuery -> IO (String, Bool)
-runKLQuery query = do
+runQuery :: S.SMT OPQuery -> IO (String, Bool)
+runQuery query = do
   let specs_trip = do
         OPQuery specs pre forall exists post <- query
         return $ (specs, RHLETrip pre forall exists post)
