@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
-module SMTMonad
-  ( module SMTMonad
+module Orhle.SMTMonad
+  ( module Orhle.SMTMonad
   , Expr
   , Type
   )
@@ -34,6 +34,7 @@ newtype SMT a = SMT (WriterT (Set Name) (State Int) a)
   deriving (Functor, Applicative, Monad, MonadWriter (Set Name), MonadState Int)
 
 newtype Symbol = Symbol Name
+  deriving (Eq, Ord)
 
 mkStringSymbol :: String -> SMT Symbol
 mkStringSymbol = return . Symbol . N

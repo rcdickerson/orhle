@@ -1,17 +1,16 @@
-module ImpPrettyPrint
+module Orhle.ImpPrettyPrint
         ( prettyprint
         , prettyprintAExp
         , prettyprintBExp
         )
 where
 
-import Assertion ( Assertion
-                 , Arith )
 import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Render.Text
 import Data.Text.Prettyprint.Doc.Render.String
 import Data.Text ( Text )
-import Imp
+import Orhle.Assertion ( Assertion, Arith )
+import Orhle.Imp
 
 prettyprint :: Stmt -> Text
 prettyprint = renderStrict . layoutPretty defaultLayoutOptions . prettyStmt

@@ -1,4 +1,4 @@
-module Assertion
+module Orhle.Assertion
   ( Arith(..)
   , Assertion(..)
   , Ident(..)
@@ -8,10 +8,10 @@ module Assertion
   , toSMT
   ) where
 
-import           Data.List ( intercalate )
-import           MapNames
-import           SMTMonad  ( SMT )
-import qualified SMTMonad as SMT
+import Data.List ( intercalate )
+import Orhle.MapNames
+import Orhle.SMTMonad  ( SMT )
+import qualified Orhle.SMTMonad as SMT
 
 
 -----------------

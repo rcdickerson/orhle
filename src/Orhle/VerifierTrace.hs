@@ -1,4 +1,4 @@
-module VerifierTrace
+module Orhle.VerifierTrace
   ( VerifierTrace
   , VTWriter
   , logAbductionFailure
@@ -17,12 +17,12 @@ module VerifierTrace
 
 import           Control.Monad.Writer
 import qualified Data.List            as List
-import           Imp
-import           ImpPrettyPrint
-import           Triples
+import           Orhle.Imp
+import           Orhle.ImpPrettyPrint
+import           Orhle.Triple
 
-data VerifierTrace = VTRhle RHLETrip
-                   | VTHle  HLETrip
+data VerifierTrace = VTRhle RhleTriple
+                   | VTHle  HleTriple
                    | VTAbduction Bool [String] String String
                    | VTCall VTKind String String
                    | VTStartBranch String
@@ -33,10 +33,10 @@ data VTKind = VTKindA | VTKindE | VTKindGeneral
 
 type VTWriter m a = WriterT [VerifierTrace] m a
 
-logRhle :: (Monad m) => RHLETrip -> VTWriter m ()
+logRhle :: (Monad m) => RhleTriple -> VTWriter m ()
 logRhle trip = do tell [VTRhle trip]
 
-logHle :: (Monad m) => HLETrip -> VTWriter m ()
+logHle :: (Monad m) => HleTriple -> VTWriter m ()
 logHle trip = do tell [VTHle trip]
 
 logMsg :: (Monad m) => String -> VTWriter m ()
@@ -75,11 +75,11 @@ ppVTrace' :: Int -> [VerifierTrace] -> String
 ppVTrace' _ [] = ""
 ppVTrace' indent (t:ts) =
   case t of
-    VTRhle (RHLETrip pre aProgs eProgs post) ->
+    VTRhle (RhleTriple pre aProgs eProgs post) ->
       let progStr = ppStmtsStart aProgs
           rest    = ppVTrace' indent ts
       in start ++ "A " ++ (show pre) ++ " :: " ++ progStr ++ "\n" ++ rest
-    VTHle  (HLETrip  pre progE post) ->
+    VTHle  (HleTriple  pre progE post) ->
       let progStr = ppStmtStart progE
           rest    = ppVTrace' indent ts
       in start ++ "E " ++ (show pre) ++ " :: " ++ progStr ++ "\n" ++ rest

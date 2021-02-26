@@ -1,4 +1,4 @@
-module AbdTrace
+module Orhle.Abduction.AbdTrace
   ( AbdTrace(..)
   , ATWriter
   , logAbdFailure
@@ -10,13 +10,14 @@ module AbdTrace
   , ppAbdTrace
   ) where
 
-import Control.Monad.Writer
-import Z3.Monad
+import           Control.Monad.Writer
+import           Orhle.SMTMonad  ( SMT )
+import qualified Orhle.SMTMonad as SMT
 
-data AbdTrace = ATAbdStart [String] AST AST
+data AbdTrace = ATAbdStart [String] SMT.Expr SMT.Expr
               | ATFailure String
-              | ATFlatten String AST AST
-              | ATFormula String AST
+              | ATFlatten String SMT.Expr SMT.Expr
+              | ATFormula String SMT.Expr
               | ATMessage String
               | ATSuccess
 
@@ -25,33 +26,33 @@ type ATWriter m a = WriterT [AbdTrace] m a
 logAbdFailure :: (Monad m) => String -> ATWriter m ()
 logAbdFailure message = do tell [ATFailure message]
 
-logAbdFlatten :: (Monad m) => String -> AST -> AST -> ATWriter m ()
+logAbdFlatten :: (Monad m) => String -> SMT.Expr -> SMT.Expr -> ATWriter m ()
 logAbdFlatten name from to = do tell [ATFlatten name from to]
 
-logAbdFormula :: (Monad m) => String -> AST -> ATWriter m ()
+logAbdFormula :: (Monad m) => String -> SMT.Expr -> ATWriter m ()
 logAbdFormula message formula = do tell [ATFormula message formula]
 
 logAbdMessage :: (Monad m) => String -> ATWriter m ()
 logAbdMessage message = do tell [ATMessage message]
 
-logAbdStart :: (Monad m) => [String] -> AST -> AST -> ATWriter m ()
+logAbdStart :: (Monad m) => [String] -> SMT.Expr -> SMT.Expr -> ATWriter m ()
 logAbdStart abdDescs pre post = do tell [ATAbdStart abdDescs pre post]
 
 logAbdSuccess :: (Monad m) => ATWriter m ()
 logAbdSuccess = do tell [ATSuccess]
 
 
-ppAbdTrace :: [AbdTrace] -> Z3 String
+ppAbdTrace :: [AbdTrace] -> SMT String
 ppAbdTrace = ppAbdTrace' 0
 
-ppAbdTrace' :: Int -> [AbdTrace] -> Z3 String
+ppAbdTrace' :: Int -> [AbdTrace] -> SMT String
 ppAbdTrace' _ [] = return ""
 ppAbdTrace' indent (t:ts) = do
   rest <- ppAbdTrace' indent ts
   case t of
     ATAbdStart abdNames pre post -> do
-      preStr <- astToString pre
-      postStr <- astToString post
+      let preStr  = SMT.exprToString pre
+      let postStr = SMT.exprToString post
       return $ start ++ "!! Starting Abduction\n"
                      ++ "Abducibles: " ++ (show abdNames) ++ "\n"
                      ++ "Precondition: " ++ preStr ++ "\n"
@@ -59,13 +60,13 @@ ppAbdTrace' indent (t:ts) = do
                      ++ rest
     ATFailure msg -> return $ start ++ "Abduction Failure: " ++ msg ++ "\n" ++ rest
     ATFlatten name from to -> do
-      fromStr <- astToString from
-      toStr   <- astToString to
+      let fromStr = SMT.exprToString from
+      let toStr   = SMT.exprToString to
       return $ start ++
         name ++ " before flatten: " ++ fromStr ++ "\n" ++
         name ++ " after flatten: "  ++ toStr   ++ "\n" ++ rest
     ATFormula msg formula -> do
-      formulaStr <- astToString formula
+      let formulaStr = SMT.exprToString formula
       return $ start ++ msg ++ ": " ++ formulaStr ++ "\n" ++ rest
     ATMessage msg -> return $ start ++ msg ++ "\n" ++ rest
     ATSuccess -> return "Success\n"

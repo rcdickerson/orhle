@@ -1,34 +1,20 @@
 module Orhle
-    ( AExp(..)
-    , BExp(..)
-    , HLTrip(..)
-    , HLETrip(..)
-    , ExpectedResult(..)
-    , Query(..)
+    ( HlTriple(..)
+    , HleTriple(..)
     , Exec(..)
     , ExecId
-    , RHLETrip(..)
+    , RhleTriple(..)
     , Spec(..)
     , SpecMap
     , SpecMaps(..)
-    , Stmt(..)
-    , SFun(..)
-    , Var
-    , Verifier
     , addSpec
     , emptySpecMap
     , impParser
-    , mkRHLETrip
     , parseImp
     , parseOrhleApp
-    , ppVTrace
-    , rhleVerifier
     ) where
 
-import Imp
-import ImpParser
-import OrhleParser
-import Spec
-import Triples
-import Verifier
-import VerifierTrace
+import Orhle.ImpParser
+import Orhle.OrhleParser
+import Orhle.Spec
+import Orhle.Triple

@@ -1,4 +1,4 @@
-module Imp
+module Orhle.Imp
     ( AExp(..)
     , BExp(..)
     , SFun(..)
@@ -13,11 +13,11 @@ module Imp
     , svars
     ) where
 
-import           Assertion  ( Assertion)
-import qualified Assertion as A
 import qualified Data.Set  as Set
-import           MapNames
-import qualified SMTMonad  as S
+import           Orhle.Assertion  ( Assertion)
+import qualified Orhle.Assertion as A
+import           Orhle.MapNames
+import qualified Orhle.SMTMonad  as S
 
 
 type Var = String

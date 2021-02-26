@@ -38,14 +38,14 @@ import           Data.Sequence                  ( Seq(..)
                                                 , fromList
                                                 )
 
-import qualified Imp                           as I
+import qualified Orhle.Imp                     as I
+import qualified Orhle.Assertion               as A
+import qualified Orhle.AssertionParser         as AParse
 import qualified Language.Java.Syntax          as J
 
 --
 -- Data types
 --
-
-type ITransStmt = I.AbsStmt String
 
 data MethodContext = MethodContext
     { mcLoopInvariants :: Map.Map String String
@@ -58,21 +58,21 @@ data TransBodyState = TransBodyState
 
 
 newtype TransBody a =
-  TransBody (ExceptT String (RWS MethodContext [ITransStmt] TransBodyState) a)
-  deriving (Functor, Applicative, Monad, MonadReader MethodContext, MonadWriter [ITransStmt], MonadState TransBodyState, MonadError String)
+  TransBody (ExceptT String (RWS MethodContext [I.Stmt] TransBodyState) a)
+  deriving (Functor, Applicative, Monad, MonadReader MethodContext, MonadWriter [I.Stmt], MonadState TransBodyState, MonadError String)
 
 runTransBody
   :: MethodContext
   -> TransBodyState
   -> TransBody a
-  -> (Either String a, TransBodyState, [ITransStmt])
+  -> (Either String a, TransBodyState, [I.Stmt])
 runTransBody sig st (TransBody a) = runRWS (runExceptT a) sig st
 
 --
 -- Translation
 --
 
-translate :: MethodContext -> J.CompilationUnit -> Either String ITransStmt
+translate :: MethodContext -> J.CompilationUnit -> Either String I.Stmt
 translate methodContext =
   translateMethodBody methodContext <=< extractSingleMethod
 
@@ -82,7 +82,7 @@ extractSingleMethod (J.CompilationUnit _maybePackageDecl _importList [J.ClassTyp
   = Right methodBodyBlock
 extractSingleMethod _ = Left "bad Java compilation unit"
 
-translateMethodBody :: MethodContext -> J.Block -> Either String ITransStmt
+translateMethodBody :: MethodContext -> J.Block -> Either String I.Stmt
 translateMethodBody methodContext (J.Block jStmts_l) =
   let (jStmts, lastRetJExp) = case fromList jStmts_l of
         s :|> (J.BlockStmt (J.Return jRetExp)) -> (s, jRetExp)
@@ -150,12 +150,17 @@ translateStmt (J.Labeled jLabel (J.BasicFor jInit jCond jUpdates jBody)) = do
   tell [I.SWhile cond (I.SSeq body) (inv, var, False)]
 translateStmt s = throwError ("unsupported statement: " ++ show s)
 
-getLoopAnnotations :: J.Ident -> TransBody (String, String)
+getLoopAnnotations :: J.Ident -> TransBody (A.Assertion, A.Arith)
 getLoopAnnotations (J.Ident label) = do
   maybeInv <- asks (Map.lookup label . mcLoopInvariants)
-  inv      <- maybe noInvError return maybeInv
-  var      <- asks (fromMaybe "true" . Map.lookup label . mcLoopVariants)
-  return (inv, var)
+  invStr   <- maybe noInvError return maybeInv
+  varStr   <- asks (fromMaybe "0" . Map.lookup label . mcLoopVariants)
+  let inv  = AParse.parseAssertion invStr
+  let var  = AParse.parseArith varStr
+  case (inv, var) of
+    (Right i, Right v) -> return (i, v)
+    (Left msg, _) -> error $ show msg
+    (_, Left msg) -> error $ show msg
   where noInvError = throwError ("loop has no invariant: " ++ label)
 
 -- TODO: we probably want to support more than only expressions of type int
@@ -237,5 +242,5 @@ ensureVar e          = do
   tell [I.SAsgn v e]
   return v
 
-inBlock :: TransBody a -> TransBody (a, [ITransStmt])
+inBlock :: TransBody a -> TransBody (a, [I.Stmt])
 inBlock = censor (const []) . listen

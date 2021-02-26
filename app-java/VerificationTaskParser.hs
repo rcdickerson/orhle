@@ -4,15 +4,17 @@ module VerificationTaskParser
   ( VerificationTask(..)
   , Execution(..)
   , parseVerificationTask
-  , parseFunSpecsFile
+  , parseSpecsFile
   )
 where
 
 import           Text.Parsec
 import           Text.Parsec.Language
 import qualified Text.Parsec.Token             as Token
+import           Orhle.Assertion
+import           Orhle.AssertionParser
+import           Orhle.Spec
 
-import           Spec                           ( FunSpec(FunSpec) )
 
 type LoopLabel = String
 
@@ -123,15 +125,15 @@ execSubscriptParser = do
   whiteSpace >> char ']' >> whiteSpace
   return eid
 
-parseFunSpecsFile
+parseSpecsFile
   :: String
   -> Either
        ParseError
-       ([(String, FunSpec String)], [(String, FunSpec String)])
-parseFunSpecsFile = runParser funSpecsFileParser () ""
+       ([(String, Spec)], [(String, Spec)])
+parseSpecsFile = runParser funSpecsFileParser () ""
 
 funSpecsFileParser
-  :: VTParser ([(String, FunSpec String)], [(String, FunSpec String)])
+  :: VTParser ([(String, Spec)], [(String, Spec)])
 funSpecsFileParser = do
   whiteSpace
   aspecs <- option [] $ try $ funSpecList "aspecs"
@@ -141,13 +143,13 @@ funSpecsFileParser = do
   eof
   return (aspecs, especs)
 
-funSpecList :: String -> VTParser [(String, FunSpec String)]
+funSpecList :: String -> VTParser [(String, Spec)]
 funSpecList t = do
   reserved t
   whiteSpace
   braces (whiteSpace >> many funSpec)
 
-funSpec :: VTParser (String, FunSpec String)
+funSpec :: VTParser (String, Spec)
 funSpec = do
   funName <- identifier
   params  <- parens (identifier `sepBy` comma)
@@ -157,14 +159,19 @@ funSpec = do
       reservedLabel "choiceVars"
       vars <- identifier `sepBy` comma
       _    <- char ';'
-      return vars
+      return $ map (\v -> Ident v Int) vars
     whiteSpace
-    pre <- option "true" $ reservedLabel "pre" *> untilSemi
+    preStr <- option "true" $ reservedLabel "pre" *> untilSemi
     whiteSpace
-    post <- option "true" $ reservedLabel "post" *> untilSemi
+    postStr <- option "true" $ reservedLabel "post" *> untilSemi
     whiteSpace
-    return (choiceVars, pre, post)
-  return (funName, FunSpec params choiceVars pre post)
+    let pre  = parseAssertion preStr
+    let post = parseAssertion postStr
+    case (pre, post) of
+      (Right preA, Right postA) -> return (choiceVars, preA, postA)
+      (Left err, _) -> fail $ show err
+      (_, Left err) -> fail $ show err
+  return (funName, Spec params choiceVars pre post)
 
 
 reservedLabel :: String -> VTParser ()

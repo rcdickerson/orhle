@@ -1,20 +1,20 @@
-module Verifier
+module Orhle.Verifier
   ( Failure(..)
   , Success(..)
   , Verifier
   , rhleVerifier
   ) where
 
-import           Assertion             ( Assertion )
-import qualified Assertion            as A
 import qualified Data.Set             as Set
-import           Imp
-import qualified MapNames             as Names
-import           Spec
-import qualified SMTMonad             as SMT
-import           Triples
+import           Orhle.Assertion       ( Assertion )
+import qualified Orhle.Assertion      as A
+import           Orhle.Imp
+import qualified Orhle.MapNames       as Names
+import           Orhle.Spec
+import qualified Orhle.SMTMonad       as SMT
+import           Orhle.Triple
 
-type Verifier = SpecMaps -> RHLETrip -> IO (Either Failure Success)
+type Verifier = SpecMaps -> RhleTriple -> IO (Either Failure Success)
 data Failure  = Failure { model :: SMT.Model }
 data Success  = Success
 
@@ -23,7 +23,7 @@ data VCQuant = VCUniversal
              deriving Show
 
 rhleVerifier :: Verifier
-rhleVerifier specs (RHLETrip pre aProgs eProgs post) = let
+rhleVerifier specs (RhleTriple pre aProgs eProgs post) = let
   vcsA = vcsForProgs VCExistential (especs specs) eProgs post
   vcsE = vcsForProgs VCUniversal   (aspecs specs) aProgs vcsA
   vcs  = A.Imp pre vcsE

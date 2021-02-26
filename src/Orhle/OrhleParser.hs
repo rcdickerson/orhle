@@ -1,43 +1,34 @@
-module OrhleParser
+module Orhle.OrhleParser
   ( ExpectedResult(..)
-  , Query(..)
   , Exec(..)
   , ExecId
   , parseOrhleApp
   ) where
 
-import           Assertion             ( Assertion )
-import qualified Assertion            as A
-import           AssertionParser       ( parseAssertion )
 import           Control.Monad
-import qualified Data.Map             as Map
-import           Imp
-import           ImpParser
-import qualified MapNames             as Names
+import qualified Data.Map              as Map
+import           Orhle.Assertion        ( Assertion )
+import qualified Orhle.Assertion       as A
+import           Orhle.AssertionParser
+import           Orhle.Imp
+import           Orhle.ImpParser
+import qualified Orhle.MapNames        as Names
+import           Orhle.Spec             ( Spec(..)
+                                        , SpecMap
+                                        , SpecMaps(..)
+                                        )
+import qualified Orhle.Spec            as S
+import           Orhle.Triple
 import           Text.Parsec
 import           Text.Parsec.Language
-import qualified Text.Parsec.Token    as Token
-import           SMTMonad              ( SMT )
-import qualified SMTMonad             as SMT
-import           Spec                  ( Spec(..)
-                                       , SpecMap
-                                       , SpecMaps(..)
-                                       )
-import qualified Spec                 as S
+import qualified Text.Parsec.Token     as Token
 
-data Query = Query
-             { qSpecs       :: SpecMaps
-             , qPreCond     :: Assertion
-             , qForallProgs :: [Stmt]
-             , qExistsProgs :: [Stmt]
-             , qPostCond    :: Assertion
-             }
 
 data Exec = Forall String ExecId | Exists String ExecId
 type ExecId = Maybe String
 type NamedProg = (String, Stmt)
 
-data ExpectedResult = Success | Failure
+data ExpectedResult = ExpectSuccess | ExpectFailure
   deriving (Eq, Show)
 
 languageDef :: LanguageDef()
@@ -71,10 +62,10 @@ whiteSpace = Token.whiteSpace lexer
 
 type OrhleAppParser a = Parsec String () a
 
-parseOrhleApp :: String -> Either ParseError ([Exec], Query, ExpectedResult)
+parseOrhleApp :: String -> Either ParseError ([Exec], SpecMaps, RhleTriple, ExpectedResult)
 parseOrhleApp str = runParser orhleAppParser () "" str
 
-orhleAppParser :: OrhleAppParser ([Exec], Query, ExpectedResult)
+orhleAppParser :: OrhleAppParser ([Exec], SpecMaps, RhleTriple, ExpectedResult)
 orhleAppParser = do
   whiteSpace
   expectedResult <- try expectedValid <|> expectedInvalid; whiteSpace
@@ -105,8 +96,7 @@ orhleAppParser = do
         Just prog -> return $ prefixProgram prog exec
   aProgs <- mapM lookupAndPrefix aExecs
   eProgs <- mapM lookupAndPrefix eExecs
-  let query = Query specs pre aProgs eProgs post
-  return $ ((aExecs ++ eExecs), query, expectedResult)
+  return $ ((aExecs ++ eExecs), specs, RhleTriple pre aProgs eProgs post, expectedResult)
 
 prefixProgram :: Stmt -> Exec -> Stmt
 prefixProgram prog exec = Names.prefix (execPrefix exec) prog
@@ -133,7 +123,7 @@ expectedValid = do
   char ':' >> whiteSpace
   reserved "valid" >> whiteSpace
   semi >> whiteSpace
-  return Success
+  return ExpectSuccess
 
 expectedInvalid :: OrhleAppParser ExpectedResult
 expectedInvalid = do
@@ -141,7 +131,7 @@ expectedInvalid = do
   char ':' >> whiteSpace
   reserved "invalid" >> whiteSpace
   semi >> whiteSpace
-  return Failure
+  return ExpectFailure
 
 execs :: String -> (String -> ExecId -> Exec) -> OrhleAppParser [Exec]
 execs keyword quant = do

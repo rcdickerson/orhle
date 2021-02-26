@@ -1,4 +1,4 @@
-module Spec
+module Orhle.Spec
   ( Spec(..)
   , SpecMap
   , SpecMaps(..)
@@ -10,12 +10,12 @@ module Spec
   , specAtCallsite
   ) where
 
-import           Assertion        ( Assertion )
-import qualified Assertion       as A
 import           Data.List        ( isPrefixOf )
 import qualified Data.Map        as Map
-import           Imp
-import qualified MapNames        as Names
+import           Orhle.Assertion  ( Assertion )
+import qualified Orhle.Assertion as A
+import           Orhle.Imp
+import qualified Orhle.MapNames  as Names
 
 data Spec = Spec { params        :: [Var]
                  , choiceVars    :: [A.Ident]

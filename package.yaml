@@ -31,6 +31,18 @@ dependencies:
 library:
   source-dirs:
     - src
+  exposed-modules:
+    - Orhle
+    - Orhle.Assertion
+    - Orhle.AssertionParser
+    - Orhle.Imp
+    - Orhle.ImpParser
+    - Orhle.ImpPrettyPrint
+    - Orhle.OrhleParser
+    - Orhle.Spec
+    - Orhle.SMTMonad
+    - Orhle.Triple
+    - Orhle.Verifier
 
 executables:
   orhle-exe:

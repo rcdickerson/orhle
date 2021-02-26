@@ -1,4 +1,4 @@
-module MapNames
+module Orhle.MapNames
   ( MappableNames
   , mapNames
   , prefix
