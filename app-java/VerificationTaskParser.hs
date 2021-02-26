@@ -13,7 +13,6 @@ import           Text.Parsec.Language
 import qualified Text.Parsec.Token             as Token
 import           Orhle
 import           Orhle.Assertion
-import           Orhle.AssertionParser
 
 
 type LoopLabel = String

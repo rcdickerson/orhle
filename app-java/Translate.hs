@@ -40,7 +40,6 @@ import           Data.Sequence                  ( Seq(..)
 
 import qualified Orhle.Imp                     as I
 import qualified Orhle.Assertion               as A
-import qualified Orhle.AssertionParser         as AParse
 import qualified Language.Java.Syntax          as J
 
 --
@@ -155,8 +154,8 @@ getLoopAnnotations (J.Ident label) = do
   maybeInv <- asks (Map.lookup label . mcLoopInvariants)
   invStr   <- maybe noInvError return maybeInv
   varStr   <- asks (fromMaybe "0" . Map.lookup label . mcLoopVariants)
-  let inv  = AParse.parseAssertion invStr
-  let var  = AParse.parseArith varStr
+  let inv  = A.parseAssertion invStr
+  let var  = A.parseArith varStr
   case (inv, var) of
     (Right i, Right v) -> return (i, v)
     (Left msg, _) -> error $ show msg

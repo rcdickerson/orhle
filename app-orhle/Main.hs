@@ -4,6 +4,7 @@ import Orhle ( RhleTriple(..), parseOrhle )
 import qualified Orhle
 import System.Environment
 import System.Exit
+import Text.Show.Pretty ( pPrintList )
 
 main :: IO ()
 main = do
@@ -48,9 +49,11 @@ printQuery execs (RhleTriple pre aProgs eProgs post) = do
   mapM_ printExec execs
   putStrLn ""
   putStrLn "------------------------------------------------"
-  putStrLn $ "Universal Programs:\n  " ++ (show aProgs)
+  putStrLn $ "Universal Programs:"
+  pPrintList aProgs
   putStrLn "------------------------------------------------"
-  putStrLn $ "Existential Programs:\n  " ++ (show eProgs)
+  putStrLn $ "Existential Programs:"
+  pPrintList eProgs
   putStrLn "------------------------------------------------"
   putStrLn $ "Precondition:\n  " ++ (show pre)
   putStrLn "------------------------------------------------"

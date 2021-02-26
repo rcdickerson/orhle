@@ -17,8 +17,8 @@ module Orhle.VerifierTrace
 
 import           Control.Monad.Writer
 import qualified Data.List            as List
-import           Orhle.Imp
-import           Orhle.ImpPrettyPrint
+import           Orhle.Imp.ImpLanguage
+import           Orhle.Imp.ImpPrettyPrint
 import           Orhle.Triple
 
 data VerifierTrace = VTRhle RhleTriple

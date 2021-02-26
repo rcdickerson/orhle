@@ -1,4 +1,4 @@
-module Orhle.AssertionParser
+module Orhle.Assertion.AssertionParser
   ( ParseError
   , arithParser
   , assertionParser
@@ -6,13 +6,11 @@ module Orhle.AssertionParser
   , parseAssertion
   ) where
 
-import           Orhle.Assertion       ( Arith
-                                       , Assertion
-                                       )
-import qualified Orhle.Assertion      as A
-import           Text.Parsec
-import           Text.Parsec.Language
-import qualified Text.Parsec.Token    as Token
+import Orhle.Assertion.AssertionLanguage ( Arith, Assertion )
+import qualified Orhle.Assertion.AssertionLanguage as A
+import Text.Parsec
+import Text.Parsec.Language
+import qualified Text.Parsec.Token as Token
 
 languageDef :: LanguageDef ()
 languageDef = Token.LanguageDef

@@ -9,9 +9,7 @@ import           Control.Monad
 import qualified Data.Map              as Map
 import           Orhle.Assertion        ( Assertion )
 import qualified Orhle.Assertion       as A
-import           Orhle.AssertionParser
 import           Orhle.Imp
-import           Orhle.ImpParser
 import qualified Orhle.MapNames        as Names
 import           Orhle.Spec
 import qualified Orhle.Spec            as S
@@ -169,7 +167,7 @@ labeledAssertion label = do
   reserved label >> whiteSpace >> char ':' >> whiteSpace
   str <- untilSemi
   whiteSpace
-  case parseAssertion str of
+  case A.parseAssertion str of
     Left error      -> fail $ show error
     Right assertion -> return assertion
 

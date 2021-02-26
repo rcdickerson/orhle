@@ -1,15 +1,16 @@
 -- A simple Imp parser with specified uninterpreted functions.
 -- Based on https://wiki.haskell.org/Parsing_a_simple_imperative_language
 
-module Orhle.ImpParser
-    ( impParser
+module Orhle.Imp.ImpParser
+    ( ParseError(..)
+    , impParser
     , parseImp
     ) where
 
 import Control.Monad
-import Orhle.Assertion
-import Orhle.AssertionParser
-import Orhle.Imp
+import Orhle.Assertion.AssertionLanguage
+import Orhle.Assertion.AssertionParser
+import Orhle.Imp.ImpLanguage
 import Text.Parsec
 import Text.Parsec.Expr
 import Text.Parsec.Language

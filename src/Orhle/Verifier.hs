@@ -8,7 +8,7 @@ module Orhle.Verifier
 import qualified Data.Set             as Set
 import           Orhle.Assertion       ( Assertion )
 import qualified Orhle.Assertion      as A
-import           Orhle.Imp
+import           Orhle.Imp.ImpLanguage
 import qualified Orhle.MapNames       as Names
 import           Orhle.Spec
 import qualified Orhle.SMT            as SMT

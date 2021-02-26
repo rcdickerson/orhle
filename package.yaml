@@ -34,10 +34,7 @@ library:
   exposed-modules:
     - Orhle
     - Orhle.Assertion
-    - Orhle.AssertionParser
     - Orhle.Imp
-    - Orhle.ImpParser
-    - Orhle.ImpPrettyPrint
 
 executables:
   orhle-exe:
@@ -49,6 +46,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - orhle
+    - pretty-show
   java-orhle-exe:
     main:                Main.hs
     source-dirs:         app-java
