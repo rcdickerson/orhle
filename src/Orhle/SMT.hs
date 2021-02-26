@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
-module Orhle.SMTMonad
-  ( module Orhle.SMTMonad
+module Orhle.SMT
+  ( module Orhle.SMT
   , Expr
   , Type
   )

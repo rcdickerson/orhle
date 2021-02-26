@@ -17,7 +17,7 @@ import qualified Data.Set  as Set
 import           Orhle.Assertion  ( Assertion)
 import qualified Orhle.Assertion as A
 import           Orhle.MapNames
-import qualified Orhle.SMTMonad  as S
+import qualified Orhle.SMT as S
 
 
 type Var = String

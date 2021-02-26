@@ -6,8 +6,8 @@ module Orhle.Abduction.MSA
   ) where
 
 import qualified Data.Set as Set
-import           Orhle.SMTMonad  ( SMT )
-import qualified Orhle.SMTMonad as SMT
+import           Orhle.SMT  ( SMT )
+import qualified Orhle.SMT as SMT
 
 findMsaVars :: SMT.Expr -> [SMT.Symbol] -> SMT [SMT.Symbol]
 findMsaVars formula vars = do

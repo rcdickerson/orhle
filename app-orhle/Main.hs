@@ -2,7 +2,7 @@ module Main where
 
 import Orhle ( RhleTriple(..), parseOrhle )
 import qualified Orhle
-import qualified Orhle.SMTMonad as S
+import qualified Orhle.SMT as S
 import System.Environment
 import System.Exit
 
@@ -38,7 +38,8 @@ run orhle = do
       printQuery execs rhleTriple
       result <- Orhle.verify specs rhleTriple
       let (output, didAsExpected) = case result of
-            Left (Orhle.Failure (S.Model m)) -> ("Invalid. " ++ m, expected == Orhle.ExpectFailure)
+            Left (Orhle.Failure (S.Model m)) ->
+              ("Invalid. " ++ m, expected == Orhle.ExpectFailure)
             Right _ -> ("Valid.", expected == Orhle.ExpectSuccess)
       return (output, didAsExpected)
 

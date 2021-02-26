@@ -11,7 +11,7 @@ import qualified Orhle.Assertion      as A
 import           Orhle.Imp
 import qualified Orhle.MapNames       as Names
 import           Orhle.Spec
-import qualified Orhle.SMTMonad       as SMT
+import qualified Orhle.SMT            as SMT
 import           Orhle.Triple
 
 type Verifier = AESpecs -> RhleTriple -> IO (Either Failure Success)

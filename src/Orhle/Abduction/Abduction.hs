@@ -15,8 +15,8 @@ import Orhle.Abduction.InterpMap
 import Orhle.Abduction.MSA
 import Orhle.Abduction.Simplify
 import Orhle.Imp
-import Orhle.SMTMonad  ( SMT )
-import qualified Orhle.SMTMonad as SMT
+import Orhle.SMT ( SMT )
+import qualified Orhle.SMT as SMT
 
 --------------------------------------------------------------------------------
 

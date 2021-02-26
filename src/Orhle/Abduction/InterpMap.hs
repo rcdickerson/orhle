@@ -9,8 +9,8 @@ module Orhle.Abduction.InterpMap
 
 import qualified Data.Map as Map
 import           Orhle.Abduction.Abducible
-import           Orhle.SMTMonad  ( SMT )
-import qualified Orhle.SMTMonad as SMT
+import           Orhle.SMT  ( SMT )
+import qualified Orhle.SMT as SMT
 
 type InterpMap = Map.Map Abducible SMT.Expr
 

@@ -38,7 +38,7 @@ library:
     - Orhle.Imp
     - Orhle.ImpParser
     - Orhle.ImpPrettyPrint
-    - Orhle.SMTMonad
+    - Orhle.SMT
 
 executables:
   orhle-exe:

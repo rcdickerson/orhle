@@ -9,8 +9,8 @@ import           Control.Monad (foldM)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import           Orhle.Imp
-import           Orhle.SMTMonad  ( SMT )
-import qualified Orhle.SMTMonad as SMT
+import           Orhle.SMT  ( SMT )
+import qualified Orhle.SMT as SMT
 
 
 data Abducible = Abducible

@@ -11,8 +11,8 @@ module Orhle.Abduction.AbdTrace
   ) where
 
 import           Control.Monad.Writer
-import           Orhle.SMTMonad  ( SMT )
-import qualified Orhle.SMTMonad as SMT
+import           Orhle.SMT  ( SMT )
+import qualified Orhle.SMT as SMT
 
 data AbdTrace = ATAbdStart [String] SMT.Expr SMT.Expr
               | ATFailure String

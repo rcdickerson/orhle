@@ -10,8 +10,8 @@ module Orhle.Assertion
 
 import Data.List ( intercalate )
 import Orhle.MapNames
-import Orhle.SMTMonad  ( SMT )
-import qualified Orhle.SMTMonad as SMT
+import Orhle.SMT ( SMT )
+import qualified Orhle.SMT as SMT
 
 
 -----------------

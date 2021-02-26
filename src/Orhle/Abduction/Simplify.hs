@@ -10,8 +10,8 @@ module Orhle.Abduction.Simplify
 where
 
 import           Data.List
-import           Orhle.SMTMonad  ( SMT )
-import qualified Orhle.SMTMonad as SMT
+import           Orhle.SMT  ( SMT )
+import qualified Orhle.SMT as SMT
 
 data NodeType = NTLeaf | NTAnd | NTOr
 
