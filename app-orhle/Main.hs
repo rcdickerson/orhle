@@ -1,8 +1,7 @@
 module Main where
 
-import Orhle
-import Orhle.OrhleParser
-import Orhle.Verifier
+import Orhle ( RhleTriple(..), parseOrhle )
+import qualified Orhle
 import qualified Orhle.SMTMonad as S
 import System.Environment
 import System.Exit
@@ -27,36 +26,41 @@ showUsage =
 
 run :: String -> IO (String, Bool)
 run orhle = do
+  putStrLn ""
   putStrLn "*******************************************"
   putStrLn "****               ORHLE               ****"
   putStrLn "****     The Oracular RHLE Verifier    ****"
   putStrLn "*******************************************"
   putStrLn ""
-  case parseOrhleApp orhle of
-    Left  err -> return $ ((show err) ++ "\n", False)
+  case parseOrhle orhle of
+    Left  err -> return $ (err, False)
     Right (execs, specs, rhleTriple, expected) -> do
       printQuery execs rhleTriple
-      result <- rhleVerifier specs rhleTriple
+      result <- Orhle.verify specs rhleTriple
       let (output, didAsExpected) = case result of
-            Left (Failure (S.Model m)) -> ("Invalid. " ++ m, expected == ExpectFailure)
-            Right _ -> ("Valid.", expected == ExpectSuccess)
+            Left (Orhle.Failure (S.Model m)) -> ("Invalid. " ++ m, expected == Orhle.ExpectFailure)
+            Right _ -> ("Valid.", expected == Orhle.ExpectSuccess)
       return (output, didAsExpected)
 
-printQuery :: [Exec] -> RhleTriple -> IO ()
+printQuery :: [Orhle.Exec] -> RhleTriple -> IO ()
 printQuery execs (RhleTriple pre aProgs eProgs post) = do
   putStrLn ":: Executions"
   mapM_ printExec execs
   putStrLn ""
-  print "------------------------------------------------\n"
-  print $ "Universal Programs:\n" ++ (show aProgs) ++   "\n"
-  print "------------------------------------------------\n"
-  print $ "Existential Programs:\n" ++ (show eProgs) ++ "\n"
-  print "------------------------------------------------\n"
+  putStrLn "------------------------------------------------"
+  putStrLn $ "Universal Programs:\n  " ++ (show aProgs)
+  putStrLn "------------------------------------------------"
+  putStrLn $ "Existential Programs:\n  " ++ (show eProgs)
+  putStrLn "------------------------------------------------"
+  putStrLn $ "Precondition:\n  " ++ (show pre)
+  putStrLn "------------------------------------------------"
+  putStrLn $ "Postcondition:\n  " ++ (show post)
+  putStrLn "------------------------------------------------\n"
 
-printExec :: Exec -> IO ()
-printExec (Forall name eid) = putStrLn $ "  " ++ name ++ (eidStr eid) ++ " (forall)"
-printExec (Exists name eid) = putStrLn $ "  " ++ name ++ (eidStr eid) ++ " (exists)"
+printExec :: Orhle.Exec -> IO ()
+printExec (Orhle.Forall name eid) = putStrLn $ "  " ++ name ++ (eidStr eid) ++ " (forall)"
+printExec (Orhle.Exists name eid) = putStrLn $ "  " ++ name ++ (eidStr eid) ++ " (exists)"
 
-eidStr :: ExecId -> String
+eidStr :: Orhle.ExecId -> String
 eidStr Nothing = ""
 eidStr (Just eid) = "[" ++ eid ++ "]"

@@ -14,7 +14,7 @@ import           Orhle.Spec
 import qualified Orhle.SMTMonad       as SMT
 import           Orhle.Triple
 
-type Verifier = SpecMaps -> RhleTriple -> IO (Either Failure Success)
+type Verifier = AESpecs -> RhleTriple -> IO (Either Failure Success)
 data Failure  = Failure { model :: SMT.Model }
 data Success  = Success
 

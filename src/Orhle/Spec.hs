@@ -1,7 +1,7 @@
 module Orhle.Spec
   ( Spec(..)
   , SpecMap
-  , SpecMaps(..)
+  , AESpecs(..)
   , addSpec
   , emptySpecMap
   , funList
@@ -25,7 +25,7 @@ data Spec = Spec { params        :: [Var]
 
 type SpecMap = Map.Map String Spec
 
-data SpecMaps = SpecMaps
+data AESpecs = SpecMaps
   { aspecs :: SpecMap
   , especs :: SpecMap
   }

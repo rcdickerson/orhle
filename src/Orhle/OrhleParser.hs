@@ -1,7 +1,7 @@
 module Orhle.OrhleParser
-  ( ExpectedResult(..)
-  , Exec(..)
+  ( Exec(..)
   , ExecId
+  , ExpectedResult(..)
   , parseOrhleApp
   ) where
 
@@ -13,10 +13,7 @@ import           Orhle.AssertionParser
 import           Orhle.Imp
 import           Orhle.ImpParser
 import qualified Orhle.MapNames        as Names
-import           Orhle.Spec             ( Spec(..)
-                                        , SpecMap
-                                        , SpecMaps(..)
-                                        )
+import           Orhle.Spec
 import qualified Orhle.Spec            as S
 import           Orhle.Triple
 import           Text.Parsec
@@ -62,10 +59,10 @@ whiteSpace = Token.whiteSpace lexer
 
 type OrhleAppParser a = Parsec String () a
 
-parseOrhleApp :: String -> Either ParseError ([Exec], SpecMaps, RhleTriple, ExpectedResult)
+parseOrhleApp :: String -> Either ParseError ([Exec], AESpecs, RhleTriple, ExpectedResult)
 parseOrhleApp str = runParser orhleAppParser () "" str
 
-orhleAppParser :: OrhleAppParser ([Exec], SpecMaps, RhleTriple, ExpectedResult)
+orhleAppParser :: OrhleAppParser ([Exec], AESpecs, RhleTriple, ExpectedResult)
 orhleAppParser = do
   whiteSpace
   expectedResult <- try expectedValid <|> expectedInvalid; whiteSpace
