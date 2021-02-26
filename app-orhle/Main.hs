@@ -12,8 +12,7 @@ main = do
   case parseArgs args of
      Nothing   -> showUsage
      Just path -> do
-       (output, didAsExpected) <- readFile path >>= run
-       putStrLn output
+       didAsExpected <- readFile path >>= run
        if didAsExpected then exitSuccess else exitFailure
 
 parseArgs :: [String] -> Maybe FilePath
@@ -24,7 +23,7 @@ showUsage :: IO ()
 showUsage =
   putStrLn "Usage: orhle <filename>"
 
-run :: String -> IO (String, Bool)
+run :: String -> IO Bool
 run orhle = do
   putStrLn ""
   putStrLn "*******************************************"
@@ -33,15 +32,19 @@ run orhle = do
   putStrLn "*******************************************"
   putStrLn ""
   case parseOrhle orhle of
-    Left  err -> return $ (err, False)
+    Left err -> do
+      putStrLn $ "Parse error: " ++ err
+      return False
     Right (execs, specs, rhleTriple, expected) -> do
       printQuery execs rhleTriple
       result <- Orhle.verify specs rhleTriple
-      let (output, didAsExpected) = case result of
-            Left (Orhle.Failure (Orhle.Model m)) ->
-              ("Invalid. " ++ m, expected == Orhle.ExpectFailure)
-            Right _ -> ("Valid.", expected == Orhle.ExpectSuccess)
-      return (output, didAsExpected)
+      case result of
+        Left failure -> do
+          printFailure failure
+          return $ expected == Orhle.ExpectFailure
+        Right success -> do
+          printSuccess success
+          return $ expected == Orhle.ExpectSuccess
 
 printQuery :: [Orhle.Exec] -> RhleTriple -> IO ()
 printQuery execs (RhleTriple pre aProgs eProgs post) = do
@@ -59,6 +62,20 @@ printQuery execs (RhleTriple pre aProgs eProgs post) = do
   putStrLn "------------------------------------------------"
   putStrLn $ "Postcondition:\n  " ++ (show post)
   putStrLn "------------------------------------------------\n"
+
+printFailure :: Orhle.Failure -> IO ()
+printFailure (Orhle.Failure vcs (Orhle.Model model)) = do
+  putStrLn $ "Verification conditions:\n  " ++ (show vcs)
+  putStrLn ""
+  putStrLn $ "Falsifying model:\n  " ++ model
+  putStrLn ""
+  putStrLn "Invalid."
+
+printSuccess :: Orhle.Success -> IO ()
+printSuccess (Orhle.Success vcs) = do
+  putStrLn $ "Verification conditions:\n  " ++ (show vcs)
+  putStrLn ""
+  putStrLn "Valid."
 
 printExec :: Orhle.Exec -> IO ()
 printExec (Orhle.Forall name eid) = putStrLn $ "  " ++ name ++ (eidStr eid) ++ " (forall)"

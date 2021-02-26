@@ -5,18 +5,18 @@ module Orhle.Verifier
   , rhleVerifier
   ) where
 
-import qualified Data.Set             as Set
-import           Orhle.Assertion       ( Assertion )
-import qualified Orhle.Assertion      as A
+import qualified Data.Set as Set
+import           Orhle.Assertion ( Assertion )
+import qualified Orhle.Assertion as A
 import           Orhle.Imp.ImpLanguage
-import qualified Orhle.MapNames       as Names
+import qualified Orhle.MapNames as Names
 import           Orhle.Spec
-import qualified Orhle.SMT            as SMT
+import qualified Orhle.SMT as SMT
 import           Orhle.Triple
 
 type Verifier = AESpecs -> RhleTriple -> IO (Either Failure Success)
-data Failure  = Failure { model :: SMT.Model }
-data Success  = Success
+data Failure  = Failure { failureVcs :: Assertion,  model :: SMT.Model }
+data Success  = Success { successVcs :: Assertion }
 
 data VCQuant = VCUniversal
              | VCExistential
@@ -29,16 +29,12 @@ rhleVerifier specs (RhleTriple pre aProgs eProgs post) = let
   vcs  = A.Imp pre vcsE
   vcsPkg = SMT.packageSmt $ do
     vcSmt <- A.toSMT vcs
-    -- logMsg $ "Verification Conditions\n" ++ (indent (SMT.dumpExpr vcSmt)) ++ "\n"
     return vcSmt
   in do
     maybeModel <- SMT.checkValid vcsPkg
     case maybeModel of
-      Nothing    -> return $ Right  Success
-      Just model -> return $ Left $ Failure model
-    -- where
-    --   indent = intercalate "\n" . (map $ \l -> "  " ++ l) . lines
-    --   sortAndIndent = intercalate "\n" . (map $ \l -> "  " ++ l) . sort . lines
+      Nothing -> return . Right $ Success vcs
+      Just m  -> return . Left  $ Failure vcs m
 
 vcsForProgs :: VCQuant -> SpecMap -> [Stmt] -> Assertion -> Assertion
 vcsForProgs quant specs progs post = foldr (generateVCs quant specs) post progs
