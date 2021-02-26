@@ -33,7 +33,6 @@ import qualified Language.Java.Syntax          as JavaSyntax
 import           Orhle
 import           Orhle.Imp
 import           Orhle.ImpPrettyPrint
-import qualified Orhle.SMT                     as S
 
 import           Translate
 import           VerificationTaskParser
