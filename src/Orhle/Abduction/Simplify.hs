@@ -9,13 +9,13 @@ module Orhle.Abduction.Simplify
   )
 where
 
-import           Data.List
-import           Orhle.SMT  ( SMT )
+import Data.List
+import Orhle.Assertion
 import qualified Orhle.SMT as SMT
 
 data NodeType = NTLeaf | NTAnd | NTOr
 
-simplifyWrt :: SMT.Expr -> SMT.Expr -> SMT SMT.Expr
+simplifyWrt :: Assertion -> Assertion -> IO Assertion
 simplifyWrt wrt expr = do return expr
   -- wrt'  <- nnf wrt
   -- expr' <- nnf expr

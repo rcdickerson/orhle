@@ -1,4 +1,4 @@
-module VerifierTests where
+module Orhle.VerifierTests where
 
 import Data.List        (isSuffixOf)
 import Orhle
@@ -6,25 +6,21 @@ import System.Directory (getDirectoryContents)
 import System.FilePath
 import Test.HUnit
 
-assertVerifierResultMatches :: OPExpectedResult -> VerifierResult -> Assertion
-assertVerifierResultMatches expected (result, trace) =
+assertVerifierResultMatches :: ExpectedResult -> (Either Failure Success) -> Assertion
+assertVerifierResultMatches expected result =
   case (expected, result) of
-    (OPSuccess, Right _)   -> return ()
-    (OPFailure, Left  _)   -> return ()
-    (OPSuccess, Left  msg) -> assertFailure
-      $ "Expected VALID but was INVALID\n" ++ msg ++ "\n" ++ (ppVTrace trace)
-    (OPFailure, Right msg) -> assertFailure
-      $ "Expected INVALID but was VALID\n" ++ msg ++ "\n" ++ (ppVTrace trace)
-
+    (ExpectSuccess, Right _)   -> return ()
+    (ExpectFailure, Left  _)   -> return ()
+    (ExpectSuccess, Left (Failure _ model)) -> assertFailure
+      $ "Expected VALID but was INVALID\n" ++ "model: " ++ model
+    (ExpectFailure, Right _) -> assertFailure
+      $ "Expected INVALID but was VALID"
 
 parseAndTest :: String -> Assertion
-parseAndTest progStr = case parseOrhleApp progStr of
+parseAndTest progStr = case parseOrhle progStr of
   Left  err -> assertFailure $ "Parse error: " ++ (show err)
-  Right (_, query, expected) -> do
-    let specsAndTrip = do
-          (OPQuery specs pre forallProgs existsProgs post) <- query
-          return (specs, RHLETrip pre forallProgs existsProgs post)
-    result <- rhleVerifier specsAndTrip
+  Right (_, specs, triple, expected) -> do
+    result <- verify specs triple
     assertVerifierResultMatches expected result
 
 readImpFiles :: FilePath -> IO [(String, String)]
@@ -41,4 +37,4 @@ buildTestCases dirName = do
   return . TestList $ map buildTestCase impFiles
 
 buildVerifierTests :: IO Test
-buildVerifierTests = buildTestCases $ "test" </> "imp"
+buildVerifierTests = buildTestCases $ "test" </> "resources" </> "imp"

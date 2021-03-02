@@ -5,10 +5,8 @@ module Orhle.Imp.ImpLanguage
     , Stmt(..)
     , Var
     , aexpToArith
-    , aexpToSmt
     , avars
     , bexpToAssertion
-    , bexpToSmt
     , bvars
     , svars
     ) where
@@ -17,7 +15,6 @@ import qualified Data.Set  as Set
 import           Orhle.Assertion.AssertionLanguage  ( Assertion)
 import qualified Orhle.Assertion.AssertionLanguage as A
 import           Orhle.MapNames
-import qualified Orhle.SMT as S
 
 
 type Var = String
@@ -78,26 +75,6 @@ aexpToArith aexp = case aexp of
     power = aexpToArith aexp2
     in A.Pow base power
 
-aexpToSmt :: AExp -> S.SMT S.Expr
-aexpToSmt aexp = case aexp of
-  ALit i   -> S.mkIntNum i
-  AVar var -> S.mkIntVar =<< S.mkStringSymbol var
-  AAdd aexp1 aexp2 -> S.mkAdd =<< mapM aexpToSmt [aexp1, aexp2]
-  ASub aexp1 aexp2 -> S.mkSub =<< mapM aexpToSmt [aexp1, aexp2]
-  AMul aexp1 aexp2 -> S.mkMul =<< mapM aexpToSmt [aexp1, aexp2]
-  ADiv aexp1 aexp2 -> do
-    dividend <- aexpToSmt aexp1
-    divisor  <- aexpToSmt aexp2
-    S.mkDiv dividend divisor
-  AMod aexp1 aexp2 -> do
-    dividend <- aexpToSmt aexp1
-    divisor  <- aexpToSmt aexp2
-    S.mkMod dividend divisor
-  APow aexp1 aexp2 -> do
-    base <- aexpToSmt aexp1
-    power <- aexpToSmt aexp2
-    S.mkPower base power
-
 
 -------------------------
 -- Boolean Expressions --
@@ -157,38 +134,6 @@ bexpToAssertion bexp = case bexp of
   BGe  a1 a2 -> A.Gte (aexpToArith a1) (aexpToArith a2)
   BGt  a1 a2 -> A.Gt  (aexpToArith a1) (aexpToArith a2)
   BLt  a1 a2 -> A.Lt  (aexpToArith a1) (aexpToArith a2)
-
-bexpToSmt :: BExp -> S.SMT S.Expr
-bexpToSmt bexp = case bexp of
-  BTrue        -> S.mkTrue
-  BFalse       -> S.mkFalse
-  BNot b       -> S.mkNot =<< bexpToSmt b
-  BAnd b1  b2  -> S.mkAnd =<< mapM bexpToSmt [b1, b2]
-  BOr  b1  b2  -> S.mkOr  =<< mapM bexpToSmt [b1, b2]
-  BEq  lhs rhs -> do
-    lhsAST <- aexpToSmt lhs
-    rhsAST <- aexpToSmt rhs
-    S.mkEq lhsAST rhsAST
-  BNe  lhs rhs -> do
-    lhsAST <- aexpToSmt lhs
-    rhsAST <- aexpToSmt rhs
-    S.mkNot =<< S.mkEq lhsAST rhsAST
-  BLe  lhs rhs -> do
-    lhsAST <- aexpToSmt lhs
-    rhsAST <- aexpToSmt rhs
-    S.mkLe lhsAST rhsAST
-  BGe  lhs rhs -> do
-    lhsAST <- aexpToSmt lhs
-    rhsAST <- aexpToSmt rhs
-    S.mkGe lhsAST rhsAST
-  BGt  lhs rhs -> do
-    lhsAST <- aexpToSmt lhs
-    rhsAST <- aexpToSmt rhs
-    S.mkGt lhsAST rhsAST
-  BLt  lhs rhs -> do
-    lhsAST <- aexpToSmt lhs
-    rhsAST <- aexpToSmt rhs
-    S.mkLt lhsAST rhsAST
 
 
 ---------------

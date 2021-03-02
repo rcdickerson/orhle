@@ -9,7 +9,6 @@ import           Control.Monad (foldM)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import           Orhle.Imp
-import           Orhle.SMT  ( SMT )
 import qualified Orhle.SMT as SMT
 
 

@@ -5,10 +5,10 @@ module Orhle.Assertion
   , Name
   , ParseError
   , Sort(..)
+  , freeVars
   , parseArith
   , parseAssertion
   , subArith
-  , toSMT
   ) where
 
 import Orhle.Assertion.AssertionLanguage

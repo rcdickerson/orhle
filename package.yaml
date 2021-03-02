@@ -22,11 +22,11 @@ dependencies:
 - containers
 - mtl
 - parsec
-- text
-- prettyprinter
 - simple-smt
 - smtLib
+- text
 - pretty
+- prettyprinter
 
 library:
   source-dirs:

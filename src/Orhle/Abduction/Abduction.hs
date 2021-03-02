@@ -14,24 +14,24 @@ import Orhle.Abduction.Abducible
 import Orhle.Abduction.InterpMap
 import Orhle.Abduction.MSA
 import Orhle.Abduction.Simplify
+import Orhle.Assertion
 import Orhle.Imp
-import Orhle.SMT ( SMT )
 import qualified Orhle.SMT as SMT
 
 --------------------------------------------------------------------------------
 
 data AbductionProblem = AbductionProblem
   { apAbducibles :: [Abducible]
-  , apPreCond    :: SMT.Expr
-  , apPostCond   :: SMT.Expr
+  , apPreCond    :: Assertion
+  , apPostCond   :: Assertion
   } deriving (Show)
 
 type AbductionResult = Either String InterpMap
-type TracedResult    = ATWriter SMT AbductionResult
+type TracedResult    = ATWriter IO AbductionResult
 
 --------------------------------------------------------------------------------
 
--- abduce :: [Abducible] -> [SMT.Expr] -> [SMT.Expr] -> SMT (AbductionResult, [AbdTrace])
+-- abduce :: [Abducible] -> [Assertion] -> [Assertion] -> SMT (AbductionResult, [AbdTrace])
 -- abduce abds pres posts = do
 --   pre  <- mkAnd pres
 --   post <- mkAnd posts
@@ -64,7 +64,7 @@ type TracedResult    = ATWriter SMT AbductionResult
 --   let filteredStrs = filter notInVars symbolStrs
 --   mapM mkStringSymbol filteredStrs
 
--- noAbduction :: SMT.Expr -> SMT.Expr -> TracedResult
+-- noAbduction :: Assertion -> Assertion -> TracedResult
 -- noAbduction pre post = do
 --   logAbdMessage "No variables to abduce over; using simplified pre => post."
 --   imp      <- lift $ mkImplies pre post
@@ -75,7 +75,7 @@ type TracedResult    = ATWriter SMT AbductionResult
 --     then return.Right $ emptyIMap
 --     else return.Left  $ "Preconditions are inconsistent with postconditions."
 
--- singleAbduction :: Abducible -> SMT.Expr -> SMT.Expr -> TracedResult
+-- singleAbduction :: Abducible -> Assertion -> Assertion -> TracedResult
 -- singleAbduction abd@(Abducible abdName abdParams) pre post = do
 --   logAbdMessage $ "Performing single abduction for " ++ abdName
 --   imp           <- lift $ mkImplies pre post
@@ -98,7 +98,7 @@ type TracedResult    = ATWriter SMT AbductionResult
 --     False -> return.Left  $ "No satisfying abduction found."
 --     True  -> return.Right $ Map.insert abd qeResSimpl emptyIMap
 
--- multiAbduction :: [Abducible] -> SMT.Expr -> SMT.Expr -> TracedResult
+-- multiAbduction :: [Abducible] -> Assertion -> Assertion -> TracedResult
 -- multiAbduction abds pre post = do
 --   logAbdMessage $ "Performing multiabduction over " ++ (show $ map abdName abds)
 --   combinedAbd    <- lift $ combineAbducibles abds
@@ -107,13 +107,13 @@ type TracedResult    = ATWriter SMT AbductionResult
 --     Left  err  -> return.Left $ err
 --     Right imap -> cartDecomp abds pre (imap Map.! combinedAbd)
 
-combineAbducibles :: [Abducible] -> SMT Abducible
+combineAbducibles :: [Abducible] -> IO Abducible
 combineAbducibles abds = do
   let vars = foldr insertAbd Set.empty abds
   return $ Abducible "_combined_abducible" $ Set.toList vars
     where insertAbd (Abducible _ vars) varSet = foldr Set.insert varSet vars
 
--- cartDecomp :: [Abducible] -> SMT.Expr -> SMT.Expr -> TracedResult
+-- cartDecomp :: [Abducible] -> Assertion -> Assertion -> TracedResult
 -- cartDecomp abds pre combinedResult = do
 --   logAbdMessage "! Cartesian Decomposition"
 --   logAbdMessage $ "Abducibles: " ++ (show abds)
@@ -122,14 +122,14 @@ combineAbducibles abds = do
 --   initMap <- lift $ initSolution abds pre combinedResult
 --   foldlM (replaceWithDecomp combinedResult) initMap abds
 --   where
---     replaceWithDecomp :: SMT.Expr -> AbductionResult -> Abducible -> TracedResult
+--     replaceWithDecomp :: Assertion -> AbductionResult -> Abducible -> TracedResult
 --     replaceWithDecomp _    (Left err)   _   = return.Left $ err
 --     replaceWithDecomp post (Right imap) abd = do
 --       decResult <- (decompose post) abd imap
 --       case decResult of
 --         Left  err -> return.Left  $ err
 --         Right dec -> return.Right $ Map.union dec imap
---     decompose :: SMT.Expr -> Abducible -> InterpMap -> TracedResult
+--     decompose :: Assertion -> Abducible -> InterpMap -> TracedResult
 --     decompose post abd imap = do
 --       let complement = Map.withoutKeys imap $ Set.singleton abd
 --       pre' <- lift $ mkAnd (map snd $ Map.toList complement)
@@ -139,9 +139,9 @@ combineAbducibles abds = do
 --           "Unable to decompose " ++ (show combinedResult) ++ ": " ++ err
 --         Right imap' -> return.Right $ imap'
 
--- initSolution :: [Abducible] -> SMT.Expr -> SMT.Expr -> SMT AbductionResult
+-- initSolution :: [Abducible] -> Assertion -> Assertion -> SMT AbductionResult
 -- initSolution abds pre combinedResult = do
---   modelRes <- modelSMT.Expr =<< mkAnd [pre, combinedResult]
+--   modelRes <- modelAssertion =<< mkAnd [pre, combinedResult]
 --   case modelRes of
 --     Left  err   -> return.Left $ err
 --     Right model -> foldlM (getAbdInterp model) (Right Map.empty) abds
@@ -156,12 +156,12 @@ combineAbducibles abds = do
 --           interp <- mkAnd asts
 --           return.Right $ Map.insert abd interp imap
 --     ----
---     eitherCons :: (Either String SMT.Expr) -> (Either String [SMT.Expr]) -> (Either String [SMT.Expr])
+--     eitherCons :: (Either String Assertion) -> (Either String [Assertion]) -> (Either String [Assertion])
 --     eitherCons (Left err)  _           = Left err
 --     eitherCons _           (Left err)  = Left err
 --     eitherCons (Right ast) (Right lst) = Right (ast:lst)
 --     ----
---     getVarInterp :: SMT.Model -> Var -> SMT (Either String SMT.Expr)
+--     getVarInterp :: SMT.Model -> Var -> SMT (Either String Assertion)
 --     getVarInterp model var = do
 --       varSymb <- mkStringSymbol $ var
 --       varDecl <- mkFuncDecl varSymb [] =<< mkIntSort
@@ -171,7 +171,7 @@ combineAbducibles abds = do
 --         Just v  -> return.Right =<< mkEq v =<< aexpToSMT (AVar $ var)
 
 
--- performQe :: [SMT.Symbol] -> SMT.Expr -> SMT SMT.Expr
+-- performQe :: [SMT.Symbol] -> Assertion -> SMT Assertion
 -- performQe [] formula = do
 --   dummy <- mkFreshConst "dummy" =<< mkIntSort
 --   dummySymbol <- mkStringSymbol =<< astToString dummy
@@ -207,7 +207,7 @@ combineAbducibles abds = do
 --   pop 1
 --   mkAnd $ concat formulas
 
--- modelAST :: SMT.Expr -> SMT (Either String SMT.Model)
+-- modelAST :: Assertion -> SMT (Either String SMT.Model)
 -- modelAST ast = do
 --   push
 --   assert ast

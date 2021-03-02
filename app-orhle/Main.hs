@@ -64,7 +64,7 @@ printQuery execs (RhleTriple pre aProgs eProgs post) = do
   putStrLn "------------------------------------------------\n"
 
 printFailure :: Orhle.Failure -> IO ()
-printFailure (Orhle.Failure vcs (Orhle.Model model)) = do
+printFailure (Orhle.Failure vcs model) = do
   putStrLn $ "Verification conditions:\n  " ++ (show vcs)
   putStrLn ""
   putStrLn $ "Falsifying model:\n  " ++ model

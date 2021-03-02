@@ -6,7 +6,6 @@ module Orhle
     , ExecId
     , ExpectedResult(..)
     , Failure(..)
-    , Model(..)
     , RhleTriple(..)
     , Spec(..)
     , SpecMap
@@ -22,7 +21,6 @@ module Orhle
 
 import Orhle.OrhleParser
 import Orhle.Spec
-import Orhle.SMT ( Model(..) )
 import Orhle.Triple
 import Orhle.Verifier
 

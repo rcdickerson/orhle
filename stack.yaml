@@ -41,8 +41,8 @@ packages:
 # (e.g., acme-missiles-0.3)
 # extra-deps: [z3-408.0]
 extra-deps:
-- simple-smt-0.9.4@sha256:93746e0c4bade39c9848549103de5b65b169f1faa5b76c7b9bcde2031f31c58f,775
-- smtLib-1.1@sha256:6e80aa14ae39adb238a12ec404c3034a8d54a8e6d1656075383fff5e6854b224,850
+- smtLib-1.1@sha256:6e80aa14ae39adb238a12ec404c3034a8d54a8e6d1656075383fff5e6854b224
+- simple-smt-0.9.4@sha256:93746e0c4bade39c9848549103de5b65b169f1faa5b76c7b9bcde2031f31c58f
 
 # Override default flag values for local packages and extra-deps
 # flags: {}

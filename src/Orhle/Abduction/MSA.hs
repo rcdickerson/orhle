@@ -6,22 +6,22 @@ module Orhle.Abduction.MSA
   ) where
 
 import qualified Data.Set as Set
-import           Orhle.SMT  ( SMT )
+import Orhle.Assertion
 import qualified Orhle.SMT as SMT
 
-findMsaVars :: SMT.Expr -> [SMT.Symbol] -> SMT [SMT.Symbol]
+findMsaVars :: Assertion -> [Ident] -> IO [Ident]
 findMsaVars formula vars = do
   musVars <- findMusVarSet formula varSet 0
   return $ Set.toList $ Set.difference varSet musVars
   where
     varSet = Set.fromList vars
 
-findMusVars :: SMT.Expr -> [SMT.Symbol] -> SMT [SMT.Symbol]
+findMusVars :: Assertion -> [Ident] -> IO [Ident]
 findMusVars formula vars = do
   musVars <- findMusVarSet formula (Set.fromList vars) 0
   return $ Set.toList musVars
 
-findMusVarSet :: SMT.Expr -> Set.Set SMT.Symbol -> Int -> SMT (Set.Set SMT.Symbol)
+findMusVarSet :: Assertion -> Set.Set Ident -> Int -> IO (Set.Set Ident)
 findMusVarSet formula candidateVars lowerBound = do
   return Set.empty
   -- if (null candidateVars) || (length candidateVars) <= lowerBound
@@ -43,5 +43,5 @@ findMusVarSet formula candidateVars lowerBound = do
   --     y' <- findMusVarSet formula candidateVars' lowerBound
   --     return $ if (length y') > lowerBound then y' else best'
 
-chooseFrom :: Set.Set SMT.Symbol -> (SMT.Symbol, Set.Set SMT.Symbol)
+chooseFrom :: Set.Set Ident -> (Ident, Set.Set Ident)
 chooseFrom = Set.deleteFindMin

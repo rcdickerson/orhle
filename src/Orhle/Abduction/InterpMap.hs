@@ -8,16 +8,16 @@ module Orhle.Abduction.InterpMap
     ) where
 
 import qualified Data.Map as Map
-import           Orhle.Abduction.Abducible
-import           Orhle.SMT  ( SMT )
+import Orhle.Assertion
+import Orhle.Abduction.Abducible
 import qualified Orhle.SMT as SMT
 
-type InterpMap = Map.Map Abducible SMT.Expr
+type InterpMap = Map.Map Abducible Assertion
 
 emptyIMap :: InterpMap
 emptyIMap = Map.empty
 
-singletonIMap :: Abducible -> SMT.Expr -> InterpMap
+singletonIMap :: Abducible -> Assertion -> InterpMap
 singletonIMap var duc = Map.singleton var duc
 
 -- putInterpMap :: InterpMap -> IO ()

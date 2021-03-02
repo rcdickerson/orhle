@@ -4,15 +4,14 @@ module Orhle.Assertion.AssertionLanguage
   , Ident(..)
   , Name
   , Sort(..)
+  , freeVars
   , subArith
-  , toSMT
   ) where
 
 import Data.List ( intercalate )
+import Data.Set  ( Set )
+import qualified Data.Set as Set
 import Orhle.MapNames
-import Orhle.SMT ( SMT )
-import qualified Orhle.SMT as SMT
-
 
 -----------------
 -- Identifiers --
@@ -20,8 +19,8 @@ import qualified Orhle.SMT as SMT
 
 type Name = String
 
-data Sort = Int
-          -- Add support for other sorts as needed.
+data Sort = Bool
+          | Int
           deriving (Eq, Ord)
 
 data Ident = Ident { identName :: Name
@@ -30,6 +29,7 @@ data Ident = Ident { identName :: Name
            deriving (Eq, Ord)
 
 instance Show Sort where
+  show Bool = "bool"
   show Int  = "int"
 
 instance Show Ident where
@@ -49,8 +49,8 @@ data Arith = Num Integer
            | Sub [Arith]
            | Mul [Arith]
            | Div Arith Arith
-           | Pow Arith Arith
            | Mod Arith Arith
+           | Pow Arith Arith
            deriving (Eq, Ord)
 
 showSexp :: Show a => String -> [a] -> String
@@ -63,8 +63,8 @@ instance Show Arith where
   show (Sub as)    = showSexp "-"  as
   show (Mul as)    = showSexp "*"  as
   show (Div a1 a2) = showSexp "/"  [a1, a2]
-  show (Pow a1 a2) = showSexp "^"  [a1, a2]
   show (Mod a1 a2) = showSexp "%"  [a1, a2]
+  show (Pow a1 a2) = showSexp "^"  [a1, a2]
 
 instance MappableNames Arith where
   mapNames _ (Num x)     = Num x
@@ -73,8 +73,8 @@ instance MappableNames Arith where
   mapNames f (Sub as)    = Sub $ map (mapNames f) as
   mapNames f (Mul as)    = Mul $ map (mapNames f) as
   mapNames f (Div a1 a2) = Div (mapNames f a1) (mapNames f a2)
-  mapNames f (Pow a1 a2) = Pow (mapNames f a1) (mapNames f a2)
   mapNames f (Mod a1 a2) = Mod (mapNames f a1) (mapNames f a2)
+  mapNames f (Pow a1 a2) = Pow (mapNames f a1) (mapNames f a2)
 
 
 ----------------
@@ -152,8 +152,8 @@ instance SubstitutableArith Arith where
       Sub as    -> Sub $ map sub as
       Mul as    -> Mul $ map sub as
       Div a1 a2 -> Div (sub a1) (sub a2)
-      Pow a1 a2 -> Pow (sub a1) (sub a2)
       Mod a1 a2 -> Mod (sub a1) (sub a2)
+      Pow a1 a2 -> Pow (sub a1) (sub a2)
 
 instance SubstitutableArith Assertion where
   subArith from to assertion =
@@ -175,51 +175,37 @@ instance SubstitutableArith Assertion where
       (Exists vars a) -> Exists vars (sub a)
 
 
--------------------
--- SMT Embedding --
--------------------
+--------------------
+-- Free Variables --
+--------------------
 
-class SMTEmbeddable a where
-  toSMT :: a -> SMT SMT.Expr
+class FreeVariables a where
+  freeVars :: a -> Set Ident
 
-instance SMTEmbeddable Ident where
-  toSMT (Ident name sort) = do
-    nameSymb <- SMT.mkStringSymbol name
-    case sort of
-      Int  -> SMT.mkIntVar nameSymb
+instance FreeVariables Arith where
+  freeVars arith = case arith of
+    Num _     -> Set.empty
+    Var ident -> Set.singleton ident
+    Add as    -> Set.unions $ map freeVars as
+    Sub as    -> Set.unions $ map freeVars as
+    Mul as    -> Set.unions $ map freeVars as
+    Div a1 a2 -> Set.union (freeVars a1) (freeVars a2)
+    Mod a1 a2 -> Set.union (freeVars a1) (freeVars a2)
+    Pow a1 a2 -> Set.union (freeVars a1) (freeVars a2)
 
-instance SMTEmbeddable Arith where
-  toSMT (Num n)     = SMT.mkIntNum n
-  toSMT (Var ident) = toSMT ident
-  toSMT (Add as)    = SMT.mkAdd =<< mapM toSMT as
-  toSMT (Sub as)    = SMT.mkSub =<< mapM toSMT as
-  toSMT (Mul as)    = SMT.mkMul =<< mapM toSMT as
-  toSMT (Div a1 a2) = bind2 SMT.mkDiv   (toSMT a1) (toSMT a2)
-  toSMT (Pow a1 a2) = bind2 SMT.mkPower (toSMT a1) (toSMT a2)
-  toSMT (Mod a1 a2) = bind2 SMT.mkMod   (toSMT a1) (toSMT a2)
-
-instance SMTEmbeddable Assertion where
-  toSMT ATrue         = SMT.mkTrue
-  toSMT AFalse        = SMT.mkFalse
-  toSMT (Atom ident)  = toSMT ident
-  toSMT (Not a)       = SMT.mkNot =<< toSMT a
-  toSMT (And as)      = SMT.mkAnd =<< mapM toSMT as
-  toSMT (Or as)       = SMT.mkOr  =<< mapM toSMT as
-  toSMT (Imp a1 a2)   = bind2 SMT.mkImplies (toSMT a1) (toSMT a2)
-  toSMT (Eq a1 a2)    = bind2 SMT.mkEq (toSMT a1) (toSMT a2)
-  toSMT (Lt a1 a2)    = bind2 SMT.mkLt (toSMT a1) (toSMT a2)
-  toSMT (Gt a1 a2)    = bind2 SMT.mkGt (toSMT a1) (toSMT a2)
-  toSMT (Lte a1 a2)   = bind2 SMT.mkLe (toSMT a1) (toSMT a2)
-  toSMT (Gte a1 a2)   = bind2 SMT.mkGe (toSMT a1) (toSMT a2)
-  toSMT (Forall vs a) = bind2 SMT.mkForallConst
-                          (SMT.stringsToApps $ map identName vs)
-                          (toSMT a)
-  toSMT (Exists vs a) = bind2 SMT.mkExistsConst
-                          (SMT.stringsToApps $ map identName vs)
-                          (toSMT a)
-
-bind2 :: Monad m => (a -> b -> m c) -> m a -> m b -> m c
-bind2 f ma mb = do
-  a <- ma
-  b <- mb
-  f a b
+instance FreeVariables Assertion where
+  freeVars assertion = case assertion of
+    ATrue        -> Set.empty
+    AFalse       -> Set.empty
+    Atom ident   -> Set.singleton ident
+    Not  a       -> freeVars a
+    And  as      -> Set.unions $ map freeVars as
+    Or   as      -> Set.unions $ map freeVars as
+    Imp  a1 a2   -> Set.union (freeVars a1) (freeVars a2)
+    Eq   a1 a2   -> Set.union (freeVars a1) (freeVars a2)
+    Lt   a1 a2   -> Set.union (freeVars a1) (freeVars a2)
+    Gt   a1 a2   -> Set.union (freeVars a1) (freeVars a2)
+    Lte  a1 a2   -> Set.union (freeVars a1) (freeVars a2)
+    Gte  a1 a2   -> Set.union (freeVars a1) (freeVars a2)
+    Forall ids a -> Set.difference (freeVars a) (Set.fromList ids)
+    Exists ids a -> Set.difference (freeVars a) (Set.fromList ids)
