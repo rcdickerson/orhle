@@ -2,7 +2,7 @@ module Orhle.OrhleParser
   ( Exec(..)
   , ExecId
   , ExpectedResult(..)
-  , parseOrhleApp
+  , parseOrhle
   ) where
 
 import           Control.Monad
@@ -57,11 +57,11 @@ whiteSpace = Token.whiteSpace lexer
 
 type OrhleAppParser a = Parsec String () a
 
-parseOrhleApp :: String -> Either ParseError ([Exec], AESpecs, RhleTriple, ExpectedResult)
-parseOrhleApp str = runParser orhleAppParser () "" str
+parseOrhle :: String -> Either ParseError ([Exec], AESpecs, RhleTriple, ExpectedResult)
+parseOrhle str = runParser orhleParser () "" str
 
-orhleAppParser :: OrhleAppParser ([Exec], AESpecs, RhleTriple, ExpectedResult)
-orhleAppParser = do
+orhleParser :: OrhleAppParser ([Exec], AESpecs, RhleTriple, ExpectedResult)
+orhleParser = do
   whiteSpace
   expectedResult <- try expectedValid <|> expectedInvalid; whiteSpace
 

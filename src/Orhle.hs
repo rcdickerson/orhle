@@ -13,7 +13,7 @@ module Orhle
     , addSpec
     , emptySpecMap
     , lookupSpec
-    , parseOrhle
+    , Orhle.parseOrhle
     , prefixSpecs
     , specAtCallsite
     , verify
@@ -25,7 +25,7 @@ import Orhle.Triple
 import Orhle.Verifier
 
 parseOrhle :: String -> Either String ([Exec], AESpecs, RhleTriple, ExpectedResult)
-parseOrhle input = case parseOrhleApp input of
+parseOrhle input = case Orhle.OrhleParser.parseOrhle input of
   Left err     -> Left  $ show err
   Right result -> Right $ result
 
