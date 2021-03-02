@@ -5,9 +5,9 @@ module Orhle.SMT
   ) where
 
 import qualified Data.Set as Set
-import           Orhle.Assertion.AssertionLanguage as A
+import qualified Orhle.Assertion.AssertionLanguage as A
 import qualified SimpleSMT as SSMT
-import           SMTLib2 as S
+import qualified SMTLib2 as S
 import           SMTLib2.Core ( tBool )
 import           SMTLib2.Int  ( tInt )
 import qualified Text.PrettyPrint as PP
@@ -35,7 +35,7 @@ checkSat assertion = let
       SSMT.Unsat   -> return Unsat
       SSMT.Unknown -> return Unknown
 
-simplify :: A.Assertion -> IO Assertion
+simplify :: A.Assertion -> IO A.Assertion
 simplify assertion = do
   return assertion
 
@@ -52,8 +52,8 @@ simplify assertion = do
 -- from Assertion and 2) the SMT-Lib representation seems more likely to be
 -- adaptable to other solver backends if we want to move away from Simple-SMT in
 -- the future. ~RCD
-toSSMT :: PP a => a -> SSMT.SExpr
-toSSMT = SSMT.Atom . PP.render . pp
+toSSMT :: S.PP a => a -> SSMT.SExpr
+toSSMT = SSMT.Atom . PP.render . S.pp
 
 --------------------
 -- SMT Embeddings --
@@ -67,14 +67,14 @@ instance SMTEmbeddable A.Ident where
 
 instance SMTEmbeddable A.Arith where
   toSMT arith = case arith of
-    Num n     -> S.Lit $ S.LitNum n
-    Var ident -> toSMT ident
-    Add as    -> toApp "+"   as
-    Sub as    -> toApp "-"   as
-    Mul as    -> toApp "*"   as
-    Div a1 a2 -> toApp "/"   [a1, a2]
-    Mod a1 a2 -> toApp "mod" [a1, a2]
-    Pow a1 a2 -> toApp "^"   [a1, a2]
+    A.Num n     -> S.Lit $ S.LitNum n
+    A.Var ident -> toSMT ident
+    A.Add as    -> toApp "+"   as
+    A.Sub as    -> toApp "-"   as
+    A.Mul as    -> toApp "*"   as
+    A.Div a1 a2 -> toApp "/"   [a1, a2]
+    A.Mod a1 a2 -> toApp "mod" [a1, a2]
+    A.Pow a1 a2 -> toApp "^"   [a1, a2]
 
 instance SMTEmbeddable A.Assertion where
   toSMT assertion = case assertion of
@@ -101,10 +101,10 @@ toApp f as = S.app (stringToSIdent f) (map toSMT as)
 
 toBinder :: A.Ident -> S.Binder
 toBinder (A.Ident name sort) = case sort of
-  Bool -> S.Bind (S.N name) tBool
-  Int  -> S.Bind (S.N name) tInt
+  A.Bool -> S.Bind (S.N name) tBool
+  A.Int  -> S.Bind (S.N name) tInt
 
 toDeclareConst :: A.Ident -> S.Command
 toDeclareConst (A.Ident name sort) = case sort of
-  Bool -> S.CmdDeclareConst (S.N name) tBool
-  Int  -> S.CmdDeclareConst (S.N name) tInt
+  A.Bool -> S.CmdDeclareConst (S.N name) tBool
+  A.Int  -> S.CmdDeclareConst (S.N name) tInt
