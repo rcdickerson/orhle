@@ -104,14 +104,6 @@ execPrefix exec = case (getExecId exec) of
 untilSemi :: OrhleAppParser String
 untilSemi = manyTill anyChar (try $ char ';')
 
--- condition :: OrhleAppParser (SMT SMT.Expr)
--- condition = do
---   smtStr <- untilSemi
---   whiteSpace
---   case parseSMT smtStr of
---     Left err  -> fail $ show err
---     Right ast -> return ast
-
 expectedValid :: OrhleAppParser ExpectedResult
 expectedValid = do
   reserved "expected" >> whiteSpace
