@@ -2,7 +2,7 @@
 -- Based on https://wiki.haskell.org/Parsing_a_simple_imperative_language
 
 module Orhle.Imp.ImpParser
-    ( ParseError(..)
+    ( ParseError
     , impParser
     , parseImp
     ) where
