@@ -15,7 +15,7 @@ import qualified Orhle.SMT as SMT
 import           Orhle.Triple
 
 type Verifier = AESpecs -> RhleTriple -> IO (Either Failure Success)
-data Failure  = Failure { failureVcs :: Assertion,  model :: String }
+data Failure  = Failure { failureVcs :: Assertion,  message :: String }
 data Success  = Success { successVcs :: Assertion }
 
 data VCQuant = VCUniversal
@@ -30,8 +30,9 @@ rhleVerifier specs (RhleTriple pre aProgs eProgs post) = let
   in do
     result <- SMT.checkValid vcs
     case result of
-      SMT.Sat m -> return . Left  $ Failure vcs m
-      SMT.Unsat -> return . Right $ Success vcs
+      SMT.Sat m   -> return . Left  $ Failure vcs m
+      SMT.Unsat   -> return . Right $ Success vcs
+      SMT.Unknown -> return . Left  $ Failure vcs ":: solver returned unknown ::"
 
 vcsForProgs :: VCQuant -> SpecMap -> [Stmt] -> Assertion -> Assertion
 vcsForProgs quant specs progs post = foldr (generateVCs quant specs) post progs

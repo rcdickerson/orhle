@@ -5,7 +5,7 @@ module Orhle.SMT
   ) where
 
 import qualified Data.Set as Set
-import qualified Orhle.Assertion.AssertionLanguage as A
+import qualified Orhle.Assertion as A
 import qualified SimpleSMT as SSMT
 import qualified SMTLib2 as S
 import           SMTLib2.Core ( tBool )
@@ -23,8 +23,8 @@ checkSat assertion = let
   declareVars   = map toDeclareConst fvs
   assertionExpr = toSMT assertion
   in do
-    logger <- SSMT.newLogger 0
-    solver <- SSMT.newSolver "z3" ["-in"] $ Just logger
+    -- logger <- SSMT.newLogger 0
+    solver <- SSMT.newSolver "z3" ["-in"] Nothing -- $ Just logger
     mapM_ (SSMT.ackCommand solver) (map toSSMT declareVars)
     SSMT.assert solver $ toSSMT assertionExpr
     result <- SSMT.check solver
@@ -35,9 +35,25 @@ checkSat assertion = let
       SSMT.Unsat   -> return Unsat
       SSMT.Unknown -> return Unknown
 
-simplify :: A.Assertion -> IO A.Assertion
-simplify assertion = do
-  return assertion
+simplify :: A.Assertion -> IO (Either String A.Assertion)
+simplify assertion = let
+  fvs         = Set.toList $ A.freeVars assertion
+  declareVars = map toDeclareConst fvs
+  (SSMT.Atom assertionSSMT) = toSSMT $ toSMT assertion
+  ssmt = SSMT.Atom $ "(simplify " ++ assertionSSMT ++ ")"
+  in do
+    solver <- SSMT.newSolver "z3" ["-in"] Nothing
+    mapM_ (SSMT.ackCommand solver) (map toSSMT declareVars)
+    result <- SSMT.command solver ssmt
+    case result of
+      SSMT.Atom simplified -> case A.parseAssertion simplified of
+        Left err -> return . Left $ unlines [
+          "Unable to simplify, assertion parse error: ", show err,
+          "\n  on SMT result:", SSMT.showsSExpr result ""]
+        Right a  -> return . Right $ a
+      _ -> return . Left $ unlines[
+        "Unable to simplify, solver returned: ",
+        SSMT.showsSExpr result ""]
 
 -- We want to encode assertions using smt-lib types, but simple-smt declares its
 -- own (simple, but weak) s-expression type. So, right before we interact with a
