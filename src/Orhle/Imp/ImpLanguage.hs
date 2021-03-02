@@ -167,7 +167,7 @@ instance MappableNames Stmt where
   mapNames f (SSeq stmts)   = SSeq $ map (mapNames f) stmts
   mapNames f (SIf b t e)    = SIf (mapNames f b) (mapNames f t) (mapNames f e)
   mapNames f (SWhile cond body (inv, var, local)) =
-    SWhile (mapNames f cond) (mapNames f body) ((mapNames f inv), (mapNames f var), local)
+    SWhile (mapNames f cond) (mapNames f body) (inv, var, local)
   mapNames f (SCall as ps name) =
     SCall (map f as) (map f ps) (f name)
 
