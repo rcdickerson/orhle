@@ -68,8 +68,6 @@ printFailure (Orhle.Failure vcs message) = do
   putStrLn $ "Verification conditions:\n  " ++ (show vcs)
   putStrLn ""
   putStrLn $ "Failure:\n  " ++ message
-  putStrLn ""
-  putStrLn "Invalid."
 
 printSuccess :: Orhle.Success -> IO ()
 printSuccess (Orhle.Success vcs) = do

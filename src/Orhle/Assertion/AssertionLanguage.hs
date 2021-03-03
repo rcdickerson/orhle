@@ -95,6 +95,7 @@ data Assertion = ATrue
                | Gte    Arith Arith
                | Forall [Ident] Assertion
                | Exists [Ident] Assertion
+               | Hole
                deriving (Eq, Ord)
 
 showQuant :: Show a => String -> [Ident] -> a -> String
@@ -117,6 +118,7 @@ instance Show Assertion where
   show (Gte a1 a2)     = showSexp ">=" [a1, a2]
   show (Forall vars a) = showQuant "forall" vars a
   show (Exists vars a) = showQuant "exists" vars a
+  show Hole            = "??"
 
 instance MappableNames Assertion where
   mapNames _ ATrue         = ATrue
@@ -133,6 +135,7 @@ instance MappableNames Assertion where
   mapNames f (Gte a1 a2)   = Gte (mapNames f a1) (mapNames f a2)
   mapNames f (Forall vs a) = Forall (map (mapNames f) vs) (mapNames f a)
   mapNames f (Exists vs a) = Exists (map (mapNames f) vs) (mapNames f a)
+  mapNames _ Hole          = Hole
 
 
 -----------------------------
@@ -173,6 +176,7 @@ instance SubstitutableArith Assertion where
       (Gte a1 a2)     -> Gte (subArith from to a1) (subArith from to a2)
       (Forall vars a) -> Forall vars (sub a)
       (Exists vars a) -> Exists vars (sub a)
+      Hole            -> Hole
 
 
 --------------------
@@ -209,3 +213,4 @@ instance FreeVariables Assertion where
     Gte  a1 a2   -> Set.union (freeVars a1) (freeVars a2)
     Forall ids a -> Set.difference (freeVars a) (Set.fromList ids)
     Exists ids a -> Set.difference (freeVars a) (Set.fromList ids)
+    Hole         -> Set.empty

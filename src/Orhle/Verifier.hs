@@ -8,10 +8,10 @@ module Orhle.Verifier
 import qualified Data.Set as Set
 import           Orhle.Assertion ( Assertion )
 import qualified Orhle.Assertion as A
+import qualified Orhle.HoleInference as Inf
 import           Orhle.Imp.ImpLanguage
 import qualified Orhle.MapNames as Names
 import           Orhle.Spec
-import qualified Orhle.SMT as SMT
 import           Orhle.Triple
 
 type Verifier = AESpecs -> RhleTriple -> IO (Either Failure Success)
@@ -28,11 +28,10 @@ rhleVerifier specs (RhleTriple pre aProgs eProgs post) = let
   vcsE = vcsForProgs VCUniversal   (aspecs specs) aProgs vcsA
   vcs  = A.Imp pre vcsE
   in do
-    result <- SMT.checkValid vcs
+    result <- Inf.inferAndCheck Inf.DisallowHoles vcs
     case result of
-      SMT.Sat m   -> return . Left  $ Failure vcs m
-      SMT.Unsat   -> return . Right $ Success vcs
-      SMT.Unknown -> return . Left  $ Failure vcs ":: solver returned unknown ::"
+      Left  msg       -> return . Left  $ Failure vcs msg
+      Right filledVcs -> return . Right $ Success filledVcs
 
 vcsForProgs :: VCQuant -> SpecMap -> [Stmt] -> Assertion -> Assertion
 vcsForProgs quant specs progs post = foldr (generateVCs quant specs) post progs

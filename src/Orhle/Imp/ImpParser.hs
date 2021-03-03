@@ -96,7 +96,7 @@ whileStmt = do
   cond  <- bExpression
   whiteSpace
   reserved "do"
-  (inv, local) <- option (ATrue, True) $ do
+  (inv, local) <- option (Hole, True) $ do
     reserved "@inv"
     local  <- option False $ do reserved "local"; return True
     invStr <- braces $ many $ noneOf "{}"
