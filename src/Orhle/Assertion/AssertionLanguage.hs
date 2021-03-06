@@ -8,10 +8,10 @@ module Orhle.Assertion.AssertionLanguage
   , subArith
   ) where
 
-import Data.List ( intercalate )
-import Data.Set  ( Set )
+import           Data.List ( intercalate )
+import           Data.Set  ( Set )
 import qualified Data.Set as Set
-import Orhle.MapNames
+import           Orhle.MapNames
 
 -----------------
 -- Identifiers --
@@ -63,7 +63,7 @@ instance Show Arith where
   show (Sub as)    = showSexp "-"  as
   show (Mul as)    = showSexp "*"  as
   show (Div a1 a2) = showSexp "/"  [a1, a2]
-  show (Mod a1 a2) = showSexp "%"  [a1, a2]
+  show (Mod a1 a2) = showSexp "mod"  [a1, a2]
   show (Pow a1 a2) = showSexp "^"  [a1, a2]
 
 instance MappableNames Arith where
@@ -95,19 +95,19 @@ data Assertion = ATrue
                | Gte    Arith Arith
                | Forall [Ident] Assertion
                | Exists [Ident] Assertion
-               | Hole
+               | Hole   Int
                deriving (Eq, Ord)
 
 showQuant :: Show a => String -> [Ident] -> a -> String
 showQuant name qvars body = "(" ++ name ++ " "
-                                ++ (intercalate " " $ map show qvars)
+                                ++ "(" ++ (intercalate " " $ map show qvars) ++ ")"
                                 ++ (show body) ++ ")"
 
 instance Show Assertion where
   show ATrue           = "true"
   show AFalse          = "false"
   show (Atom ident)    = identName ident
-  show (Not a)         = showSexp "!" [a]
+  show (Not a)         = showSexp "not" [a]
   show (And as)        = showSexp "and" as
   show (Or as)         = showSexp "or" as
   show (Imp a1 a2)     = showSexp "=>" [a1, a2]
@@ -118,7 +118,7 @@ instance Show Assertion where
   show (Gte a1 a2)     = showSexp ">=" [a1, a2]
   show (Forall vars a) = showQuant "forall" vars a
   show (Exists vars a) = showQuant "exists" vars a
-  show Hole            = "??"
+  show (Hole i)        = "?" ++ (show i)
 
 instance MappableNames Assertion where
   mapNames _ ATrue         = ATrue
@@ -135,7 +135,7 @@ instance MappableNames Assertion where
   mapNames f (Gte a1 a2)   = Gte (mapNames f a1) (mapNames f a2)
   mapNames f (Forall vs a) = Forall (map (mapNames f) vs) (mapNames f a)
   mapNames f (Exists vs a) = Exists (map (mapNames f) vs) (mapNames f a)
-  mapNames _ Hole          = Hole
+  mapNames _ (Hole i)      = Hole i
 
 
 -----------------------------
@@ -176,7 +176,7 @@ instance SubstitutableArith Assertion where
       (Gte a1 a2)     -> Gte (subArith from to a1) (subArith from to a2)
       (Forall vars a) -> Forall vars (sub a)
       (Exists vars a) -> Exists vars (sub a)
-      Hole            -> Hole
+      (Hole i)        -> Hole i
 
 
 --------------------
@@ -201,7 +201,7 @@ instance FreeVariables Assertion where
   freeVars assertion = case assertion of
     ATrue        -> Set.empty
     AFalse       -> Set.empty
-    Atom ident   -> Set.singleton ident
+    Atom id      -> Set.singleton id
     Not  a       -> freeVars a
     And  as      -> Set.unions $ map freeVars as
     Or   as      -> Set.unions $ map freeVars as
@@ -213,4 +213,4 @@ instance FreeVariables Assertion where
     Gte  a1 a2   -> Set.union (freeVars a1) (freeVars a2)
     Forall ids a -> Set.difference (freeVars a) (Set.fromList ids)
     Exists ids a -> Set.difference (freeVars a) (Set.fromList ids)
-    Hole         -> Set.empty
+    (Hole _)     -> Set.empty

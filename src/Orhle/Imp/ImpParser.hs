@@ -16,7 +16,7 @@ import Text.Parsec.Expr
 import Text.Parsec.Language
 import qualified Text.Parsec.Token as Token
 
-languageDef :: LanguageDef()
+languageDef :: LanguageDef Int
 languageDef = Token.LanguageDef
   { Token.caseSensitive   = True
   , Token.commentStart    = "/*"
@@ -52,11 +52,11 @@ comma      = Token.comma      lexer
 semi       = Token.semi       lexer
 whiteSpace = Token.whiteSpace lexer
 
-type ImpParser a = Parsec String () a
+type ImpParser a = Parsec String Int a
 type StmtParser  = ImpParser Stmt
 
 parseImp :: String -> Either ParseError Stmt
-parseImp = runParser impParser () ""
+parseImp = runParser impParser 0 ""
 
 impParser :: StmtParser
 impParser = do
@@ -96,13 +96,12 @@ whileStmt = do
   cond  <- bExpression
   whiteSpace
   reserved "do"
-  (inv, local) <- option (Hole, True) $ do
+  inv <- tryOrHole $ do
     reserved "@inv"
-    local  <- option False $ do reserved "local"; return True
     invStr <- braces $ many $ noneOf "{}"
     case parseAssertion invStr of
       Left err  -> fail (show err)
-      Right inv -> return (inv, local)
+      Right inv -> return inv
   var <- option (Num 0) $ do
     reserved "@var"
     varStr <- braces $ many $ noneOf "{}"
@@ -116,8 +115,17 @@ whileStmt = do
   let bodySeq = case body of
                   (stmt:[]) -> stmt
                   _         -> SSeq body
-  let while = SWhile cond bodySeq (inv, var, local)
+  let while = SWhile cond bodySeq (inv, var)
   return while
+
+tryOrHole :: (ImpParser Assertion) -> ImpParser Assertion
+tryOrHole p = try p <|> hole
+
+hole :: ImpParser Assertion
+hole = do
+  holeNum <- getState
+  modifyState (+1)
+  return $ Hole holeNum
 
 assignStmt :: StmtParser
 assignStmt = do

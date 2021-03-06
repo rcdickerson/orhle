@@ -32,7 +32,7 @@ prettyStmt (SIf c t e) = vsep
         , indent 2 (prettyStmt e)
         , pretty "end"
         ]
-prettyStmt (SWhile c b (i, v, _)) = vsep
+prettyStmt (SWhile c b (i, v)) = vsep
         [ pretty "while" <+> prettyBExp c <+> pretty "do"
         , indent 2 $ vsep
                 [ pretty "@inv" <+> braces (prettyAssertion i)

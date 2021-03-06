@@ -157,7 +157,7 @@ data Stmt
   | SAsgn  Var AExp
   | SSeq   [Stmt]
   | SIf    BExp Stmt Stmt
-  | SWhile BExp Stmt (Assertion, A.Arith, Bool)
+  | SWhile BExp Stmt (Assertion, A.Arith)
   | SCall  [Var] [Var] String
   deriving (Eq, Ord, Show)
 
@@ -166,8 +166,8 @@ instance MappableNames Stmt where
   mapNames f (SAsgn v aexp) = SAsgn (f v) (mapNames f aexp)
   mapNames f (SSeq stmts)   = SSeq $ map (mapNames f) stmts
   mapNames f (SIf b t e)    = SIf (mapNames f b) (mapNames f t) (mapNames f e)
-  mapNames f (SWhile cond body (inv, var, local)) =
-    SWhile (mapNames f cond) (mapNames f body) (inv, var, local)
+  mapNames f (SWhile cond body (inv, var)) =
+    SWhile (mapNames f cond) (mapNames f body) (inv, var)
   mapNames f (SCall as ps name) =
     SCall (map f as) (map f ps) (f name)
 

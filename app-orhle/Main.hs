@@ -65,14 +65,14 @@ printQuery execs (RhleTriple pre aProgs eProgs post) = do
 
 printFailure :: Orhle.Failure -> IO ()
 printFailure (Orhle.Failure vcs message) = do
-  putStrLn $ "Verification conditions:\n  " ++ (show vcs)
-  putStrLn ""
+--  putStrLn $ "Verification conditions:\n  " ++ (show vcs)
+--  putStrLn ""
   putStrLn $ "Failure:\n  " ++ message
 
 printSuccess :: Orhle.Success -> IO ()
 printSuccess (Orhle.Success vcs) = do
-  putStrLn $ "Verification conditions:\n  " ++ (show vcs)
-  putStrLn ""
+--  putStrLn $ "Verification conditions:\n  " ++ (show vcs)
+--  putStrLn ""
   putStrLn "Valid."
 
 printExec :: Orhle.Exec -> IO ()

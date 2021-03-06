@@ -135,7 +135,7 @@ translateStmt (J.Labeled jLabel (J.While jCond jBody)) = do
   cond        <- translateBExp jCond
   (() , body) <- inBlock (translateStmt jBody)
   (inv, var ) <- getLoopAnnotations jLabel
-  tell [I.SWhile cond (I.SSeq body) (inv, var, False)]
+  tell [I.SWhile cond (I.SSeq body) (inv, var)]
 translateStmt (J.Labeled jLabel (J.BasicFor jInit jCond jUpdates jBody)) = do
   case jInit of
     Just (J.ForInitExps exps      ) -> mapM_ translateExp exps
@@ -146,7 +146,7 @@ translateStmt (J.Labeled jLabel (J.BasicFor jInit jCond jUpdates jBody)) = do
   ((), body) <- inBlock $ translateStmt jBody >> mapM_ translateExp
                                                        (fromMaybe [] jUpdates)
   (inv, var) <- getLoopAnnotations jLabel
-  tell [I.SWhile cond (I.SSeq body) (inv, var, False)]
+  tell [I.SWhile cond (I.SSeq body) (inv, var)]
 translateStmt s = throwError ("unsupported statement: " ++ show s)
 
 getLoopAnnotations :: J.Ident -> TransBody (A.Assertion, A.Arith)

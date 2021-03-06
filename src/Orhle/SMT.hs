@@ -23,8 +23,8 @@ checkSat assertion = let
   declareVars   = map toDeclareConst fvs
   assertionExpr = toSMT assertion
   in do
-    -- logger <- SSMT.newLogger 0
-    solver <- SSMT.newSolver "z3" ["-in"] Nothing -- $ Just logger
+    logger <- SSMT.newLogger 0
+    solver <- SSMT.newSolver "z3" ["-in"] $ Just logger
     mapM_ (SSMT.ackCommand solver) (map toSSMT declareVars)
     SSMT.assert solver $ toSSMT assertionExpr
     result <- SSMT.check solver
@@ -42,7 +42,8 @@ simplify assertion = let
   (SSMT.Atom assertionSSMT) = toSSMT $ toSMT assertion
   ssmt = SSMT.Atom $ "(simplify " ++ assertionSSMT ++ ")"
   in do
-    solver <- SSMT.newSolver "z3" ["-in"] Nothing
+    logger <- SSMT.newLogger 0
+    solver <- SSMT.newSolver "z3" ["-in"] $ Just logger
     mapM_ (SSMT.ackCommand solver) (map toSSMT declareVars)
     result <- SSMT.command solver ssmt
     case result of

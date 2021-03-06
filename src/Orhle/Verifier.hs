@@ -28,7 +28,7 @@ rhleVerifier specs (RhleTriple pre aProgs eProgs post) = let
   vcsE = vcsForProgs VCUniversal   (aspecs specs) aProgs vcsA
   vcs  = A.Imp pre vcsE
   in do
-    result <- Inf.inferAndCheck Inf.DisallowHoles vcs
+    result <- Inf.inferAndCheck (Inf.Enumerative 5) vcs
     case result of
       Left  msg       -> return . Left  $ Failure vcs msg
       Right filledVcs -> return . Right $ Success filledVcs
@@ -52,7 +52,7 @@ generateVCs quant specs stmt post =
       vcIf   = A.Imp cond  vcs1
       vcElse = A.Imp ncond vcs2
       in A.And [vcIf, vcElse]
-    loop@(SWhile b body (inv, measure, _)) -> let
+    loop@(SWhile b body (inv, measure)) -> let
       cond        = bexpToAssertion b
       loopVars    = Set.toList $ svars loop
       freshVars   = locallyFreshVars loopVars
