@@ -18,10 +18,9 @@ import           Text.Parsec
 import           Text.Parsec.Language
 import qualified Text.Parsec.Token     as Token
 
-
 data Exec = Forall String ExecId | Exists String ExecId
 type ExecId = Maybe String
-type NamedProg = (String, Stmt)
+type NamedProg = (String, Program)
 
 data ExpectedResult = ExpectSuccess | ExpectFailure
   deriving (Eq, Show)
@@ -93,7 +92,7 @@ orhleParser = do
   eProgs <- mapM lookupAndPrefix eExecs
   return $ ((aExecs ++ eExecs), specs, RhleTriple pre aProgs eProgs post, expectedResult)
 
-prefixProgram :: Stmt -> Exec -> Stmt
+prefixProgram :: Program -> Exec -> Program
 prefixProgram prog exec = Names.prefix (execPrefix exec) prog
 
 execPrefix :: Exec -> String

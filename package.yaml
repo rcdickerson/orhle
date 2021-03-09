@@ -25,6 +25,7 @@ dependencies:
 - simple-smt
 - smtLib
 - text
+- unbounded-delays
 - pretty
 - prettyprinter
 

@@ -4,6 +4,7 @@ module Orhle.Assertion.AssertionLanguage
   , Ident(..)
   , Name
   , Sort(..)
+  , fillHole
   , freeVars
   , subArith
   ) where
@@ -118,7 +119,7 @@ instance Show Assertion where
   show (Gte a1 a2)     = showSexp ">=" [a1, a2]
   show (Forall vars a) = showQuant "forall" vars a
   show (Exists vars a) = showQuant "exists" vars a
-  show (Hole i)        = "?" ++ (show i)
+  show (Hole i)        = "??" ++ (show i)
 
 instance MappableNames Assertion where
   mapNames _ ATrue         = ATrue
@@ -136,6 +137,26 @@ instance MappableNames Assertion where
   mapNames f (Forall vs a) = Forall (map (mapNames f) vs) (mapNames f a)
   mapNames f (Exists vs a) = Exists (map (mapNames f) vs) (mapNames f a)
   mapNames _ (Hole i)      = Hole i
+
+fillHole :: Int -> Assertion -> Assertion -> Assertion
+fillHole holeId fill assertion = let
+  fillRec = fillHole holeId fill
+  in case assertion of
+    ATrue      -> ATrue
+    AFalse     -> AFalse
+    Atom i     -> Atom i
+    Not a      -> Not $ fillRec a
+    And as     -> And $ map fillRec as
+    Or  as     -> Or  $ map fillRec as
+    Imp a1 a2  -> Imp (fillRec a1) (fillRec a2)
+    Eq  a1 a2  -> Eq  a1 a2
+    Lt  a1 a2  -> Lt  a1 a2
+    Gt  a1 a2  -> Gt  a1 a2
+    Lte a1 a2  -> Lte a1 a2
+    Gte a1 a2  -> Gte a1 a2
+    Forall v a -> Forall v (fillRec a)
+    Exists v a -> Exists v (fillRec a)
+    Hole i     -> if i == holeId then fill else (Hole i)
 
 
 -----------------------------
@@ -201,7 +222,7 @@ instance FreeVariables Assertion where
   freeVars assertion = case assertion of
     ATrue        -> Set.empty
     AFalse       -> Set.empty
-    Atom id      -> Set.singleton id
+    Atom i       -> Set.singleton i
     Not  a       -> freeVars a
     And  as      -> Set.unions $ map freeVars as
     Or   as      -> Set.unions $ map freeVars as

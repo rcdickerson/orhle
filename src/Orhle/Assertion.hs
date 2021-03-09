@@ -5,6 +5,7 @@ module Orhle.Assertion
   , Name
   , ParseError
   , Sort(..)
+  , fillHole
   , freeVars
   , parseArith
   , parseAssertion

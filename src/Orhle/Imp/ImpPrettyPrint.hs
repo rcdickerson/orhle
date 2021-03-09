@@ -12,8 +12,8 @@ import Data.Text ( Text )
 import Orhle.Assertion.AssertionLanguage ( Assertion, Arith )
 import Orhle.Imp.ImpLanguage
 
-prettyprint :: Stmt -> Text
-prettyprint = renderStrict . layoutPretty defaultLayoutOptions . prettyStmt
+prettyprint :: Program -> Text
+prettyprint = renderStrict . layoutPretty defaultLayoutOptions . prettyProgram
 
 prettyprintAExp :: AExp -> String
 prettyprintAExp = renderString . layoutPretty defaultLayoutOptions . prettyAExp
@@ -21,27 +21,27 @@ prettyprintAExp = renderString . layoutPretty defaultLayoutOptions . prettyAExp
 prettyprintBExp :: BExp -> String
 prettyprintBExp = renderString . layoutPretty defaultLayoutOptions . prettyBExp
 
-prettyStmt :: Stmt -> Doc ()
-prettyStmt SSkip       = pretty "skip" <> semi
-prettyStmt (SAsgn v a) = pretty v <+> pretty ":=" <+> prettyAExp a <> semi
-prettyStmt (SSeq ss  ) = vsep (map prettyStmt ss)
-prettyStmt (SIf c t e) = vsep
+prettyProgram :: Program -> Doc ()
+prettyProgram SSkip       = pretty "skip" <> semi
+prettyProgram (SAsgn v a) = pretty v <+> pretty ":=" <+> prettyAExp a <> semi
+prettyProgram (SSeq ss  ) = vsep (map prettyProgram ss)
+prettyProgram (SIf c t e) = vsep
         [ pretty "if" <+> prettyBExp c <+> pretty "then"
-        , indent 2 (prettyStmt t)
+        , indent 2 (prettyProgram t)
         , pretty "else"
-        , indent 2 (prettyStmt e)
+        , indent 2 (prettyProgram e)
         , pretty "end"
         ]
-prettyStmt (SWhile c b (i, v)) = vsep
+prettyProgram (SWhile c b (i, v)) = vsep
         [ pretty "while" <+> prettyBExp c <+> pretty "do"
         , indent 2 $ vsep
                 [ pretty "@inv" <+> braces (prettyAssertion i)
                 , pretty "@var" <+> braces (prettyArith v)
-                , prettyStmt b
+                , prettyProgram b
                 ]
         , pretty "end"
         ]
-prettyStmt (SCall ls rs n) =
+prettyProgram (SCall ls rs n) =
         hsep (punctuate comma (map pretty ls))
                 <+> pretty ":="
                 <+> pretty "call"

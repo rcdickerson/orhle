@@ -2,11 +2,13 @@ module Orhle.Imp
   ( AExp(..)
   , BExp(..)
   , ParseError
+  , Program(..)
   , SFun(..)
-  , Stmt(..)
   , Var
+  , fillInvHole
+  , invHoleIds
   , parseImp
-  , ppStmt
+  , ppProg
   , ppAExp
   , ppBExp
   ) where
@@ -16,8 +18,8 @@ import Orhle.Imp.ImpLanguage
 import Orhle.Imp.ImpParser
 import Orhle.Imp.ImpPrettyPrint
 
-ppStmt :: Stmt -> String
-ppStmt = unpack . prettyprint
+ppProg :: Program -> String
+ppProg = unpack . prettyprint
 
 ppAExp :: AExp -> String
 ppAExp = prettyprintAExp

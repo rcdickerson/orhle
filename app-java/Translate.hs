@@ -57,21 +57,21 @@ data TransBodyState = TransBodyState
 
 
 newtype TransBody a =
-  TransBody (ExceptT String (RWS MethodContext [I.Stmt] TransBodyState) a)
-  deriving (Functor, Applicative, Monad, MonadReader MethodContext, MonadWriter [I.Stmt], MonadState TransBodyState, MonadError String)
+  TransBody (ExceptT String (RWS MethodContext [I.Program] TransBodyState) a)
+  deriving (Functor, Applicative, Monad, MonadReader MethodContext, MonadWriter [I.Program], MonadState TransBodyState, MonadError String)
 
 runTransBody
   :: MethodContext
   -> TransBodyState
   -> TransBody a
-  -> (Either String a, TransBodyState, [I.Stmt])
+  -> (Either String a, TransBodyState, [I.Program])
 runTransBody sig st (TransBody a) = runRWS (runExceptT a) sig st
 
 --
 -- Translation
 --
 
-translate :: MethodContext -> J.CompilationUnit -> Either String I.Stmt
+translate :: MethodContext -> J.CompilationUnit -> Either String I.Program
 translate methodContext =
   translateMethodBody methodContext <=< extractSingleMethod
 
@@ -81,7 +81,7 @@ extractSingleMethod (J.CompilationUnit _maybePackageDecl _importList [J.ClassTyp
   = Right methodBodyBlock
 extractSingleMethod _ = Left "bad Java compilation unit"
 
-translateMethodBody :: MethodContext -> J.Block -> Either String I.Stmt
+translateMethodBody :: MethodContext -> J.Block -> Either String I.Program
 translateMethodBody methodContext (J.Block jStmts_l) =
   let (jStmts, lastRetJExp) = case fromList jStmts_l of
         s :|> (J.BlockStmt (J.Return jRetExp)) -> (s, jRetExp)
@@ -241,5 +241,5 @@ ensureVar e          = do
   tell [I.SAsgn v e]
   return v
 
-inBlock :: TransBody a -> TransBody (a, [I.Stmt])
+inBlock :: TransBody a -> TransBody (a, [I.Program])
 inBlock = censor (const []) . listen

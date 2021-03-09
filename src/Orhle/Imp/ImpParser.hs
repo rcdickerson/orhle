@@ -53,34 +53,34 @@ semi       = Token.semi       lexer
 whiteSpace = Token.whiteSpace lexer
 
 type ImpParser a = Parsec String Int a
-type StmtParser  = ImpParser Stmt
+type ProgramParser  = ImpParser Program
 
-parseImp :: String -> Either ParseError Stmt
+parseImp :: String -> Either ParseError Program
 parseImp = runParser impParser 0 ""
 
-impParser :: StmtParser
+impParser :: ProgramParser
 impParser = do
   whiteSpace
   prog <- program
   return prog
 
-program :: StmtParser
+program :: ProgramParser
 program = do
   stmts <- many1 $ statement
   case length stmts of
     1 -> return $ head stmts
     _ -> return $ SSeq  stmts
 
-statement :: StmtParser
-statement =   ifStmt
-          <|> whileStmt
-          <|> skipStmt
-          <|> try funcStmt
-          <|> assignStmt
+statement :: ProgramParser
+statement =   ifProgram
+          <|> whileProgram
+          <|> skipProgram
+          <|> try funcProgram
+          <|> assignProgram
           <|> parens statement
 
-ifStmt :: StmtParser
-ifStmt = do
+ifProgram :: ProgramParser
+ifProgram = do
   reserved "if"
   cond  <- bExpression
   reserved "then"
@@ -90,8 +90,8 @@ ifStmt = do
   reserved "end"
   return $ SIf cond (SSeq tbranch) (SSeq ebranch)
 
-whileStmt :: StmtParser
-whileStmt = do
+whileProgram :: ProgramParser
+whileProgram = do
   reserved "while"
   cond  <- bExpression
   whiteSpace
@@ -127,16 +127,16 @@ hole = do
   modifyState (+1)
   return $ Hole holeNum
 
-assignStmt :: StmtParser
-assignStmt = do
+assignProgram :: ProgramParser
+assignProgram = do
   var  <- identifier
   reservedOp ":="
   expr <- aExpression
   semi
   return $ SAsgn var expr
 
-funcStmt :: StmtParser
-funcStmt = do
+funcProgram :: ProgramParser
+funcProgram = do
   assignees <- varArray
   reservedOp ":="
   reserved "call"
@@ -159,8 +159,8 @@ varArray = do
              then [vars]
              else map (\n -> vars ++ "_" ++ (show n)) [0..(num-1)]
 
-skipStmt :: StmtParser
-skipStmt = reserved "skip" >> semi >> return SSkip
+skipProgram :: ProgramParser
+skipProgram = reserved "skip" >> semi >> return SSkip
 
 aExpression :: ImpParser AExp
 aExpression = buildExpressionParser aOperators aTerm

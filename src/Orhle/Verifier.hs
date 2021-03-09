@@ -8,8 +8,9 @@ module Orhle.Verifier
 import qualified Data.Set as Set
 import           Orhle.Assertion ( Assertion )
 import qualified Orhle.Assertion as A
-import qualified Orhle.HoleInference as Inf
-import           Orhle.Imp.ImpLanguage
+import qualified Orhle.InvariantInference as Inf
+import           Orhle.Imp.ImpLanguage ( Program(..), Var )
+import qualified Orhle.Imp.ImpLanguage as Imp
 import qualified Orhle.MapNames as Names
 import           Orhle.Spec
 import           Orhle.Triple
@@ -24,28 +25,33 @@ data VCQuant = VCUniversal
 
 rhleVerifier :: Verifier
 rhleVerifier specs (RhleTriple pre aProgs eProgs post) = let
-  vcsA = vcsForProgs VCExistential (especs specs) eProgs post
-  vcsE = vcsForProgs VCUniversal   (aspecs specs) aProgs vcsA
-  vcs  = A.Imp pre vcsE
+  pvarsToArith = Set.map (\var -> A.Var $ A.Ident var A.Int)
+  plitsToArith = Set.map (\i   -> A.Num i)
+  varsAtHole _ = Set.toList . Set.unions $
+                 (map (pvarsToArith . Imp.pvars) (aProgs ++ eProgs)) ++
+                 (map (plitsToArith . Imp.plits) (aProgs ++ eProgs))
+  vcTransform filledAProgs filledEProgs = A.Imp pre vcsE where
+      vcsA = vcsForProgs VCExistential (especs specs) filledEProgs post
+      vcsE = vcsForProgs VCUniversal   (aspecs specs) filledAProgs vcsA
   in do
-    result <- Inf.inferAndCheck (Inf.Enumerative 5) vcs
-    case result of
-      Left  msg       -> return . Left  $ Failure vcs msg
-      Right filledVcs -> return . Right $ Success filledVcs
+    result <- Inf.inferAndCheck (Inf.Enumerative 2) varsAtHole vcTransform aProgs eProgs
+    return $ case result of
+      Left  msg -> Left  $ Failure (vcTransform aProgs eProgs) msg
+      Right _   -> Right $ Success (vcTransform aProgs eProgs) -- TODO: filled VCs
 
-vcsForProgs :: VCQuant -> SpecMap -> [Stmt] -> Assertion -> Assertion
+vcsForProgs :: VCQuant -> SpecMap -> [Program] -> Assertion -> Assertion
 vcsForProgs quant specs progs post = foldr (generateVCs quant specs) post progs
 
-generateVCs :: VCQuant -> SpecMap -> Stmt -> Assertion -> Assertion
+generateVCs :: VCQuant -> SpecMap -> Program -> Assertion -> Assertion
 generateVCs quant specs stmt post =
   let vcs = generateVCs quant specs in
   case stmt of
     SSkip          -> post
     SSeq []        -> post
     SSeq (s:ss)    -> vcs s $ vcs (SSeq ss) post
-    SAsgn lhs rhs  -> A.subArith (A.Ident lhs A.Int) (aexpToArith rhs) post
+    SAsgn lhs rhs  -> A.subArith (A.Ident lhs A.Int) (Imp.aexpToArith rhs) post
     SIf b s1 s2 -> let
-      cond   = bexpToAssertion b
+      cond   = Imp.bexpToAssertion b
       ncond  = A.Not $ cond
       vcs1   = vcs s1 post
       vcs2   = vcs s2 post
@@ -53,8 +59,8 @@ generateVCs quant specs stmt post =
       vcElse = A.Imp ncond vcs2
       in A.And [vcIf, vcElse]
     loop@(SWhile b body (inv, measure)) -> let
-      cond        = bexpToAssertion b
-      loopVars    = Set.toList $ svars loop
+      cond        = Imp.bexpToAssertion b
+      loopVars    = Set.toList $ Imp.pvars loop
       freshVars   = locallyFreshVars loopVars
       bodyVC      = (case quant of
                        VCUniversal -> vcs body inv

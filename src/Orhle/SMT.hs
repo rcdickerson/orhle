@@ -1,5 +1,6 @@
 module Orhle.SMT
-  ( SMTResult(..)
+  ( SatResult(..)
+  , ValidResult(..)
   , checkValid
   , simplify
   ) where
@@ -12,19 +13,25 @@ import           SMTLib2.Core ( tBool )
 import           SMTLib2.Int  ( tInt )
 import qualified Text.PrettyPrint as PP
 
-data SMTResult = Sat String | Unsat | Unknown
+data SatResult = Sat String | Unsat | SatUnknown
+data ValidResult = Valid | Invalid String | ValidUnknown
 
-checkValid :: A.Assertion -> IO SMTResult
-checkValid = checkSat . A.Not
+checkValid :: A.Assertion -> IO ValidResult
+checkValid assertion = do
+  satResult <- checkSat (A.Not assertion)
+  return $ case satResult of
+    Sat model  -> Invalid model
+    Unsat      -> Valid
+    SatUnknown -> ValidUnknown
 
-checkSat :: A.Assertion -> IO SMTResult
+checkSat :: A.Assertion -> IO SatResult
 checkSat assertion = let
   fvs           = Set.toList $ A.freeVars assertion
   declareVars   = map toDeclareConst fvs
   assertionExpr = toSMT assertion
   in do
     logger <- SSMT.newLogger 0
-    solver <- SSMT.newSolver "z3" ["-in"] $ Just logger
+    solver <- SSMT.newSolver "z3" ["-in"] Nothing -- $ Just logger
     mapM_ (SSMT.ackCommand solver) (map toSSMT declareVars)
     SSMT.assert solver $ toSSMT assertionExpr
     result <- SSMT.check solver
@@ -33,7 +40,7 @@ checkSat assertion = let
         model <- SSMT.command solver $ SSMT.List [SSMT.Atom "get-model"]
         return . Sat $ SSMT.showsSExpr model ""
       SSMT.Unsat   -> return Unsat
-      SSMT.Unknown -> return Unknown
+      SSMT.Unknown -> return SatUnknown
 
 simplify :: A.Assertion -> IO (Either String A.Assertion)
 simplify assertion = let

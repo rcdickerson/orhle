@@ -9,19 +9,19 @@ import Orhle.Imp
 
 data HlTriple = HlTriple
   { hlPre  :: Assertion
-  , hlProg :: Stmt
+  , hlProg :: Program
   , hlPost :: Assertion
   } deriving (Show)
 
 data HleTriple = HleTriple
   { hlePre  :: Assertion
-  , hleProg :: Stmt
+  , hleProg :: Program
   , hlePost :: Assertion
   } deriving (Show)
 
 data RhleTriple = RhleTriple
   { rhlePre    :: Assertion
-  , rhleAProgs :: [Stmt]
-  , rhleEProgs :: [Stmt]
+  , rhleAProgs :: [Program]
+  , rhleEProgs :: [Program]
   , rhlePost   :: Assertion
   } deriving (Show)

@@ -9,7 +9,6 @@ import Control.Monad.Writer
 import Data.Foldable
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Orhle.Abduction.AbdTrace
 import Orhle.Abduction.Abducible
 import Orhle.Abduction.InterpMap
 import Orhle.Abduction.MSA
@@ -27,7 +26,6 @@ data AbductionProblem = AbductionProblem
   } deriving (Show)
 
 type AbductionResult = Either String InterpMap
-type TracedResult    = ATWriter IO AbductionResult
 
 --------------------------------------------------------------------------------
 

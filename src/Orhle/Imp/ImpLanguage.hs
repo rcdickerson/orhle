@@ -1,14 +1,17 @@
 module Orhle.Imp.ImpLanguage
     ( AExp(..)
     , BExp(..)
+    , Program(..)
     , SFun(..)
-    , Stmt(..)
     , Var
     , aexpToArith
     , avars
     , bexpToAssertion
     , bvars
-    , svars
+    , fillInvHole
+    , invHoleIds
+    , plits
+    , pvars
     ) where
 
 import qualified Data.Set  as Set
@@ -54,6 +57,17 @@ avars aexp = case aexp of
   ADiv lhs rhs -> Set.union (avars lhs) (avars rhs)
   AMod lhs rhs -> Set.union (avars lhs) (avars rhs)
   APow lhs rhs -> Set.union (avars lhs) (avars rhs)
+
+alits :: AExp -> Set.Set Integer
+alits aexp = case aexp of
+  ALit i -> Set.singleton i
+  AVar v -> Set.empty
+  AAdd lhs rhs -> Set.union (alits lhs) (alits rhs)
+  ASub lhs rhs -> Set.union (alits lhs) (alits rhs)
+  AMul lhs rhs -> Set.union (alits lhs) (alits rhs)
+  ADiv lhs rhs -> Set.union (alits lhs) (alits rhs)
+  AMod lhs rhs -> Set.union (alits lhs) (alits rhs)
+  APow lhs rhs -> Set.union (alits lhs) (alits rhs)
 
 aexpToArith :: AExp -> A.Arith
 aexpToArith aexp = case aexp of
@@ -121,6 +135,20 @@ bvars bexp = case bexp of
   BLt  lhs rhs -> Set.union (avars lhs) (avars rhs)
   BGt  lhs rhs -> Set.union (avars lhs) (avars rhs)
 
+blits :: BExp -> Set.Set Integer
+blits bexp = case bexp of
+  BTrue        -> Set.empty
+  BFalse       -> Set.empty
+  BNot b       -> blits b
+  BAnd b1  b2  -> Set.union (blits b1)  (blits b2)
+  BOr  b1  b2  -> Set.union (blits b1)  (blits b2)
+  BEq  lhs rhs -> Set.union (alits lhs) (alits rhs)
+  BNe  lhs rhs -> Set.union (alits lhs) (alits rhs)
+  BLe  lhs rhs -> Set.union (alits lhs) (alits rhs)
+  BGe  lhs rhs -> Set.union (alits lhs) (alits rhs)
+  BLt  lhs rhs -> Set.union (alits lhs) (alits rhs)
+  BGt  lhs rhs -> Set.union (alits lhs) (alits rhs)
+
 bexpToAssertion :: BExp -> Assertion
 bexpToAssertion bexp = case bexp of
   BTrue      -> A.ATrue
@@ -150,18 +178,18 @@ instance MappableNames SFun where
 
 
 ----------------
--- Statements --
+-- Programs --
 ----------------
-data Stmt
+data Program
   = SSkip
   | SAsgn  Var AExp
-  | SSeq   [Stmt]
-  | SIf    BExp Stmt Stmt
-  | SWhile BExp Stmt (Assertion, A.Arith)
+  | SSeq   [Program]
+  | SIf    BExp Program Program
+  | SWhile BExp Program (Assertion, A.Arith)
   | SCall  [Var] [Var] String
   deriving (Eq, Ord, Show)
 
-instance MappableNames Stmt where
+instance MappableNames Program where
   mapNames _ SSkip          = SSkip
   mapNames f (SAsgn v aexp) = SAsgn (f v) (mapNames f aexp)
   mapNames f (SSeq stmts)   = SSeq $ map (mapNames f) stmts
@@ -171,13 +199,52 @@ instance MappableNames Stmt where
   mapNames f (SCall as ps name) =
     SCall (map f as) (map f ps) (f name)
 
-svars :: Stmt -> Set.Set Var
-svars stmt = case stmt of
+pvars :: Program -> Set.Set Var
+pvars prog = case prog of
   SSkip                      -> Set.empty
   SAsgn  var aexp            -> Set.insert var $ avars aexp
-  SSeq   []                  -> svars SSkip
-  SSeq   (s:ss)              -> Set.union (svars s) (svars $ SSeq ss)
+  SSeq   []                  -> Set.empty
+  SSeq   (s:ss)              -> Set.union (pvars s) (pvars $ SSeq ss)
   SIf    cond bThen bElse    -> Set.unions
-                                  [(bvars cond), (svars bThen), (svars bElse)]
-  SWhile cond body _         -> Set.union (bvars cond) (svars body)
+                                  [(bvars cond), (pvars bThen), (pvars bElse)]
+  SWhile cond body _         -> Set.union (bvars cond) (pvars body)
   SCall  assignees params  _ -> Set.fromList $ assignees ++ params
+
+plits :: Program -> Set.Set Integer
+plits prog = case prog of
+  SSkip                   -> Set.empty
+  SAsgn  var aexp         -> alits aexp
+  SSeq   []               -> Set.empty
+  SSeq   (s:ss)           -> Set.union (plits s) (plits $ SSeq ss)
+  SIf    cond bThen bElse -> Set.unions
+                               [(blits cond), (plits bThen), (plits bElse)]
+  SWhile cond body _      -> Set.union (blits cond) (plits body)
+  SCall  _ _ _            -> Set.empty
+
+
+invHoleIds :: Program -> Set.Set Int
+invHoleIds prog = case prog of
+  SSkip       -> Set.empty
+  SAsgn _ _   -> Set.empty
+  SSeq ps     -> Set.unions $ map invHoleIds ps
+  SIf _ p1 p2 -> Set.union (invHoleIds p1) (invHoleIds p2)
+  SCall _ _ _ -> Set.empty
+  SWhile _ body (inv, _) -> Set.union (invHoleIds body) $
+    case inv of
+      A.Hole hid -> Set.singleton hid
+      _          -> Set.empty
+
+fillInvHole :: Program -> Int -> Assertion -> Program
+fillInvHole prog holeId fill = let
+  fillRec p = fillInvHole p holeId fill
+  in case prog of
+    SSkip            -> SSkip
+    SAsgn v a        -> SAsgn v a
+    SSeq ps          -> SSeq $ map fillRec ps
+    SIf c p1 p2      -> SIf c (fillRec p1) (fillRec p2)
+    SCall as ps name -> SCall as ps name
+    SWhile c body (inv, var) ->
+      let inv' = case inv of
+            A.Hole hid -> if hid == holeId then fill else inv
+            _          -> inv
+      in SWhile c (fillRec body) (inv', var)
