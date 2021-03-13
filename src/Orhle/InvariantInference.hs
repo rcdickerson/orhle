@@ -9,7 +9,6 @@ module Orhle.InvariantInference
 import System.IO
 import Control.Concurrent.Timeout
 
-import           Data.Either ( rights )
 import           Data.Map  ( Map, (!) )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -105,11 +104,15 @@ tryAllFills depth holeVals currentSubs vcTransform aProgs eProgs =
     filledProgs          = map subsAndFills fills
     tryFill (subs, filledAProgs, filledEProgs)
                          = tryAllFills depth holeVals' subs vcTransform filledAProgs filledEProgs
-    in do
-      tries <- sequence $ map tryFill filledProgs
-      return $ case rights tries of
-        []  -> Left "Unable to find fills for assertion holes."
-        a:_ -> Right a
+    in firstRight $ map tryFill filledProgs
+
+firstRight :: [IO (Either ErrorMsg (Map Int Assertion))] -> IO (Either ErrorMsg (Map Int Assertion))
+firstRight []         = return $ Left "Unable to find fills for assertion holes."
+firstRight (try:rest) = do
+  result <- try
+  case result of
+    Left _  -> firstRight rest
+    Right a -> return $ Right a
 
 enumerateAssertions :: Int -> [Arith] -> [Assertion]
 enumerateAssertions 0 _ = []

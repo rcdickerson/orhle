@@ -5,6 +5,7 @@ module Orhle.Imp.ImpParser
     ( ParseError
     , impParser
     , parseImp
+    , parseImpWithHoleIndex
     ) where
 
 import Control.Monad
@@ -52,17 +53,23 @@ comma      = Token.comma      lexer
 semi       = Token.semi       lexer
 whiteSpace = Token.whiteSpace lexer
 
-type ImpParser a = Parsec String Int a
-type ProgramParser  = ImpParser Program
+type ImpParser a   = Parsec String Int a
+type ProgramParser = ImpParser Program
 
 parseImp :: String -> Either ParseError Program
-parseImp = runParser impParser 0 ""
+parseImp str = do
+  (_, prog) <- parseImpWithHoleIndex 0 str
+  return prog
 
-impParser :: ProgramParser
+parseImpWithHoleIndex :: Int -> String -> Either ParseError (Int, Program)
+parseImpWithHoleIndex index str = runParser impParser index "" str
+
+impParser :: ImpParser (Int, Program)
 impParser = do
   whiteSpace
   prog <- program
-  return prog
+  holeIndex <- getState
+  return (holeIndex, prog)
 
 program :: ProgramParser
 program = do

@@ -10,6 +10,7 @@ import qualified Data.Map              as Map
 import           Orhle.Assertion        ( Assertion )
 import qualified Orhle.Assertion       as A
 import           Orhle.Imp
+import           Orhle.Imp.ImpParser
 import qualified Orhle.MapNames        as Names
 import           Orhle.Spec
 import qualified Orhle.Spec            as S
@@ -25,7 +26,7 @@ type NamedProg = (String, Program)
 data ExpectedResult = ExpectSuccess | ExpectFailure
   deriving (Eq, Show)
 
-languageDef :: LanguageDef()
+languageDef :: LanguageDef Int
 languageDef = Token.LanguageDef
   { Token.caseSensitive   = True
   , Token.commentStart    = "/*"
@@ -54,10 +55,10 @@ comma      = Token.comma      lexer
 semi       = Token.semi       lexer
 whiteSpace = Token.whiteSpace lexer
 
-type OrhleAppParser a = Parsec String () a
+type OrhleAppParser a = Parsec String Int a
 
 parseOrhle :: String -> Either ParseError ([Exec], AESpecs, RhleTriple, ExpectedResult)
-parseOrhle str = runParser orhleParser () "" str
+parseOrhle str = runParser orhleParser 0 "" str
 
 orhleParser :: OrhleAppParser ([Exec], AESpecs, RhleTriple, ExpectedResult)
 orhleParser = do
@@ -185,9 +186,12 @@ program = do
   char ')' >> whiteSpace >> char ':'
   progStr <- manyTill anyChar (try $ reserved "endp")
   whiteSpace
-  case parseImp progStr of
-    Left err ->   fail $ show err
-    Right prog -> return (name, prog)
+  holeIndex <- getState
+  case parseImpWithHoleIndex holeIndex progStr of
+    Left err                 -> fail $ show err
+    Right (holeIndex', prog) -> do
+      putState holeIndex'
+      return (name, prog)
 
 getExecName :: Exec -> String
 getExecName (Forall name _) = name

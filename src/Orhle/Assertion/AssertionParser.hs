@@ -79,9 +79,10 @@ boolLit = do
   rest  <- many $ alphaNum <|> char '!' <|> char '_'
   let name = start:rest
   whitespace
-  return $ case name of
-    "true"  -> A.ATrue
-    "false" -> A.AFalse
+  case name of
+    "true"  -> return A.ATrue
+    "false" -> return A.AFalse
+    _       -> fail $ "expected a boolean literal, got: " ++ name
 
 arithLit :: ArithParser
 arithLit = int <|> arithIdent
