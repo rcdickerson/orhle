@@ -151,7 +151,7 @@ funcProgram = do
   params  <- (liftM concat) . parens $ sepBy varArray comma
   whiteSpace
   semi
-  return $ SCall assignees params funName
+  return $ SCall (SFun funName params) assignees
 
 varArray :: ImpParser [Var]
 varArray = do

@@ -41,7 +41,7 @@ prettyProgram (SWhile c b (i, v)) = vsep
                 ]
         , pretty "end"
         ]
-prettyProgram (SCall ls rs n) =
+prettyProgram (SCall (SFun n rs) ls) =
         hsep (punctuate comma (map pretty ls))
                 <+> pretty ":="
                 <+> pretty "call"

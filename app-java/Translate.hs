@@ -172,7 +172,7 @@ translateExp (J.MethodInv (J.MethodCall jMethodName jArgs)) = do
   retVar     <- freshTmpVar
   methodName <- translateMethodName jMethodName
   args       <- mapM (ensureVar <=< translateExp) jArgs
-  tell [I.SCall [retVar] args methodName] -- TODO: renaming?
+  tell [I.SCall (I.SFun methodName args) [retVar]] -- TODO: renaming?
   return (I.AVar retVar)
  where
   translateMethodName :: J.Name -> TransBody String

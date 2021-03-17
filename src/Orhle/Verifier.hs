@@ -74,8 +74,8 @@ generateVCs quant specs stmt post =
       loopVC      = A.Forall freshIdents (freshen $ A.Imp (A.And [cond, inv]) bodyVC)
       endVC       = A.Forall freshIdents (freshen $ A.Imp (A.And [A.Not cond, inv]) post)
       in A.And [inv, loopVC, endVC]
-    SCall assignees cparams funName ->
-      case (specAtCallsite assignees cparams funName specs) of
+    SCall (Imp.SFun funName funParams) assignees ->
+      case (specAtCallsite assignees funParams funName specs) of
         Nothing -> error $ "No " ++ (show quant) ++ " specification for " ++ funName ++
                    ". Specified functions are: " ++ (show $ funList specs)
         Just (cvars, fPre, fPost) ->
