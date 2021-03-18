@@ -24,12 +24,13 @@ pre: (and
 post: (= parity!1!l parity!2!l);
 
 
-prog parity():
+fun parity() {
   if (h % 2 == 1) then
     l := 1;
     h := 1;
   else
     l := 0;
     h := 0;
-  end
-endp
+  endif
+  return 0;
+}

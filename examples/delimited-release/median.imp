@@ -53,36 +53,37 @@ post: (=>
         (= median!1!ret median!2!ret));
 
 
-prog median(a1, a2, b1, b2):
+fun median(a1, a2, b1, b2) {
   if (a1 <= b1) then
     x1 := 1;
   else
     x1 := 0;
-  end
+  endif
 
   if (x1 == 1) then
     a3 := a2;
   else
     a3 := a1;
-  end
+  endif
 
   if (x1 == 1) then
     b3 := b1;
   else
     b3 := b2;
-  end
+  endif
 
   if (a3 <= b3) then
     x2 := 1;
   else
     x2 := 0;
-  end
+  endif
 
   if (x2 == 1) then
     m := a3;
   else
     m := b3;
-  end
+  endif
 
   ret := m;
-endp
+  return ret;
+}

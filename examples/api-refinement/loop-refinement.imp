@@ -19,7 +19,7 @@ especs:
     post: (= ret! n);
   }
 
-prog original():
+fun original() {
   sum := 0;
   while (sum <= 100) do
     @inv { (=> (> original!sum 100) (= original!sum refinement!sum)) }
@@ -27,13 +27,15 @@ prog original():
     r := call rand();
     sum := sum + r;
   end
-endp
+  return sum;
+}
 
-prog refinement():
+fun refinement() {
   sum := 0;
   while (sum <= 100) do
     @inv { (and (<= 0 refinement!sum) (< refinement!sum 110)) }
     r := call randOdd();
     sum := sum + r;
   end
-endp
+  return sum;
+}

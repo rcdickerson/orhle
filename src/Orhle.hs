@@ -6,6 +6,7 @@ module Orhle
     , ExecId
     , ExpectedResult(..)
     , Failure(..)
+    , FunImplEnv
     , RhleTriple(..)
     , Spec(..)
     , SpecMap
@@ -19,12 +20,13 @@ module Orhle
     , verify
     ) where
 
+import Orhle.Imp
 import Orhle.OrhleParser
 import Orhle.Spec
 import Orhle.Triple
 import Orhle.Verifier
 
-parseOrhle :: String -> Either String ([Exec], AESpecs, RhleTriple, ExpectedResult)
+parseOrhle :: String -> Either String ([Exec], FunImplEnv, AESpecs, RhleTriple, ExpectedResult)
 parseOrhle input = case Orhle.OrhleParser.parseOrhle input of
   Left err     -> Left  $ show err
   Right result -> Right $ result

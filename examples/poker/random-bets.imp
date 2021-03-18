@@ -21,7 +21,8 @@ especs:
     post: (= ret! r);
   }
 
-prog bet(hand[5]):
+fun bet(hand[5]) {
   maxBet := 10;
   ret := call random(maxBet);
-endp
+  return ret;
+}

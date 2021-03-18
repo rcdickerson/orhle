@@ -5,7 +5,7 @@ exists: bet[2];
 
 post: (= bet!1!ret bet!2!ret);
 
-prog bet(hand[5]):
+fun bet(hand[5]) {
   count_1 := 0;
   count_2 := 0;
   count_3 := 0;
@@ -36,4 +36,5 @@ prog bet(hand[5]):
   if (count_3 > max_count) then max_count := count_3; else skip; end
 
   ret := max_count * 3;
-endp
+  return ret;
+}

@@ -18,7 +18,7 @@ especs:
     post: (= ret! c);
   }
 
-prog play():
+fun play() {
   while (handValue < 21) do
     @inv { (<= play!handValue 21) }
     @var { (- 30 handValue) }
@@ -26,4 +26,5 @@ prog play():
     card := call draw();
     handValue := handValue + card;
   end
-endp
+  return handValue;
+}

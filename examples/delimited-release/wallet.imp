@@ -21,16 +21,17 @@ pre: (and
        (= buy!1!cost buy!2!cost)
 
        // Delimited Release
-       (= (>= buy!1!funds buy!1!cost) (>= buy!2!funds buy!2!cost)));
+       (and (>= buy!1!funds buy!1!cost) (>= buy!2!funds buy!2!cost)));
 
 post: (= buy!1!spent buy!2!spent);
 
 
-prog buy(funds, spent, cost):
+fun buy(funds, spent, cost) {
   if (funds >= cost) then
     funds := funds - cost;
     spent := spent + cost;
   else
     skip;
-  end
-endp
+  endif
+  return 0;
+}

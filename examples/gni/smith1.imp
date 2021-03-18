@@ -9,10 +9,11 @@ exists: smith[3];
 pre:  (= smith!1!secret smith!3!secret);
 post: (= smith!2!ret smith!3!ret);
 
-prog smith(secret):
+fun smith(secret) {
   if (secret % 2 == 0) then
     ret := 0;
   else
     ret := 1;
-  end
-endp
+  endif
+  return ret;
+}

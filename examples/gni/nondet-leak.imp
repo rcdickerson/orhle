@@ -24,11 +24,12 @@ especs:
     post: (= ret! n);
   }
 
-prog leak(high, low):
+fun leak(high, low) {
   r := call randInt();
   if (r == 50) then
     ret := high + low;
   else
     ret := low;
-  end
-endp
+  endif
+  return ret;
+}

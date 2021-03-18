@@ -18,8 +18,9 @@ post: (and
         (not (= unused!1A!ret unused!1B!ret))
         (not (= unused!2A!ret unused!2B!ret)));
 
-prog unused(param1, param2):
+fun unused(param1, param2) {
   x := param1 + param2;
   y := x - param2;
   ret := y;
-endp
+  return ret;
+}

@@ -35,7 +35,7 @@ run orhle = do
     Left err -> do
       putStrLn $ "Parse error: " ++ err
       return False
-    Right (execs, specs, rhleTriple, expected) -> do
+    Right (execs, funs, specs, rhleTriple, expected) -> do
       printQuery execs rhleTriple
       result <- Orhle.verify specs rhleTriple
       case result of
@@ -76,8 +76,8 @@ printSuccess (Orhle.Success vcs) = do
   putStrLn "Valid."
 
 printExec :: Orhle.Exec -> IO ()
-printExec (Orhle.Forall name eid) = putStrLn $ "  " ++ name ++ (eidStr eid) ++ " (forall)"
-printExec (Orhle.Exists name eid) = putStrLn $ "  " ++ name ++ (eidStr eid) ++ " (exists)"
+printExec (Orhle.ExecForall name eid) = putStrLn $ "  " ++ name ++ (eidStr eid) ++ " (forall)"
+printExec (Orhle.ExecExists name eid) = putStrLn $ "  " ++ name ++ (eidStr eid) ++ " (exists)"
 
 eidStr :: Orhle.ExecId -> String
 eidStr Nothing = ""

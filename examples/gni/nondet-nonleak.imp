@@ -25,11 +25,12 @@ especs:
     post: (= ret! n);
   }
 
-prog nonleak(high, low):
+fun nonleak(high, low) {
   r := call randInt();
   if (r == 5000) then
     ret := high + low;
   else
     ret := low;
-  end
-endp
+  endif
+  return ret;
+}

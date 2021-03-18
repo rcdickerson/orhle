@@ -18,7 +18,7 @@ post: (and
         (= denningA2!f1_L denningE!f1_L)
         (= denningA2!f2_L denningE!f2_L));
 
-prog denningA1(f1_L, f2_L, f3_H, f4_H):
+fun denningA1(f1_L, f2_L, f3_H, f4_H) {
   i   := 1;
   n   := 0;
   sum := 0;
@@ -38,14 +38,15 @@ prog denningA1(f1_L, f2_L, f3_H, f4_H):
       sum := sum + x;
     else
       skip;
-    end
+    endif
     i := i + 1;
   end
   f2_L := n + sum + (sum / n);
   f1_L := f2_L;
-endp
+  return f1_L;
+}
 
-prog denningA2(f1_L, f2_L, f3_H, f4_H):
+fun denningA2(f1_L, f2_L, f3_H, f4_H) {
   i   := 1;
   n   := 0;
   sum := 0;
@@ -65,14 +66,15 @@ prog denningA2(f1_L, f2_L, f3_H, f4_H):
       sum := sum + x;
     else
       skip;
-    end
+    endif
     i := i + 1;
   end
   f2_L := n + sum + (sum / n);
   f1_L := f2_L;
-endp
+  return f1_L;
+}
 
-prog denningE(f1_L, f2_L, f3_H, f4_H):
+fun denningE(f1_L, f2_L, f3_H, f4_H) {
   i   := 1;
   n   := 0;
   sum := 0;
@@ -95,9 +97,10 @@ prog denningE(f1_L, f2_L, f3_H, f4_H):
       sum := sum + x;
     else
       skip;
-    end
+    endif
     i := i + 1;
   end
   f2_L := n + sum + (sum / n);
   f1_L := f2_L;
-endp
+  return f1_L;
+}

@@ -19,7 +19,7 @@ assertVerifierResultMatches expected result =
 parseAndTest :: String -> Assertion
 parseAndTest progStr = case parseOrhle progStr of
   Left  err -> assertFailure $ "Parse error: " ++ (show err)
-  Right (_, specs, triple, expected) -> do
+  Right (_, _, specs, triple, expected) -> do
     result <- verify specs triple
     assertVerifierResultMatches expected result
 

@@ -18,7 +18,8 @@ especs:
     post: (= ret! c);
   }
 
-prog play():
+fun play() {
   card := call draw();
   handValue := handValue + card;
-endp
+  return handValue;
+}

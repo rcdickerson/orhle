@@ -23,12 +23,13 @@ especs:
     post: (= ret! n);
   }
 
-prog unused(param1, param2):
+fun unused(param1, param2) {
   x := param1 + param2;
   r := call flip();
   if (r == 0) then
     ret := x - param2;
   else
     ret := param1;
-  end
-endp
+  endif
+  return ret;
+}

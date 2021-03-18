@@ -17,7 +17,7 @@ pre:  (= parity!1!l parity!2!l);
 post: (= parity!1!l parity!2!l);
 
 
-prog parity():
+fun parity() {
   h := h % 2;
   if (h == 1) then
     l := 1;
@@ -25,5 +25,6 @@ prog parity():
   else
     l := 0;
     h := 0;
-  end
-endp
+  endif
+  return 0;
+}

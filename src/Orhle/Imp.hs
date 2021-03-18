@@ -1,6 +1,7 @@
 module Orhle.Imp
   ( AExp(..)
   , BExp(..)
+  , FunImplEnv
   , ParseError
   , Program(..)
   , SFun(..)

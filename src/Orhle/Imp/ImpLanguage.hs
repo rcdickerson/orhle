@@ -178,7 +178,7 @@ data SFun = SFun
 instance MappableNames SFun where
   mapNames f (SFun name params) = SFun (f name) (map f params)
 
-type FunImplEnv = Map String Program
+type FunImplEnv = Map String (Program, AExp)
 
 
 ----------------

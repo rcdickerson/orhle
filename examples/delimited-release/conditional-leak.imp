@@ -36,10 +36,11 @@ pre: (and
 
 post: (= cond!2!ret cond!3!ret);
 
-prog cond():
+fun cond() {
   if (l == 0) then
     ret := h1 % 2;
   else
     ret := h1 % 2;
-  end
-endp
+  endif
+  return ret;
+}

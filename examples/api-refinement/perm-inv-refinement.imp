@@ -46,12 +46,14 @@ especs:
     post: (and (= ret!0 n0) (= ret!1 n1) (= ret!2 n2));
   }
 
-prog original():
+fun original() {
    list[3] := call originalGetValues();
    sum := list_0 + list_1 + list_2;
-endp
+   return sum;
+}
 
-prog refinement():
+fun refinement() {
    list[3] := call refinedGetValues();
    sum := list_0 + list_1 + list_2;
-endp
+   return sum;
+}

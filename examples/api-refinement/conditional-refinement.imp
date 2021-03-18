@@ -21,20 +21,22 @@ especs:
     post: (= ret! n);
   }
 
-prog original():
+fun original() {
   r := call flipCoin();
   if (r == 0) then
     ret := 10;
   else
     ret := 20;
-  end
-endp
+  endif
+  return ret;
+}
 
-prog refinement():
+fun refinement() {
   r := call flipCoin();
   if (r == 0) then
     ret := 20;
   else
     ret := 10;
-  end
-endp
+  endif
+  return ret;
+}

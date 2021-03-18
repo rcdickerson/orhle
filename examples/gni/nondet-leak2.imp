@@ -22,11 +22,12 @@ especs:
     post: (= ret! n);
   }
 
-prog run(high, low):
+fun run(high, low) {
   flip := call flipCoin();
   if (flip == 0) then
     low := high + low;
   else
     skip;
-  end
-endp
+  endif
+  return low;
+}

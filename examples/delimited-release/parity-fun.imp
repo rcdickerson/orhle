@@ -35,7 +35,7 @@ especs:
     post: (= ret! (mod val 2));
   }
 
-prog run():
+fun run() {
   p := call parity(h);
   if (p == 1) then
     l := 1;
@@ -43,5 +43,6 @@ prog run():
   else
     l := 0;
     h := 0;
-  end
-endp
+  endif
+  return 0;
+}

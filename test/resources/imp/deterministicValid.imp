@@ -6,20 +6,22 @@ exists: E;
 pre: true;
 post: (= A!y E!y);
 
-prog A():
+fun A() {
   x := 3;
   if x == 3 then
     y := 3;
   else
     y := 300;
-  end
-endp
+  endif
+  return y;
+}
 
-prog E():
+fun E() {
   x := 4;
   if x == 3 then
     y := 300;
   else
     y := 3;
-  end
-endp
+  endif
+  return y;
+}

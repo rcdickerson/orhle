@@ -7,6 +7,7 @@ exists: unused[1], unused[2];
 pre:  (not (= unused!1!param unused!2!param));
 post: (not (= unused!1!ret   unused!2!ret));
 
-prog unused(param):
+fun unused(param) {
   ret := 5;
-endp
+  return ret;
+}

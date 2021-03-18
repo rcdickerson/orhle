@@ -25,6 +25,7 @@ post: (and
         (not (= used!2A!ret used!2B!ret))
         (not (= used!3A!ret used!3B!ret)));
 
-prog used(param1, param2, param3):
+fun used(param1, param2, param3) {
   ret := (param1 + param2) - param3;
-endp
+  return ret;
+}

@@ -11,6 +11,7 @@ pre: (and
        (= leak!2!low   leak!3!low));
 post:  (= leak!2!ret   leak!3!ret);
 
-prog leak(high, low):
+fun leak(high, low) {
   ret := high + low;
-endp
+  return ret;
+}

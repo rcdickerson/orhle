@@ -29,13 +29,13 @@ pre: (and
        (= (+ calc_avg!2!salary1 calc_avg!2!salary2 calc_avg!2!salary3)
           (+ calc_avg!3!salary1 calc_avg!3!salary2 calc_avg!3!salary3)));
 
-post: (= calc_avg!2!ret  calc_avg!3!ret);
+post: (= calc_avg!2!avg  calc_avg!3!avg);
 
-prog calc_avg(salary1, salary2, salary3):
+fun calc_avg(salary1, salary2, salary3) {
   sum := 0;
   sum := sum + salary1;
   sum := sum + salary2;
   sum := sum + salary3;
   avg := sum / 3;
-  ret := avg;
-endp
+  return avg;
+}

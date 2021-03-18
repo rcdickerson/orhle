@@ -13,20 +13,22 @@ especs:
    post: (= ret! n);
  }
 
-prog A():
+fun A() {
   x := 3;
   if x == 3 then
     y := 4;
   else
     y := 300;
-  end
-endp
+  endif
+  return y;
+}
 
-prog E():
+fun E() {
   x := call randOdd();
   if x == 3 then
     y := 3;
   else
     y := 300;
-  end
-endp
+  endif
+  return y;
+}

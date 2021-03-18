@@ -20,7 +20,7 @@ post: (and
 
         (= denning!2!ret denning!3!ret));
 
-prog denning(i_L, e_L, f_L, x_H, sum_H):
+fun denning(i_L, e_L, f_L, x_H, sum_H) {
   max_sum := 100;
   oob_error := 0;
 
@@ -36,12 +36,13 @@ prog denning(i_L, e_L, f_L, x_H, sum_H):
       oob_error := 1;
     else
       skip;
-    end
+    endif
   end
 
   if (oob_error == 1) then
     ret := 0;
   else
     ret := 1;
-  end;
-endp
+  endif
+  return ret;
+}

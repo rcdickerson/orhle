@@ -20,10 +20,12 @@ especs:
       post: (= ret! n);
   }
 
-prog original():
+fun original() {
   x := call originalRand();
-endp
+  return x;
+}
 
-prog refinement():
+fun refinement() {
   x := call refinedRand();
-endp
+  return x;
+}
