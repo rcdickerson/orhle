@@ -1,4 +1,4 @@
-// A non-deterministic program that doesn't use one of its parameters.
+// A simple non-deterministic coin flip that ignores all parameters.
 
 expected: valid;
 
@@ -32,12 +32,6 @@ especs:
   }
 
 fun unused(param1, param2) {
-  x := param1 + param2;
-  r := call flip();
-  if (r == 0) then
-    ret := x - param2;
-  else
-    ret := param1;
-  endif
+  ret := call flip();
   return ret;
 }

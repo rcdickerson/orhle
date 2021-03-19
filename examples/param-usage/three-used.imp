@@ -1,11 +1,9 @@
 // A program that uses all of its parameters.
 
-expected: valid;
+expected: invalid;
 
-exists:
-  used[1A], used[1B],
-  used[2A], used[2B],
-  used[3A], used[3B];
+forall: used[1A], used[2A], used[3A];
+exists: used[1B], used[2B], used[3B];
 
 pre: (and
         (not (= used!1A!param1 used!1B!param1))
@@ -20,10 +18,10 @@ pre: (and
         (= used!3A!param2 used!3B!param2)
         (not (= used!3A!param3 used!3B!param3)));
 
-post: (and
-        (not (= used!1A!ret used!1B!ret))
-        (not (= used!2A!ret used!2B!ret))
-        (not (= used!3A!ret used!3B!ret)));
+post: (or
+        (= used!1A!ret used!1B!ret)
+        (= used!2A!ret used!2B!ret)
+        (= used!3A!ret used!3B!ret));
 
 fun used(param1, param2, param3) {
   ret := (param1 + param2) - param3;
