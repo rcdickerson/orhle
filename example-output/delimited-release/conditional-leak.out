@@ -1,3 +1,4 @@
+
 *******************************************
 ****               ORHLE               ****
 ****     The Oracular RHLE Verifier    ****
@@ -8,51 +9,90 @@
   cond[2] (forall)
   cond[3] (exists)
 
-:: Verification Conditions
-  (=> (and (= cond!1!h1 cond!3!h1)
-           (= cond!1!h2 cond!3!h2)
-           (= cond!1!l cond!2!l)
-           (= cond!2!l cond!3!l)
-           (=> (= cond!1!l 0)
-               (and (= (mod cond!1!h1 2) (mod cond!2!h1 2))
-                    (= (mod cond!2!h1 2) (mod cond!3!h1 2))))
-           (=> (not (= cond!1!l 0))
-               (and (= (mod cond!1!h2 2) (mod cond!2!h2 2))
-                    (= (mod cond!2!h2 2) (mod cond!3!h2 2)))))
-      (and (=> (= cond!2!l 0)
-               (and (or (not (= cond!1!l 0))
-                        (and (or (not (= cond!3!l 0))
-                                 (= (mod cond!2!h1 2) (mod cond!3!h1 2)))
-                             (or (= cond!3!l 0)
-                                 (= (mod cond!2!h1 2) (mod cond!3!h1 2)))))
-                    (or (= cond!1!l 0)
-                        (and (or (not (= cond!3!l 0))
-                                 (= (mod cond!2!h1 2) (mod cond!3!h1 2)))
-                             (or (= cond!3!l 0)
-                                 (= (mod cond!2!h1 2) (mod cond!3!h1 2)))))))
-           (=> (not (= cond!2!l 0))
-               (and (or (not (= cond!1!l 0))
-                        (and (or (not (= cond!3!l 0))
-                                 (= (mod cond!2!h1 2) (mod cond!3!h1 2)))
-                             (or (= cond!3!l 0)
-                                 (= (mod cond!2!h1 2) (mod cond!3!h1 2)))))
-                    (or (= cond!1!l 0)
-                        (and (or (not (= cond!3!l 0))
-                                 (= (mod cond!2!h1 2) (mod cond!3!h1 2)))
-                             (or (= cond!3!l 0)
-                                 (= (mod cond!2!h1 2) (mod cond!3!h1 2)))))))))
+Universal Programs:
+[ SIf
+    (BEq (AVar cond ! 1 ! l) (ALit 0))
+    (SAsgn cond ! 1 ! ret (AMod (AVar cond ! 1 ! h1) (ALit 2)))
+    (SAsgn cond ! 1 ! ret (AMod (AVar cond ! 1 ! h1) (ALit 2)))
+, SIf
+    (BEq (AVar cond ! 2 ! l) (ALit 0))
+    (SAsgn cond ! 2 ! ret (AMod (AVar cond ! 2 ! h1) (ALit 2)))
+    (SAsgn cond ! 2 ! ret (AMod (AVar cond ! 2 ! h1) (ALit 2)))
+]
 
-Invalid. Model:
-  cond!1!h1 -> 0
-  cond!1!h2 -> 0
-  cond!1!l -> 3
-  cond!2!h1 -> 1
-  cond!2!h2 -> 0
-  cond!2!l -> 3
-  cond!3!h1 -> 0
-  cond!3!h2 -> 0
-  cond!3!l -> 3
+Existential Programs:
+[ SIf
+    (BEq (AVar cond ! 3 ! l) (ALit 0))
+    (SAsgn cond ! 3 ! ret (AMod (AVar cond ! 3 ! h1) (ALit 2)))
+    (SAsgn cond ! 3 ! ret (AMod (AVar cond ! 3 ! h1) (ALit 2)))
+]
 
-real	0m0.078s
-user	0m0.088s
-sys	0m0.025s
+Universal Specifications:
+fromList []
+
+Existential Specifications:
+fromList []
+
+Precondition:
+  (and (= cond!1!h1 cond!3!h1) (= cond!1!h2 cond!3!h2) (= cond!1!l cond!2!l) (= cond!2!l cond!3!l) (=> (= cond!1!l 0) (and (= (mod cond!1!h1 2) (mod cond!2!h1 2)) (= (mod cond!2!h1 2) (mod cond!3!h1 2)))) (=> (not (= cond!1!l 0)) (and (= (mod cond!1!h2 2) (mod cond!2!h2 2)) (= (mod cond!2!h2 2) (mod cond!3!h2 2)))))
+
+Postcondition:
+  (= cond!2!ret cond!3!ret)
+
+[send->] (set-option :print-success true )
+[<-recv] success
+[send->] (set-option :produce-models true )
+[<-recv] success
+[send->] (declare-const cond!1!h1 Int)
+[<-recv] success
+[send->] (declare-const cond!1!h2 Int)
+[<-recv] success
+[send->] (declare-const cond!1!l Int)
+[<-recv] success
+[send->] (declare-const cond!2!h1 Int)
+[<-recv] success
+[send->] (declare-const cond!2!h2 Int)
+[<-recv] success
+[send->] (declare-const cond!2!l Int)
+[<-recv] success
+[send->] (declare-const cond!3!h1 Int)
+[<-recv] success
+[send->] (declare-const cond!3!h2 Int)
+[<-recv] success
+[send->] (declare-const cond!3!l Int)
+[<-recv] success
+[send->] (assert (not (=> (and (= cond!1!h1 cond!3!h1) (= cond!1!h2 cond!3!h2)
+              (= cond!1!l cond!2!l) (= cond!2!l cond!3!l)
+              (=> (= cond!1!l 0)
+                  (and (= (mod cond!1!h1 2) (mod cond!2!h1 2))
+                       (= (mod cond!2!h1 2) (mod cond!3!h1 2))))
+              (=> (not (= cond!1!l 0))
+                  (and (= (mod cond!1!h2 2) (mod cond!2!h2 2))
+                       (= (mod cond!2!h2 2) (mod cond!3!h2 2)))))
+         (and (=> (= cond!2!l 0)
+                  (and (=> (= cond!1!l 0)
+                           (and (=> (= cond!3!l 0) (= (mod cond!2!h1 2) (mod cond!3!h1 2)))
+                                (=> (not (= cond!3!l 0)) (= (mod cond!2!h1 2) (mod cond!3!h1 2)))))
+                       (=> (not (= cond!1!l 0))
+                           (and (=> (= cond!3!l 0) (= (mod cond!2!h1 2) (mod cond!3!h1 2)))
+                                (=> (not (= cond!3!l 0))
+                                    (= (mod cond!2!h1 2) (mod cond!3!h1 2)))))))
+              (=> (not (= cond!2!l 0))
+                  (and (=> (= cond!1!l 0)
+                           (and (=> (= cond!3!l 0) (= (mod cond!2!h1 2) (mod cond!3!h1 2)))
+                                (=> (not (= cond!3!l 0)) (= (mod cond!2!h1 2) (mod cond!3!h1 2)))))
+                       (=> (not (= cond!1!l 0))
+                           (and (=> (= cond!3!l 0) (= (mod cond!2!h1 2) (mod cond!3!h1 2)))
+                                (=> (not (= cond!3!l 0))
+                                    (= (mod cond!2!h1 2) (mod cond!3!h1 2)))))))))) )
+[<-recv] success
+[send->] (check-sat )
+[<-recv] sat
+[send->] (get-model )
+[<-recv] (model (define-fun cond!2!h2 () Int 2 ) (define-fun cond!2!h1 () Int 3 ) (define-fun cond!3!h2 () Int 2 ) (define-fun cond!3!h1 () Int 2 ) (define-fun cond!3!l () Int 1 ) (define-fun cond!1!l () Int 1 ) (define-fun cond!2!l () Int 1 ) (define-fun cond!1!h2 () Int 2 ) (define-fun cond!1!h1 () Int 2 ) )
+Failure:
+  (model (define-fun cond!2!h2 () Int 2 ) (define-fun cond!2!h1 () Int 3 ) (define-fun cond!3!h2 () Int 2 ) (define-fun cond!3!h1 () Int 2 ) (define-fun cond!3!l () Int 1 ) (define-fun cond!1!l () Int 1 ) (define-fun cond!2!l () Int 1 ) (define-fun cond!1!h2 () Int 2 ) (define-fun cond!1!h1 () Int 2 ) )
+
+real	0m0.096s
+user	0m0.072s
+sys	0m0.042s

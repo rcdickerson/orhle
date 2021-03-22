@@ -1,10 +1,10 @@
 module Main where
 
-import Orhle ( RhleTriple(..), parseOrhle )
+import Orhle ( AESpecs(..), RhleTriple(..), parseOrhle )
 import qualified Orhle
 import System.Environment
 import System.Exit
-import Text.Show.Pretty ( pPrintList )
+import Text.Show.Pretty ( pPrint, pPrintList )
 
 main :: IO ()
 main = do
@@ -35,9 +35,9 @@ run orhle = do
     Left err -> do
       putStrLn $ "Parse error: " ++ err
       return False
-    Right (execs, funs, specs, rhleTriple, expected) -> do
-      printQuery execs rhleTriple
-      result <- Orhle.verify specs rhleTriple
+    Right (execs, funs, specs, triple, expected) -> do
+      printQuery execs specs triple
+      result <- Orhle.verify specs triple
       case result of
         Left failure -> do
           printFailure failure
@@ -46,22 +46,29 @@ run orhle = do
           printSuccess success
           return $ expected == Orhle.ExpectSuccess
 
-printQuery :: [Orhle.Exec] -> RhleTriple -> IO ()
-printQuery execs (RhleTriple pre aProgs eProgs post) = do
+printQuery :: [Orhle.Exec] -> AESpecs -> RhleTriple -> IO ()
+printQuery execs
+           (AESpecs aSpecs eSpecs)
+           (RhleTriple pre aProgs eProgs post) = do
   putStrLn ":: Executions"
   mapM_ printExec execs
   putStrLn ""
-  putStrLn "------------------------------------------------"
   putStrLn $ "Universal Programs:"
   pPrintList aProgs
-  putStrLn "------------------------------------------------"
+  putStrLn ""
   putStrLn $ "Existential Programs:"
   pPrintList eProgs
-  putStrLn "------------------------------------------------"
+  putStrLn ""
+  putStrLn $ "Universal Specifications:"
+  pPrint aSpecs
+  putStrLn ""
+  putStrLn $ "Existential Specifications:"
+  pPrint eSpecs
+  putStrLn ""
   putStrLn $ "Precondition:\n  " ++ (show pre)
-  putStrLn "------------------------------------------------"
+  putStrLn ""
   putStrLn $ "Postcondition:\n  " ++ (show post)
-  putStrLn "------------------------------------------------\n"
+  putStrLn ""
 
 printFailure :: Orhle.Failure -> IO ()
 printFailure (Orhle.Failure vcs message) = do

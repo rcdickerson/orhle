@@ -39,7 +39,7 @@ inferAndCheck strategy varsAtHole vcTransform aProgs eProgs =
     Enumerative depth -> enumerativeSynth depth varsAtHole vcTransform aProgs eProgs
 
 countInvariantHoles :: [Imp.Program] -> Int
-countInvariantHoles = length . Set.toList . Set.unions . (map Imp.invHoleIds)
+countInvariantHoles = length . Set.toList . Set.unions . (map invHoleIds)
 
 countAssertionHoles :: Assertion -> Int
 countAssertionHoles assertion = case assertion of
@@ -61,12 +61,39 @@ countAssertionHoles assertion = case assertion of
   where
     sumHoles = sum . (map countAssertionHoles)
 
+invHoleIds :: Imp.Program -> Set.Set Int
+invHoleIds prog = case prog of
+  Imp.SSkip                  -> Set.empty
+  Imp.SAsgn _ _              -> Set.empty
+  Imp.SSeq ps                -> Set.unions $ map invHoleIds ps
+  Imp.SIf _ p1 p2            -> Set.union (invHoleIds p1) (invHoleIds p2)
+  Imp.SCall _ _              -> Set.empty
+  Imp.SWhile _ body (inv, _) -> Set.union (invHoleIds body) $
+      case inv of
+        A.Hole hid -> Set.singleton hid
+        _          -> Set.empty
+
+fillInvHole :: Imp.Program -> Int -> Assertion -> Imp.Program
+fillInvHole prog holeId fill = let
+  fillRec p = fillInvHole p holeId fill
+  in case prog of
+    Imp.SSkip                    -> Imp.SSkip
+    asgn@(Imp.SAsgn _ _)         -> asgn
+    Imp.SSeq ps                  -> Imp.SSeq $ map fillRec ps
+    Imp.SIf c p1 p2              -> Imp.SIf c (fillRec p1) (fillRec p2)
+    call@(Imp.SCall _ _)         -> call
+    Imp.SWhile c body (inv, var) ->
+      let inv' = case inv of
+            A.Hole hid -> if hid == holeId then fill else inv
+            _          -> inv
+      in Imp.SWhile c (fillRec body) (inv', var)
+
 enumerativeSynth :: Int -> ValsAtHole -> VCTransform
                  -> [Imp.Program] -> [Imp.Program]
                  -> IO (Either ErrorMsg (Map Int Assertion))
 enumerativeSynth depth valsAtHole vcTransform aProgs eProgs =
   let
-    holeIds  = Set.unions $ map Imp.invHoleIds (aProgs ++ eProgs)
+    holeIds  = Set.unions $ map invHoleIds (aProgs ++ eProgs)
     holeVals = Map.fromSet valsAtHole holeIds
   in do
     putStrLn $ "Var map: " ++ (show holeVals)
@@ -97,7 +124,7 @@ tryAllFills depth holeVals currentSubs vcTransform aProgs eProgs =
     holeId               = head $ Map.keys holeVals
     fills                = enumerateAssertions depth $ holeVals!holeId
     holeVals'            = Map.delete holeId holeVals
-    fillProgs progs fill = map (\prog -> Imp.fillInvHole prog holeId fill) progs
+    fillProgs progs fill = map (\prog -> fillInvHole prog holeId fill) progs
     subsAndFills fill    = ( Map.insert holeId fill currentSubs
                            , fillProgs aProgs fill
                            , fillProgs eProgs fill )

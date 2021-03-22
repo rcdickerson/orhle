@@ -10,7 +10,8 @@ import qualified Data.Map              as Map
 import           Orhle.Assertion        ( Assertion(..) )
 import qualified Orhle.Assertion       as A
 import qualified Orhle.Imp             as Imp
-import qualified Orhle.MapNames        as Names
+import           Orhle.Names            ( Name(..) )
+import qualified Orhle.Names           as Names
 import           Orhle.Spec             ( Spec(..) )
 import qualified Orhle.Spec            as S
 import           Orhle.Triple
@@ -82,7 +83,7 @@ orhleParser = do
   let prefixExecId specMap exec = S.prefixSpecs (execPrefix exec) specMap
   let prefixedASpecs = Map.unions $ map (prefixExecId aSpecs) aExecs
   let prefixedESpecs = Map.unions $ map (prefixExecId eSpecs) eExecs
-  let specs = S.SpecMaps prefixedASpecs prefixedESpecs
+  let specs = S.AESpecs prefixedASpecs prefixedESpecs
 
   -- TODO: better is to compose the parser combinators
   rest <- manyTill anyChar eof
@@ -153,18 +154,19 @@ execId = do
 
 specification :: OrhleAppParser S.SpecMap
 specification = do
-  name   <- identifier
+  funName <- identifier
   params <- (liftM concat) . parens $ sepBy varArray comma
+  let paramNames = map (\n -> Name n 0) params
   whiteSpace >> char '{' >> whiteSpace
   choiceVars <- option [] $ do
     reserved "choiceVars" >> whiteSpace >> char ':' >> whiteSpace
     vars <- sepBy identifier comma
     whiteSpace >> char ';' >> whiteSpace
-    return $ map (\v -> A.Ident v A.Int) vars
+    return $ map (\v -> A.Ident (A.Name v 0) A.Int) vars
   pre  <- option A.ATrue $ labeledAssertion "pre"
   post <- option A.ATrue $ labeledAssertion "post"
   whiteSpace >> char '}' >> whiteSpace
-  return $ S.addSpec name (Spec params choiceVars pre post) S.emptySpecMap
+  return $ S.addSpec (Name funName 0) (Spec paramNames choiceVars pre post) S.emptySpecMap
 
 labeledAssertion :: String -> OrhleAppParser Assertion
 labeledAssertion label = do

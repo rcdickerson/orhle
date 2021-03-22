@@ -1,3 +1,5 @@
+Replacements: fromList [(run!2!p,run!2!p!1)]
+
 *******************************************
 ****               ORHLE               ****
 ****     The Oracular RHLE Verifier    ****
@@ -7,40 +9,81 @@
   run[1] (forall)
   run[2] (exists)
 
-:: Verification Conditions
-  (=> (and (= run!1!l run!2!l) (= (mod run!1!h 2) (mod run!2!h 2)))
-      (and true
-           (=> (= run!1!p (mod run!1!h 2))
-               (and (=> (= run!1!p 1)
-                        (and (exists ((run!2!p!0 Int))
-                               (! (= run!2!p!0 (mod run!2!h 2)) :weight 0))
-                             (forall ((run!2!p!0 Int))
-                               (! (or (not (= run!2!p!0 (mod run!2!h 2)))
-                                      (and (or (not (= run!2!p!0 1))
-                                               (= parity!1!l parity!2!l))
-                                           (or (= parity!1!l parity!2!l)
-                                               (= run!2!p!0 1))))
-                                  :weight 0))))
-                    (=> (not (= run!1!p 1))
-                        (and (exists ((run!2!p!0 Int))
-                               (! (= run!2!p!0 (mod run!2!h 2)) :weight 0))
-                             (forall ((run!2!p!0 Int))
-                               (! (or (not (= run!2!p!0 (mod run!2!h 2)))
-                                      (and (or (not (= run!2!p!0 1))
-                                               (= parity!1!l parity!2!l))
-                                           (or (= parity!1!l parity!2!l)
-                                               (= run!2!p!0 1))))
-                                  :weight 0))))))))
+Universal Programs:
+[ SSeq
+    [ SCall
+        SFun { fName = run ! 1 ! parity , fParams = [ run ! 1 ! h ] }
+        [ run ! 1 ! p ]
+    , SIf
+        (BEq (AVar run ! 1 ! p) (ALit 1))
+        (SSeq [ SAsgn run ! 1 ! l (ALit 1) , SAsgn run ! 1 ! h (ALit 1) ])
+        (SSeq [ SAsgn run ! 1 ! l (ALit 0) , SAsgn run ! 1 ! h (ALit 0) ])
+    ]
+]
 
-Invalid. Model:
-  parity!1!l -> 4
-  parity!2!l -> 5
-  run!1!h -> 1
-  run!1!l -> 8
-  run!1!p -> 1
-  run!2!h -> 1
-  run!2!l -> 8
+Existential Programs:
+[ SSeq
+    [ SCall
+        SFun { fName = run ! 2 ! parity , fParams = [ run ! 2 ! h ] }
+        [ run ! 2 ! p ]
+    , SIf
+        (BEq (AVar run ! 2 ! p) (ALit 1))
+        (SSeq [ SAsgn run ! 2 ! l (ALit 1) , SAsgn run ! 2 ! h (ALit 1) ])
+        (SSeq [ SAsgn run ! 2 ! l (ALit 0) , SAsgn run ! 2 ! h (ALit 0) ])
+    ]
+]
 
-real	0m0.248s
-user	0m0.273s
-sys	0m0.071s
+Universal Specifications:
+fromList [(run!1!parity,Spec {params = [run!1!val], choiceVars = [], preCondition = true, postCondition = (= ret! (mod run!1!val 2))})]
+
+Existential Specifications:
+fromList [(run!2!parity,Spec {params = [run!2!val], choiceVars = [], preCondition = true, postCondition = (= ret! (mod run!2!val 2))})]
+
+Precondition:
+  (and (= run!1!l run!2!l) (= (mod run!1!h 2) (mod run!2!h 2)))
+
+Postcondition:
+  (= run!1!l run!2!l)
+
+[send->] (set-option :print-success true )
+[<-recv] success
+[send->] (set-option :produce-models true )
+[<-recv] success
+[send->] (declare-const run!1!h Int)
+[<-recv] success
+[send->] (declare-const run!1!l Int)
+[<-recv] success
+[send->] (declare-const run!1!p Int)
+[<-recv] success
+[send->] (declare-const run!2!h Int)
+[<-recv] success
+[send->] (declare-const run!2!l Int)
+[<-recv] success
+[send->] (assert (not (=> (and (= run!1!l run!2!l)
+              (= (mod run!1!h 2) (mod run!2!h 2)))
+         (and true
+              (=> (= run!1!p (mod run!1!h 2))
+                  (and (=> (= run!1!p 1)
+                           (and true
+                                (exists ((run!2!p!1 Int))
+                                   (= run!2!p!1 (mod run!2!h 2)))
+                                (forall ((run!2!p!1 Int))
+                                   (=> (= run!2!p!1 (mod run!2!h 2))
+                                       (and (=> (= run!2!p!1 1) (= 1 1))
+                                            (=> (not (= run!2!p!1 1)) (= 1 0)))))))
+                       (=> (not (= run!1!p 1))
+                           (and true
+                                (exists ((run!2!p!1 Int))
+                                   (= run!2!p!1 (mod run!2!h 2)))
+                                (forall ((run!2!p!1 Int))
+                                   (=> (= run!2!p!1 (mod run!2!h 2))
+                                       (and (=> (= run!2!p!1 1) (= 0 1))
+                                            (=> (not (= run!2!p!1 1)) (= 0 0)))))))))))) )
+[<-recv] success
+[send->] (check-sat )
+[<-recv] unsat
+Valid.
+
+real	0m0.099s
+user	0m0.107s
+sys	0m0.048s

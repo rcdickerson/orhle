@@ -2,7 +2,7 @@ module Orhle.Assertion.AssertionLanguage
   ( Arith(..)
   , Assertion(..)
   , Ident(..)
-  , Name
+  , Name(..)
   , Sort(..)
   , fillHole
   , freeVars
@@ -12,13 +12,13 @@ module Orhle.Assertion.AssertionLanguage
 import           Data.List ( intercalate )
 import           Data.Set  ( Set )
 import qualified Data.Set as Set
-import           Orhle.MapNames
+import           Orhle.Names ( Name(..)
+                             , CollectableNames(..)
+                             , MappableNames(..) )
 
 -----------------
 -- Identifiers --
 -----------------
-
-type Name = String
 
 data Sort = Bool
           | Int
@@ -34,7 +34,10 @@ instance Show Sort where
   show Int  = "int"
 
 instance Show Ident where
-  show (Ident name sort) = "(" ++ name ++ " " ++ (show sort) ++ ")"
+  show (Ident name sort) = "(" ++ (show name) ++ " " ++ (show sort) ++ ")"
+
+instance CollectableNames Ident where
+  namesIn (Ident name _) = Set.singleton name
 
 instance MappableNames Ident where
   mapNames f (Ident name sort) = Ident (f name) sort
@@ -59,13 +62,13 @@ showSexp name as = "(" ++ name ++ " " ++ (intercalate " " $ map show as) ++ ")"
 
 instance Show Arith where
   show (Num n)     = show n
-  show (Var ident) = identName ident
-  show (Add as)    = showSexp "+"  as
-  show (Sub as)    = showSexp "-"  as
-  show (Mul as)    = showSexp "*"  as
-  show (Div a1 a2) = showSexp "/"  [a1, a2]
-  show (Mod a1 a2) = showSexp "mod"  [a1, a2]
-  show (Pow a1 a2) = showSexp "^"  [a1, a2]
+  show (Var ident) = show $ identName ident
+  show (Add as)    = showSexp "+"   as
+  show (Sub as)    = showSexp "-"   as
+  show (Mul as)    = showSexp "*"   as
+  show (Div a1 a2) = showSexp "/"   [a1, a2]
+  show (Mod a1 a2) = showSexp "mod" [a1, a2]
+  show (Pow a1 a2) = showSexp "^"   [a1, a2]
 
 instance MappableNames Arith where
   mapNames _ (Num x)     = Num x
@@ -76,6 +79,16 @@ instance MappableNames Arith where
   mapNames f (Div a1 a2) = Div (mapNames f a1) (mapNames f a2)
   mapNames f (Mod a1 a2) = Mod (mapNames f a1) (mapNames f a2)
   mapNames f (Pow a1 a2) = Pow (mapNames f a1) (mapNames f a2)
+
+instance CollectableNames Arith where
+  namesIn (Num _)     = Set.empty
+  namesIn (Var ident) = namesIn ident
+  namesIn (Add as)    = Set.unions $ map namesIn as
+  namesIn (Sub as)    = Set.unions $ map namesIn as
+  namesIn (Mul as)    = Set.unions $ map namesIn as
+  namesIn (Div a1 a2) = Set.union (namesIn a1) (namesIn a2)
+  namesIn (Mod a1 a2) = Set.union (namesIn a1) (namesIn a2)
+  namesIn (Pow a1 a2) = Set.union (namesIn a1) (namesIn a2)
 
 
 ----------------
@@ -107,7 +120,7 @@ showQuant name qvars body = "(" ++ name ++ " "
 instance Show Assertion where
   show ATrue           = "true"
   show AFalse          = "false"
-  show (Atom ident)    = identName ident
+  show (Atom ident)    = show $ identName ident
   show (Not a)         = showSexp "not" [a]
   show (And as)        = showSexp "and" as
   show (Or as)         = showSexp "or" as
@@ -137,6 +150,23 @@ instance MappableNames Assertion where
   mapNames f (Forall vs a) = Forall (map (mapNames f) vs) (mapNames f a)
   mapNames f (Exists vs a) = Exists (map (mapNames f) vs) (mapNames f a)
   mapNames _ (Hole i)      = Hole i
+
+instance CollectableNames Assertion where
+  namesIn ATrue         = Set.empty
+  namesIn AFalse        = Set.empty
+  namesIn (Atom ident)  = namesIn ident
+  namesIn (Not a)       = namesIn a
+  namesIn (And as)      = Set.unions $ map namesIn as
+  namesIn (Or as)       = Set.unions $ map namesIn as
+  namesIn (Imp a1 a2)   = Set.union (namesIn a1) (namesIn a2)
+  namesIn (Eq a1 a2)    = Set.union (namesIn a1) (namesIn a2)
+  namesIn (Lt a1 a2)    = Set.union (namesIn a1) (namesIn a2)
+  namesIn (Gt a1 a2)    = Set.union (namesIn a1) (namesIn a2)
+  namesIn (Lte a1 a2)   = Set.union (namesIn a1) (namesIn a2)
+  namesIn (Gte a1 a2)   = Set.union (namesIn a1) (namesIn a2)
+  namesIn (Forall vs a) = Set.union (Set.fromList $ map identName vs) (namesIn a)
+  namesIn (Exists vs a) = Set.union (Set.fromList $ map identName vs) (namesIn a)
+  namesIn (Hole _)      = Set.empty
 
 fillHole :: Int -> Assertion -> Assertion -> Assertion
 fillHole holeId fill assertion = let

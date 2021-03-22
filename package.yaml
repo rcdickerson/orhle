@@ -22,12 +22,13 @@ dependencies:
 - containers
 - mtl
 - parsec
+- pretty
+- prettyprinter
 - simple-smt
 - smtLib
 - text
+- transformers
 - unbounded-delays
-- pretty
-- prettyprinter
 
 library:
   source-dirs:

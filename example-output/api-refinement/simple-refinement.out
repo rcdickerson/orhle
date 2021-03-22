@@ -1,3 +1,5 @@
+Replacements: fromList [(original!x,original!x!1)]
+
 *******************************************
 ****               ORHLE               ****
 ****     The Oracular RHLE Verifier    ****
@@ -7,25 +9,52 @@
   refinement (forall)
   original (exists)
 
-:: Verification Conditions
-  (=> true
-      (and true
-           (=> (and (>= refinement!x 0)
-                    (< refinement!x 20)
-                    (= (mod refinement!x 2) 1))
-               (exists ((original!n Int))
-                 (! (and (>= original!n 0)
-                         (not (<= 20 original!n))
-                         (exists ((original!x!0 Int))
-                           (! (= original!x!0 original!n) :weight 0))
-                         (forall ((original!x!0 Int))
-                           (! (or (not (= original!x!0 original!n))
-                                  (= original!x!0 refinement!x))
-                              :weight 0)))
-                    :weight 0)))))
+Universal Programs:
+[ SCall
+    SFun { fName = refinement ! refinedRand , fParams = [] }
+    [ refinement ! x ]
+]
 
+Existential Programs:
+[ SCall
+    SFun { fName = original ! originalRand , fParams = [] }
+    [ original ! x ]
+]
+
+Universal Specifications:
+fromList [(refinement!refinedRand,Spec {params = [], choiceVars = [], preCondition = true, postCondition = (and (>= ret! 0) (< ret! 20) (= (mod ret! 2) 1))})]
+
+Existential Specifications:
+fromList [(original!originalRand,Spec {params = [], choiceVars = [(original!n int)], preCondition = (and (>= original!n 0) (< original!n 20)), postCondition = (= ret! original!n)})]
+
+Precondition:
+  true
+
+Postcondition:
+  (= original!x refinement!x)
+
+[send->] (set-option :print-success true )
+[<-recv] success
+[send->] (set-option :produce-models true )
+[<-recv] success
+[send->] (declare-const refinement!x Int)
+[<-recv] success
+[send->] (assert (not (=> true
+         (and true
+              (=> (and (>= refinement!x 0) (< refinement!x 20)
+                       (= (mod refinement!x 2) 1))
+                  (exists ((original!n Int))
+                     (and (and (>= original!n 0) (< original!n 20))
+                          (exists ((original!x!1 Int))
+                             (= original!x!1 original!n))
+                          (forall ((original!x!1 Int))
+                             (=> (= original!x!1 original!n)
+                                 (= original!x!1 refinement!x))))))))) )
+[<-recv] success
+[send->] (check-sat )
+[<-recv] unsat
 Valid.
 
-real	0m0.111s
-user	0m0.119s
-sys	0m0.021s
+real	0m0.089s
+user	0m0.067s
+sys	0m0.037s

@@ -100,7 +100,7 @@ translateMethodBody methodContext (J.Block jStmts_l) =
           ++ show stmts
           )
         Right maybeRetExp -> Right $ I.SSeq $ case maybeRetExp of
-          Just retExp -> stmts ++ [I.SAsgn "return" retExp]
+          Just retExp -> stmts ++ [I.SAsgn (I.Name "return" 0) retExp]
           Nothing     -> stmts
 
 translateBlockStmt :: J.BlockStmt -> TransBody ()
@@ -114,7 +114,7 @@ translateVarDecl :: J.VarDecl -> TransBody ()
 translateVarDecl (J.VarDecl (J.VarId (J.Ident varName)) (Just (J.InitExp jExp)))
   = do
     exp <- translateExp jExp
-    tell [I.SAsgn varName exp] -- TODO: shadowing?
+    tell [I.SAsgn (I.Name varName 0) exp] -- TODO: shadowing?
 -- do nothing for uninitialized variables
 translateVarDecl (J.VarDecl _ Nothing) = return ()
 translateVarDecl (J.VarDecl _ _      ) = throwError "arrays are unsupported"
@@ -166,13 +166,13 @@ getLoopAnnotations (J.Ident label) = do
 translateExp :: J.Exp -> TransBody I.AExp
 -- TODO: a simple name could refer to a local variable, parameter, or field (JLS 6.5.6.1)
 translateExp (J.ExpName (J.Name [J.Ident unqualName])) =
-  return (I.AVar unqualName)
+  return (I.AVar (I.Name unqualName 0))
 translateExp (J.Lit       (J.Int i                       )) = return (I.ALit i)
 translateExp (J.MethodInv (J.MethodCall jMethodName jArgs)) = do
   retVar     <- freshTmpVar
   methodName <- translateMethodName jMethodName
   args       <- mapM (ensureVar <=< translateExp) jArgs
-  tell [I.SCall (I.SFun methodName args) [retVar]] -- TODO: renaming?
+  tell [I.SCall (I.SFun (I.Name methodName 0) args) [retVar]] -- TODO: renaming?
   return (I.AVar retVar)
  where
   translateMethodName :: J.Name -> TransBody String
@@ -181,8 +181,8 @@ translateExp (J.MethodInv (J.MethodCall jMethodName jArgs)) = do
 translateExp (J.Assign (J.NameLhs (J.Name [J.Ident jUnqualLhsName])) J.EqualA jRhs)
   = do
     rhs <- translateExp jRhs
-    tell [I.SAsgn jUnqualLhsName rhs]
-    return (I.AVar jUnqualLhsName)
+    tell [I.SAsgn (I.Name jUnqualLhsName 0) rhs]
+    return (I.AVar (I.Name jUnqualLhsName 0))
 translateExp (J.BinOp jLhs jOp jRhs) = do
   lhs <- translateExp jLhs
   rhs <- translateExp jRhs
@@ -197,15 +197,15 @@ translateExp (J.BinOp jLhs jOp jRhs) = do
 translateExp (J.PreIncrement (J.ExpName (J.Name [J.Ident jUnqualName]))) = do
   saved <- freshTmpVar
   tell
-    [ I.SAsgn jUnqualName (I.AAdd (I.AVar jUnqualName) (I.ALit 1))
-    , I.SAsgn saved (I.AVar jUnqualName)
+    [ I.SAsgn (I.Name jUnqualName 0) (I.AAdd (I.AVar (I.Name jUnqualName 0)) (I.ALit 1))
+    , I.SAsgn saved (I.AVar (I.Name jUnqualName 0))
     ]
   return (I.AVar saved)
 translateExp (J.PostIncrement (J.ExpName (J.Name [J.Ident jUnqualName]))) = do
   saved <- freshTmpVar
   tell
-    [ I.SAsgn saved (I.AVar jUnqualName)
-    , I.SAsgn jUnqualName (I.AAdd (I.AVar jUnqualName) (I.ALit 1))
+    [ I.SAsgn saved (I.AVar (I.Name jUnqualName 0))
+    , I.SAsgn (I.Name jUnqualName 0) (I.AAdd (I.AVar (I.Name jUnqualName 0)) (I.ALit 1))
     ]
   return (I.AVar saved)
 translateExp e = throwError ("unsupported expression: " ++ show e)
@@ -228,13 +228,13 @@ translateBExp e = throwError ("unsupported boolean expression: " ++ show e)
 -- Utilities
 --
 
-freshTmpVar :: TransBody I.Var
+freshTmpVar :: TransBody I.Name
 freshTmpVar = do
   n <- gets tbsTmpVarCounter
   modify (\s -> s { tbsTmpVarCounter = n + 1 })
-  return ("$tmp" ++ show n)
+  return $ I.Name ("$tmp" ++ show n) 0
 
-ensureVar :: I.AExp -> TransBody I.Var
+ensureVar :: I.AExp -> TransBody I.Name
 ensureVar (I.AVar v) = return v
 ensureVar e          = do
   v <- freshTmpVar

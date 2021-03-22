@@ -1,3 +1,4 @@
+
 *******************************************
 ****               ORHLE               ****
 ****     The Oracular RHLE Verifier    ****
@@ -7,17 +8,67 @@
   parity[1] (forall)
   parity[2] (exists)
 
-:: Verification Conditions
-  (=> (and (= parity!1!l parity!2!l) (= (mod parity!1!h 2) (mod parity!2!h 2)))
-      (and (=> (= (mod parity!1!h 2) 1)
-               (and (or (not (= (mod parity!2!h 2) 1)) (= 1 1))
-                    (or (= 1 0) (= (mod parity!2!h 2) 1))))
-           (=> (not (= (mod parity!1!h 2) 1))
-               (and (or (not (= (mod parity!2!h 2) 1)) (= 0 1))
-                    (or (= 0 0) (= (mod parity!2!h 2) 1))))))
+Universal Programs:
+[ SSeq
+    [ SAsgn parity ! 1 ! h (AMod (AVar parity ! 1 ! h) (ALit 2))
+    , SIf
+        (BEq (AVar parity ! 1 ! h) (ALit 1))
+        (SSeq
+           [ SAsgn parity ! 1 ! l (ALit 1) , SAsgn parity ! 1 ! h (ALit 1) ])
+        (SSeq
+           [ SAsgn parity ! 1 ! l (ALit 0) , SAsgn parity ! 1 ! h (ALit 0) ])
+    ]
+]
 
+Existential Programs:
+[ SSeq
+    [ SAsgn parity ! 2 ! h (AMod (AVar parity ! 2 ! h) (ALit 2))
+    , SIf
+        (BEq (AVar parity ! 2 ! h) (ALit 1))
+        (SSeq
+           [ SAsgn parity ! 2 ! l (ALit 1) , SAsgn parity ! 2 ! h (ALit 1) ])
+        (SSeq
+           [ SAsgn parity ! 2 ! l (ALit 0) , SAsgn parity ! 2 ! h (ALit 0) ])
+    ]
+]
+
+Universal Specifications:
+fromList []
+
+Existential Specifications:
+fromList []
+
+Precondition:
+  (and (= parity!1!l parity!2!l) (= (mod parity!1!h 2) (mod parity!2!h 2)))
+
+Postcondition:
+  (= parity!1!l parity!2!l)
+
+[send->] (set-option :print-success true )
+[<-recv] success
+[send->] (set-option :produce-models true )
+[<-recv] success
+[send->] (declare-const parity!1!h Int)
+[<-recv] success
+[send->] (declare-const parity!1!l Int)
+[<-recv] success
+[send->] (declare-const parity!2!h Int)
+[<-recv] success
+[send->] (declare-const parity!2!l Int)
+[<-recv] success
+[send->] (assert (not (=> (and (= parity!1!l parity!2!l)
+              (= (mod parity!1!h 2) (mod parity!2!h 2)))
+         (and (=> (= (mod parity!1!h 2) 1)
+                  (and (=> (= (mod parity!2!h 2) 1) (= 1 1))
+                       (=> (not (= (mod parity!2!h 2) 1)) (= 1 0))))
+              (=> (not (= (mod parity!1!h 2) 1))
+                  (and (=> (= (mod parity!2!h 2) 1) (= 0 1))
+                       (=> (not (= (mod parity!2!h 2) 1)) (= 0 0))))))) )
+[<-recv] success
+[send->] (check-sat )
+[<-recv] unsat
 Valid.
 
-real	0m0.078s
-user	0m0.076s
-sys	0m0.027s
+real	0m0.092s
+user	0m0.070s
+sys	0m0.037s

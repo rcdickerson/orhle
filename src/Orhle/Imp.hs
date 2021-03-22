@@ -2,12 +2,10 @@ module Orhle.Imp
   ( AExp(..)
   , BExp(..)
   , FunImplEnv
+  , Name(..)
   , ParseError
   , Program(..)
   , SFun(..)
-  , Var
-  , fillInvHole
-  , invHoleIds
   , parseImp
   , ppProg
   , ppAExp

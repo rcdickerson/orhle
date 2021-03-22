@@ -1,3 +1,4 @@
+
 *******************************************
 ****               ORHLE               ****
 ****     The Oracular RHLE Verifier    ****
@@ -8,20 +9,57 @@
   leak[2] (forall)
   leak[3] (exists)
 
-:: Verification Conditions
-  (=> (and (= leak!1!high leak!3!high)
-           (= leak!1!low leak!2!low)
-           (= leak!2!low leak!3!low))
-      (and (= (+ leak!2!high leak!2!low) (+ leak!3!high leak!3!low))))
+Universal Programs:
+[ SAsgn leak !
+    1 ! ret (AAdd (AVar leak ! 1 ! high) (AVar leak ! 1 ! low))
+, SAsgn leak !
+    2 ! ret (AAdd (AVar leak ! 2 ! high) (AVar leak ! 2 ! low))
+]
 
-Invalid. Model:
-  leak!1!high -> 0
-  leak!1!low -> 2
-  leak!2!high -> (- 1)
-  leak!2!low -> 2
-  leak!3!high -> 0
-  leak!3!low -> 2
+Existential Programs:
+[ SAsgn leak !
+    3 ! ret (AAdd (AVar leak ! 3 ! high) (AVar leak ! 3 ! low))
+]
 
-real	0m0.080s
-user	0m0.076s
-sys	0m0.030s
+Universal Specifications:
+fromList []
+
+Existential Specifications:
+fromList []
+
+Precondition:
+  (and (= leak!1!high leak!3!high) (= leak!1!low leak!2!low) (= leak!2!low leak!3!low))
+
+Postcondition:
+  (= leak!2!ret leak!3!ret)
+
+[send->] (set-option :print-success true )
+[<-recv] success
+[send->] (set-option :produce-models true )
+[<-recv] success
+[send->] (declare-const leak!1!high Int)
+[<-recv] success
+[send->] (declare-const leak!1!low Int)
+[<-recv] success
+[send->] (declare-const leak!2!high Int)
+[<-recv] success
+[send->] (declare-const leak!2!low Int)
+[<-recv] success
+[send->] (declare-const leak!3!high Int)
+[<-recv] success
+[send->] (declare-const leak!3!low Int)
+[<-recv] success
+[send->] (assert (not (=> (and (= leak!1!high leak!3!high) (= leak!1!low leak!2!low)
+              (= leak!2!low leak!3!low))
+         (= (+ leak!2!high leak!2!low) (+ leak!3!high leak!3!low)))) )
+[<-recv] success
+[send->] (check-sat )
+[<-recv] sat
+[send->] (get-model )
+[<-recv] (model (define-fun leak!3!high () Int 0 ) (define-fun leak!2!high () Int 1 ) (define-fun leak!3!low () Int 0 ) (define-fun leak!1!low () Int 0 ) (define-fun leak!2!low () Int 0 ) (define-fun leak!1!high () Int 0 ) )
+Failure:
+  (model (define-fun leak!3!high () Int 0 ) (define-fun leak!2!high () Int 1 ) (define-fun leak!3!low () Int 0 ) (define-fun leak!1!low () Int 0 ) (define-fun leak!2!low () Int 0 ) (define-fun leak!1!high () Int 0 ) )
+
+real	0m0.090s
+user	0m0.085s
+sys	0m0.028s

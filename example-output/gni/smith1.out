@@ -1,3 +1,4 @@
+
 *******************************************
 ****               ORHLE               ****
 ****     The Oracular RHLE Verifier    ****
@@ -8,28 +9,69 @@
   smith[2] (forall)
   smith[3] (exists)
 
-:: Verification Conditions
-  (=> (= smith!1!secret smith!3!secret)
-      (and (=> (= (mod smith!2!secret 2) 0)
-               (and (or (not (= (mod smith!1!secret 2) 0))
-                        (and (or (not (= (mod smith!3!secret 2) 0)) (= 0 0))
-                             (or (= (mod smith!3!secret 2) 0) (= 0 1))))
-                    (or (= (mod smith!1!secret 2) 0)
-                        (and (or (not (= (mod smith!3!secret 2) 0)) (= 0 0))
-                             (or (= (mod smith!3!secret 2) 0) (= 0 1))))))
-           (=> (not (= (mod smith!2!secret 2) 0))
-               (and (or (not (= (mod smith!1!secret 2) 0))
-                        (and (or (not (= (mod smith!3!secret 2) 0)) (= 1 0))
-                             (or (= (mod smith!3!secret 2) 0) (= 1 1))))
-                    (or (= (mod smith!1!secret 2) 0)
-                        (and (or (not (= (mod smith!3!secret 2) 0)) (= 1 0))
-                             (or (= (mod smith!3!secret 2) 0) (= 1 1))))))))
+Universal Programs:
+[ SIf
+    (BEq (AMod (AVar smith ! 1 ! secret) (ALit 2)) (ALit 0))
+    (SAsgn smith ! 1 ! ret (ALit 0))
+    (SAsgn smith ! 1 ! ret (ALit 1))
+, SIf
+    (BEq (AMod (AVar smith ! 2 ! secret) (ALit 2)) (ALit 0))
+    (SAsgn smith ! 2 ! ret (ALit 0))
+    (SAsgn smith ! 2 ! ret (ALit 1))
+]
 
-Invalid. Model:
-  smith!1!secret -> 0
-  smith!2!secret -> 1
-  smith!3!secret -> 0
+Existential Programs:
+[ SIf
+    (BEq (AMod (AVar smith ! 3 ! secret) (ALit 2)) (ALit 0))
+    (SAsgn smith ! 3 ! ret (ALit 0))
+    (SAsgn smith ! 3 ! ret (ALit 1))
+]
 
-real	0m0.079s
-user	0m0.071s
-sys	0m0.030s
+Universal Specifications:
+fromList []
+
+Existential Specifications:
+fromList []
+
+Precondition:
+  (= smith!1!secret smith!3!secret)
+
+Postcondition:
+  (= smith!2!ret smith!3!ret)
+
+[send->] (set-option :print-success true )
+[<-recv] success
+[send->] (set-option :produce-models true )
+[<-recv] success
+[send->] (declare-const smith!1!secret Int)
+[<-recv] success
+[send->] (declare-const smith!2!secret Int)
+[<-recv] success
+[send->] (declare-const smith!3!secret Int)
+[<-recv] success
+[send->] (assert (not (=> (= smith!1!secret smith!3!secret)
+         (and (=> (= (mod smith!2!secret 2) 0)
+                  (and (=> (= (mod smith!1!secret 2) 0)
+                           (and (=> (= (mod smith!3!secret 2) 0) (= 0 0))
+                                (=> (not (= (mod smith!3!secret 2) 0)) (= 0 1))))
+                       (=> (not (= (mod smith!1!secret 2) 0))
+                           (and (=> (= (mod smith!3!secret 2) 0) (= 0 0))
+                                (=> (not (= (mod smith!3!secret 2) 0)) (= 0 1))))))
+              (=> (not (= (mod smith!2!secret 2) 0))
+                  (and (=> (= (mod smith!1!secret 2) 0)
+                           (and (=> (= (mod smith!3!secret 2) 0) (= 1 0))
+                                (=> (not (= (mod smith!3!secret 2) 0)) (= 1 1))))
+                       (=> (not (= (mod smith!1!secret 2) 0))
+                           (and (=> (= (mod smith!3!secret 2) 0) (= 1 0))
+                                (=> (not (= (mod smith!3!secret 2) 0)) (= 1 1))))))))) )
+[<-recv] success
+[send->] (check-sat )
+[<-recv] sat
+[send->] (get-model )
+[<-recv] (model (define-fun smith!3!secret () Int (- 2 ) ) (define-fun smith!2!secret () Int 3 ) (define-fun smith!1!secret () Int (- 2 ) ) )
+Failure:
+  (model (define-fun smith!3!secret () Int (- 2 ) ) (define-fun smith!2!secret () Int 3 ) (define-fun smith!1!secret () Int (- 2 ) ) )
+
+real	0m0.106s
+user	0m0.126s
+sys	0m0.044s

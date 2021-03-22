@@ -1,3 +1,4 @@
+
 *******************************************
 ****               ORHLE               ****
 ****     The Oracular RHLE Verifier    ****
@@ -8,14 +9,67 @@
   nonleak[2] (forall)
   nonleak[3] (exists)
 
-:: Verification Conditions
-  (=> (and (= nonleak!1!high nonleak!3!high)
-           (= nonleak!1!low nonleak!2!low)
-           (= nonleak!2!low nonleak!3!low))
-      (and (= (- (+ nonleak!2!low nonleak!2!high) nonleak!2!high) nonleak!3!low)))
+Universal Programs:
+[ SSeq
+    [ SAsgn nonleak !
+        1 ! x (AAdd (AVar nonleak ! 1 ! low) (AVar nonleak ! 1 ! high))
+    , SAsgn nonleak !
+        1 ! ret (ASub (AVar nonleak ! 1 ! x) (AVar nonleak ! 1 ! high))
+    ]
+, SSeq
+    [ SAsgn nonleak !
+        2 ! x (AAdd (AVar nonleak ! 2 ! low) (AVar nonleak ! 2 ! high))
+    , SAsgn nonleak !
+        2 ! ret (ASub (AVar nonleak ! 2 ! x) (AVar nonleak ! 2 ! high))
+    ]
+]
 
+Existential Programs:
+[ SSeq
+    [ SAsgn nonleak !
+        3 ! x (AAdd (AVar nonleak ! 3 ! low) (AVar nonleak ! 3 ! high))
+    , SAsgn nonleak !
+        3 ! ret (ASub (AVar nonleak ! 3 ! x) (AVar nonleak ! 3 ! high))
+    ]
+]
+
+Universal Specifications:
+fromList []
+
+Existential Specifications:
+fromList []
+
+Precondition:
+  (and (= nonleak!1!high nonleak!3!high) (= nonleak!1!low nonleak!2!low) (= nonleak!2!low nonleak!3!low))
+
+Postcondition:
+  (= nonleak!2!ret nonleak!3!ret)
+
+[send->] (set-option :print-success true )
+[<-recv] success
+[send->] (set-option :produce-models true )
+[<-recv] success
+[send->] (declare-const nonleak!1!high Int)
+[<-recv] success
+[send->] (declare-const nonleak!1!low Int)
+[<-recv] success
+[send->] (declare-const nonleak!2!high Int)
+[<-recv] success
+[send->] (declare-const nonleak!2!low Int)
+[<-recv] success
+[send->] (declare-const nonleak!3!high Int)
+[<-recv] success
+[send->] (declare-const nonleak!3!low Int)
+[<-recv] success
+[send->] (assert (not (=> (and (= nonleak!1!high nonleak!3!high)
+              (= nonleak!1!low nonleak!2!low) (= nonleak!2!low nonleak!3!low))
+         (= (- (+ nonleak!2!low nonleak!2!high) nonleak!2!high)
+            (- (+ nonleak!3!low nonleak!3!high) nonleak!3!high)))) )
+[<-recv] success
+[send->] (check-sat )
+[<-recv] unsat
 Valid.
 
-real	0m0.095s
-user	0m0.096s
-sys	0m0.033s
+real	0m0.099s
+user	0m0.134s
+sys	0m0.030s

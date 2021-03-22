@@ -4,9 +4,9 @@ import qualified Data.Set as Set
 import Orhle.Assertion
 import Test.HUnit
 
--- Some dummy identifiers for testing
-foo = Ident "foo" Bool
-bar = Ident "bar" Int
+-- Some dummy names for testing
+foo = Ident (Name "foo" 0) Bool
+bar = Ident (Name "bar" 0) Int
 
 testArithSubOverArith = let
   arith    = Add [(Num 5), (Var foo), (Var bar)]

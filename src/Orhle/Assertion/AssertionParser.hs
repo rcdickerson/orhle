@@ -6,10 +6,11 @@ module Orhle.Assertion.AssertionParser
   , parseAssertion
   ) where
 
-import Orhle.Assertion.AssertionLanguage ( Arith, Assertion )
+import           Orhle.Assertion.AssertionLanguage ( Arith, Assertion )
 import qualified Orhle.Assertion.AssertionLanguage as A
-import Text.Parsec
-import Text.Parsec.Language
+import           Orhle.Names ( Name(..) )
+import           Text.Parsec
+import           Text.Parsec.Language
 import qualified Text.Parsec.Token as Token
 
 languageDef :: LanguageDef ()
@@ -53,6 +54,7 @@ whitespace = Token.whiteSpace lexer
 type AssertionParser = Parsec String () Assertion
 type ArithParser     = Parsec String () Arith
 type IdentParser     = Parsec String () A.Ident
+type NameParser      = Parsec String () Name
 type SortParser      = Parsec String () A.Sort
 
 parseAssertion :: String -> Either ParseError Assertion
@@ -93,7 +95,7 @@ arithIdent = do
   rest  <- many $ alphaNum <|> char '!' <|> char '_'
   let name = start:rest
   whitespace
-  return . A.Var $ A.Ident name A.Int
+  return . A.Var $ A.Ident (Name name 0) A.Int
 
 forall :: AssertionParser
 forall = do
@@ -120,7 +122,7 @@ quantVar = do
   whitespace
   sort <- sortFromString =<< identifier
   char ')' >> whitespace
-  return $ A.Ident name sort
+  return $ A.Ident (Name name 0) sort
 
 sortFromString :: String -> SortParser
 sortFromString "Int" = return A.Int

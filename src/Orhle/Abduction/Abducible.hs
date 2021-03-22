@@ -1,6 +1,6 @@
 module Orhle.Abduction.Abducible
   ( Abducible(..)
-  , FreshVarMapping(..)
+  , FreshNameMapping(..)
 --  , fvmFlatten
 --  , fvmFromAbducibles
   ) where
@@ -9,12 +9,13 @@ import           Control.Monad (foldM)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import           Orhle.Imp
+import           Orhle.Names
 import qualified Orhle.SMT as SMT
 
 
 data Abducible = Abducible
   { abdName   :: String
-  , abdParams :: [Var]
+  , abdParams :: [Name]
   } deriving (Ord, Eq)
 
 instance Show Abducible where
@@ -23,19 +24,19 @@ instance Show Abducible where
 
 --------------------------------------------------------------------------------
 
-data FreshVarMapping = FreshVarMapping
-  { fvmOrigToFresh :: Map.Map Var Var
-  , fvmFreshToOrig :: Map.Map Var Var
+data FreshNameMapping = FreshNameMapping
+  { fvmOrigToFresh :: Map.Map Name Name
+  , fvmFreshToOrig :: Map.Map Name Name
   , fvmOrigAbds    :: Set.Set Abducible
   , fvmFreshAbds   :: Set.Set Abducible
   }
 
-fvmEmpty :: FreshVarMapping
-fvmEmpty = FreshVarMapping Map.empty Map.empty Set.empty Set.empty
+fvmEmpty :: FreshNameMapping
+fvmEmpty = FreshNameMapping Map.empty Map.empty Set.empty Set.empty
 
-fvmInsert :: Abducible -> Abducible -> FreshVarMapping -> FreshVarMapping
+fvmInsert :: Abducible -> Abducible -> FreshNameMapping -> FreshNameMapping
 fvmInsert abdOrig abdFresh fvm =
-  FreshVarMapping origToFresh' freshToOrig' origAbds' freshAbds'
+  FreshNameMapping origToFresh' freshToOrig' origAbds' freshAbds'
   where
     origToFresh' = foldr
                    (uncurry Map.insert)
@@ -48,29 +49,29 @@ fvmInsert abdOrig abdFresh fvm =
     origAbds'    = Set.insert abdOrig (fvmOrigAbds fvm)
     freshAbds'   = Set.insert abdFresh (fvmFreshAbds fvm)
 
--- fvmReplacementTerm :: FreshVarMapping -> Abducible -> SMT SMT.Expr
+-- fvmReplacementTerm :: FreshNameMapping -> Abducible -> SMT SMT.Expr
 -- fvmReplacementTerm fvm abd = do
---   let varToAST = \v -> mkStringSymbol v >>= mkIntVar
---   abdVarASTs   <- sequence $ map varToAST $ abdParams abd
---   freshVarASTs <- sequence $ map varToAST $ freshVars
---   eqTerms      <- sequence $ map (uncurry mkEq) $ zip abdVarASTs freshVarASTs
+--   let varToAST = \v -> mkStringSymbol v >>= mkIntName
+--   abdNameASTs   <- sequence $ map varToAST $ abdParams abd
+--   freshNameASTs <- sequence $ map varToAST $ freshNames
+--   eqTerms      <- sequence $ map (uncurry mkEq) $ zip abdNameASTs freshNameASTs
 --   mkAnd eqTerms
---     where freshVars = map (fvmOrigToFresh fvm Map.!) (abdParams abd)
+--     where freshNames = map (fvmOrigToFresh fvm Map.!) (abdParams abd)
 
--- fvmFromAbducibles :: [Abducible] -> SMT FreshVarMapping
+-- fvmFromAbducibles :: [Abducible] -> SMT FreshNameMapping
 -- fvmFromAbducibles abds = foldM insertAbd fvmEmpty abds
 --   where
---     insertAbd fvm abd@(Abducible abdNameStr abdParamVars) = do
---         freshAbdParamASTs <- mkFreshIntVars abdParamVars
---         freshAbdParamVars <- mapM astToString freshAbdParamASTs
---         let freshAbd = Abducible abdNameStr freshAbdParamVars
+--     insertAbd fvm abd@(Abducible abdNameStr abdParamNames) = do
+--         freshAbdParamASTs <- mkFreshIntNames abdParamNames
+--         freshAbdParamNames <- mapM astToString freshAbdParamASTs
+--         let freshAbd = Abducible abdNameStr freshAbdParamNames
 --         return $ fvmInsert abd freshAbd fvm
 
--- fvmFlatten :: FreshVarMapping -> SMT.Expr -> SMT SMT.Expr
+-- fvmFlatten :: FreshNameMapping -> SMT.Expr -> SMT SMT.Expr
 -- fvmFlatten fvm phi = foldM flattenAbd phi (fvmOrigAbds fvm)
 --   where
 --     flattenAbd :: SMT.Expr -> Abducible -> SMT SMT.Expr
 --     flattenAbd phi' abd = do
---       abdAST      <- mkBoolVar =<< mkStringSymbol (abdName abd)
+--       abdAST      <- mkBoolName =<< mkStringSymbol (abdName abd)
 --       replacement <- fvmReplacementTerm fvm abd
 --       substitute phi' [abdAST] [replacement]

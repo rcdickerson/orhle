@@ -1,3 +1,7 @@
+Replacements: fromList [(original!r,original!r!1),(original!sum,original!sum!1)]
+Replacements: fromList [(original!r,original!r!2)]
+Replacements: fromList [(refinement!r,refinement!r!1),(refinement!sum,refinement!sum!1)]
+
 *******************************************
 ****               ORHLE               ****
 ****     The Oracular RHLE Verifier    ****
@@ -7,55 +11,84 @@
   refinement (forall)
   original (exists)
 
-:: Verification Conditions
-  (=> true
-      (and (<= 0 0)
-           (< 0 111)
-           (forall ((refinement!r Int) (refinement!sum Int))
-             (! (=> (and (<= refinement!sum 100)
-                         (and (<= 0 refinement!sum) (< refinement!sum 111)))
-                    (and true
-                         (=> (and (<= 0 refinement!r) (< refinement!r 11))
-                             (and (<= 0 (+ refinement!sum refinement!r))
-                                  (< (+ refinement!sum refinement!r) 111)))))
-                :weight 0))
-           (forall ((refinement!r Int) (refinement!sum Int))
-             (! (=> (and (not (<= refinement!sum 100))
-                         (and (<= 0 refinement!sum) (< refinement!sum 111)))
-                    (and (not (<= refinement!sum 100))
-                         (not (<= 110 refinement!sum))
-                         (exists ((original!sum!1 Int))
-                           (! (or (not (and (<= original!sum!1 100)
-                                            (or (not (<= original!sum!1 100))
-                                                (and (not (<= refinement!sum 100))
-                                                     (not (<= 110 refinement!sum))))
-                                            (or (<= original!sum!1 100)
-                                                (= original!sum!1 refinement!sum))))
-                                  (exists ((original!n Int))
-                                    (! (and (<= 0 original!n)
-                                            (not (<= 10 original!n))
-                                            (exists ((original!r!2 Int))
-                                              (! (= original!r!2 original!n)
-                                                 :weight 0))
-                                            (forall ((original!r!2 Int))
-                                              (! (not (= original!r!2 original!n))
-                                                 :weight 0)))
-                                       :weight 0)))
-                              :weight 0))
-                         (exists ((original!sum Int))
-                           (! (and (not (<= original!sum 100))
-                                   (or (not (<= original!sum 100))
-                                       (and (not (<= refinement!sum 100))
-                                            (not (<= 110 refinement!sum))))
-                                   (or (<= original!sum 100)
-                                       (= original!sum refinement!sum))
-                                   (= original!sum refinement!sum))
-                              :weight 0))))
-                :weight 0))))
+Universal Programs:
+[ SSeq [SAsgn refinement!sum (ALit 0),SWhile (BLe (AVar refinement!sum) (ALit 100)) (SSeq [SCall (SFun {fName = refinement!biggerRand, fParams = []}) [refinement!r],SAsgn refinement!sum (AAdd (AVar refinement!sum) (AVar refinement!r))]) ((and (<= 0 refinement!sum) (< refinement!sum 111)),0)]
+]
 
-Invalid. Model:
+Existential Programs:
+[ SSeq [SAsgn original!sum (ALit 0),SWhile (BLe (AVar original!sum) (ALit 100)) (SSeq [SCall (SFun {fName = original!rand, fParams = []}) [original!r],SAsgn original!sum (AAdd (AVar original!sum) (AVar original!r))]) ((and (=> (<= original!sum 100) (and (< 100 refinement!sum) (< refinement!sum 110))) (=> (< 100 original!sum) (= original!sum refinement!sum))),(- 110 original!sum))]
+]
 
+Universal Specifications:
+fromList [(refinement!biggerRand,Spec {params = [], choiceVars = [], preCondition = true, postCondition = (and (<= 0 ret!) (< ret! 11))})]
 
-real	0m0.088s
-user	0m0.089s
-sys	0m0.035s
+Existential Specifications:
+fromList [(original!rand,Spec {params = [], choiceVars = [(original!n int)], preCondition = (and (<= 0 original!n) (< original!n 10)), postCondition = (= ret! original!n)})]
+
+Precondition:
+  true
+
+Postcondition:
+  (= original!sum refinement!sum)
+
+[send->] (set-option :print-success true )
+[<-recv] success
+[send->] (set-option :produce-models true )
+[<-recv] success
+[send->] (assert (not (=> true
+         (and (and (<= 0 0) (< 0 111))
+              (forall ((refinement!r!1 Int) (refinement!sum!1 Int))
+                 (=> (and (<= refinement!sum!1 100)
+                          (and (<= 0 refinement!sum!1) (< refinement!sum!1 111)))
+                     (and true
+                          (=> (and (<= 0 refinement!r!1) (< refinement!r!1 11))
+                              (and (<= 0 (+ refinement!sum!1 refinement!r!1))
+                                   (< (+ refinement!sum!1 refinement!r!1) 111))))))
+              (forall ((refinement!r!1 Int) (refinement!sum!1 Int))
+                 (=> (and (not (<= refinement!sum!1 100))
+                          (and (<= 0 refinement!sum!1) (< refinement!sum!1 111)))
+                     (and (and (=> (<= 0 100)
+                                   (and (< 100 refinement!sum!1) (< refinement!sum!1 110)))
+                               (=> (< 100 0) (= 0 refinement!sum!1)))
+                          (forall ((original!r!1 Int) (original!sum!1 Int))
+                             (=> (and (<= original!sum!1 100)
+                                      (and (=> (<= original!sum!1 100)
+                                               (and (< 100 refinement!sum!1)
+                                                    (< refinement!sum!1 110)))
+                                           (=> (< 100 original!sum!1)
+                                               (= original!sum!1 refinement!sum!1))))
+                                 (exists ((original!n Int))
+                                    (and (and (<= 0 original!n) (< original!n 10))
+                                         (exists ((original!r!2 Int))
+                                            (= original!r!2 original!n))
+                                         (forall ((original!r!2 Int))
+                                            (=> (= original!r!2 original!n)
+                                                (and (and (=> (<= (+ original!sum!1 original!r!2)
+                                                                  100)
+                                                              (and (< 100 refinement!sum!1)
+                                                                   (< refinement!sum!1 110)))
+                                                          (=> (< 100
+                                                                 (+ original!sum!1 original!r!2))
+                                                              (= (+ original!sum!1 original!r!2)
+                                                                 refinement!sum!1)))
+                                                     (< (- 110 (+ original!sum!1 original!r!2))
+                                                        (- 110 original!sum!1)))))))))
+                          (forall ((original!r!1 Int) (original!sum!1 Int))
+                             (=> (and (not (<= original!sum!1 100))
+                                      (and (=> (<= original!sum!1 100)
+                                               (and (< 100 refinement!sum!1)
+                                                    (< refinement!sum!1 110)))
+                                           (=> (< 100 original!sum!1)
+                                               (= original!sum!1 refinement!sum!1))))
+                                 (= original!sum!1 refinement!sum!1))))))))) )
+[<-recv] success
+[send->] (check-sat )
+[<-recv] sat
+[send->] (get-model )
+[<-recv] (model )
+Failure:
+  (model )
+
+real	0m0.112s
+user	0m0.144s
+sys	0m0.052s

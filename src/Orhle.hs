@@ -7,6 +7,7 @@ module Orhle
     , ExpectedResult(..)
     , Failure(..)
     , FunImplEnv
+    , Name(..)
     , RhleTriple(..)
     , Spec(..)
     , SpecMap

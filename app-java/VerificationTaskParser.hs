@@ -158,7 +158,7 @@ funSpec = do
       reservedLabel "choiceVars"
       vars <- identifier `sepBy` comma
       _    <- char ';'
-      return $ map (\v -> Ident v Int) vars
+      return $ map (\v -> Ident (Name v 0) Int) vars
     whiteSpace
     preStr <- option "true" $ reservedLabel "pre" *> untilSemi
     whiteSpace
@@ -170,7 +170,7 @@ funSpec = do
       (Right preA, Right postA) -> return (choiceVars, preA, postA)
       (Left err, _) -> fail $ show err
       (_, Left err) -> fail $ show err
-  return (funName, Spec params choiceVars pre post)
+  return (funName, Spec (map (\p -> Name p 0) params) choiceVars pre post)
 
 
 reservedLabel :: String -> VTParser ()

@@ -1,3 +1,5 @@
+Replacements: fromList [(run!2!flip,run!2!flip!1)]
+
 *******************************************
 ****               ORHLE               ****
 ****     The Oracular RHLE Verifier    ****
@@ -7,205 +9,168 @@
   run[1] (forall)
   run[2] (exists)
 
-:: Verification Conditions
-  (=> (= run!1!low run!2!low)
-      (and (and (=> (< run!1!low run!1!high)
-                    (and (and (and (and true
-                                        (=> (or (= run!1!flip 0) (= run!1!flip 1))
-                                            (and (and (=> (= run!1!flip 0)
-                                                          (and (and (and (and (and (and (=> (< run!2!low
-                                                                                               run!2!high)
-                                                                                            (and (and (and (exists ((run!2!n Int))
-                                                                                                              (and (or (= run!2!n
-                                                                                                                          0)
-                                                                                                                       (= run!2!n
-                                                                                                                          1))
-                                                                                                                   (exists ((run!2!flip0 Int))
-                                                                                                                      (= run!2!flip0
-                                                                                                                         run!2!n))
-                                                                                                                   (forall ((run!2!flip0 Int))
-                                                                                                                      (=> (= run!2!flip0
-                                                                                                                             run!2!n)
-                                                                                                                          (and (and (=> (= run!2!flip0
-                                                                                                                                           0)
-                                                                                                                                        (and (and (and (and (= (- 1
-                                                                                                                                                                  0)
-                                                                                                                                                               (- 1
-                                                                                                                                                                  0)))))))
-                                                                                                                                    (=> (not (= run!2!flip0
-                                                                                                                                                0))
-                                                                                                                                        (and (and (and (and (= (- 1
-                                                                                                                                                                  0)
-                                                                                                                                                               0))))))))))))))))
-                                                                                        (=> (not (< run!2!low
-                                                                                                    run!2!high))
-                                                                                            (and (and (and (exists ((run!2!n Int))
-                                                                                                              (and (or (= run!2!n
-                                                                                                                          0)
-                                                                                                                       (= run!2!n
-                                                                                                                          1))
-                                                                                                                   (exists ((run!2!flip0 Int))
-                                                                                                                      (= run!2!flip0
-                                                                                                                         run!2!n))
-                                                                                                                   (forall ((run!2!flip0 Int))
-                                                                                                                      (=> (= run!2!flip0
-                                                                                                                             run!2!n)
-                                                                                                                          (and (and (=> (= run!2!flip0
-                                                                                                                                           0)
-                                                                                                                                        (and (and (and (and (= (- 1
-                                                                                                                                                                  0)
-                                                                                                                                                               (- 1
-                                                                                                                                                                  1)))))))
-                                                                                                                                    (=> (not (= run!2!flip0
-                                                                                                                                                0))
-                                                                                                                                        (and (and (and (and (= (- 1
-                                                                                                                                                                  0)
-                                                                                                                                                               1)))))))))))))))))))))))
-                                                      (=> (not (= run!1!flip 0))
-                                                          (and (and (and (and (and (and (=> (< run!2!low
-                                                                                               run!2!high)
-                                                                                            (and (and (and (exists ((run!2!n Int))
-                                                                                                              (and (or (= run!2!n
-                                                                                                                          0)
-                                                                                                                       (= run!2!n
-                                                                                                                          1))
-                                                                                                                   (exists ((run!2!flip0 Int))
-                                                                                                                      (= run!2!flip0
-                                                                                                                         run!2!n))
-                                                                                                                   (forall ((run!2!flip0 Int))
-                                                                                                                      (=> (= run!2!flip0
-                                                                                                                             run!2!n)
-                                                                                                                          (and (and (=> (= run!2!flip0
-                                                                                                                                           0)
-                                                                                                                                        (and (and (and (and (= 0
-                                                                                                                                                               (- 1
-                                                                                                                                                                  0)))))))
-                                                                                                                                    (=> (not (= run!2!flip0
-                                                                                                                                                0))
-                                                                                                                                        (and (and (and (and (= 0
-                                                                                                                                                               0))))))))))))))))
-                                                                                        (=> (not (< run!2!low
-                                                                                                    run!2!high))
-                                                                                            (and (and (and (exists ((run!2!n Int))
-                                                                                                              (and (or (= run!2!n
-                                                                                                                          0)
-                                                                                                                       (= run!2!n
-                                                                                                                          1))
-                                                                                                                   (exists ((run!2!flip0 Int))
-                                                                                                                      (= run!2!flip0
-                                                                                                                         run!2!n))
-                                                                                                                   (forall ((run!2!flip0 Int))
-                                                                                                                      (=> (= run!2!flip0
-                                                                                                                             run!2!n)
-                                                                                                                          (and (and (=> (= run!2!flip0
-                                                                                                                                           0)
-                                                                                                                                        (and (and (and (and (= 0
-                                                                                                                                                               (- 1
-                                                                                                                                                                  1)))))))
-                                                                                                                                    (=> (not (= run!2!flip0
-                                                                                                                                                0))
-                                                                                                                                        (and (and (and (and (= 0
-                                                                                                                                                               1)))))))))))))))))))))))))))))))
-                (=> (not (< run!1!low run!1!high))
-                    (and (and (and (and true
-                                        (=> (or (= run!1!flip 0) (= run!1!flip 1))
-                                            (and (and (=> (= run!1!flip 0)
-                                                          (and (and (and (and (and (and (=> (< run!2!low
-                                                                                               run!2!high)
-                                                                                            (and (and (and (exists ((run!2!n Int))
-                                                                                                              (and (or (= run!2!n
-                                                                                                                          0)
-                                                                                                                       (= run!2!n
-                                                                                                                          1))
-                                                                                                                   (exists ((run!2!flip0 Int))
-                                                                                                                      (= run!2!flip0
-                                                                                                                         run!2!n))
-                                                                                                                   (forall ((run!2!flip0 Int))
-                                                                                                                      (=> (= run!2!flip0
-                                                                                                                             run!2!n)
-                                                                                                                          (and (and (=> (= run!2!flip0
-                                                                                                                                           0)
-                                                                                                                                        (and (and (and (and (= (- 1
-                                                                                                                                                                  1)
-                                                                                                                                                               (- 1
-                                                                                                                                                                  0)))))))
-                                                                                                                                    (=> (not (= run!2!flip0
-                                                                                                                                                0))
-                                                                                                                                        (and (and (and (and (= (- 1
-                                                                                                                                                                  1)
-                                                                                                                                                               0))))))))))))))))
-                                                                                        (=> (not (< run!2!low
-                                                                                                    run!2!high))
-                                                                                            (and (and (and (exists ((run!2!n Int))
-                                                                                                              (and (or (= run!2!n
-                                                                                                                          0)
-                                                                                                                       (= run!2!n
-                                                                                                                          1))
-                                                                                                                   (exists ((run!2!flip0 Int))
-                                                                                                                      (= run!2!flip0
-                                                                                                                         run!2!n))
-                                                                                                                   (forall ((run!2!flip0 Int))
-                                                                                                                      (=> (= run!2!flip0
-                                                                                                                             run!2!n)
-                                                                                                                          (and (and (=> (= run!2!flip0
-                                                                                                                                           0)
-                                                                                                                                        (and (and (and (and (= (- 1
-                                                                                                                                                                  1)
-                                                                                                                                                               (- 1
-                                                                                                                                                                  1)))))))
-                                                                                                                                    (=> (not (= run!2!flip0
-                                                                                                                                                0))
-                                                                                                                                        (and (and (and (and (= (- 1
-                                                                                                                                                                  1)
-                                                                                                                                                               1)))))))))))))))))))))))
-                                                      (=> (not (= run!1!flip 0))
-                                                          (and (and (and (and (and (and (=> (< run!2!low
-                                                                                               run!2!high)
-                                                                                            (and (and (and (exists ((run!2!n Int))
-                                                                                                              (and (or (= run!2!n
-                                                                                                                          0)
-                                                                                                                       (= run!2!n
-                                                                                                                          1))
-                                                                                                                   (exists ((run!2!flip0 Int))
-                                                                                                                      (= run!2!flip0
-                                                                                                                         run!2!n))
-                                                                                                                   (forall ((run!2!flip0 Int))
-                                                                                                                      (=> (= run!2!flip0
-                                                                                                                             run!2!n)
-                                                                                                                          (and (and (=> (= run!2!flip0
-                                                                                                                                           0)
-                                                                                                                                        (and (and (and (and (= 1
-                                                                                                                                                               (- 1
-                                                                                                                                                                  0)))))))
-                                                                                                                                    (=> (not (= run!2!flip0
-                                                                                                                                                0))
-                                                                                                                                        (and (and (and (and (= 1
-                                                                                                                                                               0))))))))))))))))
-                                                                                        (=> (not (< run!2!low
-                                                                                                    run!2!high))
-                                                                                            (and (and (and (exists ((run!2!n Int))
-                                                                                                              (and (or (= run!2!n
-                                                                                                                          0)
-                                                                                                                       (= run!2!n
-                                                                                                                          1))
-                                                                                                                   (exists ((run!2!flip0 Int))
-                                                                                                                      (= run!2!flip0
-                                                                                                                         run!2!n))
-                                                                                                                   (forall ((run!2!flip0 Int))
-                                                                                                                      (=> (= run!2!flip0
-                                                                                                                             run!2!n)
-                                                                                                                          (and (and (=> (= run!2!flip0
-                                                                                                                                           0)
-                                                                                                                                        (and (and (and (and (= 1
-                                                                                                                                                               (- 1
-                                                                                                                                                                  1)))))))
-                                                                                                                                    (=> (not (= run!2!flip0
-                                                                                                                                                0))
-                                                                                                                                        (and (and (and (and (= 1
-                                                                                                                                                               1))))))))))))))))))))))))))))))))))
+Universal Programs:
+[ SSeq
+    [ SIf
+        (BLt (AVar run ! 1 ! low) (AVar run ! 1 ! high))
+        (SAsgn run ! 1 ! low (ALit 0))
+        (SAsgn run ! 1 ! low (ALit 1))
+    , SCall
+        SFun { fName = run ! 1 ! flipCoin , fParams = [] }
+        [ run ! 1 ! flip ]
+    , SIf
+        (BEq (AVar run ! 1 ! flip) (ALit 0))
+        (SAsgn run ! 1 ! low (ASub (ALit 1) (AVar run ! 1 ! low)))
+        SSkip
+    ]
+]
 
+Existential Programs:
+[ SSeq
+    [ SIf
+        (BLt (AVar run ! 2 ! low) (AVar run ! 2 ! high))
+        (SAsgn run ! 2 ! low (ALit 0))
+        (SAsgn run ! 2 ! low (ALit 1))
+    , SCall
+        SFun { fName = run ! 2 ! flipCoin , fParams = [] }
+        [ run ! 2 ! flip ]
+    , SIf
+        (BEq (AVar run ! 2 ! flip) (ALit 0))
+        (SAsgn run ! 2 ! low (ASub (ALit 1) (AVar run ! 2 ! low)))
+        SSkip
+    ]
+]
+
+Universal Specifications:
+fromList [(run!1!flipCoin,Spec {params = [], choiceVars = [], preCondition = true, postCondition = (or (= ret! 0) (= ret! 1))})]
+
+Existential Specifications:
+fromList [(run!2!flipCoin,Spec {params = [], choiceVars = [(run!2!n int)], preCondition = (or (= run!2!n 0) (= run!2!n 1)), postCondition = (= ret! run!2!n)})]
+
+Precondition:
+  (= run!1!low run!2!low)
+
+Postcondition:
+  (= run!1!low run!2!low)
+
+[send->] (set-option :print-success true )
+[<-recv] success
+[send->] (set-option :produce-models true )
+[<-recv] success
+[send->] (declare-const run!1!flip Int)
+[<-recv] success
+[send->] (declare-const run!1!high Int)
+[<-recv] success
+[send->] (declare-const run!1!low Int)
+[<-recv] success
+[send->] (declare-const run!2!high Int)
+[<-recv] success
+[send->] (declare-const run!2!low Int)
+[<-recv] success
+[send->] (assert (not (=> (= run!1!low run!2!low)
+         (and (=> (< run!1!low run!1!high)
+                  (and true
+                       (=> (or (= run!1!flip 0) (= run!1!flip 1))
+                           (and (=> (= run!1!flip 0)
+                                    (and (=> (< run!2!low run!2!high)
+                                             (exists ((run!2!n Int))
+                                                (and (or (= run!2!n 0) (= run!2!n 1))
+                                                     (exists ((run!2!flip!1 Int))
+                                                        (= run!2!flip!1 run!2!n))
+                                                     (forall ((run!2!flip!1 Int))
+                                                        (=> (= run!2!flip!1 run!2!n)
+                                                            (and (=> (= run!2!flip!1 0)
+                                                                     (= (- 1 0) (- 1 0)))
+                                                                 (=> (not (= run!2!flip!1 0))
+                                                                     (= (- 1 0) 0))))))))
+                                         (=> (not (< run!2!low run!2!high))
+                                             (exists ((run!2!n Int))
+                                                (and (or (= run!2!n 0) (= run!2!n 1))
+                                                     (exists ((run!2!flip!1 Int))
+                                                        (= run!2!flip!1 run!2!n))
+                                                     (forall ((run!2!flip!1 Int))
+                                                        (=> (= run!2!flip!1 run!2!n)
+                                                            (and (=> (= run!2!flip!1 0)
+                                                                     (= (- 1 0) (- 1 1)))
+                                                                 (=> (not (= run!2!flip!1 0))
+                                                                     (= (- 1 0) 1))))))))))
+                                (=> (not (= run!1!flip 0))
+                                    (and (=> (< run!2!low run!2!high)
+                                             (exists ((run!2!n Int))
+                                                (and (or (= run!2!n 0) (= run!2!n 1))
+                                                     (exists ((run!2!flip!1 Int))
+                                                        (= run!2!flip!1 run!2!n))
+                                                     (forall ((run!2!flip!1 Int))
+                                                        (=> (= run!2!flip!1 run!2!n)
+                                                            (and (=> (= run!2!flip!1 0)
+                                                                     (= 0 (- 1 0)))
+                                                                 (=> (not (= run!2!flip!1 0))
+                                                                     (= 0 0))))))))
+                                         (=> (not (< run!2!low run!2!high))
+                                             (exists ((run!2!n Int))
+                                                (and (or (= run!2!n 0) (= run!2!n 1))
+                                                     (exists ((run!2!flip!1 Int))
+                                                        (= run!2!flip!1 run!2!n))
+                                                     (forall ((run!2!flip!1 Int))
+                                                        (=> (= run!2!flip!1 run!2!n)
+                                                            (and (=> (= run!2!flip!1 0)
+                                                                     (= 0 (- 1 1)))
+                                                                 (=> (not (= run!2!flip!1 0))
+                                                                     (= 0 1))))))))))))))
+              (=> (not (< run!1!low run!1!high))
+                  (and true
+                       (=> (or (= run!1!flip 0) (= run!1!flip 1))
+                           (and (=> (= run!1!flip 0)
+                                    (and (=> (< run!2!low run!2!high)
+                                             (exists ((run!2!n Int))
+                                                (and (or (= run!2!n 0) (= run!2!n 1))
+                                                     (exists ((run!2!flip!1 Int))
+                                                        (= run!2!flip!1 run!2!n))
+                                                     (forall ((run!2!flip!1 Int))
+                                                        (=> (= run!2!flip!1 run!2!n)
+                                                            (and (=> (= run!2!flip!1 0)
+                                                                     (= (- 1 1) (- 1 0)))
+                                                                 (=> (not (= run!2!flip!1 0))
+                                                                     (= (- 1 1) 0))))))))
+                                         (=> (not (< run!2!low run!2!high))
+                                             (exists ((run!2!n Int))
+                                                (and (or (= run!2!n 0) (= run!2!n 1))
+                                                     (exists ((run!2!flip!1 Int))
+                                                        (= run!2!flip!1 run!2!n))
+                                                     (forall ((run!2!flip!1 Int))
+                                                        (=> (= run!2!flip!1 run!2!n)
+                                                            (and (=> (= run!2!flip!1 0)
+                                                                     (= (- 1 1) (- 1 1)))
+                                                                 (=> (not (= run!2!flip!1 0))
+                                                                     (= (- 1 1) 1))))))))))
+                                (=> (not (= run!1!flip 0))
+                                    (and (=> (< run!2!low run!2!high)
+                                             (exists ((run!2!n Int))
+                                                (and (or (= run!2!n 0) (= run!2!n 1))
+                                                     (exists ((run!2!flip!1 Int))
+                                                        (= run!2!flip!1 run!2!n))
+                                                     (forall ((run!2!flip!1 Int))
+                                                        (=> (= run!2!flip!1 run!2!n)
+                                                            (and (=> (= run!2!flip!1 0)
+                                                                     (= 1 (- 1 0)))
+                                                                 (=> (not (= run!2!flip!1 0))
+                                                                     (= 1 0))))))))
+                                         (=> (not (< run!2!low run!2!high))
+                                             (exists ((run!2!n Int))
+                                                (and (or (= run!2!n 0) (= run!2!n 1))
+                                                     (exists ((run!2!flip!1 Int))
+                                                        (= run!2!flip!1 run!2!n))
+                                                     (forall ((run!2!flip!1 Int))
+                                                        (=> (= run!2!flip!1 run!2!n)
+                                                            (and (=> (= run!2!flip!1 0)
+                                                                     (= 1 (- 1 1)))
+                                                                 (=> (not (= run!2!flip!1 0))
+                                                                     (= 1 1))))))))))))))))) )
+[<-recv] success
+[send->] (check-sat )
+[<-recv] unsat
 Valid.
 
-real	0m0.098s
-user	0m0.136s
-sys	0m0.035s
+real	0m0.116s
+user	0m0.157s
+sys	0m0.075s

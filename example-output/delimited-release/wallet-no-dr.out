@@ -1,3 +1,4 @@
+
 *******************************************
 ****               ORHLE               ****
 ****     The Oracular RHLE Verifier    ****
@@ -7,26 +8,78 @@
   buy[1] (forall)
   buy[2] (exists)
 
-:: Verification Conditions
-  (=> (and (= buy!1!spent buy!2!spent) (= buy!1!cost buy!2!cost))
-      (and (=> (>= buy!1!funds buy!1!cost)
-               (and (or (not (>= buy!2!funds buy!2!cost))
-                        (= (+ buy!1!spent buy!1!cost) (+ buy!2!spent buy!2!cost)))
-                    (or (= (+ buy!1!spent buy!1!cost) buy!2!spent)
-                        (>= buy!2!funds buy!2!cost))))
-           (=> (not (>= buy!1!funds buy!1!cost))
-               (and (or (not (>= buy!2!funds buy!2!cost))
-                        (= buy!1!spent (+ buy!2!spent buy!2!cost)))
-                    (or (= buy!1!spent buy!2!spent) (>= buy!2!funds buy!2!cost))))))
+Universal Programs:
+[ SIf
+    (BGe (AVar buy ! 1 ! funds) (AVar buy ! 1 ! cost))
+    (SSeq
+       [ SAsgn buy !
+           1 ! funds (ASub (AVar buy ! 1 ! funds) (AVar buy ! 1 ! cost))
+       , SAsgn buy !
+           1 ! spent (AAdd (AVar buy ! 1 ! spent) (AVar buy ! 1 ! cost))
+       ])
+    SSkip
+]
 
-Invalid. Model:
-  buy!1!cost -> (- 1)
-  buy!1!funds -> (- 2)
-  buy!1!spent -> 2
-  buy!2!cost -> (- 1)
-  buy!2!funds -> 0
-  buy!2!spent -> 2
+Existential Programs:
+[ SIf
+    (BGe (AVar buy ! 2 ! funds) (AVar buy ! 2 ! cost))
+    (SSeq
+       [ SAsgn buy !
+           2 ! funds (ASub (AVar buy ! 2 ! funds) (AVar buy ! 2 ! cost))
+       , SAsgn buy !
+           2 ! spent (AAdd (AVar buy ! 2 ! spent) (AVar buy ! 2 ! cost))
+       ])
+    SSkip
+]
 
-real	0m0.083s
-user	0m0.066s
-sys	0m0.049s
+Universal Specifications:
+fromList []
+
+Existential Specifications:
+fromList []
+
+Precondition:
+  (and (= buy!1!spent buy!2!spent) (= buy!1!cost buy!2!cost))
+
+Postcondition:
+  (= buy!1!spent buy!2!spent)
+
+[send->] (set-option :print-success true )
+[<-recv] success
+[send->] (set-option :produce-models true )
+[<-recv] success
+[send->] (declare-const buy!1!cost Int)
+[<-recv] success
+[send->] (declare-const buy!1!funds Int)
+[<-recv] success
+[send->] (declare-const buy!1!spent Int)
+[<-recv] success
+[send->] (declare-const buy!2!cost Int)
+[<-recv] success
+[send->] (declare-const buy!2!funds Int)
+[<-recv] success
+[send->] (declare-const buy!2!spent Int)
+[<-recv] success
+[send->] (assert (not (=> (and (= buy!1!spent buy!2!spent)
+              (= buy!1!cost buy!2!cost))
+         (and (=> (>= buy!1!funds buy!1!cost)
+                  (and (=> (>= buy!2!funds buy!2!cost)
+                           (= (+ buy!1!spent buy!1!cost) (+ buy!2!spent buy!2!cost)))
+                       (=> (not (>= buy!2!funds buy!2!cost))
+                           (= (+ buy!1!spent buy!1!cost) buy!2!spent))))
+              (=> (not (>= buy!1!funds buy!1!cost))
+                  (and (=> (>= buy!2!funds buy!2!cost)
+                           (= buy!1!spent (+ buy!2!spent buy!2!cost)))
+                       (=> (not (>= buy!2!funds buy!2!cost))
+                           (= buy!1!spent buy!2!spent))))))) )
+[<-recv] success
+[send->] (check-sat )
+[<-recv] sat
+[send->] (get-model )
+[<-recv] (model (define-fun buy!2!cost () Int (- 1 ) ) (define-fun buy!1!funds () Int (- 1 ) ) (define-fun buy!2!funds () Int (- 2 ) ) (define-fun buy!1!cost () Int (- 1 ) ) (define-fun buy!2!spent () Int 0 ) (define-fun buy!1!spent () Int 0 ) )
+Failure:
+  (model (define-fun buy!2!cost () Int (- 1 ) ) (define-fun buy!1!funds () Int (- 1 ) ) (define-fun buy!2!funds () Int (- 2 ) ) (define-fun buy!1!cost () Int (- 1 ) ) (define-fun buy!2!spent () Int 0 ) (define-fun buy!1!spent () Int 0 ) )
+
+real	0m0.112s
+user	0m0.216s
+sys	0m0.062s

@@ -7,15 +7,16 @@ module Orhle.Imp.ImpParser
     , parseImpWithHoleIndex
     ) where
 
-import Control.Monad
+import           Control.Monad
 import qualified Data.Map as Map
-import Data.Maybe ( catMaybes )
-import Orhle.Assertion.AssertionLanguage
-import Orhle.Assertion.AssertionParser
-import Orhle.Imp.ImpLanguage
-import Text.Parsec
-import Text.Parsec.Expr
-import Text.Parsec.Language
+import           Data.Maybe ( catMaybes )
+import           Orhle.Assertion.AssertionLanguage
+import           Orhle.Assertion.AssertionParser
+import           Orhle.Imp.ImpLanguage
+import           Orhle.Names ( Name(..) )
+import           Text.Parsec
+import           Text.Parsec.Expr
+import           Text.Parsec.Language
 import qualified Text.Parsec.Token as Token
 
 languageDef :: LanguageDef ParseCtx
@@ -149,7 +150,7 @@ assignStmt = do
   reservedOp ":="
   expr <- aExpression
   semi
-  return $ SAsgn var expr
+  return $ SAsgn (Name var 0) expr
 
 funDef :: ImpParser ()
 funDef = do
@@ -172,20 +173,20 @@ funCall = do
   funName <- identifier
   params  <- (liftM concat) . parens $ sepBy varArray comma
   _ <- semi
-  return $ SCall (SFun funName params) assignees
+  return $ SCall (SFun (Name funName 0) params) assignees
 
-varArray :: ImpParser [Var]
+varArray :: ImpParser [Name]
 varArray = do
-  (vars, num) <- try (do
+  (name, num) <- try (do
                          var <- identifier
                          char '[' >> whiteSpace
                          num <- integer
                          char ']' >> whiteSpace
                          return (var, num))
                      <|> (do var <- identifier; return (var, 0))
-  return $ if (num == 0)
-             then [vars]
-             else map (\n -> vars ++ "_" ++ (show n)) [0..(num-1)]
+  return $ case num of
+    0 -> [Name name 0]
+    _ -> map (\n -> Name (name ++ "_" ++ (show n)) 0) [0..(num-1)]
 
 skipStmt :: ProgramParser
 skipStmt = reserved "skip" >> semi >> return SSkip
@@ -210,7 +211,7 @@ bOperators = [ [Prefix (reservedOp "!" >> return BNot)]
              ]
 
 aTerm =  parens aExpression
-     <|> liftM AVar identifier
+     <|> (identifier >>= \name -> return $ AVar $ Name name 0)
      <|> liftM ALit integer
 
 bTerm =  parens bExpression

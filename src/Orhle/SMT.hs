@@ -7,6 +7,7 @@ module Orhle.SMT
 
 import qualified Data.Set as Set
 import qualified Orhle.Assertion as A
+import           Orhle.Names ( Name(..) )
 import qualified SimpleSMT as SSMT
 import qualified SMTLib2 as S
 import           SMTLib2.Core ( tBool )
@@ -31,7 +32,7 @@ checkSat assertion = let
   assertionExpr = toSMT assertion
   in do
     logger <- SSMT.newLogger 0
-    solver <- SSMT.newSolver "z3" ["-in"] Nothing -- $ Just logger
+    solver <- SSMT.newSolver "z3" ["-in"] $ Just logger
     mapM_ (SSMT.ackCommand solver) (map toSSMT declareVars)
     SSMT.assert solver $ toSSMT assertionExpr
     result <- SSMT.check solver
@@ -86,8 +87,12 @@ toSSMT = SSMT.Atom . PP.render . S.pp
 class SMTEmbeddable a where
   toSMT :: a -> S.Expr
 
+nameStr :: Name -> String
+nameStr (Name name 0) = name
+nameStr (Name name i) = name ++ "!" ++ show i
+
 instance SMTEmbeddable A.Ident where
-  toSMT (A.Ident name _) =  S.app (stringToSIdent name) []
+  toSMT (A.Ident name _) = S.app (stringToSIdent $ nameStr name) []
 
 instance SMTEmbeddable A.Arith where
   toSMT arith = case arith of
@@ -125,10 +130,10 @@ toApp f as = S.app (stringToSIdent f) (map toSMT as)
 
 toBinder :: A.Ident -> S.Binder
 toBinder (A.Ident name sort) = case sort of
-  A.Bool -> S.Bind (S.N name) tBool
-  A.Int  -> S.Bind (S.N name) tInt
+  A.Bool -> S.Bind (S.N $ nameStr name) tBool
+  A.Int  -> S.Bind (S.N $ nameStr name) tInt
 
 toDeclareConst :: A.Ident -> S.Command
 toDeclareConst (A.Ident name sort) = case sort of
-  A.Bool -> S.CmdDeclareConst (S.N name) tBool
-  A.Int  -> S.CmdDeclareConst (S.N name) tInt
+  A.Bool -> S.CmdDeclareConst (S.N $ nameStr name) tBool
+  A.Int  -> S.CmdDeclareConst (S.N $ nameStr name) tInt

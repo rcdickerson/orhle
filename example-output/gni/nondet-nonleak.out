@@ -1,3 +1,5 @@
+Replacements: fromList [(nonleak!3!r,nonleak!3!r!1)]
+
 *******************************************
 ****               ORHLE               ****
 ****     The Oracular RHLE Verifier    ****
@@ -8,56 +10,149 @@
   nonleak[2] (forall)
   nonleak[3] (exists)
 
-:: Verification Conditions
-  (let ((a!1 (exists ((nonleak!3!n Int))
-               (! (let ((a!1 (exists ((nonleak!3!r!0 Int))
-                               (! (= nonleak!3!r!0 nonleak!3!n) :weight 0))))
-                    (and (>= nonleak!3!n 0)
-                         (not (<= 100 nonleak!3!n))
-                         a!1
-                         (forall ((nonleak!3!r!0 Int))
-                           (! (or (not (= nonleak!3!r!0 nonleak!3!n))
-                                  (and (or (not (= nonleak!3!r!0 5000))
-                                           (= (+ nonleak!2!high nonleak!2!low)
-                                              (+ nonleak!3!high nonleak!3!low)))
-                                       (or (= (+ nonleak!2!high nonleak!2!low)
-                                              nonleak!3!low)
-                                           (= nonleak!3!r!0 5000))))
-                              :weight 0))))
-                  :weight 0)))
-        (a!2 (exists ((nonleak!3!n Int))
-               (! (let ((a!1 (exists ((nonleak!3!r!0 Int))
-                               (! (= nonleak!3!r!0 nonleak!3!n) :weight 0))))
-                    (and (>= nonleak!3!n 0)
-                         (not (<= 100 nonleak!3!n))
-                         a!1
-                         (forall ((nonleak!3!r!0 Int))
-                           (! (or (not (= nonleak!3!r!0 nonleak!3!n))
-                                  (and (or (not (= nonleak!3!r!0 5000))
-                                           (= nonleak!2!low
-                                              (+ nonleak!3!high nonleak!3!low)))
-                                       (or (= nonleak!2!low nonleak!3!low)
-                                           (= nonleak!3!r!0 5000))))
-                              :weight 0))))
-                  :weight 0))))
-    (=> (and (= nonleak!1!high nonleak!3!high)
-             (= nonleak!1!low nonleak!2!low)
-             (= nonleak!2!low nonleak!3!low))
-        (and true
-             (=> (and (>= nonleak!2!r 0) (< nonleak!2!r 100))
-                 (and (=> (= nonleak!2!r 5000)
-                          (and (or (not (and (>= nonleak!1!r 0)
-                                             (not (<= 100 nonleak!1!r))))
-                                   (and (or (not (= nonleak!1!r 5000)) a!1)
-                                        (or (= nonleak!1!r 5000) a!1)))))
-                      (=> (not (= nonleak!2!r 5000))
-                          (and (or (not (and (>= nonleak!1!r 0)
-                                             (not (<= 100 nonleak!1!r))))
-                                   (and (or (not (= nonleak!1!r 5000)) a!2)
-                                        (or (= nonleak!1!r 5000) a!2))))))))))
+Universal Programs:
+[ SSeq
+    [ SCall
+        SFun { fName = nonleak ! 1 ! randInt , fParams = [] }
+        [ nonleak ! 1 ! r ]
+    , SIf
+        (BEq (AVar nonleak ! 1 ! r) (ALit 5000))
+        (SAsgn nonleak !
+           1 ! ret (AAdd (AVar nonleak ! 1 ! high) (AVar nonleak ! 1 ! low)))
+        (SAsgn nonleak ! 1 ! ret (AVar nonleak ! 1 ! low))
+    ]
+, SSeq
+    [ SCall
+        SFun { fName = nonleak ! 2 ! randInt , fParams = [] }
+        [ nonleak ! 2 ! r ]
+    , SIf
+        (BEq (AVar nonleak ! 2 ! r) (ALit 5000))
+        (SAsgn nonleak !
+           2 ! ret (AAdd (AVar nonleak ! 2 ! high) (AVar nonleak ! 2 ! low)))
+        (SAsgn nonleak ! 2 ! ret (AVar nonleak ! 2 ! low))
+    ]
+]
 
+Existential Programs:
+[ SSeq
+    [ SCall
+        SFun { fName = nonleak ! 3 ! randInt , fParams = [] }
+        [ nonleak ! 3 ! r ]
+    , SIf
+        (BEq (AVar nonleak ! 3 ! r) (ALit 5000))
+        (SAsgn nonleak !
+           3 ! ret (AAdd (AVar nonleak ! 3 ! high) (AVar nonleak ! 3 ! low)))
+        (SAsgn nonleak ! 3 ! ret (AVar nonleak ! 3 ! low))
+    ]
+]
+
+Universal Specifications:
+fromList [(nonleak!1!randInt,Spec {params = [], choiceVars = [], preCondition = true, postCondition = (and (>= ret! 0) (< ret! 100))}),(nonleak!2!randInt,Spec {params = [], choiceVars = [], preCondition = true, postCondition = (and (>= ret! 0) (< ret! 100))})]
+
+Existential Specifications:
+fromList [(nonleak!3!randInt,Spec {params = [], choiceVars = [(nonleak!3!n int)], preCondition = (and (>= nonleak!3!n 0) (< nonleak!3!n 100)), postCondition = (= ret! nonleak!3!n)})]
+
+Precondition:
+  (and (= nonleak!1!high nonleak!3!high) (= nonleak!1!low nonleak!2!low) (= nonleak!2!low nonleak!3!low))
+
+Postcondition:
+  (= nonleak!2!ret nonleak!3!ret)
+
+[send->] (set-option :print-success true )
+[<-recv] success
+[send->] (set-option :produce-models true )
+[<-recv] success
+[send->] (declare-const nonleak!1!high Int)
+[<-recv] success
+[send->] (declare-const nonleak!1!low Int)
+[<-recv] success
+[send->] (declare-const nonleak!1!r Int)
+[<-recv] success
+[send->] (declare-const nonleak!2!high Int)
+[<-recv] success
+[send->] (declare-const nonleak!2!low Int)
+[<-recv] success
+[send->] (declare-const nonleak!2!r Int)
+[<-recv] success
+[send->] (declare-const nonleak!3!high Int)
+[<-recv] success
+[send->] (declare-const nonleak!3!low Int)
+[<-recv] success
+[send->] (assert (not (=> (and (= nonleak!1!high nonleak!3!high)
+              (= nonleak!1!low nonleak!2!low) (= nonleak!2!low nonleak!3!low))
+         (and true
+              (=> (and (>= nonleak!2!r 0) (< nonleak!2!r 100))
+                  (and (=> (= nonleak!2!r 5000)
+                           (and true
+                                (=> (and (>= nonleak!1!r 0) (< nonleak!1!r 100))
+                                    (and (=> (= nonleak!1!r 5000)
+                                             (exists ((nonleak!3!n Int))
+                                                (and (and (>= nonleak!3!n 0) (< nonleak!3!n 100))
+                                                     (exists ((nonleak!3!r!1 Int))
+                                                        (= nonleak!3!r!1 nonleak!3!n))
+                                                     (forall ((nonleak!3!r!1 Int))
+                                                        (=> (= nonleak!3!r!1 nonleak!3!n)
+                                                            (and (=> (= nonleak!3!r!1 5000)
+                                                                     (= (+ nonleak!2!high
+                                                                           nonleak!2!low)
+                                                                        (+ nonleak!3!high
+                                                                           nonleak!3!low)))
+                                                                 (=> (not (= nonleak!3!r!1 5000))
+                                                                     (= (+ nonleak!2!high
+                                                                           nonleak!2!low)
+                                                                        nonleak!3!low))))))))
+                                         (=> (not (= nonleak!1!r 5000))
+                                             (exists ((nonleak!3!n Int))
+                                                (and (and (>= nonleak!3!n 0) (< nonleak!3!n 100))
+                                                     (exists ((nonleak!3!r!1 Int))
+                                                        (= nonleak!3!r!1 nonleak!3!n))
+                                                     (forall ((nonleak!3!r!1 Int))
+                                                        (=> (= nonleak!3!r!1 nonleak!3!n)
+                                                            (and (=> (= nonleak!3!r!1 5000)
+                                                                     (= (+ nonleak!2!high
+                                                                           nonleak!2!low)
+                                                                        (+ nonleak!3!high
+                                                                           nonleak!3!low)))
+                                                                 (=> (not (= nonleak!3!r!1 5000))
+                                                                     (= (+ nonleak!2!high
+                                                                           nonleak!2!low)
+                                                                        nonleak!3!low))))))))))))
+                       (=> (not (= nonleak!2!r 5000))
+                           (and true
+                                (=> (and (>= nonleak!1!r 0) (< nonleak!1!r 100))
+                                    (and (=> (= nonleak!1!r 5000)
+                                             (exists ((nonleak!3!n Int))
+                                                (and (and (>= nonleak!3!n 0) (< nonleak!3!n 100))
+                                                     (exists ((nonleak!3!r!1 Int))
+                                                        (= nonleak!3!r!1 nonleak!3!n))
+                                                     (forall ((nonleak!3!r!1 Int))
+                                                        (=> (= nonleak!3!r!1 nonleak!3!n)
+                                                            (and (=> (= nonleak!3!r!1 5000)
+                                                                     (= nonleak!2!low
+                                                                        (+ nonleak!3!high
+                                                                           nonleak!3!low)))
+                                                                 (=> (not (= nonleak!3!r!1 5000))
+                                                                     (= nonleak!2!low
+                                                                        nonleak!3!low))))))))
+                                         (=> (not (= nonleak!1!r 5000))
+                                             (exists ((nonleak!3!n Int))
+                                                (and (and (>= nonleak!3!n 0) (< nonleak!3!n 100))
+                                                     (exists ((nonleak!3!r!1 Int))
+                                                        (= nonleak!3!r!1 nonleak!3!n))
+                                                     (forall ((nonleak!3!r!1 Int))
+                                                        (=> (= nonleak!3!r!1 nonleak!3!n)
+                                                            (and (=> (= nonleak!3!r!1 5000)
+                                                                     (= nonleak!2!low
+                                                                        (+ nonleak!3!high
+                                                                           nonleak!3!low)))
+                                                                 (=> (not (= nonleak!3!r!1 5000))
+                                                                     (= nonleak!2!low
+                                                                        nonleak!3!low))))))))))))))))) )
+[<-recv] success
+[send->] (check-sat )
+[<-recv] unsat
 Valid.
 
-real	0m0.088s
-user	0m0.076s
-sys	0m0.033s
+real	0m0.100s
+user	0m0.126s
+sys	0m0.046s

@@ -2,7 +2,7 @@ module Orhle.Assertion
   ( Arith(..)
   , Assertion(..)
   , Ident(..)
-  , Name
+  , Name(..)
   , ParseError
   , Sort(..)
   , fillHole

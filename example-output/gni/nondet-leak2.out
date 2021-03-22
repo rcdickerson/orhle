@@ -1,3 +1,5 @@
+Replacements: fromList [(run!2!flip,run!2!flip!1)]
+
 *******************************************
 ****               ORHLE               ****
 ****     The Oracular RHLE Verifier    ****
@@ -7,55 +9,92 @@
   run[1] (forall)
   run[2] (exists)
 
-:: Verification Conditions
-  (=> (= run!1!low run!2!low)
-      (and true
-           (=> (or (= run!1!flip 0) (= run!1!flip 1))
-               (and (=> (= run!1!flip 0)
-                        (and (exists ((run!2!n Int))
-                               (! (let ((a!1 (exists ((run!2!flip!0 Int))
-                                               (! (= run!2!flip!0 run!2!n)
-                                                  :weight 0))))
-                                    (and (or (= run!2!n 0) (= run!2!n 1))
-                                         a!1
-                                         (forall ((run!2!flip!0 Int))
-                                           (! (or (not (= run!2!flip!0 run!2!n))
-                                                  (and (or (not (= run!2!flip!0 0))
-                                                           (= (+ run!1!high
-                                                                 run!1!low)
-                                                              (+ run!2!high
-                                                                 run!2!low)))
-                                                       (or (= (+ run!1!high
-                                                                 run!1!low)
-                                                              run!2!low)
-                                                           (= run!2!flip!0 0))))
-                                              :weight 0))))
-                                  :weight 0))))
-                    (=> (not (= run!1!flip 0))
-                        (and (exists ((run!2!n Int))
-                               (! (let ((a!1 (exists ((run!2!flip!0 Int))
-                                               (! (= run!2!flip!0 run!2!n)
-                                                  :weight 0))))
-                                    (and (or (= run!2!n 0) (= run!2!n 1))
-                                         a!1
-                                         (forall ((run!2!flip!0 Int))
-                                           (! (or (not (= run!2!flip!0 run!2!n))
-                                                  (and (or (not (= run!2!flip!0 0))
-                                                           (= run!1!low
-                                                              (+ run!2!high
-                                                                 run!2!low)))
-                                                       (or (= run!1!low run!2!low)
-                                                           (= run!2!flip!0 0))))
-                                              :weight 0))))
-                                  :weight 0))))))))
+Universal Programs:
+[ SSeq
+    [ SCall
+        SFun { fName = run ! 1 ! flipCoin , fParams = [] }
+        [ run ! 1 ! flip ]
+    , SIf
+        (BEq (AVar run ! 1 ! flip) (ALit 0))
+        (SAsgn run !
+           1 ! low (AAdd (AVar run ! 1 ! high) (AVar run ! 1 ! low)))
+        SSkip
+    ]
+]
 
-Invalid. Model:
-  run!1!flip -> 0
-  run!1!high -> (- 1)
-  run!1!low -> 2
-  run!2!high -> 0
-  run!2!low -> 2
+Existential Programs:
+[ SSeq
+    [ SCall
+        SFun { fName = run ! 2 ! flipCoin , fParams = [] }
+        [ run ! 2 ! flip ]
+    , SIf
+        (BEq (AVar run ! 2 ! flip) (ALit 0))
+        (SAsgn run !
+           2 ! low (AAdd (AVar run ! 2 ! high) (AVar run ! 2 ! low)))
+        SSkip
+    ]
+]
 
-real	0m0.091s
-user	0m0.086s
-sys	0m0.021s
+Universal Specifications:
+fromList [(run!1!flipCoin,Spec {params = [], choiceVars = [], preCondition = true, postCondition = (or (= ret! 0) (= ret! 1))})]
+
+Existential Specifications:
+fromList [(run!2!flipCoin,Spec {params = [], choiceVars = [(run!2!n int)], preCondition = (or (= run!2!n 0) (= run!2!n 1)), postCondition = (= ret! run!2!n)})]
+
+Precondition:
+  (= run!1!low run!2!low)
+
+Postcondition:
+  (= run!1!low run!2!low)
+
+[send->] (set-option :print-success true )
+[<-recv] success
+[send->] (set-option :produce-models true )
+[<-recv] success
+[send->] (declare-const run!1!flip Int)
+[<-recv] success
+[send->] (declare-const run!1!high Int)
+[<-recv] success
+[send->] (declare-const run!1!low Int)
+[<-recv] success
+[send->] (declare-const run!2!high Int)
+[<-recv] success
+[send->] (declare-const run!2!low Int)
+[<-recv] success
+[send->] (assert (not (=> (= run!1!low run!2!low)
+         (and true
+              (=> (or (= run!1!flip 0) (= run!1!flip 1))
+                  (and (=> (= run!1!flip 0)
+                           (exists ((run!2!n Int))
+                              (and (or (= run!2!n 0) (= run!2!n 1))
+                                   (exists ((run!2!flip!1 Int))
+                                      (= run!2!flip!1 run!2!n))
+                                   (forall ((run!2!flip!1 Int))
+                                      (=> (= run!2!flip!1 run!2!n)
+                                          (and (=> (= run!2!flip!1 0)
+                                                   (= (+ run!1!high run!1!low)
+                                                      (+ run!2!high run!2!low)))
+                                               (=> (not (= run!2!flip!1 0))
+                                                   (= (+ run!1!high run!1!low) run!2!low))))))))
+                       (=> (not (= run!1!flip 0))
+                           (exists ((run!2!n Int))
+                              (and (or (= run!2!n 0) (= run!2!n 1))
+                                   (exists ((run!2!flip!1 Int))
+                                      (= run!2!flip!1 run!2!n))
+                                   (forall ((run!2!flip!1 Int))
+                                      (=> (= run!2!flip!1 run!2!n)
+                                          (and (=> (= run!2!flip!1 0)
+                                                   (= run!1!low (+ run!2!high run!2!low)))
+                                               (=> (not (= run!2!flip!1 0))
+                                                   (= run!1!low run!2!low))))))))))))) )
+[<-recv] success
+[send->] (check-sat )
+[<-recv] sat
+[send->] (get-model )
+[<-recv] (model (define-fun run!1!flip () Int 0 ) (define-fun run!2!high () Int 3 ) (define-fun run!1!high () Int 4 ) (define-fun run!2!low () Int 0 ) (define-fun run!1!low () Int 0 ) )
+Failure:
+  (model (define-fun run!1!flip () Int 0 ) (define-fun run!2!high () Int 3 ) (define-fun run!1!high () Int 4 ) (define-fun run!2!low () Int 0 ) (define-fun run!1!low () Int 0 ) )
+
+real	0m0.101s
+user	0m0.073s
+sys	0m0.071s

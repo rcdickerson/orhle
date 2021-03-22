@@ -23,7 +23,7 @@ prettyprintBExp = renderString . layoutPretty defaultLayoutOptions . prettyBExp
 
 prettyProgram :: Program -> Doc ()
 prettyProgram SSkip       = pretty "skip" <> semi
-prettyProgram (SAsgn v a) = pretty v <+> pretty ":=" <+> prettyAExp a <> semi
+prettyProgram (SAsgn v a) = pretty (show v) <+> pretty ":=" <+> prettyAExp a <> semi
 prettyProgram (SSeq ss  ) = vsep (map prettyProgram ss)
 prettyProgram (SIf c t e) = vsep
         [ pretty "if" <+> prettyBExp c <+> pretty "then"
@@ -42,11 +42,11 @@ prettyProgram (SWhile c b (i, v)) = vsep
         , pretty "end"
         ]
 prettyProgram (SCall (SFun n rs) ls) =
-        hsep (punctuate comma (map pretty ls))
+        hsep (punctuate comma (map (pretty . show) ls))
                 <+> pretty ":="
                 <+> pretty "call"
-                <+> pretty n
-                <>  tupled (map pretty rs)
+                <+> (pretty $ show n)
+                <>  tupled (map (pretty . show) rs)
 
 parenPrec :: Int -> Int -> Doc () -> Doc ()
 parenPrec oPrec iPrec doc = if oPrec <= iPrec then doc else parens doc
@@ -58,7 +58,7 @@ prettyAExp = go 0
     where
         go :: Int -> AExp -> Doc ()
         go _ (ALit i  ) = pretty i
-        go _ (AVar v  ) = pretty v
+        go _ (AVar v  ) = pretty $ show v
         go p (AAdd l r) = parenPrec p 1 $ go 1 l <+> pretty "+" <+> go 2 r
         go p (ASub l r) = parenPrec p 1 $ go 1 l <+> pretty "-" <+> go 2 r
         go p (AMul l r) = parenPrec p 2 $ go 2 l <+> pretty "*" <+> go 3 r

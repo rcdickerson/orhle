@@ -1,84 +1,355 @@
+Replacements: fromList [(used!1B!r,used!1B!r!1)]
+Replacements: fromList [(used!2B!r,used!2B!r!1)]
+
 *******************************************
 ****               ORHLE               ****
 ****     The Oracular RHLE Verifier    ****
 *******************************************
 
 :: Executions
-  used[1A] (exists)
+  used[1A] (forall)
+  used[2A] (forall)
   used[1B] (exists)
-  used[2A] (exists)
   used[2B] (exists)
 
-:: Verification Conditions
-  (=> (and (not (= used!1A!param1 used!1B!param1))
-           (= used!1A!param2 used!1B!param2)
-           (= used!2A!param1 used!2B!param1)
-           (not (= used!2A!param2 used!2B!param2)))
-      (and (exists ((used!2B!n Int))
-             (! (and (or (= used!2B!n 0) (= used!2B!n 1))
-                     (exists ((used!2B!r!3 Int))
-                       (! (= used!2B!r!3 used!2B!n) :weight 0))
-                     (forall ((used!2B!r!3 Int))
-                       (! (or (not (= used!2B!r!3 used!2B!n))
-                              (and (or (not (= used!2B!r!3 0))
-                                       (exists ((used!2A!n Int))
-                                         (! (let ((a!1 (exists ((used!2A!r!2 Int))
-                                                         (! (= used!2A!r!2
-                                                               used!2A!n)
-                                                            :weight 0))))
-                                              (and (or (= used!2A!n 0)
-                                                       (= used!2A!n 1))
-                                                   a!1
-                                                   (forall ((used!2A!r!2 Int))
-                                                     (! (or (not (= used!2A!r!2
-                                                                    used!2A!n))
-                                                            (and (or (not (= used!2A!r!2
-                                                                             0))
+Universal Programs:
+[ SSeq
+    [ SAsgn used !
+        1A ! x (AAdd (AVar used ! 1A ! param1) (AVar used ! 1A ! param2))
+    , SCall
+        SFun { fName = used ! 1A ! flip , fParams = [] } [ used ! 1A ! r ]
+    , SIf
+        (BEq (AVar used ! 1A ! r) (ALit 0))
+        (SAsgn used ! 1A ! ret (AVar used ! 1A ! x))
+        (SAsgn used ! 1A ! ret (AVar used ! 1A ! param1))
+    ]
+, SSeq
+    [ SAsgn used !
+        2A ! x (AAdd (AVar used ! 2A ! param1) (AVar used ! 2A ! param2))
+    , SCall
+        SFun { fName = used ! 2A ! flip , fParams = [] } [ used ! 2A ! r ]
+    , SIf
+        (BEq (AVar used ! 2A ! r) (ALit 0))
+        (SAsgn used ! 2A ! ret (AVar used ! 2A ! x))
+        (SAsgn used ! 2A ! ret (AVar used ! 2A ! param1))
+    ]
+]
+
+Existential Programs:
+[ SSeq
+    [ SAsgn used !
+        1B ! x (AAdd (AVar used ! 1B ! param1) (AVar used ! 1B ! param2))
+    , SCall
+        SFun { fName = used ! 1B ! flip , fParams = [] } [ used ! 1B ! r ]
+    , SIf
+        (BEq (AVar used ! 1B ! r) (ALit 0))
+        (SAsgn used ! 1B ! ret (AVar used ! 1B ! x))
+        (SAsgn used ! 1B ! ret (AVar used ! 1B ! param1))
+    ]
+, SSeq
+    [ SAsgn used !
+        2B ! x (AAdd (AVar used ! 2B ! param1) (AVar used ! 2B ! param2))
+    , SCall
+        SFun { fName = used ! 2B ! flip , fParams = [] } [ used ! 2B ! r ]
+    , SIf
+        (BEq (AVar used ! 2B ! r) (ALit 0))
+        (SAsgn used ! 2B ! ret (AVar used ! 2B ! x))
+        (SAsgn used ! 2B ! ret (AVar used ! 2B ! param1))
+    ]
+]
+
+Universal Specifications:
+fromList [(used!1A!flip,Spec {params = [], choiceVars = [], preCondition = true, postCondition = (or (= ret! 0) (= ret! 1))}),(used!2A!flip,Spec {params = [], choiceVars = [], preCondition = true, postCondition = (or (= ret! 0) (= ret! 1))})]
+
+Existential Specifications:
+fromList [(used!1B!flip,Spec {params = [], choiceVars = [(used!1B!n int)], preCondition = (or (= used!1B!n 0) (= used!1B!n 1)), postCondition = (= ret! used!1B!n)}),(used!2B!flip,Spec {params = [], choiceVars = [(used!2B!n int)], preCondition = (or (= used!2B!n 0) (= used!2B!n 1)), postCondition = (= ret! used!2B!n)})]
+
+Precondition:
+  (and (= used!1A!param1 used!1B!param1) (not (= used!1A!param2 used!1B!param2)) (not (= used!2A!param1 used!2B!param1)) (= used!2A!param2 used!2B!param2))
+
+Postcondition:
+  (or (= used!1A!ret used!1B!ret) (= used!2A!ret used!2B!ret))
+
+[send->] (set-option :print-success true )
+[<-recv] success
+[send->] (set-option :produce-models true )
+[<-recv] success
+[send->] (declare-const used!1A!param1 Int)
+[<-recv] success
+[send->] (declare-const used!1A!param2 Int)
+[<-recv] success
+[send->] (declare-const used!1A!r Int)
+[<-recv] success
+[send->] (declare-const used!1B!param1 Int)
+[<-recv] success
+[send->] (declare-const used!1B!param2 Int)
+[<-recv] success
+[send->] (declare-const used!2A!param1 Int)
+[<-recv] success
+[send->] (declare-const used!2A!param2 Int)
+[<-recv] success
+[send->] (declare-const used!2A!r Int)
+[<-recv] success
+[send->] (declare-const used!2B!param1 Int)
+[<-recv] success
+[send->] (declare-const used!2B!param2 Int)
+[<-recv] success
+[send->] (assert (not (=> (and (= used!1A!param1 used!1B!param1)
+              (not (= used!1A!param2 used!1B!param2))
+              (not (= used!2A!param1 used!2B!param1))
+              (= used!2A!param2 used!2B!param2))
+         (and true
+              (=> (or (= used!2A!r 0) (= used!2A!r 1))
+                  (and (=> (= used!2A!r 0)
+                           (and true
+                                (=> (or (= used!1A!r 0) (= used!1A!r 1))
+                                    (and (=> (= used!1A!r 0)
+                                             (exists ((used!2B!n Int))
+                                                (and (or (= used!2B!n 0) (= used!2B!n 1))
+                                                     (exists ((used!2B!r!1 Int))
+                                                        (= used!2B!r!1 used!2B!n))
+                                                     (forall ((used!2B!r!1 Int))
+                                                        (=> (= used!2B!r!1 used!2B!n)
+                                                            (and (=> (= used!2B!r!1 0)
                                                                      (exists ((used!1B!n Int))
-                                                                       (! (let ((a!1 (exists ((used!1B!r!1 Int))
-                                                                                       (! (= used!1B!r!1
-                                                                                             used!1B!n)
-                                                                                          :weight 0))))
-                                                                            (and (or (= used!1B!n
-                                                                                        0)
-                                                                                     (= used!1B!n
-                                                                                        1))
-                                                                                 a!1
-                                                                                 (forall ((used!1B!r!1 Int))
-                                                                                   (! (or (not (= used!1B!r!1
-                                                                                                  used!1B!n))
-                                                                                          (and (or (not (= used!1B!r!1
-                                                                                                           0))
-                                                                                                   (exists ((used!1A!n Int))
-                                                                                                     (! (let ((a!1 (exists ((used!1A!r!0 Int))
-                                                                                                                     (! (= used!1A!r!0
-                                                                                                                           used!1A!n)
-                                                                                                                        :weight 0))))
-                                                                                                          (and (or (= used!1A!n
-                                                                                                                      0)
-                                                                                                                   (= used!1A!n
-                                                                                                                      1))
-                                                                                                               a!1
-                                                                                                               (forall ((used!1A!r!0 Int))
-                                                                                                                 (! (or (not (= used!1A!r!0
-                                                                                                                                used!1A!n))
-                                                                                                                        (and (or (not (= used!1A!r!0
-                                                                                                                                         0))
-                                                                                                                                 (and (not (= (+ used!1A!param1
-                                                                                                                                                 used!1A!param2)
-                                                                                                                                              (+ used!1B!param1
-                                                                                                                                                 used!1B!param2)))
-                                                                                                                                      (not (= (+ used!2A!param1
-                                                                                                                                                 used!2A!param2)
-                                                                                                                                              (+ used!2B!param1
-                                                                                                                                                 used!2B!param2)))))
-                                                                                                                             (or (= used!1A!r!0
-                                                                                                                                    0)
-                                                                                                                                 (and (not (= used!1A!param1
-                                                                                                                                              (+ used!1B!param1
-                                                                                                                                                 used!1B!param2)))
-                                                                                                                                      (not (= (+ used!2A!param1
-                                                                                                                                                 used!2A!param2)
-                                                                                                                                              (+ used!2B!param1
-                                                                                                                                                 used!2B!param2)))))))
-                                                                                                         
+                                                                        (and (or (= used!1B!n 0)
+                                                                                 (= used!1B!n 1))
+                                                                             (exists ((used!1B!r!1 Int))
+                                                                                (= used!1B!r!1
+                                                                                   used!1B!n))
+                                                                             (forall ((used!1B!r!1 Int))
+                                                                                (=> (= used!1B!r!1
+                                                                                       used!1B!n)
+                                                                                    (and (=> (= used!1B!r!1
+                                                                                                0)
+                                                                                             (or (= (+ used!1A!param1
+                                                                                                       used!1A!param2)
+                                                                                                    (+ used!1B!param1
+                                                                                                       used!1B!param2))
+                                                                                                 (= (+ used!2A!param1
+                                                                                                       used!2A!param2)
+                                                                                                    (+ used!2B!param1
+                                                                                                       used!2B!param2))))
+                                                                                         (=> (not (= used!1B!r!1
+                                                                                                     0))
+                                                                                             (or (= (+ used!1A!param1
+                                                                                                       used!1A!param2)
+                                                                                                    used!1B!param1)
+                                                                                                 (= (+ used!2A!param1
+                                                                                                       used!2A!param2)
+                                                                                                    (+ used!2B!param1
+                                                                                                       used!2B!param2))))))))))
+                                                                 (=> (not (= used!2B!r!1 0))
+                                                                     (exists ((used!1B!n Int))
+                                                                        (and (or (= used!1B!n 0)
+                                                                                 (= used!1B!n 1))
+                                                                             (exists ((used!1B!r!1 Int))
+                                                                                (= used!1B!r!1
+                                                                                   used!1B!n))
+                                                                             (forall ((used!1B!r!1 Int))
+                                                                                (=> (= used!1B!r!1
+                                                                                       used!1B!n)
+                                                                                    (and (=> (= used!1B!r!1
+                                                                                                0)
+                                                                                             (or (= (+ used!1A!param1
+                                                                                                       used!1A!param2)
+                                                                                                    (+ used!1B!param1
+                                                                                                       used!1B!param2))
+                                                                                                 (= (+ used!2A!param1
+                                                                                                       used!2A!param2)
+                                                                                                    used!2B!param1)))
+                                                                                         (=> (not (= used!1B!r!1
+                                                                                                     0))
+                                                                                             (or (= (+ used!1A!param1
+                                                                                                       used!1A!param2)
+                                                                                                    used!1B!param1)
+                                                                                                 (= (+ used!2A!param1
+                                                                                                       used!2A!param2)
+                                                                                                    used!2B!param1)))))))))))))))
+                                         (=> (not (= used!1A!r 0))
+                                             (exists ((used!2B!n Int))
+                                                (and (or (= used!2B!n 0) (= used!2B!n 1))
+                                                     (exists ((used!2B!r!1 Int))
+                                                        (= used!2B!r!1 used!2B!n))
+                                                     (forall ((used!2B!r!1 Int))
+                                                        (=> (= used!2B!r!1 used!2B!n)
+                                                            (and (=> (= used!2B!r!1 0)
+                                                                     (exists ((used!1B!n Int))
+                                                                        (and (or (= used!1B!n 0)
+                                                                                 (= used!1B!n 1))
+                                                                             (exists ((used!1B!r!1 Int))
+                                                                                (= used!1B!r!1
+                                                                                   used!1B!n))
+                                                                             (forall ((used!1B!r!1 Int))
+                                                                                (=> (= used!1B!r!1
+                                                                                       used!1B!n)
+                                                                                    (and (=> (= used!1B!r!1
+                                                                                                0)
+                                                                                             (or (= used!1A!param1
+                                                                                                    (+ used!1B!param1
+                                                                                                       used!1B!param2))
+                                                                                                 (= (+ used!2A!param1
+                                                                                                       used!2A!param2)
+                                                                                                    (+ used!2B!param1
+                                                                                                       used!2B!param2))))
+                                                                                         (=> (not (= used!1B!r!1
+                                                                                                     0))
+                                                                                             (or (= used!1A!param1
+                                                                                                    used!1B!param1)
+                                                                                                 (= (+ used!2A!param1
+                                                                                                       used!2A!param2)
+                                                                                                    (+ used!2B!param1
+                                                                                                       used!2B!param2))))))))))
+                                                                 (=> (not (= used!2B!r!1 0))
+                                                                     (exists ((used!1B!n Int))
+                                                                        (and (or (= used!1B!n 0)
+                                                                                 (= used!1B!n 1))
+                                                                             (exists ((used!1B!r!1 Int))
+                                                                                (= used!1B!r!1
+                                                                                   used!1B!n))
+                                                                             (forall ((used!1B!r!1 Int))
+                                                                                (=> (= used!1B!r!1
+                                                                                       used!1B!n)
+                                                                                    (and (=> (= used!1B!r!1
+                                                                                                0)
+                                                                                             (or (= used!1A!param1
+                                                                                                    (+ used!1B!param1
+                                                                                                       used!1B!param2))
+                                                                                                 (= (+ used!2A!param1
+                                                                                                       used!2A!param2)
+                                                                                                    used!2B!param1)))
+                                                                                         (=> (not (= used!1B!r!1
+                                                                                                     0))
+                                                                                             (or (= used!1A!param1
+                                                                                                    used!1B!param1)
+                                                                                                 (= (+ used!2A!param1
+                                                                                                       used!2A!param2)
+                                                                                                    used!2B!param1)))))))))))))))))))
+                       (=> (not (= used!2A!r 0))
+                           (and true
+                                (=> (or (= used!1A!r 0) (= used!1A!r 1))
+                                    (and (=> (= used!1A!r 0)
+                                             (exists ((used!2B!n Int))
+                                                (and (or (= used!2B!n 0) (= used!2B!n 1))
+                                                     (exists ((used!2B!r!1 Int))
+                                                        (= used!2B!r!1 used!2B!n))
+                                                     (forall ((used!2B!r!1 Int))
+                                                        (=> (= used!2B!r!1 used!2B!n)
+                                                            (and (=> (= used!2B!r!1 0)
+                                                                     (exists ((used!1B!n Int))
+                                                                        (and (or (= used!1B!n 0)
+                                                                                 (= used!1B!n 1))
+                                                                             (exists ((used!1B!r!1 Int))
+                                                                                (= used!1B!r!1
+                                                                                   used!1B!n))
+                                                                             (forall ((used!1B!r!1 Int))
+                                                                                (=> (= used!1B!r!1
+                                                                                       used!1B!n)
+                                                                                    (and (=> (= used!1B!r!1
+                                                                                                0)
+                                                                                             (or (= (+ used!1A!param1
+                                                                                                       used!1A!param2)
+                                                                                                    (+ used!1B!param1
+                                                                                                       used!1B!param2))
+                                                                                                 (= used!2A!param1
+                                                                                                    (+ used!2B!param1
+                                                                                                       used!2B!param2))))
+                                                                                         (=> (not (= used!1B!r!1
+                                                                                                     0))
+                                                                                             (or (= (+ used!1A!param1
+                                                                                                       used!1A!param2)
+                                                                                                    used!1B!param1)
+                                                                                                 (= used!2A!param1
+                                                                                                    (+ used!2B!param1
+                                                                                                       used!2B!param2))))))))))
+                                                                 (=> (not (= used!2B!r!1 0))
+                                                                     (exists ((used!1B!n Int))
+                                                                        (and (or (= used!1B!n 0)
+                                                                                 (= used!1B!n 1))
+                                                                             (exists ((used!1B!r!1 Int))
+                                                                                (= used!1B!r!1
+                                                                                   used!1B!n))
+                                                                             (forall ((used!1B!r!1 Int))
+                                                                                (=> (= used!1B!r!1
+                                                                                       used!1B!n)
+                                                                                    (and (=> (= used!1B!r!1
+                                                                                                0)
+                                                                                             (or (= (+ used!1A!param1
+                                                                                                       used!1A!param2)
+                                                                                                    (+ used!1B!param1
+                                                                                                       used!1B!param2))
+                                                                                                 (= used!2A!param1
+                                                                                                    used!2B!param1)))
+                                                                                         (=> (not (= used!1B!r!1
+                                                                                                     0))
+                                                                                             (or (= (+ used!1A!param1
+                                                                                                       used!1A!param2)
+                                                                                                    used!1B!param1)
+                                                                                                 (= used!2A!param1
+                                                                                                    used!2B!param1)))))))))))))))
+                                         (=> (not (= used!1A!r 0))
+                                             (exists ((used!2B!n Int))
+                                                (and (or (= used!2B!n 0) (= used!2B!n 1))
+                                                     (exists ((used!2B!r!1 Int))
+                                                        (= used!2B!r!1 used!2B!n))
+                                                     (forall ((used!2B!r!1 Int))
+                                                        (=> (= used!2B!r!1 used!2B!n)
+                                                            (and (=> (= used!2B!r!1 0)
+                                                                     (exists ((used!1B!n Int))
+                                                                        (and (or (= used!1B!n 0)
+                                                                                 (= used!1B!n 1))
+                                                                             (exists ((used!1B!r!1 Int))
+                                                                                (= used!1B!r!1
+                                                                                   used!1B!n))
+                                                                             (forall ((used!1B!r!1 Int))
+                                                                                (=> (= used!1B!r!1
+                                                                                       used!1B!n)
+                                                                                    (and (=> (= used!1B!r!1
+                                                                                                0)
+                                                                                             (or (= used!1A!param1
+                                                                                                    (+ used!1B!param1
+                                                                                                       used!1B!param2))
+                                                                                                 (= used!2A!param1
+                                                                                                    (+ used!2B!param1
+                                                                                                       used!2B!param2))))
+                                                                                         (=> (not (= used!1B!r!1
+                                                                                                     0))
+                                                                                             (or (= used!1A!param1
+                                                                                                    used!1B!param1)
+                                                                                                 (= used!2A!param1
+                                                                                                    (+ used!2B!param1
+                                                                                                       used!2B!param2))))))))))
+                                                                 (=> (not (= used!2B!r!1 0))
+                                                                     (exists ((used!1B!n Int))
+                                                                        (and (or (= used!1B!n 0)
+                                                                                 (= used!1B!n 1))
+                                                                             (exists ((used!1B!r!1 Int))
+                                                                                (= used!1B!r!1
+                                                                                   used!1B!n))
+                                                                             (forall ((used!1B!r!1 Int))
+                                                                                (=> (= used!1B!r!1
+                                                                                       used!1B!n)
+                                                                                    (and (=> (= used!1B!r!1
+                                                                                                0)
+                                                                                             (or (= used!1A!param1
+                                                                                                    (+ used!1B!param1
+                                                                                                       used!1B!param2))
+                                                                                                 (= used!2A!param1
+                                                                                                    used!2B!param1)))
+                                                                                         (=> (not (= used!1B!r!1
+                                                                                                     0))
+                                                                                             (or (= used!1A!param1
+                                                                                                    used!1B!param1)
+                                                                                                 (= used!2A!param1
+                                                                                                    used!2B!param1)))))))))))))))))))))))) )
+[<-recv] success
+[send->] (check-sat )
+[<-recv] sat
+[send->] (get-model )
+[<-recv] (model (define-fun used!2A!r () Int 1 ) (define-fun used!2B!param2 () Int 0 ) (define-fun used!1A!param2 () Int 2 ) (define-fun used!2A!param1 () Int 0 ) (define-fun used!1B!param2 () Int 3 ) (define-fun used!2B!param1 () Int (- 1 ) ) (define-fun used!1A!r () Int 0 ) (define-fun used!2A!param2 () Int 0 ) (define-fun used!1B!param1 () Int 0 ) (define-fun used!1A!param1 () Int 0 ) )
+Failure:
+  (model (define-fun used!2A!r () Int 1 ) (define-fun used!2B!param2 () Int 0 ) (define-fun used!1A!param2 () Int 2 ) (define-fun used!2A!param1 () Int 0 ) (define-fun used!1B!param2 () Int 3 ) (define-fun used!2B!param1 () Int (- 1 ) ) (define-fun used!1A!r () Int 0 ) (define-fun used!2A!param2 () Int 0 ) (define-fun used!1B!param1 () Int 0 ) (define-fun used!1A!param1 () Int 0 ) )
+
+real	0m0.140s
+user	0m0.383s
+sys	0m0.061s
