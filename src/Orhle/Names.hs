@@ -30,8 +30,6 @@ import           Data.Map  ( Map, (!) )
 import qualified Data.Map as Map
 import           Data.Set  ( Set )
 
-import Debug.Trace
-
 type Handle = String
 type Id     = Int
 data Name   = Name { nHandle :: Handle
@@ -99,6 +97,5 @@ freshNames names nextIds = foldr f (Map.empty, nextIds) names
 
 freshen :: Traversable t => t Name -> NextFreshIds -> (t Name, NextFreshIds)
 freshen names nextIds =
-  trace ("Replacements: " ++ show replacements) $
   (fmap (replacements!) names, nextIds')
   where (replacements, nextIds') = freshNames names nextIds
