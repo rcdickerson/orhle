@@ -63,7 +63,9 @@ parseOrhle str = runParser orhleParser 0 "" str
 orhleParser :: OrhleAppParser ([Exec], Imp.FunImplEnv, S.AESpecs, RhleTriple, ExpectedResult)
 orhleParser = do
   whiteSpace
-  expectedResult <- try expectedValid <|> expectedInvalid; whiteSpace
+  expectedResult <- option ExpectSuccess $
+                    try expectedValid <|> expectedInvalid
+  whiteSpace
 
   aExecs  <- option [] $ try $ execs "forall" ExecForall; whiteSpace
   eExecs  <- option [] $ try $ execs "exists" ExecExists; whiteSpace
