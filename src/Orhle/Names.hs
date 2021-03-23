@@ -19,6 +19,8 @@ module Orhle.Names
   , Name(..)
   , buildNextFreshIds
   , freshen
+  , freshNames
+  , nextFreshName
   , prefix
   , substitute
   , substituteAll
@@ -29,6 +31,7 @@ module Orhle.Names
 import           Data.Map  ( Map, (!) )
 import qualified Data.Map as Map
 import           Data.Set  ( Set )
+import qualified Data.Set as Set
 
 type Handle = String
 type Id     = Int
@@ -45,6 +48,12 @@ class CollectableNames a where
 
 class MappableNames a where
   mapNames :: (Name -> Name) -> a -> a
+
+instance CollectableNames Name where
+  namesIn = Set.singleton
+
+instance MappableNames Name where
+  mapNames = ($)
 
 liftHandleMap :: (String -> String) -> Name -> Name
 liftHandleMap f (Name h i) = Name (f h) i

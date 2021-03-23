@@ -41,12 +41,12 @@ prettyProgram (SWhile c b (i, v)) = vsep
                 ]
         , pretty "end"
         ]
-prettyProgram (SCall (SFun n rs) ls) =
-        hsep (punctuate comma (map (pretty . show) ls))
+prettyProgram (SCall funName args assignees) =
+        hsep (punctuate comma (map (pretty . show) assignees))
                 <+> pretty ":="
                 <+> pretty "call"
-                <+> (pretty $ show n)
-                <>  tupled (map (pretty . show) rs)
+                <+> (pretty $ show funName)
+                <>  tupled (map (pretty . show) args)
 
 parenPrec :: Int -> Int -> Doc () -> Doc ()
 parenPrec oPrec iPrec doc = if oPrec <= iPrec then doc else parens doc

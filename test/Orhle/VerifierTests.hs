@@ -1,6 +1,7 @@
 module Orhle.VerifierTests where
 
 import Data.List        (isSuffixOf)
+import qualified Data.Map as Map
 import Orhle
 import System.Directory (getDirectoryContents)
 import System.FilePath
@@ -20,7 +21,7 @@ parseAndTest :: String -> Assertion
 parseAndTest progStr = case parseOrhle progStr of
   Left  err -> assertFailure $ "Parse error: " ++ (show err)
   Right (_, _, specs, triple, expected) -> do
-    result <- verify specs triple
+    result <- verify specs Map.empty triple
     assertVerifierResultMatches expected result
 
 readImpFiles :: FilePath -> IO [(String, String)]

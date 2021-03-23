@@ -6,6 +6,7 @@ module Orhle
     , ExecId
     , ExpectedResult(..)
     , Failure(..)
+    , FunImpl(..)
     , FunImplEnv
     , Name(..)
     , RhleTriple(..)
@@ -14,6 +15,7 @@ module Orhle
     , Success(..)
     , addSpec
     , emptySpecMap
+    , inline
     , lookupSpec
     , Orhle.parseOrhle
     , prefixSpecs
@@ -22,6 +24,7 @@ module Orhle
     ) where
 
 import Orhle.Imp
+import Orhle.Inliner
 import Orhle.OrhleParser
 import Orhle.Spec
 import Orhle.Triple
@@ -32,5 +35,5 @@ parseOrhle input = case Orhle.OrhleParser.parseOrhle input of
   Left err     -> Left  $ show err
   Right result -> Right $ result
 
-verify :: AESpecs -> RhleTriple -> IO (Either Failure Success)
+verify :: AESpecs -> FunImplEnv -> RhleTriple -> IO (Either Failure Success)
 verify = rhleVerifier

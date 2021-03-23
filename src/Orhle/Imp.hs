@@ -1,11 +1,13 @@
 module Orhle.Imp
   ( AExp(..)
   , BExp(..)
+  , CallId
+  , FunImpl(..)
   , FunImplEnv
   , Name(..)
   , ParseError
   , Program(..)
-  , SFun(..)
+  , mapCallIds
   , parseImp
   , ppProg
   , ppAExp

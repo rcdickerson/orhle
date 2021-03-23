@@ -82,33 +82,51 @@ orhleParser = do
     specs <- many $ try specification
     return $ Map.unions specs
 
+  -- TODO: better is to compose the parser combinators
+  rest <- manyTill anyChar eof
+  impls <- case Imp.parseImp rest of
+    Left err        -> fail $ show err
+    Right (_, funs) -> return funs
+
+  -- Add per-execution prefixed versions of each function implementation to
+  -- ensure names are unique across executions. This keeps the verifier from
+  -- needing to worry about polluting cross-execution namespaces when
+  -- constructing relational verification conditions, and ensures prefixed call
+  -- names in each program have appropriate entries in the implementation
+  -- environment.
+  let execPrefixes         = map execPrefix (aExecs ++ eExecs)
+  let allPrefixes key impl = map (\p -> (p ++ key, prefixImpl p impl)) execPrefixes
+  let prefixedAssocs       = concat $ map (uncurry allPrefixes) (Map.assocs impls)
+  let impls'               = Map.fromList prefixedAssocs
+
+  -- Similarly, prefix the specifications.
   let prefixExecId specMap exec = S.prefixSpecs (execPrefix exec) specMap
   let prefixedASpecs = Map.unions $ map (prefixExecId aSpecs) aExecs
   let prefixedESpecs = Map.unions $ map (prefixExecId eSpecs) eExecs
   let specs = S.AESpecs prefixedASpecs prefixedESpecs
 
-  -- TODO: better is to compose the parser combinators
-  rest <- manyTill anyChar eof
-  funs <- case Imp.parseImp rest of
-    Left err        -> fail $ show err
-    Right (_, funs) -> return funs
-
-  aProgs <- mapM (prefixedFunBody funs) aExecs
-  eProgs <- mapM (prefixedFunBody funs) eExecs
+  aProgs <- mapM (lookupExecBody impls') aExecs
+  eProgs <- mapM (lookupExecBody impls') eExecs
   return $ ((aExecs ++ eExecs)
-           , funs
+           , impls'
            , specs
            , RhleTriple pre aProgs eProgs post
            , expectedResult)
 
-prefixedFunBody :: Imp.FunImplEnv -> Exec -> OrhleAppParser Imp.Program
-prefixedFunBody funs exec =
+prefixImpl :: String -> Imp.FunImpl -> Imp.FunImpl
+prefixImpl prefix (Imp.FunImpl params body rets) = let
+  pParams   = map (Names.prefix prefix) params
+  pBody     = Names.prefix prefix $ Imp.mapCallIds (prefix ++) body
+  pRets     = map (Names.prefix prefix) rets
+  in Imp.FunImpl pParams pBody pRets
+
+lookupExecBody :: Imp.FunImplEnv -> Exec -> OrhleAppParser Imp.Program
+lookupExecBody funs exec =
   let
-    name     = getExecName exec
-    exPrefix = execPrefix exec
+    name = (execPrefix exec) ++ (getExecName exec)
   in case Map.lookup name funs of
-    Nothing        -> fail   $ "Function definition not found: " ++ name
-    Just (prog, _) -> return $ Names.prefix exPrefix prog
+    Nothing   -> fail   $ "Function definition not found: " ++ name
+    Just impl -> return $ Imp.fimpl_body impl
 
 execPrefix :: Exec -> String
 execPrefix exec =
@@ -156,7 +174,7 @@ execId = do
 
 specification :: OrhleAppParser S.SpecMap
 specification = do
-  funName <- identifier
+  callId <- identifier
   params <- (liftM concat) . parens $ sepBy varArray comma
   let paramNames = map (\n -> Name n 0) params
   whiteSpace >> char '{' >> whiteSpace
@@ -168,7 +186,8 @@ specification = do
   pre  <- option A.ATrue $ labeledAssertion "pre"
   post <- option A.ATrue $ labeledAssertion "post"
   whiteSpace >> char '}' >> whiteSpace
-  return $ S.addSpec (Name funName 0) (Spec paramNames choiceVars pre post) S.emptySpecMap
+  let spec = Spec paramNames choiceVars pre post
+  return $ S.addSpec callId spec S.emptySpecMap
 
 labeledAssertion :: String -> OrhleAppParser Assertion
 labeledAssertion label = do

@@ -12,14 +12,14 @@
 // Also others, eg:
 // https://github.com/undertow-io/undertow/blob/d0efffad5d2034bb07525cac9b299dac72c3045d/core/src/test/java/io/undertow/server/handlers/proxy/AbstractLoadBalancingProxyTestCase.java
 
-forall: test[1], test[2];
+exists: test[1], test[2];
 pre:    true;
-post:   (= test!1!success test!2!success);
+post:   (not (= test!1!success test!2!success));
 
 // alternately:
-// exists: test[1], test[2];
+// forall: test[1], test[2];
 // pre:    true;
-// post:   (not (= test!1!success test!2!success));
+// post:   (= test!1!success test!2!success);
 
 aspecs:
   service(url) {

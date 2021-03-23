@@ -67,7 +67,7 @@ invHoleIds prog = case prog of
   Imp.SAsgn _ _              -> Set.empty
   Imp.SSeq ps                -> Set.unions $ map invHoleIds ps
   Imp.SIf _ p1 p2            -> Set.union (invHoleIds p1) (invHoleIds p2)
-  Imp.SCall _ _              -> Set.empty
+  Imp.SCall _ _ _            -> Set.empty
   Imp.SWhile _ body (inv, _) -> Set.union (invHoleIds body) $
       case inv of
         A.Hole hid -> Set.singleton hid
@@ -81,7 +81,7 @@ fillInvHole prog holeId fill = let
     asgn@(Imp.SAsgn _ _)         -> asgn
     Imp.SSeq ps                  -> Imp.SSeq $ map fillRec ps
     Imp.SIf c p1 p2              -> Imp.SIf c (fillRec p1) (fillRec p2)
-    call@(Imp.SCall _ _)         -> call
+    call@(Imp.SCall _ _ _)       -> call
     Imp.SWhile c body (inv, var) ->
       let inv' = case inv of
             A.Hole hid -> if hid == holeId then fill else inv

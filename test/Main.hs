@@ -1,6 +1,7 @@
 module Main where
 
 import Orhle.AssertionTests ( assertionTests )
+import Orhle.InlinerTests   ( inlinerTests )
 import Orhle.VerifierTests  ( buildVerifierTests )
 import System.Exit
 import Test.HUnit
@@ -9,6 +10,7 @@ main :: IO Counts
 main = do
   verifierTests <- buildVerifierTests
   results       <- runTestTT $ TestList [ assertionTests
+                                        , inlinerTests
                                         , verifierTests
                                         ]
   if (errors results + failures results == 0)

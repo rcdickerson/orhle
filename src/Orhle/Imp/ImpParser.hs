@@ -13,7 +13,8 @@ import           Data.Maybe ( catMaybes )
 import           Orhle.Assertion.AssertionLanguage
 import           Orhle.Assertion.AssertionParser
 import           Orhle.Imp.ImpLanguage
-import           Orhle.Names ( Name(..) )
+import           Orhle.Names ( Name(..), namesIn )
+import qualified Orhle.Names as Names
 import           Text.Parsec
 import           Text.Parsec.Expr
 import           Text.Parsec.Language
@@ -155,15 +156,21 @@ assignStmt = do
 funDef :: ImpParser ()
 funDef = do
   reserved "fun"
-  name   <- identifier
+  handle <- identifier
   params <- (liftM concat) . parens $ sepBy varArray comma
-  (body, ret) <- braces $ do
-    bodyStmts <- many1 statement
-    reserved "return"
-    ret <- aExpression
-    _   <- semi
-    return (bodyStmts, ret)
-  recordFunDef name (sseq body) ret
+  (body, ret) <- braces funBody
+  recordFunDef handle params body [ret]
+
+funBody :: ImpParser (Program, Name)
+funBody = do
+  bodyStmts <- many1 statement
+  reserved "return"
+  retExpr <- aExpression
+  _ <- semi
+  let freshIds     = Names.buildNextFreshIds $ namesIn (SSeq bodyStmts)
+      (retName, _) = Names.nextFreshName (Name "retVal" 0) freshIds
+      body         = bodyStmts ++ [(SAsgn retName retExpr)]
+  return (sseq body, retName)
 
 funCall :: ProgramParser
 funCall = do
@@ -171,9 +178,9 @@ funCall = do
   reservedOp ":="
   reserved "call"
   funName <- identifier
-  params  <- (liftM concat) . parens $ sepBy varArray comma
+  args    <- (liftM concat) . parens $ sepBy varArray comma
   _ <- semi
-  return $ SCall (SFun (Name funName 0) params) assignees
+  return $ SCall funName args assignees
 
 varArray :: ImpParser [Name]
 varArray = do
@@ -231,9 +238,9 @@ bBinop opStr opFun = do
   rhs <- aExpression
   return $ opFun lhs rhs
 
-recordFunDef :: String -> Program -> AExp -> ImpParser ()
-recordFunDef name body ret = do
+recordFunDef :: Names.Handle -> [Name] -> Program -> [Name] -> ImpParser ()
+recordFunDef handle params body rets = do
   ParseCtx holeId funs <- getState
-  let funs' = Map.insert name (body, ret) funs
+  let funs' = Map.insert handle (FunImpl params body rets) funs
   putState $ ParseCtx holeId funs'
   return ()

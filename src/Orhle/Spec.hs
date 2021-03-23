@@ -15,17 +15,17 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import           Orhle.Assertion  ( Assertion )
 import qualified Orhle.Assertion as A
-import           Orhle.Names  ( Name, CollectableNames(..) )
-import           Orhle.Names as Names
+import           Orhle.Names  ( Name(..), CollectableNames(..) )
+import qualified Orhle.Names as Names
 
 
 --------------------
 -- Specifications --
 --------------------
-data Spec = Spec { params        :: [Name]
-                 , choiceVars    :: [A.Ident]
-                 , preCondition  :: Assertion
-                 , postCondition :: Assertion
+data Spec = Spec { spec_params        :: [Name]
+                 , spec_choiceVars    :: [A.Ident]
+                 , spec_preCondition  :: Assertion
+                 , spec_postCondition :: Assertion
                  } deriving Show
 
 instance CollectableNames Spec where
@@ -41,22 +41,22 @@ instance CollectableNames Spec where
 -- Specification Mappings --
 ----------------------------
 
-type SpecMap = Map.Map Name Spec
+type SpecMap = Map.Map Names.Handle Spec
 
 emptySpecMap :: SpecMap
 emptySpecMap = Map.empty
 
-addSpec :: Name -> Spec -> SpecMap -> SpecMap
+addSpec :: Names.Handle -> Spec -> SpecMap -> SpecMap
 addSpec = Map.insert
 
-lookupSpec :: Name -> SpecMap -> Maybe Spec
+lookupSpec :: Names.Handle -> SpecMap -> Maybe Spec
 lookupSpec = Map.lookup
 
-funList :: SpecMap -> [Name]
+funList :: SpecMap -> [Names.Handle]
 funList = Map.keys
 
-specAtCallsite :: [Name] -> [Name] -> Name -> SpecMap -> Maybe ([A.Ident], Assertion, Assertion)
-specAtCallsite assignees callParams funName funSpecs = do
+specAtCallsite :: Names.Handle -> [Name] -> [Name] -> SpecMap -> Maybe ([A.Ident], Assertion, Assertion)
+specAtCallsite funName assignees callParams funSpecs = do
   (Spec specParams cvars pre post) <- Map.lookup funName funSpecs
   let rets = retVars $ length assignees
   let bind = Names.substituteAll (rets ++ specParams) (assignees ++ callParams)
@@ -68,16 +68,16 @@ retVars 1   = [Name "ret!" 0]
 retVars len = map (\i -> Name ("ret!" ++ show i) 0) [0..(len - 1)]
 
 prefixSpecs :: String -> SpecMap -> SpecMap
-prefixSpecs prefix specs = Map.map prefixSpec $ Map.mapKeys applyNamePrefix specs
+prefixSpecs prefix specs = Map.map prefixSpec $ Map.mapKeys applyPrefix specs
   where
     applyPrefix s = if ("ret" `isPrefixOf` s) then s else prefix ++ s
     applyNamePrefix (Name h i) = Name (applyPrefix h) i
     prefixSpec (Spec specParams cvars pre post) = let
-      prefixedParams     = map applyNamePrefix specParams
-      prefixedChoiceVars = map (Names.mapNames applyNamePrefix) cvars
-      prefixedPre        = Names.mapNames applyNamePrefix pre
-      prefixedPost       = Names.mapNames applyNamePrefix post
-      in Spec prefixedParams prefixedChoiceVars prefixedPre prefixedPost
+      pParams     = map applyNamePrefix specParams
+      pChoiceVars = map (Names.mapNames applyNamePrefix) cvars
+      pPre        = Names.mapNames applyNamePrefix pre
+      pPost       = Names.mapNames applyNamePrefix post
+      in Spec pParams pChoiceVars pPre pPost
 
 
 -------------
@@ -91,6 +91,4 @@ data AESpecs = AESpecs
 
 instance CollectableNames AESpecs where
   namesIn (AESpecs as es) = Set.union (allNames as) (allNames es)
-    where
-      kvNames k v names = Set.insert k $ Set.union names (namesIn v)
-      allNames = Map.foldrWithKey kvNames Set.empty
+    where allNames = Map.foldr (Set.union . namesIn) Set.empty

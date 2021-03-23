@@ -1,12 +1,14 @@
 module Orhle.Imp.ImpLanguage
     ( AExp(..)
     , BExp(..)
+    , CallId
+    , FunImpl(..)
     , FunImplEnv
     , Name(..)
     , Program(..)
-    , SFun(..)
     , aexpToArith
     , bexpToAssertion
+    , mapCallIds
     , plits
     ) where
 
@@ -14,7 +16,10 @@ import           Data.Map ( Map )
 import qualified Data.Set  as Set
 import           Orhle.Assertion.AssertionLanguage  ( Assertion)
 import qualified Orhle.Assertion.AssertionLanguage as A
-import           Orhle.Names ( Name(..), CollectableNames(..), MappableNames(..))
+import           Orhle.Names ( Handle
+                             , Name(..)
+                             , CollectableNames(..)
+                             , MappableNames(..))
 
 
 ----------------------------
@@ -159,54 +164,76 @@ bexpToAssertion bexp = case bexp of
   BLt  a1 a2 -> A.Lt  (aexpToArith a1) (aexpToArith a2)
 
 
----------------
--- Functions --
----------------
+------------------------------
+-- Function Implementations --
+------------------------------
 
-data SFun = SFun
-  { fName     :: Name
-  , fParams   :: [Name]
-  } deriving (Eq, Ord, Show)
+data FunImpl = FunImpl { fimple_params :: [Name]
+                       , fimpl_body    :: Program
+                       , fimpl_returns :: [Name]
+                       } deriving (Ord, Eq, Show)
 
-instance MappableNames SFun where
-  mapNames f (SFun name params) = SFun (f name) (map f params)
+instance CollectableNames FunImpl where
+  namesIn (FunImpl params body returns) =
+    Set.unions [ Set.fromList params
+               , namesIn body
+               , Set.fromList returns ]
 
-type FunImplEnv = Map String (Program, AExp)
+instance MappableNames FunImpl where
+  mapNames f (FunImpl params body returns) =
+    FunImpl (map f params) (mapNames f body) (map f returns)
+
+type FunImplEnv = Map Handle FunImpl
 
 
 ----------------
 -- Programs --
 ----------------
+
+type CallId = String
+
 data Program
   = SSkip
   | SAsgn  Name AExp
   | SSeq   [Program]
   | SIf    BExp Program Program
   | SWhile BExp Program (Assertion, A.Arith)
-  | SCall  SFun [Name]
+  | SCall  CallId [Name] [Name]
   deriving (Eq, Ord, Show)
 
 instance CollectableNames Program where
   namesIn prog = case prog of
-    SSkip                      -> Set.empty
-    SAsgn  var aexp            -> Set.insert var $ namesIn aexp
-    SSeq   []                  -> Set.empty
-    SSeq   (s:ss)              -> Set.union (namesIn s) (namesIn $ SSeq ss)
-    SIf    cond bThen bElse    -> Set.unions
-                                  [(namesIn cond), (namesIn bThen), (namesIn bElse)]
-    SWhile cond body _         -> Set.union (namesIn cond) (namesIn body)
-    SCall  (SFun _ params) assignees
-                               -> Set.fromList $ assignees ++ params
+    SSkip                   -> Set.empty
+    SAsgn  var aexp         -> Set.insert var $ namesIn aexp
+    SSeq   []               -> Set.empty
+    SSeq   (s:ss)           -> Set.union (namesIn s) (namesIn $ SSeq ss)
+    SIf    cond bThen bElse -> Set.unions [ (namesIn cond)
+                                          , (namesIn bThen)
+                                          , (namesIn bElse)]
+    SWhile cond body _      -> Set.union (namesIn cond) (namesIn body)
+    SCall  _ args asgns     -> Set.fromList $ args ++ asgns
 
 instance MappableNames Program where
-  mapNames _ SSkip          = SSkip
-  mapNames f (SAsgn v aexp) = SAsgn (f v) (mapNames f aexp)
-  mapNames f (SSeq stmts)   = SSeq $ map (mapNames f) stmts
-  mapNames f (SIf b t e)    = SIf (mapNames f b) (mapNames f t) (mapNames f e)
-  mapNames f (SWhile cond body (inv, var)) =
-    SWhile (mapNames f cond) (mapNames f body) (inv, var)
-  mapNames f (SCall (SFun name ps) as) =
-    SCall (SFun (f name) (map f ps)) (map f as)
+  mapNames f prog = case prog of
+    SSkip        -> SSkip
+    SAsgn v aexp -> SAsgn (f v) (mapNames f aexp)
+    SSeq stmts   -> SSeq $ map (mapNames f) stmts
+    SIf b t e    -> SIf (mapNames f b) (mapNames f t) (mapNames f e)
+    SWhile cond body (inv, var)
+                 -> SWhile (mapNames f cond) (mapNames f body) (inv, var)
+    SCall cid args asgns
+                 -> SCall cid (map f args) (map f asgns)
+
+mapCallIds :: (CallId -> CallId) -> Program -> Program
+mapCallIds f prog = case prog of
+    SSkip        -> prog
+    SAsgn _ _    -> prog
+    SSeq stmts   -> SSeq $ map (mapCallIds f) stmts
+    SIf b t e    -> SIf b (mapCallIds f t) (mapCallIds f e)
+    SWhile cond body iv
+                 -> SWhile cond (mapCallIds f body) iv
+    SCall cid args asgns
+                 -> SCall (f cid) args asgns
 
 plits :: Program -> Set.Set Integer
 plits prog = case prog of
@@ -217,4 +244,4 @@ plits prog = case prog of
   SIf cond bThen bElse    -> Set.unions
                                [(blits cond), (plits bThen), (plits bElse)]
   SWhile cond body _      -> Set.union (blits cond) (plits body)
-  SCall _ _               -> Set.empty
+  SCall _ _ _             -> Set.empty

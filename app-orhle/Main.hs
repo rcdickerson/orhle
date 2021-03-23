@@ -1,6 +1,6 @@
 module Main where
 
-import Orhle ( AESpecs(..), RhleTriple(..), parseOrhle )
+import Orhle ( AESpecs(..), FunImplEnv(..), RhleTriple(..), parseOrhle )
 import qualified Orhle
 import System.Environment
 import System.Exit
@@ -35,9 +35,9 @@ run orhle = do
     Left err -> do
       putStrLn $ "Parse error: " ++ err
       return False
-    Right (execs, funs, specs, triple, expected) -> do
-      printQuery execs specs triple
-      result <- Orhle.verify specs triple
+    Right (execs, impls, specs, triple, expected) -> do
+      printQuery execs impls specs triple
+      result <- Orhle.verify specs impls triple
       case result of
         Left failure -> do
           printFailure failure
@@ -46,28 +46,34 @@ run orhle = do
           printSuccess success
           return $ expected == Orhle.ExpectSuccess
 
-printQuery :: [Orhle.Exec] -> AESpecs -> RhleTriple -> IO ()
+printQuery :: [Orhle.Exec] -> FunImplEnv -> AESpecs -> RhleTriple -> IO ()
 printQuery execs
+           impls
            (AESpecs aSpecs eSpecs)
            (RhleTriple pre aProgs eProgs post) = do
   putStrLn ":: Executions"
   mapM_ printExec execs
   putStrLn ""
-  putStrLn $ "Universal Programs:"
+  putStrLn $ ":: Universal Programs"
   pPrintList aProgs
   putStrLn ""
-  putStrLn $ "Existential Programs:"
+  putStrLn $ ":: Existential Programs"
   pPrintList eProgs
   putStrLn ""
-  putStrLn $ "Universal Specifications:"
+  putStrLn $ ":: Universal Specifications"
   pPrint aSpecs
   putStrLn ""
-  putStrLn $ "Existential Specifications:"
+  putStrLn $ ":: Existential Specifications"
   pPrint eSpecs
   putStrLn ""
-  putStrLn $ "Precondition:\n  " ++ (show pre)
+  putStrLn ":: Implemented Functions"
+  pPrint impls
   putStrLn ""
-  putStrLn $ "Postcondition:\n  " ++ (show post)
+  putStrLn $ ":: Precondition"
+  pPrint pre
+  putStrLn ""
+  putStrLn $ ":: Postcondition"
+  pPrint post
   putStrLn ""
 
 printFailure :: Orhle.Failure -> IO ()

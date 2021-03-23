@@ -8,12 +8,14 @@ module Orhle.Verifier
 import           Control.Monad ( foldM )
 import           Control.Monad.Identity ( Identity, runIdentity )
 import           Control.Monad.Trans.State
+import           Data.Either ( partitionEithers )
 import qualified Data.Set as Set
 import           Orhle.Assertion ( Assertion )
 import qualified Orhle.Assertion as A
 import qualified Orhle.InvariantInference as Inf
-import           Orhle.Imp.ImpLanguage ( Program(..), BExp )
+import           Orhle.Imp.ImpLanguage ( FunImplEnv, Program(..), BExp )
 import qualified Orhle.Imp.ImpLanguage as Imp
+import           Orhle.Inliner ( inline )
 import           Orhle.Names  ( Name(..), NextFreshIds, namesIn )
 import qualified Orhle.Names as Names
 import           Orhle.Spec
@@ -72,26 +74,38 @@ envGetQSpecs = do
 -- Verifier --
 --------------
 
-type Verifier = AESpecs -> RhleTriple -> IO (Either Failure Success)
+type Verifier = AESpecs -> FunImplEnv -> RhleTriple -> IO (Either Failure Success)
 data Failure  = Failure { failureVcs :: Assertion,  message :: String }
 data Success  = Success { successVcs :: Assertion }
 
 rhleVerifier :: Verifier
-rhleVerifier specs (RhleTriple pre aProgs eProgs post) =
-  let
-    pnamesAsAriths = Set.fromList . namesToIntVars . Set.toList . namesIn
-    plitsAsAriths  = (Set.map A.Num) . Imp.plits
-    valsAtHole _ = Set.toList . Set.unions $
-                   (map pnamesAsAriths (aProgs ++ eProgs)) ++
-                   (map plitsAsAriths  (aProgs ++ eProgs))
-    vcTransform filledAProgs filledEProgs = let
-      triple = RhleTriple pre filledAProgs filledEProgs post
-      in runIdentity $ evalStateT (buildVCs specs triple) (buildEnv specs triple)
-  in do
-    result <- Inf.inferAndCheck (Inf.Enumerative 2) valsAtHole vcTransform aProgs eProgs
-    return $ case result of
-      Left  msg -> Left  $ Failure (vcTransform aProgs eProgs) msg
-      Right _   -> Right $ Success (vcTransform aProgs eProgs) -- TODO: filled VCs
+rhleVerifier specs impls (RhleTriple pre aProgs eProgs post) =
+  case doInline impls aProgs eProgs of
+    Left errs -> return . Left $ Failure A.AFalse ("Problems inlining: " ++ show errs)
+    Right (inlineAs, inlineEs) -> let
+      pnamesAsAriths = Set.fromList . namesToIntVars . Set.toList . namesIn
+      plitsAsAriths  = (Set.map A.Num) . Imp.plits
+      valsAtHole _   = Set.toList . Set.unions $
+                         (map pnamesAsAriths (inlineAs ++ inlineEs)) ++
+                         (map plitsAsAriths  (inlineAs ++ inlineEs))
+      vcTransform filledAs filledEs = runVCs specs $ RhleTriple pre filledAs filledEs post
+      in do
+        result <- Inf.inferAndCheck (Inf.Enumerative 2) valsAtHole vcTransform inlineAs inlineEs
+        return $ case result of
+          Left  msg -> Left  $ Failure (vcTransform inlineAs inlineEs) msg
+          Right _   -> Right $ Success (vcTransform inlineAs inlineEs) -- TODO: filled VCs
+
+doInline :: FunImplEnv -> [Program] -> [Program] -> Either [String] ([Program], [Program])
+doInline impls aProgs eProgs = let
+  inmap = partitionEithers . map (inline impls)
+  (errorAs, inAs) = inmap aProgs
+  (errorEs, inEs) = inmap eProgs
+  in case (errorAs ++ errorEs) of
+    []   -> Right (inAs, inEs)
+    errs -> Left $ errs
+
+runVCs :: AESpecs -> RhleTriple -> Assertion
+runVCs specs triple = runIdentity $ evalStateT (buildVCs specs triple) (buildEnv specs triple)
 
 buildVCs :: AESpecs -> RhleTriple -> Verification Assertion
 buildVCs (AESpecs aspecs especs) (RhleTriple pre aProgs eProgs post) = do
@@ -115,7 +129,7 @@ weakestPre stmt post =
     SAsgn lhs rhs     -> return $ A.subArith (A.Ident lhs A.Int) (Imp.aexpToArith rhs) post
     SIf b s1 s2       -> wpIf b s1 s2 post
     SWhile b body inv -> wpLoop b body inv post
-    SCall f assignees -> wpCall f assignees post
+    SCall f args asgn -> wpCall f args asgn post
 
 wpIf :: BExp -> Program -> Program -> Assertion -> Verification Assertion
 wpIf condB tBranch eBranch post = do
@@ -145,12 +159,12 @@ wpLoop condB body (inv, measure) post = do
       endWP   = A.Forall qIdents (freshen $ A.Imp (A.And [A.Not cond, inv]) post)
   return $ A.And [inv, loopWP, endWP]
 
-wpCall :: Imp.SFun -> [Name] -> Assertion -> Verification Assertion
-wpCall (Imp.SFun funName funParams) assignees post = do
+wpCall :: Imp.CallId -> [Name] -> [Name] -> Assertion -> Verification Assertion
+wpCall cid funArgs assignees post = do
   (quant, specs) <- envGetQSpecs
-  case (specAtCallsite assignees funParams funName specs) of
-    Nothing -> error $ "No " ++ (show quant) ++ " specification for " ++ show funName ++
-               ". Specified functions are: " ++ (show $ funList specs)
+  case (specAtCallsite cid assignees funArgs specs) of
+    Nothing -> error $ "No specification for " ++ show cid ++ "."
+               ++ "Specified functions are: " ++ (show $ funList specs) ++ "."
     Just (cvars, fPre, fPost) ->
       case quant of
         VUniversal   -> return $ A.And [fPre, A.Imp fPost post]
