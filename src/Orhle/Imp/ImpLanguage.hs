@@ -198,7 +198,7 @@ data Program
   | SSeq   [Program]
   | SIf    BExp Program Program
   | SWhile BExp Program (Assertion, A.Arith)
-  | SCall  CallId [Name] [Name]
+  | SCall  CallId [AExp] [Name]
   deriving (Eq, Ord, Show)
 
 instance CollectableNames Program where
@@ -211,7 +211,7 @@ instance CollectableNames Program where
                                           , (namesIn bThen)
                                           , (namesIn bElse)]
     SWhile cond body _      -> Set.union (namesIn cond) (namesIn body)
-    SCall  _ args asgns     -> Set.fromList $ args ++ asgns
+    SCall  _ args asgns     -> Set.unions $ (Set.fromList asgns):(map namesIn args)
 
 instance MappableNames Program where
   mapNames f prog = case prog of
@@ -222,7 +222,7 @@ instance MappableNames Program where
     SWhile cond body (inv, var)
                  -> SWhile (mapNames f cond) (mapNames f body) (inv, var)
     SCall cid args asgns
-                 -> SCall cid (map f args) (map f asgns)
+                 -> SCall cid (map (mapNames f) args) (map f asgns)
 
 mapCallIds :: (CallId -> CallId) -> Program -> Program
 mapCallIds f prog = case prog of

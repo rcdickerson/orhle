@@ -7,7 +7,7 @@ module Orhle.Spec
   , funList
   , lookupSpec
   , prefixSpecs
-  , specAtCallsite
+  , retVars
   ) where
 
 import           Data.List ( isPrefixOf )
@@ -55,18 +55,6 @@ lookupSpec = Map.lookup
 funList :: SpecMap -> [Names.Handle]
 funList = Map.keys
 
-specAtCallsite :: Names.Handle -> [Name] -> [Name] -> SpecMap -> Maybe ([A.Ident], Assertion, Assertion)
-specAtCallsite funName assignees callParams funSpecs = do
-  (Spec specParams cvars pre post) <- Map.lookup funName funSpecs
-  let rets = retVars $ length assignees
-  let bind = Names.substituteAll (rets ++ specParams) (assignees ++ callParams)
-  return (cvars, bind pre, bind post)
-
-retVars :: Int -> [Name]
-retVars 0   = []
-retVars 1   = [Name "ret!" 0]
-retVars len = map (\i -> Name ("ret!" ++ show i) 0) [0..(len - 1)]
-
 prefixSpecs :: String -> SpecMap -> SpecMap
 prefixSpecs prefix specs = Map.map prefixSpec $ Map.mapKeys applyPrefix specs
   where
@@ -79,6 +67,10 @@ prefixSpecs prefix specs = Map.map prefixSpec $ Map.mapKeys applyPrefix specs
       pPost       = Names.mapNames applyNamePrefix post
       in Spec pParams pChoiceVars pPre pPost
 
+retVars :: Int -> [Name]
+retVars 0   = []
+retVars 1   = [Name "ret!" 0]
+retVars len = map (\i -> Name ("ret!" ++ show i) 0) [0..(len - 1)]
 
 -------------
 -- AESpecs --

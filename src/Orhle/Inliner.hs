@@ -47,7 +47,7 @@ doInline program = do
     SCall cid args assignees
                 -> inlineCall cid args assignees
 
-inlineCall :: CallId -> [Name] -> [Name] -> Inliner Program
+inlineCall :: CallId -> [AExp] -> [Name] -> Inliner Program
 inlineCall cid args assignees = do
   failIfInPath cid
   mImpl <- lookupImpl cid
@@ -59,15 +59,15 @@ inlineCall cid args assignees = do
       inlineBody <- doInline body
       removeFromPath cid
       asgnArgs <- zipAsgn cid params args
-      asgnRets <- zipAsgn cid assignees rets
+      asgnRets <- zipAsgn cid assignees (map AVar rets)
       return $ SSeq $ asgnArgs ++ [inlineBody] ++ asgnRets
 
-zipAsgn :: CallId -> [Name] -> [Name] -> Inliner [Program]
+zipAsgn :: CallId -> [Name] -> [AExp] -> Inliner [Program]
 zipAsgn cid lhs rhs = do
   if (length lhs /= length rhs)
     then throwError $ "Call to function " ++ (show cid)
          ++ " with wrong number of arguments."
-    else return $ map (\(l, r) -> SAsgn l (AVar r)) $ zip lhs rhs
+    else return $ map (\(l, r) -> SAsgn l r) $ zip lhs rhs
 
 freshImpl :: FunImpl -> Inliner FunImpl
 freshImpl impl = do

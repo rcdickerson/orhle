@@ -9,6 +9,7 @@ import           Control.Monad ( foldM )
 import           Control.Monad.Identity ( Identity, runIdentity )
 import           Control.Monad.Trans.State
 import           Data.Either ( partitionEithers )
+import qualified Data.Map as Map
 import qualified Data.Set as Set
 import           Orhle.Assertion ( Assertion )
 import qualified Orhle.Assertion as A
@@ -18,7 +19,8 @@ import qualified Orhle.Imp.ImpLanguage as Imp
 import           Orhle.Inliner ( inline )
 import           Orhle.Names  ( Name(..), NextFreshIds, namesIn )
 import qualified Orhle.Names as Names
-import           Orhle.Spec
+import           Orhle.Spec ( AESpecs(..), Spec(..), SpecMap )
+import qualified Orhle.Spec as Spec
 import           Orhle.Triple
 
 ------------------------------
@@ -159,12 +161,12 @@ wpLoop condB body (inv, measure) post = do
       endWP   = A.Forall qIdents (freshen $ A.Imp (A.And [A.Not cond, inv]) post)
   return $ A.And [inv, loopWP, endWP]
 
-wpCall :: Imp.CallId -> [Name] -> [Name] -> Assertion -> Verification Assertion
-wpCall cid funArgs assignees post = do
+wpCall :: Imp.CallId -> [Imp.AExp] -> [Name] -> Assertion -> Verification Assertion
+wpCall cid callArgs assignees post = do
   (quant, specs) <- envGetQSpecs
-  case (specAtCallsite cid assignees funArgs specs) of
+  case (specAtCallsite specs cid assignees callArgs) of
     Nothing -> error $ "No specification for " ++ show cid ++ "."
-               ++ "Specified functions are: " ++ (show $ funList specs) ++ "."
+               ++ "Specified functions are: " ++ (show $ Spec.funList specs) ++ "."
     Just (cvars, fPre, fPost) ->
       case quant of
         VUniversal   -> return $ A.And [fPre, A.Imp fPost post]
@@ -186,3 +188,13 @@ namesToIntIdents = fmap (\v -> A.Ident v A.Int)
 
 namesToIntVars :: Functor f => f Name -> f A.Arith
 namesToIntVars = (fmap A.Var) . namesToIntIdents
+
+specAtCallsite :: SpecMap -> Names.Handle -> [Name] -> [Imp.AExp] -> Maybe ([A.Ident], Assertion, Assertion)
+specAtCallsite specMap funName assignees callArgs = do
+  let assigneeVars = map Imp.AVar assignees
+  (Spec specParams cvars pre post) <- Map.lookup funName specMap
+  let rets       = Spec.retVars $ length assignees
+  let fromIdents = map (\n -> A.Ident n A.Int) (rets ++ specParams)
+  let toAriths   = map Imp.aexpToArith (assigneeVars ++ callArgs)
+  let bind a     = foldr (uncurry A.subArith) a (zip fromIdents toAriths)
+  return (cvars, bind pre, bind post)

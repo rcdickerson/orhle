@@ -66,9 +66,9 @@ printQuery execs
   putStrLn $ ":: Existential Specifications"
   pPrint eSpecs
   putStrLn ""
-  putStrLn ":: Implemented Functions"
-  pPrint impls
-  putStrLn ""
+--  putStrLn ":: Implemented Functions"
+--  pPrint impls
+--  putStrLn ""
   putStrLn $ ":: Precondition"
   pPrint pre
   putStrLn ""

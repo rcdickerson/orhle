@@ -5,7 +5,7 @@ import Orhle
 import Orhle.Imp
 import Test.HUnit
 
--- Some dummy names
+-- Some dummy names / aexps
 a = (Name "a" 0)
 b = (Name "b" 0)
 c = (Name "c" 0)
@@ -19,9 +19,9 @@ testSimpleInline = let
     , ("bar", FunImpl [x] (SAsgn y (AVar x)) [y])
     , ("baz", FunImpl [x] (SAsgn y (AVar x)) [y])]
   prog = SSeq [
-      SCall "foo" [a] [b]
-    , SCall "bar" [b] [c]
-    , SCall "baz" [c] [d]]
+      SCall "foo" [AVar a] [b]
+    , SCall "bar" [AVar b] [c]
+    , SCall "baz" [AVar c] [d]]
   expected = Right $ SSeq [
     SSeq [ -- SCall foo
            SAsgn (Name "x" 1) (AVar a)
@@ -46,9 +46,9 @@ testNestedInline = let
   bodyFoo = SAsgn y (AAdd (AVar x) (ALit 1))
   idImpls = Map.fromList [
       ("foo", FunImpl [x] bodyFoo [y])
-    , ("bar", FunImpl [x] (SCall "foo" [x] [y]) [y])
-    , ("baz", FunImpl [x] (SCall "bar" [x] [y]) [y])]
-  prog = SCall "baz" [a] [b]
+    , ("bar", FunImpl [x] (SCall "foo" [AVar x] [y]) [y])
+    , ("baz", FunImpl [x] (SCall "bar" [AVar x] [y]) [y])]
+  prog = SCall "baz" [AVar a] [b]
   expected = Right $
     SSeq [ -- SCall baz
            SAsgn (Name "x" 1) (AVar a)
@@ -68,14 +68,33 @@ testNestedInline = let
 
 testNoRecursion = let
   impls = Map.fromList [
-    ("foo", FunImpl [x] (SCall "foo" [x] [y]) [y])
+    ("foo", FunImpl [x] (SCall "foo" [AVar x] [y]) [y])
     ]
-  prog = SCall "foo" [a] [b]
+  prog = SCall "foo" [AVar a] [b]
   expected = Left "Cannot inline recursive call to foo"
   actual   = inline impls prog
   in TestCase $ assertEqual "inlining" expected actual
 
-inlinerTests = TestList [ TestLabel "testSimpleInline" testSimpleInline
-                        , TestLabel "testNestedInline" testNestedInline
-                        , TestLabel "testNoRecursion"  testNoRecursion
+testMultipleReturns = let
+  idImpls = Map.fromList [
+      ("foo", FunImpl [x] (SAsgn y (AVar x)) [x, y])]
+  prog = SSeq [
+      SCall "foo" [AVar a] [b, c]]
+  expected = Right $ SSeq [
+    SSeq [ -- params
+           SAsgn (Name "x" 1) (AVar a)
+           -- body
+         , SAsgn (Name "y" 1) (AVar (Name "x" 1))
+           -- returns
+         , SAsgn (Name "b" 0) (AVar (Name "x" 1))
+         , SAsgn (Name "c" 0) (AVar (Name "y" 1))
+         ]
+    ]
+  actual = inline idImpls prog
+  in TestCase $ assertEqual "inlining" expected actual
+
+inlinerTests = TestList [ TestLabel "testSimpleInline"    testSimpleInline
+                        , TestLabel "testNestedInline"    testNestedInline
+                        , TestLabel "testNoRecursion"     testNoRecursion
+                        , TestLabel "testMultipleReturns" testMultipleReturns
                         ]

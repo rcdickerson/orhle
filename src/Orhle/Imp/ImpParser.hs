@@ -96,7 +96,7 @@ statement :: ProgramParser
 statement =   ifStmt
           <|> whileStmt
           <|> skipStmt
-          <|> try funCall
+          <|> (try funCall)
           <|> assignStmt
           <|> parens statement
 
@@ -105,9 +105,8 @@ ifStmt = do
   reserved "if"
   cond  <- bExpression
   reserved "then"
-  tbranch <- many1 $ try statement
-  reserved "else"
-  ebranch <- many1 $ try statement
+  tbranch <- many1 statement
+  ebranch <- option [SSkip] $ (reserved "else" >>= \_ -> many1 statement)
   reserved "endif"
   return $ SIf cond (sseq tbranch) (sseq ebranch)
 
@@ -150,40 +149,65 @@ assignStmt = do
   var  <- identifier
   reservedOp ":="
   expr <- aExpression
-  semi
+  _ <- semi
   return $ SAsgn (Name var 0) expr
 
 funDef :: ImpParser ()
 funDef = do
   reserved "fun"
   handle <- identifier
-  params <- (liftM concat) . parens $ sepBy varArray comma
-  (body, ret) <- braces funBody
-  recordFunDef handle params body [ret]
+  params <- nameTuple
+  (body, rets) <- braces funBody
+  recordFunDef handle params body rets
 
-funBody :: ImpParser (Program, Name)
+funBody :: ImpParser (Program, [Name])
 funBody = do
-  bodyStmts <- many1 statement
+  bodyStmts <- many statement
   reserved "return"
-  retExpr <- aExpression
+  retExprs <- (try varArray)
+          <|> (try $ aExpression >>= return . return)
+          <|> aexpTuple
   _ <- semi
-  let freshIds     = Names.buildNextFreshIds $ namesIn (SSeq bodyStmts)
-      (retName, _) = Names.nextFreshName (Name "retVal" 0) freshIds
-      body         = bodyStmts ++ [(SAsgn retName retExpr)]
-  return (sseq body, retName)
+  let freshIds = Names.buildNextFreshIds $ namesIn (SSeq bodyStmts)
+      retNames = fst $ foldr (\_ (names, ids) ->
+                                 let (nextFresh, ids') = Names.nextFreshName (Name "retVal" 0) ids
+                                 in  (nextFresh:names, ids'))
+                       ([], freshIds)
+                       retExprs
+      asgns    = map (uncurry SAsgn) $ zip retNames retExprs
+      body     = bodyStmts ++ asgns
+  return (sseq body, retNames)
 
 funCall :: ProgramParser
 funCall = do
-  assignees <- varArray
+  assignees <- (try nameTuple) <|> nameArray
   reservedOp ":="
   reserved "call"
   funName <- identifier
-  args    <- (liftM concat) . parens $ sepBy varArray comma
+  args    <- aexpTuple
   _ <- semi
   return $ SCall funName args assignees
 
-varArray :: ImpParser [Name]
+aexpTuple :: ImpParser [AExp]
+aexpTuple = do
+  args <- parens $ sepBy argument comma
+  return $ concat args
+
+argument :: ImpParser [AExp]
+argument = varArray <|> (aExpression >>= return . return)
+
+varArray :: ImpParser [AExp]
 varArray = do
+  names <- nameArray
+  return $ map AVar names
+
+nameTuple :: ImpParser [Name]
+nameTuple = do
+  names <- parens $ sepBy nameArray comma
+  return $ concat names
+
+nameArray :: ImpParser [Name]
+nameArray = do
   (name, num) <- try (do
                          var <- identifier
                          char '[' >> whiteSpace

@@ -19,7 +19,6 @@ module Orhle
     , lookupSpec
     , Orhle.parseOrhle
     , prefixSpecs
-    , specAtCallsite
     , verify
     ) where
 
