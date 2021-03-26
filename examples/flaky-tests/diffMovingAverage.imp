@@ -11,9 +11,9 @@ pre:    true;
 post:   (not (= test!1!success test!2!success));
 
 aspecs:
-  // Any current time is possible.
+  // Any positive current time is possible.
   getCurrentTimeMs() {
-    post: true;
+    post: (> 0 ret!)
   }
 
   // Sleep is not guaranteed to be precise, the only
@@ -26,7 +26,7 @@ especs:
   // Treat all possible current times as realizable.
   getCurrentTimeMs() {
     choiceVars: t;
-    pre:  true;
+    pre:  (> 0 t);
     post: (= ret! t);
   }
 
@@ -36,7 +36,8 @@ especs:
   // by developers underestimating this interval.)
   sleep(interval, currentTime) {
     choiceVars: t;
-    pre:  (and (<= (- interval 15) t)
+    pre:  (and (>= 0 t)
+               (<= (- interval 15) t)
                (<= t (+ interval 15)));
     post: (= ret! (+ currentTime t));
   }
@@ -130,8 +131,14 @@ fun testAverage() {
   // Begin test code.
   counter := 0;
   while (counter < 5) do
-    @inv { (> 110 currentAverage) }
-    @var { (- 5 counter) }
+    @inv { (and
+              (=> (> testAverage!1!counter 0)
+                  (>  110 testAverage!1!currentAverage))
+              (=> (> testAverage!2!counter 0)
+                  (and
+                    (>= 90  testAverage!2!currentAverage)
+                    (<= 100 testAverage!2!currentAverage)))) }
+    @var { (- 10 (+ testAverage!1!counter testAverage!2!counter)) }
 
     (currentTimeMs, curPosition, currentAverage, usedFields, lastValue, diffs[5]) := call recordTimestamp(
      currentTimeMs, curPosition, currentAverage, usedFields, lastValue, diffs[5]);
