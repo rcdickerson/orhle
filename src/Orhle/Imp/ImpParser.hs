@@ -13,8 +13,8 @@ import           Data.Maybe ( catMaybes )
 import           Orhle.Assertion.AssertionLanguage
 import           Orhle.Assertion.AssertionParser
 import           Orhle.Imp.ImpLanguage
-import           Orhle.Names ( Name(..), namesIn )
-import qualified Orhle.Names as Names
+import           Orhle.Name ( Name(..), namesIn )
+import qualified Orhle.Name as Name
 import           Text.Parsec
 import           Text.Parsec.Expr
 import           Text.Parsec.Language
@@ -168,9 +168,9 @@ funBody = do
           <|> (try $ aExpression >>= return . return)
           <|> aexpTuple
   _ <- semi
-  let freshIds = Names.buildNextFreshIds $ namesIn (SSeq bodyStmts)
+  let freshIds = Name.buildNextFreshIds $ namesIn (SSeq bodyStmts)
       retNames = fst $ foldr (\_ (names, ids) ->
-                                 let (nextFresh, ids') = Names.nextFreshName (Name "retVal" 0) ids
+                                 let (nextFresh, ids') = Name.nextFreshName (Name "retVal" 0) ids
                                  in  (nextFresh:names, ids'))
                        ([], freshIds)
                        retExprs
@@ -262,7 +262,7 @@ bBinop opStr opFun = do
   rhs <- aExpression
   return $ opFun lhs rhs
 
-recordFunDef :: Names.Handle -> [Name] -> Program -> [Name] -> ImpParser ()
+recordFunDef :: Name.Handle -> [Name] -> Program -> [Name] -> ImpParser ()
 recordFunDef handle params body rets = do
   ParseCtx holeId funs <- getState
   let funs' = Map.insert handle (FunImpl params body rets) funs

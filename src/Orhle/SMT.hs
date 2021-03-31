@@ -7,7 +7,8 @@ module Orhle.SMT
 
 import qualified Data.Set as Set
 import qualified Orhle.Assertion as A
-import           Orhle.Names ( Name(..) )
+import           Orhle.Name ( Name(..), TypedName(..) )
+import qualified Orhle.Name as Name
 import qualified SimpleSMT as SSMT
 import qualified SMTLib2 as S
 import           SMTLib2.Core ( tBool )
@@ -91,8 +92,8 @@ nameStr :: Name -> String
 nameStr (Name name 0) = name
 nameStr (Name name i) = name ++ "!" ++ show i
 
-instance SMTEmbeddable A.Ident where
-  toSMT (A.Ident name _) = S.app (stringToSIdent $ nameStr name) []
+instance SMTEmbeddable TypedName where
+  toSMT (TypedName name _) = S.app (stringToSIdent $ nameStr name) []
 
 instance SMTEmbeddable A.Arith where
   toSMT arith = case arith of
@@ -121,6 +122,7 @@ instance SMTEmbeddable A.Assertion where
     A.Gte  a1 a2   -> toApp ">="  [a1, a2]
     A.Forall ids a -> S.Quant S.Forall (map toBinder ids) (toSMT a)
     A.Exists ids a -> S.Quant S.Exists (map toBinder ids) (toSMT a)
+    A.Hole _       -> error "Unable to embed assertion with hole in SMT"
 
 stringToSIdent :: String -> S.Ident
 stringToSIdent str = S.I (S.N str) []
@@ -128,12 +130,12 @@ stringToSIdent str = S.I (S.N str) []
 toApp :: SMTEmbeddable a => String -> [a] -> S.Expr
 toApp f as = S.app (stringToSIdent f) (map toSMT as)
 
-toBinder :: A.Ident -> S.Binder
-toBinder (A.Ident name sort) = case sort of
-  A.Bool -> S.Bind (S.N $ nameStr name) tBool
-  A.Int  -> S.Bind (S.N $ nameStr name) tInt
+toBinder :: TypedName -> S.Binder
+toBinder (TypedName name sort) = case sort of
+  Name.Bool -> S.Bind (S.N $ nameStr name) tBool
+  Name.Int  -> S.Bind (S.N $ nameStr name) tInt
 
-toDeclareConst :: A.Ident -> S.Command
-toDeclareConst (A.Ident name sort) = case sort of
-  A.Bool -> S.CmdDeclareConst (S.N $ nameStr name) tBool
-  A.Int  -> S.CmdDeclareConst (S.N $ nameStr name) tInt
+toDeclareConst :: TypedName -> S.Command
+toDeclareConst (TypedName name sort) = case sort of
+  Name.Bool -> S.CmdDeclareConst (S.N $ nameStr name) tBool
+  Name.Int  -> S.CmdDeclareConst (S.N $ nameStr name) tInt

@@ -1,11 +1,8 @@
 module Orhle.Assertion
   ( Arith(..)
   , Assertion(..)
-  , Ident(..)
   , Name(..)
   , ParseError
-  , Sort(..)
-  , fillHole
   , freeVars
   , parseArith
   , parseAssertion

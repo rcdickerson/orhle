@@ -10,8 +10,8 @@ import qualified Data.Map              as Map
 import           Orhle.Assertion        ( Assertion(..) )
 import qualified Orhle.Assertion       as A
 import qualified Orhle.Imp             as Imp
-import           Orhle.Names            ( Name(..) )
-import qualified Orhle.Names           as Names
+import           Orhle.Name             ( Name(..), TypedName(..) )
+import qualified Orhle.Name            as Name
 import           Orhle.Spec             ( Spec(..) )
 import qualified Orhle.Spec            as S
 import           Orhle.Triple
@@ -115,9 +115,9 @@ orhleParser = do
 
 prefixImpl :: String -> Imp.FunImpl -> Imp.FunImpl
 prefixImpl prefix (Imp.FunImpl params body rets) = let
-  pParams   = map (Names.prefix prefix) params
-  pBody     = Names.prefix prefix $ Imp.mapCallIds (prefix ++) body
-  pRets     = map (Names.prefix prefix) rets
+  pParams   = map (Name.prefix prefix) params
+  pBody     = Name.prefix prefix $ Imp.mapCallIds (prefix ++) body
+  pRets     = map (Name.prefix prefix) rets
   in Imp.FunImpl pParams pBody pRets
 
 lookupExecBody :: Imp.FunImplEnv -> Exec -> OrhleAppParser Imp.Program
@@ -182,7 +182,7 @@ specification = do
     reserved "choiceVars" >> whiteSpace >> char ':' >> whiteSpace
     vars <- sepBy identifier comma
     whiteSpace >> char ';' >> whiteSpace
-    return $ map (\v -> A.Ident (A.Name v 0) A.Int) vars
+    return $ map (\v -> TypedName (Name v 0) Name.Int) vars
   pre  <- option A.ATrue $ labeledAssertion "pre"
   post <- option A.ATrue $ labeledAssertion "post"
   whiteSpace >> char '}' >> whiteSpace

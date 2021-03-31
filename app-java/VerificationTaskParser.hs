@@ -158,7 +158,7 @@ funSpec = do
       reservedLabel "choiceVars"
       vars <- identifier `sepBy` comma
       _    <- char ';'
-      return $ map (\v -> Ident (Name v 0) Int) vars
+      return $ map (\v -> TypedName (Name v 0) Int) vars
     whiteSpace
     preStr <- option "true" $ reservedLabel "pre" *> untilSemi
     whiteSpace

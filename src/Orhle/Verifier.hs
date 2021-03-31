@@ -17,8 +17,8 @@ import qualified Orhle.InvariantInference as Inf
 import           Orhle.Imp.ImpLanguage ( FunImplEnv, Program(..), BExp )
 import qualified Orhle.Imp.ImpLanguage as Imp
 import           Orhle.Inliner ( inline )
-import           Orhle.Names  ( Name(..), NextFreshIds, namesIn )
-import qualified Orhle.Names as Names
+import           Orhle.Name  ( Name(..), NextFreshIds, TypedName(..), namesIn )
+import qualified Orhle.Name as Name
 import           Orhle.Spec ( AESpecs(..), Spec(..), SpecMap )
 import qualified Orhle.Spec as Spec
 import           Orhle.Triple
@@ -44,14 +44,14 @@ buildEnv specs (RhleTriple pre aProgs eProgs post) = Env VUniversal specs freshM
                , Set.unions $ map namesIn eProgs
                , namesIn post
                , namesIn specs]
-    freshMap = Names.buildNextFreshIds $ Set.unions allNames
+    freshMap = Name.buildNextFreshIds $ Set.unions allNames
 
 type Verification a = StateT Env Identity a
 
 envFreshen :: Traversable t => t Name -> Verification (t Name)
 envFreshen names = do
   Env quant specs freshMap <- get
-  let (freshX, freshMap') = Names.freshen names freshMap
+  let (freshX, freshMap') = Name.freshen names freshMap
   put $ Env quant specs freshMap'
   return freshX
 
@@ -128,7 +128,9 @@ weakestPre stmt post =
     SSkip             -> return post
     SSeq []           -> return post
     SSeq (s:ss)       -> weakestPre s =<< weakestPre (SSeq ss) post
-    SAsgn lhs rhs     -> return $ A.subArith (A.Ident lhs A.Int) (Imp.aexpToArith rhs) post
+    SAsgn lhs rhs     -> return $ A.subArith (TypedName lhs Name.Int)
+                                             (Imp.aexpToArith rhs)
+                                             post
     SIf b s1 s2       -> wpIf b s1 s2 post
     SWhile b body inv -> wpLoop b body inv post
     SCall f args asgn -> wpCall f args asgn post
@@ -147,12 +149,12 @@ wpLoop condB body (inv, measure) post = do
       varSet  = Set.unions [namesIn condB, namesIn body]
       vars    = Set.toList varSet
   freshVars  <- envFreshen vars
-  let freshen = Names.substituteAll vars freshVars
+  let freshen = Name.substituteAll vars freshVars
   (quant, _) <- envGetQSpecs
   bodyWP     <- (case quant of
                    VUniversal   -> weakestPre body inv
                    VExistential -> let
-                     nextMeasure = Names.substituteAll vars freshVars measure
+                     nextMeasure = Name.substituteAll vars freshVars measure
                      measureCond = A.Lt measure nextMeasure
                      bodyPost    = A.And [inv, measureCond]
                      in weakestPre body bodyPost)
@@ -172,7 +174,7 @@ wpCall cid callArgs assignees post = do
         VUniversal   -> return $ A.And [fPre, A.Imp fPost post]
         VExistential -> do
           frAssignees <- envFreshen assignees
-          let freshen     = Names.substituteAll assignees frAssignees
+          let freshen     = Name.substituteAll assignees frAssignees
               frPost      = freshen post
               frFPost     = freshen fPost
               frIdents    = (namesToIntIdents frAssignees)
@@ -183,18 +185,18 @@ wpCall cid callArgs assignees post = do
             [] -> wp
             _  -> A.Exists cvars wp
 
-namesToIntIdents :: Functor f => f Name -> f A.Ident
-namesToIntIdents = fmap (\v -> A.Ident v A.Int)
+namesToIntIdents :: Functor f => f Name -> f TypedName
+namesToIntIdents = fmap (\v -> TypedName v Name.Int)
 
 namesToIntVars :: Functor f => f Name -> f A.Arith
 namesToIntVars = (fmap A.Var) . namesToIntIdents
 
-specAtCallsite :: SpecMap -> Names.Handle -> [Name] -> [Imp.AExp] -> Maybe ([A.Ident], Assertion, Assertion)
+specAtCallsite :: SpecMap -> Name.Handle -> [Name] -> [Imp.AExp] -> Maybe ([TypedName], Assertion, Assertion)
 specAtCallsite specMap funName assignees callArgs = do
   let assigneeVars = map Imp.AVar assignees
   (Spec specParams cvars pre post) <- Map.lookup funName specMap
   let rets       = Spec.retVars $ length assignees
-  let fromIdents = map (\n -> A.Ident n A.Int) (rets ++ specParams)
+  let fromIdents = map (\n -> TypedName n Name.Int) (rets ++ specParams)
   let toAriths   = map Imp.aexpToArith (assigneeVars ++ callArgs)
   let bind a     = foldr (uncurry A.subArith) a (zip fromIdents toAriths)
   return (cvars, bind pre, bind post)

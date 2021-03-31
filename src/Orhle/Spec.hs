@@ -13,17 +13,18 @@ module Orhle.Spec
 import           Data.List ( isPrefixOf )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import           Orhle.Assertion  ( Assertion )
-import qualified Orhle.Assertion as A
-import           Orhle.Names  ( Name(..), CollectableNames(..) )
-import qualified Orhle.Names as Names
+import           Orhle.Assertion ( Assertion )
+import           Orhle.Name  ( CollectableNames(..)
+                             , Name(..)
+                             , TypedName(..) )
+import qualified Orhle.Name as Name
 
 
 --------------------
 -- Specifications --
 --------------------
 data Spec = Spec { spec_params        :: [Name]
-                 , spec_choiceVars    :: [A.Ident]
+                 , spec_choiceVars    :: [TypedName]
                  , spec_preCondition  :: Assertion
                  , spec_postCondition :: Assertion
                  } deriving Show
@@ -41,18 +42,18 @@ instance CollectableNames Spec where
 -- Specification Mappings --
 ----------------------------
 
-type SpecMap = Map.Map Names.Handle Spec
+type SpecMap = Map.Map Name.Handle Spec
 
 emptySpecMap :: SpecMap
 emptySpecMap = Map.empty
 
-addSpec :: Names.Handle -> Spec -> SpecMap -> SpecMap
+addSpec :: Name.Handle -> Spec -> SpecMap -> SpecMap
 addSpec = Map.insert
 
-lookupSpec :: Names.Handle -> SpecMap -> Maybe Spec
+lookupSpec :: Name.Handle -> SpecMap -> Maybe Spec
 lookupSpec = Map.lookup
 
-funList :: SpecMap -> [Names.Handle]
+funList :: SpecMap -> [Name.Handle]
 funList = Map.keys
 
 prefixSpecs :: String -> SpecMap -> SpecMap
@@ -62,9 +63,9 @@ prefixSpecs prefix specs = Map.map prefixSpec $ Map.mapKeys applyPrefix specs
     applyNamePrefix (Name h i) = Name (applyPrefix h) i
     prefixSpec (Spec specParams cvars pre post) = let
       pParams     = map applyNamePrefix specParams
-      pChoiceVars = map (Names.mapNames applyNamePrefix) cvars
-      pPre        = Names.mapNames applyNamePrefix pre
-      pPost       = Names.mapNames applyNamePrefix post
+      pChoiceVars = map (Name.mapNames applyNamePrefix) cvars
+      pPre        = Name.mapNames applyNamePrefix pre
+      pPost       = Name.mapNames applyNamePrefix post
       in Spec pParams pChoiceVars pPre pPost
 
 retVars :: Int -> [Name]

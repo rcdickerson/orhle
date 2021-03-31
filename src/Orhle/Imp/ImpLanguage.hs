@@ -16,10 +16,12 @@ import           Data.Map ( Map )
 import qualified Data.Set  as Set
 import           Orhle.Assertion.AssertionLanguage  ( Assertion)
 import qualified Orhle.Assertion.AssertionLanguage as A
-import           Orhle.Names ( Handle
-                             , Name(..)
-                             , CollectableNames(..)
-                             , MappableNames(..))
+import           Orhle.Name ( CollectableNames(..)
+                            , Handle
+                            , MappableNames(..)
+                            , Name(..)
+                            , TypedName(..))
+import qualified Orhle.Name as Name
 
 
 ----------------------------
@@ -72,7 +74,7 @@ alits aexp = case aexp of
 aexpToArith :: AExp -> A.Arith
 aexpToArith aexp = case aexp of
   ALit i           -> A.Num i
-  AVar var         -> A.Var (A.Ident var A.Int)
+  AVar var         -> A.Var (TypedName var Name.Int)
   AAdd aexp1 aexp2 -> A.Add [aexpToArith aexp1, aexpToArith aexp2]
   ASub aexp1 aexp2 -> A.Sub [aexpToArith aexp1, aexpToArith aexp2]
   AMul aexp1 aexp2 -> A.Mul [aexpToArith aexp1, aexpToArith aexp2]

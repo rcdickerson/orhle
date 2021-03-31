@@ -14,12 +14,12 @@ import qualified Data.Set as Set
 import           Data.Map ( (!) )
 import qualified Data.Map as Map
 import           Orhle.Imp
-import           Orhle.Names
-import qualified Orhle.Names as Names
+import           Orhle.Name ( mapNames, namesIn )
+import qualified Orhle.Name as Name
 
 data InlineContext = Ctx { ctx_funImpls :: FunImplEnv
                          , ctx_callPath :: Set CallId
-                         , ctx_freshIds :: Names.NextFreshIds
+                         , ctx_freshIds :: Name.NextFreshIds
                          }
 type Inliner a = StateT InlineContext (ExceptT String Identity) a
 
@@ -28,7 +28,7 @@ inline impls prog = let
   implNames = Set.unions $ map namesIn $ Map.elems impls
   progNames = namesIn prog
   allNames  = Set.union progNames implNames
-  freshIds  = Names.buildNextFreshIds allNames
+  freshIds  = Name.buildNextFreshIds allNames
   ctx       = Ctx impls Set.empty freshIds
   in runIdentity $ runExceptT $ evalStateT (doInline prog) ctx
 
@@ -72,28 +72,28 @@ zipAsgn cid lhs rhs = do
 freshImpl :: FunImpl -> Inliner FunImpl
 freshImpl impl = do
   Ctx implEnv path freshIds <- get
-  let (replacements, freshIds') = Names.freshNames (namesIn impl) freshIds
+  let (replacements, freshIds') = Name.freshNames (namesIn impl) freshIds
   put $ Ctx implEnv path freshIds'
   return $ mapNames (replacements!) impl
 
-lookupImpl :: Names.Handle -> Inliner (Maybe FunImpl)
+lookupImpl :: Name.Handle -> Inliner (Maybe FunImpl)
 lookupImpl handle = do
   impls <- liftM ctx_funImpls get
   return $ Map.lookup handle impls
 
-failIfInPath :: Names.Handle -> Inliner ()
+failIfInPath :: Name.Handle -> Inliner ()
 failIfInPath handle = do
   path <- liftM ctx_callPath get
   if Set.member handle path
     then throwError $ "Cannot inline recursive call to " ++ handle
     else return ()
 
-addToPath :: Names.Handle -> Inliner ()
+addToPath :: Name.Handle -> Inliner ()
 addToPath name = do
   (Ctx impls path ids) <- get
   put $ Ctx impls (Set.insert name path) ids
 
-removeFromPath :: Names.Handle -> Inliner ()
+removeFromPath :: Name.Handle -> Inliner ()
 removeFromPath name = do
   (Ctx impls path ids) <- get
   put $ Ctx impls (Set.delete name path) ids

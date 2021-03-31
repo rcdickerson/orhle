@@ -1,10 +1,7 @@
 module Orhle.Assertion.AssertionLanguage
   ( Arith(..)
   , Assertion(..)
-  , Ident(..)
   , Name(..)
-  , Sort(..)
-  , fillHole
   , freeVars
   , subArith
   ) where
@@ -12,83 +9,61 @@ module Orhle.Assertion.AssertionLanguage
 import           Data.List ( intercalate )
 import           Data.Set  ( Set )
 import qualified Data.Set as Set
-import           Orhle.Names ( Name(..)
-                             , CollectableNames(..)
-                             , MappableNames(..) )
-
------------------
--- Identifiers --
------------------
-
-data Sort = Bool
-          | Int
-          deriving (Eq, Ord)
-
-data Ident = Ident { identName :: Name
-                   , identSort :: Sort
-                   }
-           deriving (Eq, Ord)
-
-instance Show Sort where
-  show Bool = "bool"
-  show Int  = "int"
-
-instance Show Ident where
-  show (Ident name sort) = "(" ++ (show name) ++ " " ++ (show sort) ++ ")"
-
-instance CollectableNames Ident where
-  namesIn (Ident name _) = Set.singleton name
-
-instance MappableNames Ident where
-  mapNames f (Ident name sort) = Ident (f name) sort
-
+import           Orhle.Name ( Name(..)
+                            , TypedName(..)
+                            , CollectableNames(..)
+                            , MappableNames(..) )
+import           Orhle.ShowSMT
 
 ----------------------------
 -- Arithmetic Expressions --
 ----------------------------
 
 data Arith = Num Integer
-           | Var Ident
+           | Var TypedName
            | Add [Arith]
            | Sub [Arith]
            | Mul [Arith]
            | Div Arith Arith
            | Mod Arith Arith
            | Pow Arith Arith
-           deriving (Eq, Ord)
+           deriving (Show, Eq, Ord)
 
-showSexp :: Show a => String -> [a] -> String
-showSexp name as = "(" ++ name ++ " " ++ (intercalate " " $ map show as) ++ ")"
-
-instance Show Arith where
-  show (Num n)     = show n
-  show (Var ident) = show $ identName ident
-  show (Add as)    = showSexp "+"   as
-  show (Sub as)    = showSexp "-"   as
-  show (Mul as)    = showSexp "*"   as
-  show (Div a1 a2) = showSexp "/"   [a1, a2]
-  show (Mod a1 a2) = showSexp "mod" [a1, a2]
-  show (Pow a1 a2) = showSexp "^"   [a1, a2]
+toSexp :: ShowSMT a => String -> [a] -> String
+toSexp name as = "(" ++ name ++ " " ++ (intercalate " " $ map showSMT as) ++ ")"
 
 instance MappableNames Arith where
-  mapNames _ (Num x)     = Num x
-  mapNames f (Var ident) = Var (mapNames f ident)
-  mapNames f (Add as)    = Add $ map (mapNames f) as
-  mapNames f (Sub as)    = Sub $ map (mapNames f) as
-  mapNames f (Mul as)    = Mul $ map (mapNames f) as
-  mapNames f (Div a1 a2) = Div (mapNames f a1) (mapNames f a2)
-  mapNames f (Mod a1 a2) = Mod (mapNames f a1) (mapNames f a2)
-  mapNames f (Pow a1 a2) = Pow (mapNames f a1) (mapNames f a2)
+  mapNames f arith = case arith of
+    Num x     -> Num x
+    Var tname -> Var (mapNames f tname)
+    Add as    -> Add $ map (mapNames f) as
+    Sub as    -> Sub $ map (mapNames f) as
+    Mul as    -> Mul $ map (mapNames f) as
+    Div a1 a2 -> Div (mapNames f a1) (mapNames f a2)
+    Mod a1 a2 -> Mod (mapNames f a1) (mapNames f a2)
+    Pow a1 a2 -> Pow (mapNames f a1) (mapNames f a2)
 
 instance CollectableNames Arith where
-  namesIn (Num _)     = Set.empty
-  namesIn (Var ident) = namesIn ident
-  namesIn (Add as)    = Set.unions $ map namesIn as
-  namesIn (Sub as)    = Set.unions $ map namesIn as
-  namesIn (Mul as)    = Set.unions $ map namesIn as
-  namesIn (Div a1 a2) = Set.union (namesIn a1) (namesIn a2)
-  namesIn (Mod a1 a2) = Set.union (namesIn a1) (namesIn a2)
-  namesIn (Pow a1 a2) = Set.union (namesIn a1) (namesIn a2)
+  namesIn arith = case arith of
+    Num _     -> Set.empty
+    Var tname -> namesIn tname
+    Add as    -> Set.unions $ map namesIn as
+    Sub as    -> Set.unions $ map namesIn as
+    Mul as    -> Set.unions $ map namesIn as
+    Div a1 a2 -> Set.union (namesIn a1) (namesIn a2)
+    Mod a1 a2 -> Set.union (namesIn a1) (namesIn a2)
+    Pow a1 a2 -> Set.union (namesIn a1) (namesIn a2)
+
+instance ShowSMT Arith where
+  showSMT arith = case arith of
+    Num n -> show n
+    Var tname -> showSMT $ tnName tname
+    Add as    -> toSexp "+"   as
+    Sub as    -> toSexp "-"   as
+    Mul as    -> toSexp "*"   as
+    Div a1 a2 -> toSexp "/"   [a1, a2]
+    Mod a1 a2 -> toSexp "mod" [a1, a2]
+    Pow a1 a2 -> toSexp "^"   [a1, a2]
 
 
 ----------------
@@ -97,104 +72,87 @@ instance CollectableNames Arith where
 
 data Assertion = ATrue
                | AFalse
-               | Atom   Ident
-               | Not    Assertion
-               | And    [Assertion]
-               | Or     [Assertion]
-               | Imp    Assertion Assertion
-               | Eq     Arith Arith
-               | Lt     Arith Arith
-               | Gt     Arith Arith
-               | Lte    Arith Arith
-               | Gte    Arith Arith
-               | Forall [Ident] Assertion
-               | Exists [Ident] Assertion
-               | Hole   Int
-               deriving (Eq, Ord)
-
-showQuant :: Show a => String -> [Ident] -> a -> String
-showQuant name qvars body = "(" ++ name ++ " "
-                                ++ "(" ++ (intercalate " " $ map show qvars) ++ ")"
-                                ++ (show body) ++ ")"
-
-instance Show Assertion where
-  show ATrue           = "true"
-  show AFalse          = "false"
-  show (Atom ident)    = show $ identName ident
-  show (Not a)         = showSexp "not" [a]
-  show (And as)        = showSexp "and" as
-  show (Or as)         = showSexp "or" as
-  show (Imp a1 a2)     = showSexp "=>" [a1, a2]
-  show (Eq a1 a2)      = showSexp "="  [a1, a2]
-  show (Lt a1 a2)      = showSexp "<"  [a1, a2]
-  show (Gt a1 a2)      = showSexp ">"  [a1, a2]
-  show (Lte a1 a2)     = showSexp "<=" [a1, a2]
-  show (Gte a1 a2)     = showSexp ">=" [a1, a2]
-  show (Forall vars a) = showQuant "forall" vars a
-  show (Exists vars a) = showQuant "exists" vars a
-  show (Hole i)        = "??" ++ (show i)
+               | Atom     TypedName
+               | Not      Assertion
+               | And      [Assertion]
+               | Or       [Assertion]
+               | Imp      Assertion Assertion
+               | Eq       Arith Arith
+               | Lt       Arith Arith
+               | Gt       Arith Arith
+               | Lte      Arith Arith
+               | Gte      Arith Arith
+               | Forall   [TypedName] Assertion
+               | Exists   [TypedName] Assertion
+               | Hole     Int
+               deriving (Eq, Ord, Show)
 
 instance MappableNames Assertion where
-  mapNames _ ATrue         = ATrue
-  mapNames _ AFalse        = AFalse
-  mapNames f (Atom ident)  = Atom $ mapNames f ident
-  mapNames f (Not a)       = Not  $ mapNames f a
-  mapNames f (And as)      = And  $ map (mapNames f) as
-  mapNames f (Or as)       = Or   $ map (mapNames f) as
-  mapNames f (Imp a1 a2)   = Imp (mapNames f a1) (mapNames f a2)
-  mapNames f (Eq a1 a2)    = Eq  (mapNames f a1) (mapNames f a2)
-  mapNames f (Lt a1 a2)    = Lt  (mapNames f a1) (mapNames f a2)
-  mapNames f (Gt a1 a2)    = Gt  (mapNames f a1) (mapNames f a2)
-  mapNames f (Lte a1 a2)   = Lte (mapNames f a1) (mapNames f a2)
-  mapNames f (Gte a1 a2)   = Gte (mapNames f a1) (mapNames f a2)
-  mapNames f (Forall vs a) = Forall (map (mapNames f) vs) (mapNames f a)
-  mapNames f (Exists vs a) = Exists (map (mapNames f) vs) (mapNames f a)
-  mapNames _ (Hole i)      = Hole i
+  mapNames f assertion = case assertion of
+    ATrue         -> ATrue
+    AFalse        -> AFalse
+    Atom tname    -> Atom $ mapNames f tname
+    Not a         -> Not  $ mapNames f a
+    And as        -> And  $ map (mapNames f) as
+    Or as         -> Or   $ map (mapNames f) as
+    Imp a1 a2     -> Imp (mapNames f a1) (mapNames f a2)
+    Eq a1 a2      -> Eq  (mapNames f a1) (mapNames f a2)
+    Lt a1 a2      -> Lt  (mapNames f a1) (mapNames f a2)
+    Gt a1 a2      -> Gt  (mapNames f a1) (mapNames f a2)
+    Lte a1 a2     -> Lte (mapNames f a1) (mapNames f a2)
+    Gte a1 a2     -> Gte (mapNames f a1) (mapNames f a2)
+    Forall vs a   -> Forall (map (mapNames f) vs) (mapNames f a)
+    Exists vs a   -> Exists (map (mapNames f) vs) (mapNames f a)
+    Hole i        -> Hole i
 
 instance CollectableNames Assertion where
-  namesIn ATrue         = Set.empty
-  namesIn AFalse        = Set.empty
-  namesIn (Atom ident)  = namesIn ident
-  namesIn (Not a)       = namesIn a
-  namesIn (And as)      = Set.unions $ map namesIn as
-  namesIn (Or as)       = Set.unions $ map namesIn as
-  namesIn (Imp a1 a2)   = Set.union (namesIn a1) (namesIn a2)
-  namesIn (Eq a1 a2)    = Set.union (namesIn a1) (namesIn a2)
-  namesIn (Lt a1 a2)    = Set.union (namesIn a1) (namesIn a2)
-  namesIn (Gt a1 a2)    = Set.union (namesIn a1) (namesIn a2)
-  namesIn (Lte a1 a2)   = Set.union (namesIn a1) (namesIn a2)
-  namesIn (Gte a1 a2)   = Set.union (namesIn a1) (namesIn a2)
-  namesIn (Forall vs a) = Set.union (Set.fromList $ map identName vs) (namesIn a)
-  namesIn (Exists vs a) = Set.union (Set.fromList $ map identName vs) (namesIn a)
-  namesIn (Hole _)      = Set.empty
+  namesIn assertion = case assertion of
+    ATrue          -> Set.empty
+    AFalse         -> Set.empty
+    Atom tname     -> namesIn tname
+    Not a          -> namesIn a
+    And as         -> Set.unions $ map namesIn as
+    Or as          -> Set.unions $ map namesIn as
+    Imp a1 a2      -> Set.union (namesIn a1) (namesIn a2)
+    Eq a1 a2       -> Set.union (namesIn a1) (namesIn a2)
+    Lt a1 a2       -> Set.union (namesIn a1) (namesIn a2)
+    Gt a1 a2       -> Set.union (namesIn a1) (namesIn a2)
+    Lte a1 a2      -> Set.union (namesIn a1) (namesIn a2)
+    Gte a1 a2      -> Set.union (namesIn a1) (namesIn a2)
+    Forall vs a    -> Set.unions $ (namesIn a):(map namesIn vs)
+    Exists vs a    -> Set.unions $ (namesIn a):(map namesIn vs)
+    Hole i         -> Set.empty
 
-fillHole :: Int -> Assertion -> Assertion -> Assertion
-fillHole holeId fill assertion = let
-  fillRec = fillHole holeId fill
-  in case assertion of
-    ATrue      -> ATrue
-    AFalse     -> AFalse
-    Atom i     -> Atom i
-    Not a      -> Not $ fillRec a
-    And as     -> And $ map fillRec as
-    Or  as     -> Or  $ map fillRec as
-    Imp a1 a2  -> Imp (fillRec a1) (fillRec a2)
-    Eq  a1 a2  -> Eq  a1 a2
-    Lt  a1 a2  -> Lt  a1 a2
-    Gt  a1 a2  -> Gt  a1 a2
-    Lte a1 a2  -> Lte a1 a2
-    Gte a1 a2  -> Gte a1 a2
-    Forall v a -> Forall v (fillRec a)
-    Exists v a -> Exists v (fillRec a)
-    Hole i     -> if i == holeId then fill else (Hole i)
+instance ShowSMT Assertion where
+  showSMT assertion = case assertion of
+    ATrue           -> "true"
+    AFalse          -> "false"
+    Atom tname      -> showSMT $ tnName tname
+    Not a           -> toSexp "not" [a]
+    And as          -> toSexp "and" as
+    Or as           -> toSexp "or" as
+    Imp a1 a2       -> toSexp "=>" [a1, a2]
+    Eq a1 a2        -> toSexp "="  [a1, a2]
+    Lt a1 a2        -> toSexp "<"  [a1, a2]
+    Gt a1 a2        -> toSexp ">"  [a1, a2]
+    Lte a1 a2       -> toSexp "<=" [a1, a2]
+    Gte a1 a2       -> toSexp ">=" [a1, a2]
+    Forall vars a   -> quantToSMT "forall" vars a
+    Exists vars a   -> quantToSMT "exists" vars a
+    Hole _          -> error "Cannot convert an assertion with a hole to SMT."
+    where
+      quantToSMT :: String -> [TypedName] -> Assertion -> String
+      quantToSMT name qvars body =
+        let qvarsSMT = intercalate " " $ map showSMT qvars
+        in "(" ++ name ++ " (" ++ qvarsSMT ++ ") " ++ (showSMT body) ++ ")"
 
 
------------------------------
--- Arithmetic Substitution --
------------------------------
+------------------------------
+--- Arithmetic Substitution --
+------------------------------
 
 class SubstitutableArith a where
-  subArith :: Ident -> Arith -> a -> a
+  subArith :: TypedName -> Arith -> a -> a
 
 instance SubstitutableArith Arith where
   subArith from to arith =
@@ -235,7 +193,7 @@ instance SubstitutableArith Assertion where
 --------------------
 
 class FreeVariables a where
-  freeVars :: a -> Set Ident
+  freeVars :: a -> Set TypedName
 
 instance FreeVariables Arith where
   freeVars arith = case arith of
@@ -264,4 +222,4 @@ instance FreeVariables Assertion where
     Gte  a1 a2   -> Set.union (freeVars a1) (freeVars a2)
     Forall ids a -> Set.difference (freeVars a) (Set.fromList ids)
     Exists ids a -> Set.difference (freeVars a) (Set.fromList ids)
-    (Hole _)     -> Set.empty
+    Hole i       -> Set.empty

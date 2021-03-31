@@ -1,25 +1,16 @@
---
--- Relational reasoning is rife with multiple "copies" of the same variable, and
--- program verification in general requires a lot of variable freshening. We
--- centralize these concerns using the following ontology:
---
--- 1) A "handle" is the string which identifies a variable.
--- 2) An "id" identifies some copy or freshening of a handle.
--- 3) A "name" is a (handle, id) pair.
---
--- ORHLE reperesents most variables as names, i.e. (handle, id) pairs. Freshening
--- operations are cleanly handled as mappings over IDs.
---
-module Orhle.Names
+module Orhle.Name
   ( CollectableNames(..)
   , Handle
   , Id
   , MappableNames(..)
   , NextFreshIds
   , Name(..)
+  , Type(..)
+  , TypedName(..)
   , buildNextFreshIds
   , freshen
   , freshNames
+  , fromString
   , nextFreshName
   , prefix
   , substitute
@@ -28,20 +19,23 @@ module Orhle.Names
   , substituteAllHandles
   ) where
 
+import           Data.List ( intercalate )
+import           Data.List.Split ( splitOn )
 import           Data.Map  ( Map, (!) )
 import qualified Data.Map as Map
 import           Data.Set  ( Set )
 import qualified Data.Set as Set
+import           Orhle.ShowSMT
+
+-----------
+-- Names --
+-----------
 
 type Handle = String
 type Id     = Int
 data Name   = Name { nHandle :: Handle
                    , nId     :: Id
-                   } deriving (Eq, Ord)
-
-instance Show Name where
-  show (Name h 0) = h
-  show (Name h i) = h ++ "!" ++ (show i)
+                   } deriving (Show, Eq, Ord)
 
 class CollectableNames a where
   namesIn :: a -> Set Name
@@ -55,8 +49,19 @@ instance CollectableNames Name where
 instance MappableNames Name where
   mapNames = ($)
 
+instance ShowSMT Name where
+  showSMT (Name h 0) = h
+  showSMT (Name h i) = h ++ "!" ++ (show i)
+
 liftHandleMap :: (String -> String) -> Name -> Name
 liftHandleMap f (Name h i) = Name (f h) i
+
+fromString :: String -> Name
+fromString str = case splitOn "!" str of
+  []    -> Name str 0
+  parts -> case (reads $ last parts) :: [(Int, String)] of
+    [(i, "")] -> Name (intercalate "!" $ init parts) i
+    _         -> Name str 0
 
 prefix :: MappableNames a => String -> a -> a
 prefix pre a = mapNames (liftHandleMap $ (++) pre) a
@@ -108,3 +113,30 @@ freshen :: Traversable t => t Name -> NextFreshIds -> (t Name, NextFreshIds)
 freshen names nextIds =
   (fmap (replacements!) names, nextIds')
   where (replacements, nextIds') = freshNames names nextIds
+
+
+-----------------
+-- Typed Names --
+-----------------
+
+data Type = Bool
+          | Int
+          deriving (Show, Eq, Ord)
+
+instance ShowSMT Type where
+  showSMT ty = case ty of
+    Bool -> "bool"
+    Int  -> "int"
+
+data TypedName = TypedName { tnName :: Name
+                           , tnType :: Type
+                           } deriving (Show, Eq, Ord)
+
+instance CollectableNames TypedName where
+  namesIn (TypedName name _) = Set.singleton name
+
+instance MappableNames TypedName where
+  mapNames f (TypedName name ty) = TypedName (f name) ty
+
+instance ShowSMT TypedName where
+  showSMT (TypedName name ty) = "(" ++ showSMT name ++ " " ++ showSMT ty ++ ")"

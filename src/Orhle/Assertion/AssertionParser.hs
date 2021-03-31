@@ -6,9 +6,11 @@ module Orhle.Assertion.AssertionParser
   , parseAssertion
   ) where
 
+import           Data.Char ( toLower )
 import           Orhle.Assertion.AssertionLanguage ( Arith, Assertion )
 import qualified Orhle.Assertion.AssertionLanguage as A
-import           Orhle.Names ( Name(..) )
+import           Orhle.Name ( Name(..), Type(..), TypedName(..) )
+import qualified Orhle.Name as Name
 import           Text.Parsec
 import           Text.Parsec.Language
 import qualified Text.Parsec.Token as Token
@@ -53,9 +55,9 @@ whitespace = Token.whiteSpace lexer
 
 type AssertionParser = Parsec String () Assertion
 type ArithParser     = Parsec String () Arith
-type IdentParser     = Parsec String () A.Ident
+type TNameParser     = Parsec String () TypedName
 type NameParser      = Parsec String () Name
-type SortParser      = Parsec String () A.Sort
+type TypeParser      = Parsec String () Type
 
 parseAssertion :: String -> Either ParseError Assertion
 parseAssertion assertStr = runParser assertionParser () "" assertStr
@@ -70,32 +72,42 @@ arithParser :: ArithParser
 arithParser = whitespace >> arithExpr
 
 boolExpr :: AssertionParser
-boolExpr = try forall <|> try exists <|> try boolApp <|> boolLit
+boolExpr = try forall
+       <|> try exists
+       <|> try boolApp
+       <|> try boolLit
+       <|> boolVar
 
 arithExpr :: ArithParser
-arithExpr = try arithApp <|> arithLit
+arithExpr = try arithApp
+        <|> try arithLit
+        <|> arithVar
+
+name :: NameParser
+name = identifier >>= (return . Name.fromString)
 
 boolLit :: AssertionParser
 boolLit = do
-  start <- letter
-  rest  <- many $ alphaNum <|> char '!' <|> char '_'
-  let name = start:rest
+  b <- identifier
   whitespace
-  case name of
-    "true"  -> return A.ATrue
-    "false" -> return A.AFalse
-    _       -> fail $ "expected a boolean literal, got: " ++ name
+  case b of
+    "true" -> return A.ATrue
+    "false"-> return A.AFalse
+    _       -> fail $ "expected a boolean literal, got: " ++ b
+
+boolVar :: AssertionParser
+boolVar = do
+  n <- name
+  return $ A.Atom $ TypedName n Bool
 
 arithLit :: ArithParser
-arithLit = int <|> arithIdent
+arithLit = int
 
-arithIdent :: ArithParser
-arithIdent = do
-  start <- letter
-  rest  <- many $ alphaNum <|> char '!' <|> char '_'
-  let name = start:rest
+arithVar :: ArithParser
+arithVar = do
+  n <- name
   whitespace
-  return . A.Var $ A.Ident (Name name 0) A.Int
+  return . A.Var $ TypedName n Int
 
 forall :: AssertionParser
 forall = do
@@ -115,18 +127,19 @@ exists = do
   char ')' >> whitespace
   return $ A.Exists vars body
 
-quantVar :: IdentParser
+quantVar :: TNameParser
 quantVar = do
   char '(' >> whitespace
-  name <- identifier
+  n <- name
   whitespace
-  sort <- sortFromString =<< identifier
+  ty <- typeFromString =<< identifier
   char ')' >> whitespace
-  return $ A.Ident (Name name 0) sort
+  return $ TypedName n ty
 
-sortFromString :: String -> SortParser
-sortFromString "Int" = return A.Int
-sortFromString s     = fail $ "Unknown sort: " ++ s
+typeFromString :: String -> TypeParser
+typeFromString str = case map toLower str of
+  "int" -> return Int
+  _     -> fail $ "Unknown sort: " ++ str
 
 boolApp :: AssertionParser
 boolApp = do
@@ -191,10 +204,8 @@ arithApp = do
   return parsedApp
 
 int :: ArithParser
-int = do
-  n <- many1 digit
-  whitespace
-  return $ A.Num (read n)
+int =
+  (return . A.Num . fromIntegral) =<< integer
 
 aArithApp2 :: String -> (Arith -> Arith -> Arith) -> ArithParser
 aArithApp2 name fun = do

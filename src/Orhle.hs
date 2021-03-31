@@ -9,6 +9,8 @@ module Orhle
     , FunImpl(..)
     , FunImplEnv
     , Name(..)
+    , TypedName(..)
+    , Type(..)
     , RhleTriple(..)
     , Spec(..)
     , SpecMap
@@ -24,6 +26,7 @@ module Orhle
 
 import Orhle.Imp
 import Orhle.Inliner
+import Orhle.Name
 import Orhle.OrhleParser
 import Orhle.Spec
 import Orhle.Triple
