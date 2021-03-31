@@ -35,7 +35,7 @@ type Handle = String
 type Id     = Int
 data Name   = Name { nHandle :: Handle
                    , nId     :: Id
-                   } deriving (Show, Eq, Ord)
+                   } deriving (Eq, Ord)
 
 class CollectableNames a where
   namesIn :: a -> Set Name
@@ -48,6 +48,10 @@ instance CollectableNames Name where
 
 instance MappableNames Name where
   mapNames = ($)
+
+instance Show Name where
+  show (Name h 0) = h
+  show (Name h i) = h ++ "!" ++ (show i)
 
 instance ShowSMT Name where
   showSMT (Name h 0) = h
@@ -121,7 +125,12 @@ freshen names nextIds =
 
 data Type = Bool
           | Int
-          deriving (Show, Eq, Ord)
+          deriving (Eq, Ord)
+
+instance Show Type where
+  show ty = case ty of
+    Bool -> "bool"
+    Int  -> "int"
 
 instance ShowSMT Type where
   showSMT ty = case ty of
@@ -130,13 +139,16 @@ instance ShowSMT Type where
 
 data TypedName = TypedName { tnName :: Name
                            , tnType :: Type
-                           } deriving (Show, Eq, Ord)
+                           } deriving (Eq, Ord)
+
+instance Show TypedName where
+  show (TypedName name _) = show name
+
+instance ShowSMT TypedName where
+  showSMT (TypedName name ty) = "(" ++ showSMT name ++ " " ++ showSMT ty ++ ")"
 
 instance CollectableNames TypedName where
   namesIn (TypedName name _) = Set.singleton name
 
 instance MappableNames TypedName where
   mapNames f (TypedName name ty) = TypedName (f name) ty
-
-instance ShowSMT TypedName where
-  showSMT (TypedName name ty) = "(" ++ showSMT name ++ " " ++ showSMT ty ++ ")"
