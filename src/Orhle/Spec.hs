@@ -71,7 +71,7 @@ prefixSpecs prefix specs = Map.map prefixSpec $ Map.mapKeys applyPrefix specs
 retVars :: Int -> [Name]
 retVars 0   = []
 retVars 1   = [Name "ret!" 0]
-retVars len = map (\i -> Name ("ret!" ++ show i) 0) [0..(len - 1)]
+retVars len = map (\i -> Name "ret" i) [0..(len - 1)]
 
 -------------
 -- AESpecs --

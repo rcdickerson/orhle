@@ -8,35 +8,46 @@
   parity[1] (forall)
   parity[2] (exists)
 
-Universal Programs:
-[ SIf
-    (BEq (AMod (AVar parity ! 1 ! h) (ALit 2)) (ALit 1))
-    (SSeq
-       [ SAsgn parity ! 1 ! l (ALit 1) , SAsgn parity ! 1 ! h (ALit 1) ])
-    (SSeq
-       [ SAsgn parity ! 1 ! l (ALit 0) , SAsgn parity ! 1 ! h (ALit 0) ])
+:: Universal Programs
+[ SSeq
+    [ SIf
+        (BEq (AMod (AVar parity ! 1 ! h) (ALit 2)) (ALit 1))
+        (SSeq
+           [ SAsgn parity ! 1 ! l (ALit 1) , SAsgn parity ! 1 ! h (ALit 1) ])
+        (SSeq
+           [ SAsgn parity ! 1 ! l (ALit 0) , SAsgn parity ! 1 ! h (ALit 0) ])
+    , SAsgn parity ! 1 ! retVal (ALit 0)
+    ]
 ]
 
-Existential Programs:
-[ SIf
-    (BEq (AMod (AVar parity ! 2 ! h) (ALit 2)) (ALit 1))
-    (SSeq
-       [ SAsgn parity ! 2 ! l (ALit 1) , SAsgn parity ! 2 ! h (ALit 1) ])
-    (SSeq
-       [ SAsgn parity ! 2 ! l (ALit 0) , SAsgn parity ! 2 ! h (ALit 0) ])
+:: Existential Programs
+[ SSeq
+    [ SIf
+        (BEq (AMod (AVar parity ! 2 ! h) (ALit 2)) (ALit 1))
+        (SSeq
+           [ SAsgn parity ! 2 ! l (ALit 1) , SAsgn parity ! 2 ! h (ALit 1) ])
+        (SSeq
+           [ SAsgn parity ! 2 ! l (ALit 0) , SAsgn parity ! 2 ! h (ALit 0) ])
+    , SAsgn parity ! 2 ! retVal (ALit 0)
+    ]
 ]
 
-Universal Specifications:
+:: Universal Specifications
 fromList []
 
-Existential Specifications:
+:: Existential Specifications
 fromList []
 
-Precondition:
-  (and (= parity!1!l parity!2!l) (= (mod parity!1!h 2) (mod parity!2!h 2)))
+:: Precondition
+And
+  [ Eq (Var parity ! 1 ! l) (Var parity ! 2 ! l)
+  , Eq
+      (Mod (Var parity ! 1 ! h) (Num 2))
+      (Mod (Var parity ! 2 ! h) (Num 2))
+  ]
 
-Postcondition:
-  (= parity!1!l parity!2!l)
+:: Postcondition
+Eq (Var parity ! 1 ! l) (Var parity ! 2 ! l)
 
 [send->] (set-option :print-success true )
 [<-recv] success
@@ -63,6 +74,6 @@ Postcondition:
 [<-recv] unsat
 Valid.
 
-real	0m0.101s
-user	0m0.135s
-sys	0m0.033s
+real	0m0.209s
+user	0m0.182s
+sys	0m0.028s

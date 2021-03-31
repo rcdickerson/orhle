@@ -33,7 +33,7 @@ checkSat assertion = let
   assertionExpr = toSMT assertion
   in do
     logger <- SSMT.newLogger 0
-    solver <- SSMT.newSolver "z3" ["-in"] Nothing -- $ Just logger
+    solver <- SSMT.newSolver "z3" ["-in"] $ Just logger
     mapM_ (SSMT.ackCommand solver) (map toSSMT declareVars)
     SSMT.assert solver $ toSSMT assertionExpr
     result <- SSMT.check solver

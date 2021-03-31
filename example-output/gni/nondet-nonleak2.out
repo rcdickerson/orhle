@@ -1,4 +1,3 @@
-Replacements: fromList [(run!2!flip,run!2!flip!1)]
 
 *******************************************
 ****               ORHLE               ****
@@ -9,49 +8,47 @@ Replacements: fromList [(run!2!flip,run!2!flip!1)]
   run[1] (forall)
   run[2] (exists)
 
-Universal Programs:
+:: Universal Programs
 [ SSeq
     [ SIf
         (BLt (AVar run ! 1 ! low) (AVar run ! 1 ! high))
         (SAsgn run ! 1 ! low (ALit 0))
         (SAsgn run ! 1 ! low (ALit 1))
-    , SCall
-        SFun { fName = run ! 1 ! flipCoin , fParams = [] }
-        [ run ! 1 ! flip ]
+    , SCall "run!1!flipCoin" [] [ run ! 1 ! flip ]
     , SIf
         (BEq (AVar run ! 1 ! flip) (ALit 0))
         (SAsgn run ! 1 ! low (ASub (ALit 1) (AVar run ! 1 ! low)))
         SSkip
+    , SAsgn run ! 1 ! retVal (AVar run ! 1 ! low)
     ]
 ]
 
-Existential Programs:
+:: Existential Programs
 [ SSeq
     [ SIf
         (BLt (AVar run ! 2 ! low) (AVar run ! 2 ! high))
         (SAsgn run ! 2 ! low (ALit 0))
         (SAsgn run ! 2 ! low (ALit 1))
-    , SCall
-        SFun { fName = run ! 2 ! flipCoin , fParams = [] }
-        [ run ! 2 ! flip ]
+    , SCall "run!2!flipCoin" [] [ run ! 2 ! flip ]
     , SIf
         (BEq (AVar run ! 2 ! flip) (ALit 0))
         (SAsgn run ! 2 ! low (ASub (ALit 1) (AVar run ! 2 ! low)))
         SSkip
+    , SAsgn run ! 2 ! retVal (AVar run ! 2 ! low)
     ]
 ]
 
-Universal Specifications:
-fromList [(run!1!flipCoin,Spec {params = [], choiceVars = [], preCondition = true, postCondition = (or (= ret! 0) (= ret! 1))})]
+:: Universal Specifications
+fromList [("run!1!flipCoin",Spec {spec_params = [], spec_choiceVars = [], spec_preCondition = ATrue, spec_postCondition = Or [Eq (Var ret!) (Num 0),Eq (Var ret!) (Num 1)]})]
 
-Existential Specifications:
-fromList [(run!2!flipCoin,Spec {params = [], choiceVars = [(run!2!n int)], preCondition = (or (= run!2!n 0) (= run!2!n 1)), postCondition = (= ret! run!2!n)})]
+:: Existential Specifications
+fromList [("run!2!flipCoin",Spec {spec_params = [], spec_choiceVars = [run!2!n], spec_preCondition = Or [Eq (Var run!2!n) (Num 0),Eq (Var run!2!n) (Num 1)], spec_postCondition = Eq (Var ret!) (Var run!2!n)})]
 
-Precondition:
-  (= run!1!low run!2!low)
+:: Precondition
+Eq (Var run ! 1 ! low) (Var run ! 2 ! low)
 
-Postcondition:
-  (= run!1!low run!2!low)
+:: Postcondition
+Eq (Var run ! 1 ! low) (Var run ! 2 ! low)
 
 [send->] (set-option :print-success true )
 [<-recv] success
@@ -171,6 +168,6 @@ Postcondition:
 [<-recv] unsat
 Valid.
 
-real	0m0.116s
-user	0m0.157s
-sys	0m0.075s
+real	0m0.213s
+user	0m0.272s
+sys	0m0.022s

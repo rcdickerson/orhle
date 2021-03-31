@@ -9,29 +9,42 @@
   leak[2] (forall)
   leak[3] (exists)
 
-Universal Programs:
-[ SAsgn leak !
-    1 ! ret (AAdd (AVar leak ! 1 ! high) (AVar leak ! 1 ! low))
-, SAsgn leak !
-    2 ! ret (AAdd (AVar leak ! 2 ! high) (AVar leak ! 2 ! low))
+:: Universal Programs
+[ SSeq
+    [ SAsgn leak !
+        1 ! ret (AAdd (AVar leak ! 1 ! high) (AVar leak ! 1 ! low))
+    , SAsgn leak ! 1 ! retVal (AVar leak ! 1 ! ret)
+    ]
+, SSeq
+    [ SAsgn leak !
+        2 ! ret (AAdd (AVar leak ! 2 ! high) (AVar leak ! 2 ! low))
+    , SAsgn leak ! 2 ! retVal (AVar leak ! 2 ! ret)
+    ]
 ]
 
-Existential Programs:
-[ SAsgn leak !
-    3 ! ret (AAdd (AVar leak ! 3 ! high) (AVar leak ! 3 ! low))
+:: Existential Programs
+[ SSeq
+    [ SAsgn leak !
+        3 ! ret (AAdd (AVar leak ! 3 ! high) (AVar leak ! 3 ! low))
+    , SAsgn leak ! 3 ! retVal (AVar leak ! 3 ! ret)
+    ]
 ]
 
-Universal Specifications:
+:: Universal Specifications
 fromList []
 
-Existential Specifications:
+:: Existential Specifications
 fromList []
 
-Precondition:
-  (and (= leak!1!high leak!3!high) (= leak!1!low leak!2!low) (= leak!2!low leak!3!low))
+:: Precondition
+And
+  [ Eq (Var leak ! 1 ! high) (Var leak ! 3 ! high)
+  , Eq (Var leak ! 1 ! low) (Var leak ! 2 ! low)
+  , Eq (Var leak ! 2 ! low) (Var leak ! 3 ! low)
+  ]
 
-Postcondition:
-  (= leak!2!ret leak!3!ret)
+:: Postcondition
+Eq (Var leak ! 2 ! ret) (Var leak ! 3 ! ret)
 
 [send->] (set-option :print-success true )
 [<-recv] success
@@ -60,6 +73,6 @@ Postcondition:
 Failure:
   (model (define-fun leak!3!high () Int 0 ) (define-fun leak!2!high () Int 1 ) (define-fun leak!3!low () Int 0 ) (define-fun leak!1!low () Int 0 ) (define-fun leak!2!low () Int 0 ) (define-fun leak!1!high () Int 0 ) )
 
-real	0m0.090s
-user	0m0.085s
-sys	0m0.028s
+real	0m0.201s
+user	0m0.181s
+sys	0m0.018s

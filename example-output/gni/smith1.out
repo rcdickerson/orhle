@@ -9,35 +9,44 @@
   smith[2] (forall)
   smith[3] (exists)
 
-Universal Programs:
-[ SIf
-    (BEq (AMod (AVar smith ! 1 ! secret) (ALit 2)) (ALit 0))
-    (SAsgn smith ! 1 ! ret (ALit 0))
-    (SAsgn smith ! 1 ! ret (ALit 1))
-, SIf
-    (BEq (AMod (AVar smith ! 2 ! secret) (ALit 2)) (ALit 0))
-    (SAsgn smith ! 2 ! ret (ALit 0))
-    (SAsgn smith ! 2 ! ret (ALit 1))
+:: Universal Programs
+[ SSeq
+    [ SIf
+        (BEq (AMod (AVar smith ! 1 ! secret) (ALit 2)) (ALit 0))
+        (SAsgn smith ! 1 ! ret (ALit 0))
+        (SAsgn smith ! 1 ! ret (ALit 1))
+    , SAsgn smith ! 1 ! retVal (AVar smith ! 1 ! ret)
+    ]
+, SSeq
+    [ SIf
+        (BEq (AMod (AVar smith ! 2 ! secret) (ALit 2)) (ALit 0))
+        (SAsgn smith ! 2 ! ret (ALit 0))
+        (SAsgn smith ! 2 ! ret (ALit 1))
+    , SAsgn smith ! 2 ! retVal (AVar smith ! 2 ! ret)
+    ]
 ]
 
-Existential Programs:
-[ SIf
-    (BEq (AMod (AVar smith ! 3 ! secret) (ALit 2)) (ALit 0))
-    (SAsgn smith ! 3 ! ret (ALit 0))
-    (SAsgn smith ! 3 ! ret (ALit 1))
+:: Existential Programs
+[ SSeq
+    [ SIf
+        (BEq (AMod (AVar smith ! 3 ! secret) (ALit 2)) (ALit 0))
+        (SAsgn smith ! 3 ! ret (ALit 0))
+        (SAsgn smith ! 3 ! ret (ALit 1))
+    , SAsgn smith ! 3 ! retVal (AVar smith ! 3 ! ret)
+    ]
 ]
 
-Universal Specifications:
+:: Universal Specifications
 fromList []
 
-Existential Specifications:
+:: Existential Specifications
 fromList []
 
-Precondition:
-  (= smith!1!secret smith!3!secret)
+:: Precondition
+Eq (Var smith ! 1 ! secret) (Var smith ! 3 ! secret)
 
-Postcondition:
-  (= smith!2!ret smith!3!ret)
+:: Postcondition
+Eq (Var smith ! 2 ! ret) (Var smith ! 3 ! ret)
 
 [send->] (set-option :print-success true )
 [<-recv] success
@@ -72,6 +81,6 @@ Postcondition:
 Failure:
   (model (define-fun smith!3!secret () Int (- 2 ) ) (define-fun smith!2!secret () Int 3 ) (define-fun smith!1!secret () Int (- 2 ) ) )
 
-real	0m0.106s
-user	0m0.126s
-sys	0m0.044s
+real	0m0.203s
+user	0m0.183s
+sys	0m0.022s

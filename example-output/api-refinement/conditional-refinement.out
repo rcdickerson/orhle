@@ -1,4 +1,3 @@
-Replacements: fromList [(original!r,original!r!1)]
 
 *******************************************
 ****               ORHLE               ****
@@ -9,41 +8,39 @@ Replacements: fromList [(original!r,original!r!1)]
   refinement (forall)
   original (exists)
 
-Universal Programs:
+:: Universal Programs
 [ SSeq
-    [ SCall
-        SFun { fName = refinement ! flipCoin , fParams = [] }
-        [ refinement ! r ]
+    [ SCall "refinement!flipCoin" [] [ refinement ! r ]
     , SIf
         (BEq (AVar refinement ! r) (ALit 0))
         (SAsgn refinement ! ret (ALit 20))
         (SAsgn refinement ! ret (ALit 10))
+    , SAsgn refinement ! retVal (AVar refinement ! ret)
     ]
 ]
 
-Existential Programs:
+:: Existential Programs
 [ SSeq
-    [ SCall
-        SFun { fName = original ! flipCoin , fParams = [] }
-        [ original ! r ]
+    [ SCall "original!flipCoin" [] [ original ! r ]
     , SIf
         (BEq (AVar original ! r) (ALit 0))
         (SAsgn original ! ret (ALit 10))
         (SAsgn original ! ret (ALit 20))
+    , SAsgn original ! retVal (AVar original ! ret)
     ]
 ]
 
-Universal Specifications:
-fromList [(refinement!flipCoin,Spec {params = [], choiceVars = [], preCondition = true, postCondition = (or (= ret! 0) (= ret! 1))})]
+:: Universal Specifications
+fromList [("refinement!flipCoin",Spec {spec_params = [], spec_choiceVars = [], spec_preCondition = ATrue, spec_postCondition = Or [Eq (Var ret!) (Num 0),Eq (Var ret!) (Num 1)]})]
 
-Existential Specifications:
-fromList [(original!flipCoin,Spec {params = [], choiceVars = [(original!n int)], preCondition = (or (= original!n 0) (= original!n 1)), postCondition = (= ret! original!n)})]
+:: Existential Specifications
+fromList [("original!flipCoin",Spec {spec_params = [], spec_choiceVars = [original!n], spec_preCondition = Or [Eq (Var original!n) (Num 0),Eq (Var original!n) (Num 1)], spec_postCondition = Eq (Var ret!) (Var original!n)})]
 
-Precondition:
-  true
+:: Precondition
+ATrue
 
-Postcondition:
-  (= original!ret refinement!ret)
+:: Postcondition
+Eq (Var original ! ret) (Var refinement ! ret)
 
 [send->] (set-option :print-success true )
 [<-recv] success
@@ -77,6 +74,6 @@ Postcondition:
 [<-recv] unsat
 Valid.
 
-real	0m0.102s
-user	0m0.119s
-sys	0m0.028s
+real	0m0.201s
+user	0m0.176s
+sys	0m0.030s

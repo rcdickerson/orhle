@@ -1,50 +1,5 @@
+orhle-exe: ./examples/param-usage/completely-unused.imp: openFile: does not exist (No such file or directory)
 
-*******************************************
-****               ORHLE               ****
-****     The Oracular RHLE Verifier    ****
-*******************************************
-
-:: Executions
-  unused[1] (exists)
-  unused[2] (exists)
-
-Universal Programs:
-[]
-
-Existential Programs:
-[ SAsgn unused ! 1 ! ret (ALit 5)
-, SAsgn unused ! 2 ! ret (ALit 5)
-]
-
-Universal Specifications:
-fromList []
-
-Existential Specifications:
-fromList []
-
-Precondition:
-  (not (= unused!1!param unused!2!param))
-
-Postcondition:
-  (not (= unused!1!ret unused!2!ret))
-
-[send->] (set-option :print-success true )
-[<-recv] success
-[send->] (set-option :produce-models true )
-[<-recv] success
-[send->] (declare-const unused!1!param Int)
-[<-recv] success
-[send->] (declare-const unused!2!param Int)
-[<-recv] success
-[send->] (assert (not (=> (not (= unused!1!param unused!2!param)) (not (= 5 5)))) )
-[<-recv] success
-[send->] (check-sat )
-[<-recv] sat
-[send->] (get-model )
-[<-recv] (model (define-fun unused!2!param () Int 0 ) (define-fun unused!1!param () Int 1 ) )
-Failure:
-  (model (define-fun unused!2!param () Int 0 ) (define-fun unused!1!param () Int 1 ) )
-
-real	0m0.096s
-user	0m0.083s
-sys	0m0.035s
+real	0m0.221s
+user	0m0.189s
+sys	0m0.029s

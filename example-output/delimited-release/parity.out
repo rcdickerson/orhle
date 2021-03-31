@@ -8,7 +8,7 @@
   parity[1] (forall)
   parity[2] (exists)
 
-Universal Programs:
+:: Universal Programs
 [ SSeq
     [ SAsgn parity ! 1 ! h (AMod (AVar parity ! 1 ! h) (ALit 2))
     , SIf
@@ -17,10 +17,11 @@ Universal Programs:
            [ SAsgn parity ! 1 ! l (ALit 1) , SAsgn parity ! 1 ! h (ALit 1) ])
         (SSeq
            [ SAsgn parity ! 1 ! l (ALit 0) , SAsgn parity ! 1 ! h (ALit 0) ])
+    , SAsgn parity ! 1 ! retVal (ALit 0)
     ]
 ]
 
-Existential Programs:
+:: Existential Programs
 [ SSeq
     [ SAsgn parity ! 2 ! h (AMod (AVar parity ! 2 ! h) (ALit 2))
     , SIf
@@ -29,20 +30,26 @@ Existential Programs:
            [ SAsgn parity ! 2 ! l (ALit 1) , SAsgn parity ! 2 ! h (ALit 1) ])
         (SSeq
            [ SAsgn parity ! 2 ! l (ALit 0) , SAsgn parity ! 2 ! h (ALit 0) ])
+    , SAsgn parity ! 2 ! retVal (ALit 0)
     ]
 ]
 
-Universal Specifications:
+:: Universal Specifications
 fromList []
 
-Existential Specifications:
+:: Existential Specifications
 fromList []
 
-Precondition:
-  (and (= parity!1!l parity!2!l) (= (mod parity!1!h 2) (mod parity!2!h 2)))
+:: Precondition
+And
+  [ Eq (Var parity ! 1 ! l) (Var parity ! 2 ! l)
+  , Eq
+      (Mod (Var parity ! 1 ! h) (Num 2))
+      (Mod (Var parity ! 2 ! h) (Num 2))
+  ]
 
-Postcondition:
-  (= parity!1!l parity!2!l)
+:: Postcondition
+Eq (Var parity ! 1 ! l) (Var parity ! 2 ! l)
 
 [send->] (set-option :print-success true )
 [<-recv] success
@@ -69,6 +76,6 @@ Postcondition:
 [<-recv] unsat
 Valid.
 
-real	0m0.092s
-user	0m0.070s
-sys	0m0.037s
+real	0m0.204s
+user	0m0.175s
+sys	0m0.029s

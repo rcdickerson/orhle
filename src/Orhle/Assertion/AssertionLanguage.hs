@@ -159,7 +159,7 @@ instance SubstitutableArith Arith where
     let sub = subArith from to
     in case arith of
       Num x     -> Num x
-      Var ident -> if from == ident then to else Var ident
+      Var tname -> if from == tname then to else Var tname
       Add as    -> Add $ map sub as
       Sub as    -> Sub $ map sub as
       Mul as    -> Mul $ map sub as
@@ -173,7 +173,7 @@ instance SubstitutableArith Assertion where
     in case assertion of
       ATrue           -> ATrue
       AFalse          -> AFalse
-      (Atom ident)    -> Atom ident
+      (Atom tname)    -> Atom tname
       (Not a)         -> Not $ sub a
       (And as)        -> And $ map sub as
       (Or as)         -> Or  $ map sub as

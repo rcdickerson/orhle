@@ -8,7 +8,7 @@
   parity[1] (forall)
   parity[2] (exists)
 
-Universal Programs:
+:: Universal Programs
 [ SSeq
     [ SAsgn parity ! 1 ! h (AMod (AVar parity ! 1 ! h) (ALit 2))
     , SIf
@@ -17,10 +17,11 @@ Universal Programs:
            [ SAsgn parity ! 1 ! l (ALit 1) , SAsgn parity ! 1 ! h (ALit 1) ])
         (SSeq
            [ SAsgn parity ! 1 ! l (ALit 0) , SAsgn parity ! 1 ! h (ALit 0) ])
+    , SAsgn parity ! 1 ! retVal (ALit 0)
     ]
 ]
 
-Existential Programs:
+:: Existential Programs
 [ SSeq
     [ SAsgn parity ! 2 ! h (AMod (AVar parity ! 2 ! h) (ALit 2))
     , SIf
@@ -29,20 +30,21 @@ Existential Programs:
            [ SAsgn parity ! 2 ! l (ALit 1) , SAsgn parity ! 2 ! h (ALit 1) ])
         (SSeq
            [ SAsgn parity ! 2 ! l (ALit 0) , SAsgn parity ! 2 ! h (ALit 0) ])
+    , SAsgn parity ! 2 ! retVal (ALit 0)
     ]
 ]
 
-Universal Specifications:
+:: Universal Specifications
 fromList []
 
-Existential Specifications:
+:: Existential Specifications
 fromList []
 
-Precondition:
-  (= parity!1!l parity!2!l)
+:: Precondition
+Eq (Var parity ! 1 ! l) (Var parity ! 2 ! l)
 
-Postcondition:
-  (= parity!1!l parity!2!l)
+:: Postcondition
+Eq (Var parity ! 1 ! l) (Var parity ! 2 ! l)
 
 [send->] (set-option :print-success true )
 [<-recv] success
@@ -71,6 +73,6 @@ Postcondition:
 Failure:
   (model (define-fun parity!2!h () Int (- 3 ) ) (define-fun parity!1!h () Int 2 ) (define-fun parity!2!l () Int 0 ) (define-fun parity!1!l () Int 0 ) )
 
-real	0m0.105s
-user	0m0.152s
-sys	0m0.032s
+real	0m0.201s
+user	0m0.200s
+sys	0m0.000s

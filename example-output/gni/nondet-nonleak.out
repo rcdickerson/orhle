@@ -1,4 +1,3 @@
-Replacements: fromList [(nonleak!3!r,nonleak!3!r!1)]
 
 *******************************************
 ****               ORHLE               ****
@@ -10,53 +9,54 @@ Replacements: fromList [(nonleak!3!r,nonleak!3!r!1)]
   nonleak[2] (forall)
   nonleak[3] (exists)
 
-Universal Programs:
+:: Universal Programs
 [ SSeq
-    [ SCall
-        SFun { fName = nonleak ! 1 ! randInt , fParams = [] }
-        [ nonleak ! 1 ! r ]
+    [ SCall "nonleak!1!randInt" [] [ nonleak ! 1 ! r ]
     , SIf
         (BEq (AVar nonleak ! 1 ! r) (ALit 5000))
         (SAsgn nonleak !
            1 ! ret (AAdd (AVar nonleak ! 1 ! high) (AVar nonleak ! 1 ! low)))
         (SAsgn nonleak ! 1 ! ret (AVar nonleak ! 1 ! low))
+    , SAsgn nonleak ! 1 ! retVal (AVar nonleak ! 1 ! ret)
     ]
 , SSeq
-    [ SCall
-        SFun { fName = nonleak ! 2 ! randInt , fParams = [] }
-        [ nonleak ! 2 ! r ]
+    [ SCall "nonleak!2!randInt" [] [ nonleak ! 2 ! r ]
     , SIf
         (BEq (AVar nonleak ! 2 ! r) (ALit 5000))
         (SAsgn nonleak !
            2 ! ret (AAdd (AVar nonleak ! 2 ! high) (AVar nonleak ! 2 ! low)))
         (SAsgn nonleak ! 2 ! ret (AVar nonleak ! 2 ! low))
+    , SAsgn nonleak ! 2 ! retVal (AVar nonleak ! 2 ! ret)
     ]
 ]
 
-Existential Programs:
+:: Existential Programs
 [ SSeq
-    [ SCall
-        SFun { fName = nonleak ! 3 ! randInt , fParams = [] }
-        [ nonleak ! 3 ! r ]
+    [ SCall "nonleak!3!randInt" [] [ nonleak ! 3 ! r ]
     , SIf
         (BEq (AVar nonleak ! 3 ! r) (ALit 5000))
         (SAsgn nonleak !
            3 ! ret (AAdd (AVar nonleak ! 3 ! high) (AVar nonleak ! 3 ! low)))
         (SAsgn nonleak ! 3 ! ret (AVar nonleak ! 3 ! low))
+    , SAsgn nonleak ! 3 ! retVal (AVar nonleak ! 3 ! ret)
     ]
 ]
 
-Universal Specifications:
-fromList [(nonleak!1!randInt,Spec {params = [], choiceVars = [], preCondition = true, postCondition = (and (>= ret! 0) (< ret! 100))}),(nonleak!2!randInt,Spec {params = [], choiceVars = [], preCondition = true, postCondition = (and (>= ret! 0) (< ret! 100))})]
+:: Universal Specifications
+fromList [("nonleak!1!randInt",Spec {spec_params = [], spec_choiceVars = [], spec_preCondition = ATrue, spec_postCondition = And [Gte (Var ret!) (Num 0),Lt (Var ret!) (Num 100)]}),("nonleak!2!randInt",Spec {spec_params = [], spec_choiceVars = [], spec_preCondition = ATrue, spec_postCondition = And [Gte (Var ret!) (Num 0),Lt (Var ret!) (Num 100)]})]
 
-Existential Specifications:
-fromList [(nonleak!3!randInt,Spec {params = [], choiceVars = [(nonleak!3!n int)], preCondition = (and (>= nonleak!3!n 0) (< nonleak!3!n 100)), postCondition = (= ret! nonleak!3!n)})]
+:: Existential Specifications
+fromList [("nonleak!3!randInt",Spec {spec_params = [], spec_choiceVars = [nonleak!3!n], spec_preCondition = And [Gte (Var nonleak!3!n) (Num 0),Lt (Var nonleak!3!n) (Num 100)], spec_postCondition = Eq (Var ret!) (Var nonleak!3!n)})]
 
-Precondition:
-  (and (= nonleak!1!high nonleak!3!high) (= nonleak!1!low nonleak!2!low) (= nonleak!2!low nonleak!3!low))
+:: Precondition
+And
+  [ Eq (Var nonleak ! 1 ! high) (Var nonleak ! 3 ! high)
+  , Eq (Var nonleak ! 1 ! low) (Var nonleak ! 2 ! low)
+  , Eq (Var nonleak ! 2 ! low) (Var nonleak ! 3 ! low)
+  ]
 
-Postcondition:
-  (= nonleak!2!ret nonleak!3!ret)
+:: Postcondition
+Eq (Var nonleak ! 2 ! ret) (Var nonleak ! 3 ! ret)
 
 [send->] (set-option :print-success true )
 [<-recv] success
@@ -153,6 +153,6 @@ Postcondition:
 [<-recv] unsat
 Valid.
 
-real	0m0.100s
-user	0m0.126s
-sys	0m0.046s
+real	0m0.201s
+user	0m0.203s
+sys	0m0.019s

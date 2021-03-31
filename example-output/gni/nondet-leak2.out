@@ -1,4 +1,3 @@
-Replacements: fromList [(run!2!flip,run!2!flip!1)]
 
 *******************************************
 ****               ORHLE               ****
@@ -9,43 +8,41 @@ Replacements: fromList [(run!2!flip,run!2!flip!1)]
   run[1] (forall)
   run[2] (exists)
 
-Universal Programs:
+:: Universal Programs
 [ SSeq
-    [ SCall
-        SFun { fName = run ! 1 ! flipCoin , fParams = [] }
-        [ run ! 1 ! flip ]
+    [ SCall "run!1!flipCoin" [] [ run ! 1 ! flip ]
     , SIf
         (BEq (AVar run ! 1 ! flip) (ALit 0))
         (SAsgn run !
            1 ! low (AAdd (AVar run ! 1 ! high) (AVar run ! 1 ! low)))
         SSkip
+    , SAsgn run ! 1 ! retVal (AVar run ! 1 ! low)
     ]
 ]
 
-Existential Programs:
+:: Existential Programs
 [ SSeq
-    [ SCall
-        SFun { fName = run ! 2 ! flipCoin , fParams = [] }
-        [ run ! 2 ! flip ]
+    [ SCall "run!2!flipCoin" [] [ run ! 2 ! flip ]
     , SIf
         (BEq (AVar run ! 2 ! flip) (ALit 0))
         (SAsgn run !
            2 ! low (AAdd (AVar run ! 2 ! high) (AVar run ! 2 ! low)))
         SSkip
+    , SAsgn run ! 2 ! retVal (AVar run ! 2 ! low)
     ]
 ]
 
-Universal Specifications:
-fromList [(run!1!flipCoin,Spec {params = [], choiceVars = [], preCondition = true, postCondition = (or (= ret! 0) (= ret! 1))})]
+:: Universal Specifications
+fromList [("run!1!flipCoin",Spec {spec_params = [], spec_choiceVars = [], spec_preCondition = ATrue, spec_postCondition = Or [Eq (Var ret!) (Num 0),Eq (Var ret!) (Num 1)]})]
 
-Existential Specifications:
-fromList [(run!2!flipCoin,Spec {params = [], choiceVars = [(run!2!n int)], preCondition = (or (= run!2!n 0) (= run!2!n 1)), postCondition = (= ret! run!2!n)})]
+:: Existential Specifications
+fromList [("run!2!flipCoin",Spec {spec_params = [], spec_choiceVars = [run!2!n], spec_preCondition = Or [Eq (Var run!2!n) (Num 0),Eq (Var run!2!n) (Num 1)], spec_postCondition = Eq (Var ret!) (Var run!2!n)})]
 
-Precondition:
-  (= run!1!low run!2!low)
+:: Precondition
+Eq (Var run ! 1 ! low) (Var run ! 2 ! low)
 
-Postcondition:
-  (= run!1!low run!2!low)
+:: Postcondition
+Eq (Var run ! 1 ! low) (Var run ! 2 ! low)
 
 [send->] (set-option :print-success true )
 [<-recv] success
@@ -95,6 +92,6 @@ Postcondition:
 Failure:
   (model (define-fun run!1!flip () Int 0 ) (define-fun run!2!high () Int 3 ) (define-fun run!1!high () Int 4 ) (define-fun run!2!low () Int 0 ) (define-fun run!1!low () Int 0 ) )
 
-real	0m0.101s
-user	0m0.073s
-sys	0m0.071s
+real	0m0.199s
+user	0m0.195s
+sys	0m0.010s

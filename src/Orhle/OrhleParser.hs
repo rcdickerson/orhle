@@ -176,18 +176,20 @@ specification :: OrhleAppParser S.SpecMap
 specification = do
   callId <- identifier
   params <- (liftM concat) . parens $ sepBy varArray comma
-  let paramNames = map (\n -> Name n 0) params
   whiteSpace >> char '{' >> whiteSpace
   choiceVars <- option [] $ do
     reserved "choiceVars" >> whiteSpace >> char ':' >> whiteSpace
-    vars <- sepBy identifier comma
+    vars <- sepBy name comma
     whiteSpace >> char ';' >> whiteSpace
-    return $ map (\v -> TypedName (Name v 0) Name.Int) vars
+    return $ map (\n -> TypedName n Name.Int) vars
   pre  <- option A.ATrue $ labeledAssertion "pre"
   post <- option A.ATrue $ labeledAssertion "post"
   whiteSpace >> char '}' >> whiteSpace
-  let spec = Spec paramNames choiceVars pre post
+  let spec = Spec params choiceVars pre post
   return $ S.addSpec callId spec S.emptySpecMap
+
+name :: OrhleAppParser Name
+name = identifier >>= (return . Name.fromString)
 
 labeledAssertion :: String -> OrhleAppParser Assertion
 labeledAssertion label = do
@@ -198,18 +200,18 @@ labeledAssertion label = do
     Left error      -> fail $ show error
     Right assertion -> return assertion
 
-varArray :: OrhleAppParser [String]
+varArray :: OrhleAppParser [Name]
 varArray = do
-  (vars, num) <- try (do
-                         var <- identifier
-                         char '[' >> whiteSpace
-                         num <- integer
-                         char ']' >> whiteSpace
-                         return (var, num))
-                     <|> (do var <- identifier; return (var, 0))
+  (Name vname i, num) <- try (do
+                                 var <- name
+                                 char '[' >> whiteSpace
+                                 num <- integer
+                                 char ']' >> whiteSpace
+                                 return (var, num))
+                         <|> (do var <- name; return (var, 0))
   return $ if (num == 0)
-             then [vars]
-             else map (\n -> vars ++ "_" ++ (show n)) [0..(num-1)]
+             then [Name vname i]
+             else map (\n -> Name (vname ++ "_" ++ (show n)) i) [0..(num-1)]
 
 getExecName :: Exec -> String
 getExecName (ExecForall name _) = name

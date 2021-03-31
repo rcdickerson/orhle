@@ -10,7 +10,7 @@
   unused[1B] (exists)
   unused[2B] (exists)
 
-Universal Programs:
+:: Universal Programs
 [ SSeq
     [ SAsgn unused !
         1A !
@@ -18,6 +18,7 @@ Universal Programs:
     , SAsgn unused !
         1A ! y (ASub (AVar unused ! 1A ! x) (AVar unused ! 1A ! param2))
     , SAsgn unused ! 1A ! ret (AVar unused ! 1A ! y)
+    , SAsgn unused ! 1A ! retVal (AVar unused ! 1A ! ret)
     ]
 , SSeq
     [ SAsgn unused !
@@ -26,10 +27,11 @@ Universal Programs:
     , SAsgn unused !
         2A ! y (ASub (AVar unused ! 2A ! x) (AVar unused ! 2A ! param2))
     , SAsgn unused ! 2A ! ret (AVar unused ! 2A ! y)
+    , SAsgn unused ! 2A ! retVal (AVar unused ! 2A ! ret)
     ]
 ]
 
-Existential Programs:
+:: Existential Programs
 [ SSeq
     [ SAsgn unused !
         1B !
@@ -37,6 +39,7 @@ Existential Programs:
     , SAsgn unused !
         1B ! y (ASub (AVar unused ! 1B ! x) (AVar unused ! 1B ! param2))
     , SAsgn unused ! 1B ! ret (AVar unused ! 1B ! y)
+    , SAsgn unused ! 1B ! retVal (AVar unused ! 1B ! ret)
     ]
 , SSeq
     [ SAsgn unused !
@@ -45,20 +48,29 @@ Existential Programs:
     , SAsgn unused !
         2B ! y (ASub (AVar unused ! 2B ! x) (AVar unused ! 2B ! param2))
     , SAsgn unused ! 2B ! ret (AVar unused ! 2B ! y)
+    , SAsgn unused ! 2B ! retVal (AVar unused ! 2B ! ret)
     ]
 ]
 
-Universal Specifications:
+:: Universal Specifications
 fromList []
 
-Existential Specifications:
+:: Existential Specifications
 fromList []
 
-Precondition:
-  (and (= unused!1A!param1 unused!1B!param1) (not (= unused!1A!param2 unused!1B!param2)) (not (= unused!2A!param1 unused!2B!param1)) (= unused!2A!param2 unused!2B!param2))
+:: Precondition
+And
+  [ Eq (Var unused ! 1A ! param1) (Var unused ! 1B ! param1)
+  , Not (Eq (Var unused ! 1A ! param2) (Var unused ! 1B ! param2))
+  , Not (Eq (Var unused ! 2A ! param1) (Var unused ! 2B ! param1))
+  , Eq (Var unused ! 2A ! param2) (Var unused ! 2B ! param2)
+  ]
 
-Postcondition:
-  (or (= unused!1A!ret unused!1B!ret) (= unused!2A!ret unused!2B!ret))
+:: Postcondition
+Or
+  [ Eq (Var unused ! 1A ! ret) (Var unused ! 1B ! ret)
+  , Eq (Var unused ! 2A ! ret) (Var unused ! 2B ! ret)
+  ]
 
 [send->] (set-option :print-success true )
 [<-recv] success
@@ -93,6 +105,6 @@ Postcondition:
 [<-recv] unsat
 Valid.
 
-real	0m0.094s
-user	0m0.073s
-sys	0m0.037s
+real	0m0.213s
+user	0m0.211s
+sys	0m0.009s

@@ -1,4 +1,3 @@
-Replacements: fromList [(original!x,original!x!1)]
 
 *******************************************
 ****               ORHLE               ****
@@ -9,29 +8,31 @@ Replacements: fromList [(original!x,original!x!1)]
   refinement (forall)
   original (exists)
 
-Universal Programs:
-[ SCall
-    SFun { fName = refinement ! refinedRand , fParams = [] }
-    [ refinement ! x ]
+:: Universal Programs
+[ SSeq
+    [ SCall "refinement!refinedRand" [] [ refinement ! x ]
+    , SAsgn refinement ! retVal (AVar refinement ! x)
+    ]
 ]
 
-Existential Programs:
-[ SCall
-    SFun { fName = original ! originalRand , fParams = [] }
-    [ original ! x ]
+:: Existential Programs
+[ SSeq
+    [ SCall "original!originalRand" [] [ original ! x ]
+    , SAsgn original ! retVal (AVar original ! x)
+    ]
 ]
 
-Universal Specifications:
-fromList [(refinement!refinedRand,Spec {params = [], choiceVars = [], preCondition = true, postCondition = (and (>= ret! 0) (< ret! 20) (= (mod ret! 2) 1))})]
+:: Universal Specifications
+fromList [("refinement!refinedRand",Spec {spec_params = [], spec_choiceVars = [], spec_preCondition = ATrue, spec_postCondition = And [Gte (Var ret!) (Num 0),Lt (Var ret!) (Num 20),Eq (Mod (Var ret!) (Num 2)) (Num 1)]})]
 
-Existential Specifications:
-fromList [(original!originalRand,Spec {params = [], choiceVars = [(original!n int)], preCondition = (and (>= original!n 0) (< original!n 20)), postCondition = (= ret! original!n)})]
+:: Existential Specifications
+fromList [("original!originalRand",Spec {spec_params = [], spec_choiceVars = [original!n], spec_preCondition = And [Gte (Var original!n) (Num 0),Lt (Var original!n) (Num 20)], spec_postCondition = Eq (Var ret!) (Var original!n)})]
 
-Precondition:
-  true
+:: Precondition
+ATrue
 
-Postcondition:
-  (= original!x refinement!x)
+:: Postcondition
+Eq (Var original ! x) (Var refinement ! x)
 
 [send->] (set-option :print-success true )
 [<-recv] success
@@ -55,6 +56,6 @@ Postcondition:
 [<-recv] unsat
 Valid.
 
-real	0m0.089s
-user	0m0.067s
-sys	0m0.037s
+real	0m0.203s
+user	0m0.227s
+sys	0m0.026s

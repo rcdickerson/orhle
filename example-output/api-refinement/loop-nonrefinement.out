@@ -1,6 +1,3 @@
-Replacements: fromList [(original!r,original!r!1),(original!sum,original!sum!1)]
-Replacements: fromList [(original!r,original!r!2)]
-Replacements: fromList [(refinement!r,refinement!r!1),(refinement!sum,refinement!sum!1)]
 
 *******************************************
 ****               ORHLE               ****
@@ -11,25 +8,64 @@ Replacements: fromList [(refinement!r,refinement!r!1),(refinement!sum,refinement
   refinement (forall)
   original (exists)
 
-Universal Programs:
-[ SSeq [SAsgn refinement!sum (ALit 0),SWhile (BLe (AVar refinement!sum) (ALit 100)) (SSeq [SCall (SFun {fName = refinement!biggerRand, fParams = []}) [refinement!r],SAsgn refinement!sum (AAdd (AVar refinement!sum) (AVar refinement!r))]) ((and (<= 0 refinement!sum) (< refinement!sum 111)),0)]
+:: Universal Programs
+[ SSeq
+    [ SAsgn refinement ! sum (ALit 0)
+    , SWhile
+        (BLe (AVar refinement ! sum) (ALit 100))
+        (SSeq
+           [ SCall "refinement!biggerRand" [] [ refinement ! r ]
+           , SAsgn refinement !
+               sum (AAdd (AVar refinement ! sum) (AVar refinement ! r))
+           ])
+        ( And
+            [ Lte (Num 0) (Var refinement ! sum)
+            , Lt (Var refinement ! sum) (Num 111)
+            ]
+        , Num 0
+        )
+    , SAsgn refinement ! retVal (AVar refinement ! sum)
+    ]
 ]
 
-Existential Programs:
-[ SSeq [SAsgn original!sum (ALit 0),SWhile (BLe (AVar original!sum) (ALit 100)) (SSeq [SCall (SFun {fName = original!rand, fParams = []}) [original!r],SAsgn original!sum (AAdd (AVar original!sum) (AVar original!r))]) ((and (=> (<= original!sum 100) (and (< 100 refinement!sum) (< refinement!sum 110))) (=> (< 100 original!sum) (= original!sum refinement!sum))),(- 110 original!sum))]
+:: Existential Programs
+[ SSeq
+    [ SAsgn original ! sum (ALit 0)
+    , SWhile
+        (BLe (AVar original ! sum) (ALit 100))
+        (SSeq
+           [ SCall "original!rand" [] [ original ! r ]
+           , SAsgn original !
+               sum (AAdd (AVar original ! sum) (AVar original ! r))
+           ])
+        ( And
+            [ Imp
+                (Lte (Var original ! sum) (Num 100))
+                (And
+                   [ Lt (Num 100) (Var refinement ! sum)
+                   , Lt (Var refinement ! sum) (Num 110)
+                   ])
+            , Imp
+                (Lt (Num 100) (Var original ! sum))
+                (Eq (Var original ! sum) (Var refinement ! sum))
+            ]
+        , Sub [ Num 110 , Var original ! sum ]
+        )
+    , SAsgn original ! retVal (AVar original ! sum)
+    ]
 ]
 
-Universal Specifications:
-fromList [(refinement!biggerRand,Spec {params = [], choiceVars = [], preCondition = true, postCondition = (and (<= 0 ret!) (< ret! 11))})]
+:: Universal Specifications
+fromList [("refinement!biggerRand",Spec {spec_params = [], spec_choiceVars = [], spec_preCondition = ATrue, spec_postCondition = And [Lte (Num 0) (Var ret!),Lt (Var ret!) (Num 11)]})]
 
-Existential Specifications:
-fromList [(original!rand,Spec {params = [], choiceVars = [(original!n int)], preCondition = (and (<= 0 original!n) (< original!n 10)), postCondition = (= ret! original!n)})]
+:: Existential Specifications
+fromList [("original!rand",Spec {spec_params = [], spec_choiceVars = [original!n], spec_preCondition = And [Lte (Num 0) (Var original!n),Lt (Var original!n) (Num 10)], spec_postCondition = Eq (Var ret!) (Var original!n)})]
 
-Precondition:
-  true
+:: Precondition
+ATrue
 
-Postcondition:
-  (= original!sum refinement!sum)
+:: Postcondition
+Eq (Var original ! sum) (Var refinement ! sum)
 
 [send->] (set-option :print-success true )
 [<-recv] success
@@ -89,6 +125,6 @@ Postcondition:
 Failure:
   (model )
 
-real	0m0.112s
-user	0m0.144s
-sys	0m0.052s
+real	0m0.202s
+user	0m0.192s
+sys	0m0.022s

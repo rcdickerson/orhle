@@ -135,6 +135,9 @@ whileStmt = do
   let while = SWhile cond (sseq body) (inv, var)
   return while
 
+name :: ImpParser Name
+name = identifier >>= (return . Name.fromString)
+
 tryOrHole :: (ImpParser Assertion) -> ImpParser Assertion
 tryOrHole p = try p <|> hole
 
@@ -146,11 +149,11 @@ hole = do
 
 assignStmt :: ProgramParser
 assignStmt = do
-  var  <- identifier
+  var <- name
   reservedOp ":="
   expr <- aExpression
   _ <- semi
-  return $ SAsgn (Name var 0) expr
+  return $ SAsgn var expr
 
 funDef :: ImpParser ()
 funDef = do
@@ -208,16 +211,16 @@ nameTuple = do
 
 nameArray :: ImpParser [Name]
 nameArray = do
-  (name, num) <- try (do
-                         var <- identifier
+  (Name vname i, num) <- try (do
+                         var <- name
                          char '[' >> whiteSpace
                          num <- integer
                          char ']' >> whiteSpace
                          return (var, num))
-                     <|> (do var <- identifier; return (var, 0))
+                     <|> (do var <- name; return (var, 0))
   return $ case num of
-    0 -> [Name name 0]
-    _ -> map (\n -> Name (name ++ "_" ++ (show n)) 0) [0..(num-1)]
+    0 -> [Name vname i]
+    _ -> map (\n -> Name (vname ++ "_" ++ (show n)) i) [0..(num-1)]
 
 skipStmt :: ProgramParser
 skipStmt = reserved "skip" >> semi >> return SSkip
@@ -242,7 +245,7 @@ bOperators = [ [Prefix (reservedOp "!" >> return BNot)]
              ]
 
 aTerm =  parens aExpression
-     <|> (identifier >>= \name -> return $ AVar $ Name name 0)
+     <|> (name >>= return . AVar)
      <|> liftM ALit integer
 
 bTerm =  parens bExpression

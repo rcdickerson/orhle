@@ -1,5 +1,3 @@
-Replacements: fromList [(used!1B!r,used!1B!r!1)]
-Replacements: fromList [(used!2B!r,used!2B!r!1)]
 
 *******************************************
 ****               ORHLE               ****
@@ -12,63 +10,71 @@ Replacements: fromList [(used!2B!r,used!2B!r!1)]
   used[1B] (exists)
   used[2B] (exists)
 
-Universal Programs:
+:: Universal Programs
 [ SSeq
     [ SAsgn used !
         1A ! x (AAdd (AVar used ! 1A ! param1) (AVar used ! 1A ! param2))
-    , SCall
-        SFun { fName = used ! 1A ! flip , fParams = [] } [ used ! 1A ! r ]
+    , SCall "used!1A!flip" [] [ used ! 1A ! r ]
     , SIf
         (BEq (AVar used ! 1A ! r) (ALit 0))
         (SAsgn used ! 1A ! ret (AVar used ! 1A ! x))
         (SAsgn used ! 1A ! ret (AVar used ! 1A ! param1))
+    , SAsgn used ! 1A ! retVal (AVar used ! 1A ! ret)
     ]
 , SSeq
     [ SAsgn used !
         2A ! x (AAdd (AVar used ! 2A ! param1) (AVar used ! 2A ! param2))
-    , SCall
-        SFun { fName = used ! 2A ! flip , fParams = [] } [ used ! 2A ! r ]
+    , SCall "used!2A!flip" [] [ used ! 2A ! r ]
     , SIf
         (BEq (AVar used ! 2A ! r) (ALit 0))
         (SAsgn used ! 2A ! ret (AVar used ! 2A ! x))
         (SAsgn used ! 2A ! ret (AVar used ! 2A ! param1))
+    , SAsgn used ! 2A ! retVal (AVar used ! 2A ! ret)
     ]
 ]
 
-Existential Programs:
+:: Existential Programs
 [ SSeq
     [ SAsgn used !
         1B ! x (AAdd (AVar used ! 1B ! param1) (AVar used ! 1B ! param2))
-    , SCall
-        SFun { fName = used ! 1B ! flip , fParams = [] } [ used ! 1B ! r ]
+    , SCall "used!1B!flip" [] [ used ! 1B ! r ]
     , SIf
         (BEq (AVar used ! 1B ! r) (ALit 0))
         (SAsgn used ! 1B ! ret (AVar used ! 1B ! x))
         (SAsgn used ! 1B ! ret (AVar used ! 1B ! param1))
+    , SAsgn used ! 1B ! retVal (AVar used ! 1B ! ret)
     ]
 , SSeq
     [ SAsgn used !
         2B ! x (AAdd (AVar used ! 2B ! param1) (AVar used ! 2B ! param2))
-    , SCall
-        SFun { fName = used ! 2B ! flip , fParams = [] } [ used ! 2B ! r ]
+    , SCall "used!2B!flip" [] [ used ! 2B ! r ]
     , SIf
         (BEq (AVar used ! 2B ! r) (ALit 0))
         (SAsgn used ! 2B ! ret (AVar used ! 2B ! x))
         (SAsgn used ! 2B ! ret (AVar used ! 2B ! param1))
+    , SAsgn used ! 2B ! retVal (AVar used ! 2B ! ret)
     ]
 ]
 
-Universal Specifications:
-fromList [(used!1A!flip,Spec {params = [], choiceVars = [], preCondition = true, postCondition = (or (= ret! 0) (= ret! 1))}),(used!2A!flip,Spec {params = [], choiceVars = [], preCondition = true, postCondition = (or (= ret! 0) (= ret! 1))})]
+:: Universal Specifications
+fromList [("used!1A!flip",Spec {spec_params = [], spec_choiceVars = [], spec_preCondition = ATrue, spec_postCondition = Or [Eq (Var ret!) (Num 0),Eq (Var ret!) (Num 1)]}),("used!2A!flip",Spec {spec_params = [], spec_choiceVars = [], spec_preCondition = ATrue, spec_postCondition = Or [Eq (Var ret!) (Num 0),Eq (Var ret!) (Num 1)]})]
 
-Existential Specifications:
-fromList [(used!1B!flip,Spec {params = [], choiceVars = [(used!1B!n int)], preCondition = (or (= used!1B!n 0) (= used!1B!n 1)), postCondition = (= ret! used!1B!n)}),(used!2B!flip,Spec {params = [], choiceVars = [(used!2B!n int)], preCondition = (or (= used!2B!n 0) (= used!2B!n 1)), postCondition = (= ret! used!2B!n)})]
+:: Existential Specifications
+fromList [("used!1B!flip",Spec {spec_params = [], spec_choiceVars = [used!1B!n], spec_preCondition = Or [Eq (Var used!1B!n) (Num 0),Eq (Var used!1B!n) (Num 1)], spec_postCondition = Eq (Var ret!) (Var used!1B!n)}),("used!2B!flip",Spec {spec_params = [], spec_choiceVars = [used!2B!n], spec_preCondition = Or [Eq (Var used!2B!n) (Num 0),Eq (Var used!2B!n) (Num 1)], spec_postCondition = Eq (Var ret!) (Var used!2B!n)})]
 
-Precondition:
-  (and (= used!1A!param1 used!1B!param1) (not (= used!1A!param2 used!1B!param2)) (not (= used!2A!param1 used!2B!param1)) (= used!2A!param2 used!2B!param2))
+:: Precondition
+And
+  [ Eq (Var used ! 1A ! param1) (Var used ! 1B ! param1)
+  , Not (Eq (Var used ! 1A ! param2) (Var used ! 1B ! param2))
+  , Not (Eq (Var used ! 2A ! param1) (Var used ! 2B ! param1))
+  , Eq (Var used ! 2A ! param2) (Var used ! 2B ! param2)
+  ]
 
-Postcondition:
-  (or (= used!1A!ret used!1B!ret) (= used!2A!ret used!2B!ret))
+:: Postcondition
+Or
+  [ Eq (Var used ! 1A ! ret) (Var used ! 1B ! ret)
+  , Eq (Var used ! 2A ! ret) (Var used ! 2B ! ret)
+  ]
 
 [send->] (set-option :print-success true )
 [<-recv] success
@@ -350,6 +356,6 @@ Postcondition:
 Failure:
   (model (define-fun used!2A!r () Int 1 ) (define-fun used!2B!param2 () Int 0 ) (define-fun used!1A!param2 () Int 2 ) (define-fun used!2A!param1 () Int 0 ) (define-fun used!1B!param2 () Int 3 ) (define-fun used!2B!param1 () Int (- 1 ) ) (define-fun used!1A!r () Int 0 ) (define-fun used!2A!param2 () Int 0 ) (define-fun used!1B!param1 () Int 0 ) (define-fun used!1A!param1 () Int 0 ) )
 
-real	0m0.140s
-user	0m0.383s
-sys	0m0.061s
+real	0m0.210s
+user	0m0.235s
+sys	0m0.047s
