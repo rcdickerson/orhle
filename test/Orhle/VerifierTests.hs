@@ -12,8 +12,8 @@ assertVerifierResultMatches expected result =
   case (expected, result) of
     (ExpectSuccess, Right _)   -> return ()
     (ExpectFailure, Left  _)   -> return ()
-    (ExpectSuccess, Left (Failure _ model)) -> assertFailure
-      $ "Expected VALID but was INVALID\n" ++ "model: " ++ model
+    (ExpectSuccess, Left _) -> assertFailure
+      $ "Expected VALID but was INVALID"
     (ExpectFailure, Right _) -> assertFailure
       $ "Expected INVALID but was VALID"
 

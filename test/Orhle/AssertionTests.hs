@@ -1,12 +1,13 @@
 module Orhle.AssertionTests where
 
 import qualified Data.Set as Set
+import Orhle
 import Orhle.Assertion
 import Test.HUnit
 
 -- Some dummy names for testing
-foo = Ident (Name "foo" 0) Bool
-bar = Ident (Name "bar" 0) Int
+foo = TypedName (Name "foo" 0) Bool
+bar = TypedName (Name "bar" 0) Int
 
 testArithSubOverArith = let
   arith    = Add [(Num 5), (Var foo), (Var bar)]
@@ -32,15 +33,8 @@ testFreeVarsOverQuantification = let
   actual    = freeVars assertion
   in TestCase $ assertEqual "free variables" expected actual
 
-testFillHoles = let
-  assertion = Imp (Hole 0) (Forall [bar] $ And [Eq (Var bar) (Num 5), Hole 1])
-  expected  = Imp (Hole 0) (Forall [bar] $ And [Eq (Var bar) (Num 5), (Atom foo)])
-  actual    = fillHole 1 (Atom foo) assertion
-  in TestCase $ assertEqual "filled hole" expected actual
-
 assertionTests = TestList [ TestLabel "arithSubOverArith"     testArithSubOverArith
                           , TestLabel "arithSubOverAssertion" testArithSubOverAssertion
                           , TestLabel "basicFreeVars"         testBasicFreeVars
                           , TestLabel "freeVarsOverQuant"     testFreeVarsOverQuantification
-                          , TestLabel "fillHoles"             testFillHoles
                           ]

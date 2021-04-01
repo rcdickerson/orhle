@@ -222,4 +222,4 @@ instance FreeVariables Assertion where
     Gte  a1 a2   -> Set.union (freeVars a1) (freeVars a2)
     Forall ids a -> Set.difference (freeVars a) (Set.fromList ids)
     Exists ids a -> Set.difference (freeVars a) (Set.fromList ids)
-    Hole i       -> Set.empty
+    Hole _       -> Set.empty
