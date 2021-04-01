@@ -66,9 +66,6 @@ printQuery execs
   putStrLn $ ":: Existential Specifications"
   pPrint eSpecs
   putStrLn ""
---  putStrLn ":: Implemented Functions"
---  pPrint impls
---  putStrLn ""
   putStrLn $ ":: Precondition"
   pPrint pre
   putStrLn ""
@@ -77,15 +74,11 @@ printQuery execs
   putStrLn ""
 
 printFailure :: Orhle.Failure -> IO ()
-printFailure (Orhle.Failure vcs message) = do
---  putStrLn $ "Verification conditions:\n  " ++ (show vcs)
---  putStrLn ""
+printFailure (Orhle.Failure message) = do
   putStrLn $ "Failure:\n  " ++ message
 
 printSuccess :: Orhle.Success -> IO ()
-printSuccess (Orhle.Success vcs) = do
---  putStrLn $ "Verification conditions:\n  " ++ (show vcs)
---  putStrLn ""
+printSuccess _ = do
   putStrLn "Valid."
 
 printExec :: Orhle.Exec -> IO ()

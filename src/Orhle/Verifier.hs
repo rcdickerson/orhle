@@ -5,8 +5,8 @@ module Orhle.Verifier
   , rhleVerifier
   ) where
 
-import           Control.Monad ( foldM )
-import           Control.Monad.Identity ( Identity, runIdentity )
+import           Control.Monad.Except ( ExceptT, runExceptT, throwError )
+import           Control.Monad.IO.Class ( liftIO )
 import           Control.Monad.Trans.State
 import           Data.Either ( partitionEithers )
 import qualified Data.Map as Map
@@ -19,6 +19,7 @@ import qualified Orhle.Imp.ImpLanguage as Imp
 import           Orhle.Inliner ( inline )
 import           Orhle.Name  ( Name(..), NextFreshIds, TypedName(..), namesIn )
 import qualified Orhle.Name as Name
+import qualified Orhle.SMT as SMT
 import           Orhle.Spec ( AESpecs(..), Spec(..), SpecMap )
 import qualified Orhle.Spec as Spec
 import           Orhle.Triple
@@ -46,7 +47,7 @@ buildEnv specs (RhleTriple pre aProgs eProgs post) = Env VUniversal specs freshM
                , namesIn specs]
     freshMap = Name.buildNextFreshIds $ Set.unions allNames
 
-type Verification a = StateT Env Identity a
+type Verification a = StateT Env (ExceptT String IO) a
 
 envFreshen :: Traversable t => t Name -> Verification (t Name)
 envFreshen names = do
@@ -55,13 +56,10 @@ envFreshen names = do
   put $ Env quant specs freshMap'
   return freshX
 
-envPutQSpecs :: VQuant -> SpecMap -> Verification ()
-envPutQSpecs quant specs = do
-  Env _ (AESpecs aspecs especs) freshMap <- get
-  let aespecs = case quant of
-                  VUniversal   -> AESpecs specs  especs
-                  VExistential -> AESpecs aspecs specs
-  put $ Env quant aespecs freshMap
+envSetQuant :: VQuant -> Verification ()
+envSetQuant quant = do
+  Env _ specs freshMap <- get
+  put $ Env quant specs freshMap
 
 envGetQSpecs :: Verification (VQuant, SpecMap)
 envGetQSpecs = do
@@ -77,13 +75,13 @@ envGetQSpecs = do
 --------------
 
 type Verifier = AESpecs -> FunImplEnv -> RhleTriple -> IO (Either Failure Success)
-data Failure  = Failure { failureVcs :: Assertion,  message :: String }
-data Success  = Success { successVcs :: Assertion }
+data Failure  = Failure { failMessage :: String }
+data Success  = Success { }
 
 rhleVerifier :: Verifier
 rhleVerifier specs impls (RhleTriple pre aProgs eProgs post) =
   case doInline impls aProgs eProgs of
-    Left errs -> return . Left $ Failure A.AFalse ("Problems inlining: " ++ show errs)
+    Left errs -> return . Left $ Failure $ "Problems inlining: " ++ show errs
     Right (inlineAs, inlineEs) -> let
       pnamesAsAriths = Set.fromList . namesToIntVars . Set.toList . namesIn
       plitsAsAriths  = (Set.map A.Num) . Imp.plits
@@ -94,8 +92,8 @@ rhleVerifier specs impls (RhleTriple pre aProgs eProgs post) =
       in do
         result <- Inf.inferAndCheck (Inf.Enumerative 2) valsAtHole vcTransform inlineAs inlineEs
         return $ case result of
-          Left  msg -> Left  $ Failure (vcTransform inlineAs inlineEs) msg
-          Right _   -> Right $ Success (vcTransform inlineAs inlineEs) -- TODO: filled VCs
+          Left  msg -> Left  $ Failure msg
+          Right _   -> Right $ Success
 
 doInline :: FunImplEnv -> [Program] -> [Program] -> Either [String] ([Program], [Program])
 doInline impls aProgs eProgs = let
@@ -106,16 +104,26 @@ doInline impls aProgs eProgs = let
     []   -> Right (inAs, inEs)
     errs -> Left $ errs
 
-runVCs :: AESpecs -> RhleTriple -> Assertion
-runVCs specs triple = runIdentity $ evalStateT (buildVCs specs triple) (buildEnv specs triple)
+runVCs :: AESpecs -> RhleTriple -> IO (Either String Assertion)
+runVCs specs triple = runExceptT $ evalStateT (stepUntilDone triple) (buildEnv specs triple)
 
-buildVCs :: AESpecs -> RhleTriple -> Verification Assertion
-buildVCs (AESpecs aspecs especs) (RhleTriple pre aProgs eProgs post) = do
-    envPutQSpecs VExistential especs
-    post'  <- foldM (flip weakestPre) post eProgs
-    envPutQSpecs VUniversal aspecs
-    post'' <- foldM (flip weakestPre) post' aProgs
-    return $ A.Imp pre post''
+stepUntilDone :: RhleTriple -> Verification Assertion
+stepUntilDone triple = case triple of
+  RhleTriple pre [] [] post -> return $ A.Imp pre post
+  _                         -> step triple >>= stepUntilDone
+
+step :: RhleTriple -> Verification RhleTriple
+step (RhleTriple pre aprogs eprogs post) =
+  case (aprogs, eprogs) of
+    ([], []) -> return $ RhleTriple pre aprogs eprogs post
+    (_, eprog:erest) -> do
+      envSetQuant VExistential
+      post' <- weakestPre eprog post
+      return $ RhleTriple pre aprogs erest post'
+    (aprog:arest, _) -> do
+      envSetQuant VUniversal
+      post' <- weakestPre aprog post
+      return $ RhleTriple pre arest eprogs post'
 
 
 ------------------------------------
@@ -158,45 +166,71 @@ wpLoop condB body (inv, measure) post = do
                      measureCond = A.Lt measure nextMeasure
                      bodyPost    = A.And [inv, measureCond]
                      in weakestPre body bodyPost)
-  let qIdents = namesToIntIdents freshVars
-      loopWP  = A.Forall qIdents (freshen $ A.Imp (A.And [cond, inv]) bodyWP)
-      endWP   = A.Forall qIdents (freshen $ A.Imp (A.And [A.Not cond, inv]) post)
+  let qNames = namesToIntNames freshVars
+      loopWP = A.Forall qNames (freshen $ A.Imp (A.And [cond, inv]) bodyWP)
+      endWP  = A.Forall qNames (freshen $ A.Imp (A.And [A.Not cond, inv]) post)
   return $ A.And [inv, loopWP, endWP]
+
+wpLoopFusion :: [(BExp, Program)] -> (Assertion, A.Arith) -> Assertion -> Verification Assertion
+wpLoopFusion loops (invar, var) post = do
+  let bodies    = map snd loops
+      conds     = map (Imp.bexpToAssertion . fst) loops
+      nconds    = map A.Not conds
+      varSet    = Set.unions $ map namesIn conds ++ map namesIn bodies
+      vars      = Set.toList varSet
+  bodyWPs      <- mapM (\body -> weakestPre body invar) bodies
+  freshVars    <- envFreshen vars
+  let freshen   = Name.substituteAll vars freshVars
+  let qNames    = namesToIntNames freshVars
+  let impPost   = freshen $ A.Imp (A.And $ invar:nconds) post
+  let inductive = freshen $ A.Imp (A.And $ invar:conds) (A.And bodyWPs)
+  let sameIters = freshen $ A.Imp (A.And [invar, (A.Not $ A.And conds)]) (A.And nconds)
+  -- TODO: Variant
+  return $ A.And [ invar, A.Forall qNames $ A.And [impPost, inductive, sameIters] ]
+
+checkValid :: Assertion -> Verification ()
+checkValid assertion = do
+  result <- liftIO $ SMT.checkValid assertion
+  case result of
+    SMT.Valid        -> return ()
+    SMT.Invalid msg  -> throwError msg
+    SMT.ValidUnknown -> throwError $ "Solver returned unknown validating " ++ show assertion
 
 wpCall :: Imp.CallId -> [Imp.AExp] -> [Name] -> Assertion -> Verification Assertion
 wpCall cid callArgs assignees post = do
-  (quant, specs) <- envGetQSpecs
-  case (specAtCallsite specs cid assignees callArgs) of
-    Nothing -> error $ "No specification for " ++ show cid ++ "."
-               ++ "Specified functions are: " ++ (show $ Spec.funList specs) ++ "."
-    Just (cvars, fPre, fPost) ->
-      case quant of
-        VUniversal   -> return $ A.And [fPre, A.Imp fPost post]
-        VExistential -> do
-          frAssignees <- envFreshen assignees
-          let freshen     = Name.substituteAll assignees frAssignees
-              frPost      = freshen post
-              frFPost     = freshen fPost
-              frIdents    = (namesToIntIdents frAssignees)
-              existsPost  = A.Exists frIdents frFPost
-              forallPost  = A.Forall frIdents $ A.Imp frFPost frPost
-              wp          = A.And [fPre, existsPost, forallPost]
-          return $ case cvars of
-            [] -> wp
-            _  -> A.Exists cvars wp
+  (quant, _) <- envGetQSpecs
+  (cvars, fPre, fPost) <- specAtCallsite cid assignees callArgs
+  case quant of
+    VUniversal   -> return $ A.And [fPre, A.Imp fPost post]
+    VExistential -> do
+      frAssignees <- envFreshen assignees
+      let freshen     = Name.substituteAll assignees frAssignees
+          frPost      = freshen post
+          frFPost     = freshen fPost
+          frNames     = (namesToIntNames frAssignees)
+          existsPost  = A.Exists frNames frFPost
+          forallPost  = A.Forall frNames $ A.Imp frFPost frPost
+          wp          = A.And [fPre, existsPost, forallPost]
+      return $ case cvars of
+        [] -> wp
+        _  -> A.Exists cvars wp
 
-namesToIntIdents :: Functor f => f Name -> f TypedName
-namesToIntIdents = fmap (\v -> TypedName v Name.Int)
+namesToIntNames :: Functor f => f Name -> f TypedName
+namesToIntNames = fmap (\v -> TypedName v Name.Int)
 
 namesToIntVars :: Functor f => f Name -> f A.Arith
-namesToIntVars = (fmap A.Var) . namesToIntIdents
+namesToIntVars = (fmap A.Var) . namesToIntNames
 
-specAtCallsite :: SpecMap -> Name.Handle -> [Name] -> [Imp.AExp] -> Maybe ([TypedName], Assertion, Assertion)
-specAtCallsite specMap funName assignees callArgs = do
+specAtCallsite :: Imp.CallId -> [Name] -> [Imp.AExp] -> Verification ([TypedName], Assertion, Assertion)
+specAtCallsite cid assignees callArgs = do
+  (_, specMap) <- envGetQSpecs
   let assigneeVars = map Imp.AVar assignees
-  (Spec specParams cvars pre post) <- Map.lookup funName specMap
-  let rets       = Spec.retVars $ length assignees
-  let fromIdents = map (\n -> TypedName n Name.Int) (rets ++ specParams)
-  let toAriths   = map Imp.aexpToArith (assigneeVars ++ callArgs)
-  let bind a     = foldr (uncurry A.subArith) a (zip fromIdents toAriths)
-  return (cvars, bind pre, bind post)
+  case Map.lookup cid specMap of
+    Nothing -> throwError $ "No specification for " ++ show cid ++ "."
+               ++ "Specified functions are: " ++ (show $ Map.keys specMap) ++ "."
+    Just (Spec specParams cvars pre post) -> let
+      rets      = Spec.retVars $ length assignees
+      fromNames = map (\n -> TypedName n Name.Int) (rets ++ specParams)
+      toAriths  = map Imp.aexpToArith (assigneeVars ++ callArgs)
+      bind a    = foldr (uncurry A.subArith) a (zip fromNames toAriths)
+      in return (cvars, bind pre, bind post)

@@ -22,7 +22,7 @@ type ErrorMsg          = String
 data InferenceStrategy = DisallowHoles
                        | Enumerative { maxDepth :: Int }
 type ValsAtHole        = Int -> [Arith]
-type VCTransform       = [Imp.Program] -> [Imp.Program] -> Assertion
+type VCTransform       = [Imp.Program] -> [Imp.Program] -> IO (Either String Assertion)
 
 inferAndCheck :: InferenceStrategy -> ValsAtHole -> VCTransform
               -> [Imp.Program] -> [Imp.Program]
@@ -30,10 +30,14 @@ inferAndCheck :: InferenceStrategy -> ValsAtHole -> VCTransform
 inferAndCheck strategy varsAtHole vcTransform aProgs eProgs =
   if countInvariantHoles (aProgs ++ eProgs) == 0
   then do
-    result <- check (vcTransform aProgs eProgs)
-    return $ case result of
-      Left msg -> Left msg
-      Right _  -> Right Map.empty
+    vcResult <- vcTransform aProgs eProgs
+    case vcResult of
+      Left msg  -> return $ Left msg
+      Right vcs -> do
+        result <- check vcs
+        return $ case result of
+          Left msg -> Left msg
+          Right _  -> Right Map.empty
   else case strategy of
     DisallowHoles     -> return $ Left "Inferring missing assertions is not supported"
     Enumerative depth -> enumerativeSynth depth varsAtHole vcTransform aProgs eProgs
@@ -110,16 +114,23 @@ tryAllFills :: Int -> (Map Int [Arith]) -> (Map Int Assertion) -> VCTransform
 tryAllFills depth holeVals currentSubs vcTransform aProgs eProgs =
   if Map.null holeVals
   then do
-    result <- timeout (100000 * 20) $ check (vcTransform aProgs eProgs)
-    case result of
-      Nothing -> putStr "_"
-      Just (Left _) -> putStr "."
-      Just (Right _) -> putStr "|"
-    hFlush stdout
-    return $ case result of
-      Nothing         -> Left "timeout"
-      Just (Left msg) -> Left msg
-      Just (Right _ ) -> Right currentSubs
+    vcResult <- vcTransform aProgs eProgs
+    case vcResult of
+      Left msg  -> do
+        putStr "."
+        hFlush stdout
+        return $ Left msg
+      Right vcs -> do
+        result <- timeout (100000 * 20) $ check vcs
+        case result of
+          Nothing -> putStr "_"
+          Just (Left _) -> putStr "."
+          Just (Right _) -> putStr "|"
+        hFlush stdout
+        return $ case result of
+          Nothing         -> Left "timeout"
+          Just (Left msg) -> Left msg
+          Just (Right _ ) -> Right currentSubs
   else let
     holeId               = head $ Map.keys holeVals
     fills                = enumerateAssertions depth $ holeVals!holeId
