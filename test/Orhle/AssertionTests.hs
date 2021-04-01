@@ -1,40 +1,37 @@
-module Orhle.AssertionTests where
+{-# OPTIONS_GHC -F -pgmF htfpp #-}
+
+module Orhle.AssertionTests(htf_thisModulesTests) where
+
+import Test.Framework
 
 import qualified Data.Set as Set
 import Orhle
 import Orhle.Assertion
-import Test.HUnit
 
 -- Some dummy names for testing
 foo = TypedName (Name "foo" 0) Bool
 bar = TypedName (Name "bar" 0) Int
 
-testArithSubOverArith = let
+test_arithSubOverArith = let
   arith    = Add [(Num 5), (Var foo), (Var bar)]
   expected = Add [(Num 5), (Div (Var foo) (Var bar)), (Var bar)]
   actual   = subArith foo (Div (Var foo) (Var bar)) arith
-  in TestCase $ assertEqual "arithmetic substitution" expected actual
+  in assertEqual expected actual
 
-testArithSubOverAssertion = let
+test_arithSubOverAssertion = let
   assertion = Not $ Gte (Add [(Num 5), (Var foo)]) (Var bar)
   expected  = Not $ Gte (Add [(Num 5), (Num 10)]) (Var bar)
   actual    = subArith foo (Num 10) assertion
-  in TestCase $ assertEqual "arithmetic substitution" expected actual
+  in assertEqual expected actual
 
-testBasicFreeVars = let
+test_basicFreeVars = let
   assertion = Imp (Atom foo) (Not (Lt (Num 5) (Var bar)))
   expected  = Set.fromList [foo, bar]
   actual    = freeVars assertion
-  in TestCase $ assertEqual "free variables" expected actual
+  in assertEqual expected actual
 
-testFreeVarsOverQuantification = let
+test_freeVarsOverQuantification = let
   assertion = Imp (Atom foo) (Forall [bar] $ Eq (Var bar) (Num 5))
   expected  = Set.fromList [foo] -- bar is not free, it is captured by the forall
   actual    = freeVars assertion
-  in TestCase $ assertEqual "free variables" expected actual
-
-assertionTests = TestList [ TestLabel "arithSubOverArith"     testArithSubOverArith
-                          , TestLabel "arithSubOverAssertion" testArithSubOverAssertion
-                          , TestLabel "basicFreeVars"         testBasicFreeVars
-                          , TestLabel "freeVarsOverQuant"     testFreeVarsOverQuantification
-                          ]
+  in assertEqual expected actual

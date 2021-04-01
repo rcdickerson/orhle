@@ -9,6 +9,7 @@ import           Control.Monad.Except ( ExceptT, runExceptT, throwError )
 import           Control.Monad.IO.Class ( liftIO )
 import           Control.Monad.Trans.State
 import           Data.Either ( partitionEithers )
+import           Data.List ( partition )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import           Orhle.Assertion ( Assertion )
@@ -61,6 +62,11 @@ envSetQuant quant = do
   Env _ specs freshMap <- get
   put $ Env quant specs freshMap
 
+envGetQuant :: Verification VQuant
+envGetQuant = do
+  Env quant _ _ <- get
+  return quant
+
 envGetQSpecs :: Verification (VQuant, SpecMap)
 envGetQSpecs = do
   Env quant (AESpecs aspecs especs) _ <- get
@@ -75,8 +81,25 @@ envGetQSpecs = do
 --------------
 
 type Verifier = AESpecs -> FunImplEnv -> RhleTriple -> IO (Either Failure Success)
-data Failure  = Failure { failMessage :: String }
+data Failure  = Failure { failMessage :: String } deriving Show
 data Success  = Success { }
+
+-- When reasoning backward, it's convenient to store programs in reverse order.
+type RevSeq = [Program]
+data RevRhleTriple = RevRhleTriple Assertion [RevSeq] [RevSeq] Assertion
+
+revSeq :: Program -> RevSeq
+revSeq program = case program of
+  SSkip                  -> []
+  SAsgn name aexp        -> [ SAsgn name aexp ]
+  SSeq progs             -> reverse . concat $ map revSeq progs
+  SIf c t e              -> [ SIf c t e ]
+  SWhile c body iv       -> [ SWhile c body iv ]
+  SCall cid args assigns -> [ SCall cid args assigns ]
+
+revTriple :: RhleTriple -> RevRhleTriple
+revTriple (RhleTriple pre aprogs eprogs post) =
+  RevRhleTriple pre (map revSeq aprogs) (map revSeq eprogs) post
 
 rhleVerifier :: Verifier
 rhleVerifier specs impls (RhleTriple pre aProgs eProgs post) =
@@ -105,30 +128,78 @@ doInline impls aProgs eProgs = let
     errs -> Left $ errs
 
 runVCs :: AESpecs -> RhleTriple -> IO (Either String Assertion)
-runVCs specs triple = runExceptT $ evalStateT (stepUntilDone triple) (buildEnv specs triple)
+runVCs specs triple = runExceptT $ evalStateT (stepUntilDone $ revTriple triple) (buildEnv specs triple)
 
-stepUntilDone :: RhleTriple -> Verification Assertion
-stepUntilDone triple = case triple of
-  RhleTriple pre [] [] post -> return $ A.Imp pre post
-  _                         -> step triple >>= stepUntilDone
+stepUntilDone :: RevRhleTriple -> Verification Assertion
+stepUntilDone triple = case filterEmptyProgs triple of
+  RevRhleTriple pre [] [] post -> return $ A.Imp pre post
+  _                            -> step triple >>= stepUntilDone
 
-step :: RhleTriple -> Verification RhleTriple
-step (RhleTriple pre aprogs eprogs post) =
-  case (aprogs, eprogs) of
-    ([], []) -> return $ RhleTriple pre aprogs eprogs post
-    (_, eprog:erest) -> do
-      envSetQuant VExistential
-      post' <- weakestPre eprog post
-      return $ RhleTriple pre aprogs erest post'
-    (aprog:arest, _) -> do
-      envSetQuant VUniversal
-      post' <- weakestPre aprog post
-      return $ RhleTriple pre arest eprogs post'
+step :: RevRhleTriple -> Verification RevRhleTriple
+step triple = do
+  nonLoop <- stepFirstNonLoop triple
+  case nonLoop of
+    Nothing -> fuseLoops triple
+    Just triple' -> return triple'
 
+stepFirstNonLoop :: RevRhleTriple -> Verification (Maybe RevRhleTriple)
+stepFirstNonLoop triple = let
+  RevRhleTriple pre aprogs eprogs post = filterEmptyProgs triple
+  (aloops, as) = partition (isLoop . head) aprogs
+  (eloops, es) = partition (isLoop . head) eprogs
+  in case (as, es) of
+    ([], []) -> return Nothing
+    (_, (eprog:rest):esTail) -> do
+      post' <- weakestPreQ VExistential eprog post
+      let eprogs' = (rest:esTail) ++ eloops
+      return $ Just $ RevRhleTriple pre aprogs eprogs' post'
+    ((aprog:rest):asTail, _) -> do
+      post' <- weakestPreQ VUniversal aprog post
+      let aprogs' = (rest:asTail) ++ aloops
+      return $ Just $ RevRhleTriple pre aprogs' eprogs post'
+
+fuseLoops :: RevRhleTriple -> Verification RevRhleTriple
+fuseLoops triple = let
+  (aloops, eloops, iv, RevRhleTriple pre aprogs eprogs post) = extractLoops triple
+  in do
+    post' <- wpLoopFusion aloops eloops iv post
+    return $ RevRhleTriple pre aprogs eprogs post'
+
+extractLoops :: RevRhleTriple -> ( [(BExp, Program)], [(BExp, Program)], (Assertion, A.Arith), RevRhleTriple )
+extractLoops (RevRhleTriple pre aprogs eprogs post) = let
+  aloops = map head aprogs
+  eloops = map head eprogs
+  (SWhile _ _ iv) = head . head $ aprogs ++ eprogs -- TODO: Match invars
+  in ([], [], iv, filterEmptyProgs $ RevRhleTriple pre (map tail aprogs) (map tail eprogs) post)
+
+isLoop :: Program -> Bool
+isLoop prog = case prog of
+  SWhile _ _ _ -> True
+  _            -> False
+
+isEmpty :: [Program] -> Bool
+isEmpty progs = case progs of
+  []          -> True
+  [ SSkip ]   -> True
+  [ SSeq ss ] -> isEmpty ss
+  _           -> False
+
+filterEmptyProgs :: RevRhleTriple -> RevRhleTriple
+filterEmptyProgs (RevRhleTriple pre aprogs eprogs post) =
+  let nonempty = filter $ not . isEmpty
+  in RevRhleTriple pre (nonempty aprogs) (nonempty eprogs) post
 
 ------------------------------------
 -- Weakest Precondition Semantics --
 ------------------------------------
+
+weakestPreQ :: VQuant -> Program -> Assertion -> Verification Assertion
+weakestPreQ quant prog post = do
+  origQuant <- envGetQuant
+  envSetQuant quant
+  result <- weakestPre prog post
+  envSetQuant origQuant
+  return result
 
 weakestPre :: Program -> Assertion -> Verification Assertion
 weakestPre stmt post =
@@ -171,20 +242,31 @@ wpLoop condB body (inv, measure) post = do
       endWP  = A.Forall qNames (freshen $ A.Imp (A.And [A.Not cond, inv]) post)
   return $ A.And [inv, loopWP, endWP]
 
-wpLoopFusion :: [(BExp, Program)] -> (Assertion, A.Arith) -> Assertion -> Verification Assertion
-wpLoopFusion loops (invar, var) post = do
-  let bodies    = map snd loops
-      conds     = map (Imp.bexpToAssertion . fst) loops
-      nconds    = map A.Not conds
-      varSet    = Set.unions $ map namesIn conds ++ map namesIn bodies
+wpLoopFusion :: [(BExp, Program)] ->
+                [(BExp, Program)] ->
+                (Assertion, A.Arith) ->
+                Assertion ->
+                Verification Assertion
+wpLoopFusion aloops eloops (invar, var) post = do
+  let abodies   = map snd aloops
+      ebodies   = map snd eloops
+      aconds    = map (Imp.bexpToAssertion . fst) aloops
+      econds    = map (Imp.bexpToAssertion . fst) eloops
+      anconds   = map A.Not aconds
+      enconds   = map A.Not econds
+      allBodies = abodies ++ ebodies
+      allConds  = aconds ++ econds
+      allNConds = anconds ++ enconds
+      varSet    = Set.unions $ map namesIn allConds ++ map namesIn allBodies
       vars      = Set.toList varSet
-  bodyWPs      <- mapM (\body -> weakestPre body invar) bodies
   freshVars    <- envFreshen vars
   let freshen   = Name.substituteAll vars freshVars
   let qNames    = namesToIntNames freshVars
-  let impPost   = freshen $ A.Imp (A.And $ invar:nconds) post
-  let inductive = freshen $ A.Imp (A.And $ invar:conds) (A.And bodyWPs)
-  let sameIters = freshen $ A.Imp (A.And [invar, (A.Not $ A.And conds)]) (A.And nconds)
+  abodyWPs     <- mapM (\body -> weakestPreQ VUniversal body invar) abodies
+  ebodyWPs     <- mapM (\body -> weakestPreQ VExistential body invar) ebodies
+  let impPost   = freshen $ A.Imp (A.And $ invar:allNConds) post
+  let inductive = freshen $ A.Imp (A.And $ invar:allConds) (A.And $ abodyWPs ++ ebodyWPs)
+  let sameIters = freshen $ A.Imp (A.And [invar, (A.Not $ A.And allConds)]) (A.And allNConds)
   -- TODO: Variant
   return $ A.And [ invar, A.Forall qNames $ A.And [impPost, inductive, sameIters] ]
 
@@ -223,11 +305,11 @@ namesToIntVars = (fmap A.Var) . namesToIntNames
 
 specAtCallsite :: Imp.CallId -> [Name] -> [Imp.AExp] -> Verification ([TypedName], Assertion, Assertion)
 specAtCallsite cid assignees callArgs = do
-  (_, specMap) <- envGetQSpecs
+  (quant, specMap) <- envGetQSpecs
   let assigneeVars = map Imp.AVar assignees
   case Map.lookup cid specMap of
-    Nothing -> throwError $ "No specification for " ++ show cid ++ "."
-               ++ "Specified functions are: " ++ (show $ Map.keys specMap) ++ "."
+    Nothing -> throwError $ "No " ++ (show quant) ++ " specification for " ++ show cid ++ ". "
+               ++ "Specified " ++ (show quant) ++ " functions are: " ++ (show $ Map.keys specMap) ++ "."
     Just (Spec specParams cvars pre post) -> let
       rets      = Spec.retVars $ length assignees
       fromNames = map (\n -> TypedName n Name.Int) (rets ++ specParams)

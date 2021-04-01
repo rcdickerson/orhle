@@ -1,9 +1,12 @@
-module Orhle.InlinerTests where
+{-# OPTIONS_GHC -F -pgmF htfpp #-}
+
+module Orhle.InlinerTests(htf_thisModulesTests) where
+
+import Test.Framework
 
 import qualified Data.Map as Map
 import Orhle
 import Orhle.Imp
-import Test.HUnit
 
 -- Some dummy names / aexps
 a = (Name "a" 0)
@@ -13,7 +16,7 @@ d = (Name "d" 0)
 x = (Name "x" 0)
 y = (Name "y" 0)
 
-testSimpleInline = let
+test_simpleInline = let
   idImpls = Map.fromList [
       ("foo", FunImpl [x] (SAsgn y (AVar x)) [y])
     , ("bar", FunImpl [x] (SAsgn y (AVar x)) [y])
@@ -40,9 +43,9 @@ testSimpleInline = let
          ]
     ]
   actual = inline idImpls prog
-  in TestCase $ assertEqual "inlining" expected actual
+  in assertEqual expected actual
 
-testNestedInline = let
+test_nestedInline = let
   bodyFoo = SAsgn y (AAdd (AVar x) (ALit 1))
   idImpls = Map.fromList [
       ("foo", FunImpl [x] bodyFoo [y])
@@ -64,18 +67,18 @@ testNestedInline = let
          , SAsgn b (AVar (Name "y" 1))
          ]
   actual = inline idImpls prog
-  in TestCase $ assertEqual "inlining" expected actual
+  in assertEqual expected actual
 
-testNoRecursion = let
+test_noRecursion = let
   impls = Map.fromList [
     ("foo", FunImpl [x] (SCall "foo" [AVar x] [y]) [y])
     ]
   prog = SCall "foo" [AVar a] [b]
   expected = Left "Cannot inline recursive call to foo"
   actual   = inline impls prog
-  in TestCase $ assertEqual "inlining" expected actual
+  in assertEqual expected actual
 
-testMultipleReturns = let
+test_multipleReturns = let
   idImpls = Map.fromList [
       ("foo", FunImpl [x] (SAsgn y (AVar x)) [x, y])]
   prog = SSeq [
@@ -91,10 +94,4 @@ testMultipleReturns = let
          ]
     ]
   actual = inline idImpls prog
-  in TestCase $ assertEqual "inlining" expected actual
-
-inlinerTests = TestList [ TestLabel "testSimpleInline"    testSimpleInline
-                        , TestLabel "testNestedInline"    testNestedInline
-                        , TestLabel "testNoRecursion"     testNoRecursion
-                        , TestLabel "testMultipleReturns" testMultipleReturns
-                        ]
+  in assertEqual expected actual

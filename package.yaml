@@ -65,7 +65,7 @@ executables:
 
 tests:
   orhle-test:
-    main:                Main.hs
+    main:                TestMain.hs
     source-dirs:         test
     ghc-options:
     - -threaded
@@ -75,4 +75,4 @@ tests:
     - directory
     - filepath
     - orhle
-    - HUnit
+    - HTF
