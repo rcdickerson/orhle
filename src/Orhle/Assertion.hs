@@ -6,6 +6,7 @@ module Orhle.Assertion
   , freeVars
   , parseArith
   , parseAssertion
+  , showSMT
   , subArith
   ) where
 

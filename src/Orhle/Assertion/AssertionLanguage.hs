@@ -3,6 +3,7 @@ module Orhle.Assertion.AssertionLanguage
   , Assertion(..)
   , Name(..)
   , freeVars
+  , showSMT
   , subArith
   ) where
 

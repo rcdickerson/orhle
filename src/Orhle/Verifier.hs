@@ -169,8 +169,9 @@ extractLoops :: RevRhleTriple -> ( [(BExp, Program)], [(BExp, Program)], (Assert
 extractLoops (RevRhleTriple pre aprogs eprogs post) = let
   aloops = map head aprogs
   eloops = map head eprogs
+  condBody (SWhile cond body _) = (cond, body)
   (SWhile _ _ iv) = head . head $ aprogs ++ eprogs -- TODO: Match invars
-  in ([], [], iv, filterEmptyProgs $ RevRhleTriple pre (map tail aprogs) (map tail eprogs) post)
+  in (map condBody aloops, map condBody eloops, iv, filterEmptyProgs $ RevRhleTriple pre (map tail aprogs) (map tail eprogs) post)
 
 isLoop :: Program -> Bool
 isLoop prog = case prog of
