@@ -20,6 +20,7 @@ import qualified Orhle.Imp.ImpLanguage as Imp
 import           Orhle.Inliner ( inline )
 import           Orhle.Name  ( Name(..), NextFreshIds, TypedName(..), namesIn )
 import qualified Orhle.Name as Name
+import           Orhle.ShowSMT ( showSMT )
 import qualified Orhle.SMT as SMT
 import           Orhle.Spec ( AESpecs(..), Spec(..), SpecMap )
 import qualified Orhle.Spec as Spec
@@ -139,8 +140,21 @@ step :: RevRhleTriple -> Verification RevRhleTriple
 step triple = do
   nonLoop <- stepFirstNonLoop triple
   case nonLoop of
-    Nothing -> fuseLoops triple
+    Nothing -> fuseLoops triple -- stepTemp triple
     Just triple' -> return triple'
+
+stepTemp :: RevRhleTriple -> Verification RevRhleTriple
+stepTemp triple@(RevRhleTriple pre aprogs eprogs post) =
+  case (aprogs, eprogs) of
+    ([], []) -> return triple
+    (_, (eprog:rest):esTail) -> do
+      post' <- weakestPreQ VExistential eprog post
+      let eprogs' = (rest:esTail)
+      return $ RevRhleTriple pre aprogs eprogs' post'
+    ((aprog:rest):asTail, _) -> do
+      post' <- weakestPreQ VUniversal aprog post
+      let aprogs' = (rest:asTail)
+      return $ RevRhleTriple pre aprogs' eprogs post'
 
 stepFirstNonLoop :: RevRhleTriple -> Verification (Maybe RevRhleTriple)
 stepFirstNonLoop triple = let
@@ -260,16 +274,15 @@ wpLoopFusion aloops eloops (invar, var) post = do
       allNConds = anconds ++ enconds
       varSet    = Set.unions $ map namesIn allConds ++ map namesIn allBodies
       vars      = Set.toList varSet
+      bodyTrip  = RhleTriple (A.And $ invar:allConds) abodies ebodies invar
   freshVars    <- envFreshen vars
   let freshen   = Name.substituteAll vars freshVars
   let qNames    = namesToIntNames freshVars
-  abodyWPs     <- mapM (\body -> weakestPreQ VUniversal body invar) abodies
-  ebodyWPs     <- mapM (\body -> weakestPreQ VExistential body invar) ebodies
   let impPost   = freshen $ A.Imp (A.And $ invar:allNConds) post
-  let inductive = freshen $ A.Imp (A.And $ invar:allConds) (A.And $ abodyWPs ++ ebodyWPs)
+  inductive    <- do result <- (stepUntilDone $ revTriple bodyTrip); return $ freshen result
   let sameIters = freshen $ A.Imp (A.And [invar, (A.Not $ A.And allConds)]) (A.And allNConds)
   -- TODO: Variant
-  return $ A.And [ invar, A.Forall qNames $ A.And [impPost, inductive, sameIters] ]
+  return $ A.And [ invar, A.Forall qNames impPost, A.Forall qNames inductive, A.Forall qNames sameIters]
 
 checkValid :: Assertion -> Verification ()
 checkValid assertion = do
