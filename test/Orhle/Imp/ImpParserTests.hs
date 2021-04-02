@@ -18,7 +18,7 @@ y = n "y"
 z = n "z"
 
 -- Return value name constructor for convenience
-rv i = Name "retVal" i
+rv funName i = Name (funName ++ "!retVal") i
 
 assertCorrectParse progStr expected = case parseImp progStr of
   Left err        -> assertFailure $ "Parse error: " ++ (show err)
@@ -57,33 +57,39 @@ test_singleArrayAssignee = let
 
 test_multipleReturns = let
   prog = "fun foo() { return (a, b, c); }"
-  expectedBody = SSeq [ SAsgn (rv 2) a
-                      , SAsgn (rv 1) b
-                      , SAsgn (rv 0) c
+  expectedBody = SSeq [ SAsgn (rv "foo" 2) a
+                      , SAsgn (rv "foo" 1) b
+                      , SAsgn (rv "foo" 0) c
                       ]
-  expected = FunImpl [] expectedBody [rv 2, rv 1, rv 0]
+  expected = FunImpl [] expectedBody [rv "foo" 2, rv "foo" 1, rv "foo" 0]
   in assertCorrectFunParse prog "foo" expected
 
 test_singleArrayReturn = let
   prog = "fun foo() { return x[3]; }"
-  expectedBody = SSeq [ SAsgn (rv 2) (v "x_0")
-                      , SAsgn (rv 1) (v "x_1")
-                      , SAsgn (rv 0) (v "x_2")
+  expectedBody = SSeq [ SAsgn (rv "foo" 2) (v "x_0")
+                      , SAsgn (rv "foo" 1) (v "x_1")
+                      , SAsgn (rv "foo" 0) (v "x_2")
                       ]
-  expected = FunImpl [] expectedBody [rv 2, rv 1, rv 0]
+  expected = FunImpl [] expectedBody [rv "foo" 2, rv "foo" 1, rv "foo" 0]
   in assertCorrectFunParse prog "foo" expected
 
 
 test_arrayReturns = let
   prog = "fun foo() { return (x[3], b, z[2]); }"
-  expectedBody = SSeq [ SAsgn (rv 5) (v "x_0")
-                      , SAsgn (rv 4) (v "x_1")
-                      , SAsgn (rv 3) (v "x_2")
-                      , SAsgn (rv 2) b
-                      , SAsgn (rv 1) (v "z_0")
-                      , SAsgn (rv 0) (v "z_1")
+  expectedBody = SSeq [ SAsgn (rv "foo" 5) (v "x_0")
+                      , SAsgn (rv "foo" 4) (v "x_1")
+                      , SAsgn (rv "foo" 3) (v "x_2")
+                      , SAsgn (rv "foo" 2) b
+                      , SAsgn (rv "foo" 1) (v "z_0")
+                      , SAsgn (rv "foo" 0) (v "z_1")
                       ]
-  expected = FunImpl [] expectedBody [rv 5, rv 4, rv 3, rv 2, rv 1, rv 0]
+  expected = FunImpl [] expectedBody $ [ rv "foo" 5
+                                       , rv "foo" 4
+                                       , rv "foo" 3
+                                       , rv "foo" 2
+                                       , rv "foo" 1
+                                       , rv "foo" 0
+                                       ]
   in assertCorrectFunParse prog "foo" expected
 
 test_arrayArgs = let

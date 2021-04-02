@@ -160,11 +160,11 @@ funDef = do
   reserved "fun"
   handle <- identifier
   params <- nameTuple
-  (body, rets) <- braces funBody
+  (body, rets) <- braces (funBody handle)
   recordFunDef handle params body rets
 
-funBody :: ImpParser (Program, [Name])
-funBody = do
+funBody :: Name.Handle -> ImpParser (Program, [Name])
+funBody cid = do
   bodyStmts <- many statement
   reserved "return"
   retExprs <- (try varArray)
@@ -172,8 +172,9 @@ funBody = do
           <|> aexpTuple
   _ <- semi
   let freshIds = Name.buildNextFreshIds $ namesIn (SSeq bodyStmts)
+      retVal   = Name (cid ++ "!retVal") 0
       retNames = fst $ foldr (\_ (names, ids) ->
-                                 let (nextFresh, ids') = Name.nextFreshName (Name "retVal" 0) ids
+                                 let (nextFresh, ids') = Name.nextFreshName retVal ids
                                  in  (nextFresh:names, ids'))
                        ([], freshIds)
                        retExprs

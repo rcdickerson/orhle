@@ -294,20 +294,21 @@ checkValid assertion = do
 
 wpCall :: Imp.CallId -> [Imp.AExp] -> [Name] -> Assertion -> Verification Assertion
 wpCall cid callArgs assignees post = do
-  (quant, _) <- envGetQSpecs
-  (cvars, fPre, fPost) <- specAtCallsite cid assignees callArgs
+  (cvars, fPre, fPost) <- specAtCallsite cid callArgs
+  let retVars     = Spec.retVars $ length assignees
+  frAssignees    <- envFreshen assignees
+  let frPost      = Name.substituteAll assignees frAssignees post
+  let frFPost     = Name.substituteAll retVars   frAssignees fPost
+  (quant, _)     <- envGetQSpecs
   case quant of
-    VUniversal   -> return $ A.And [fPre, A.Imp fPost post]
-    VExistential -> do
-      frAssignees <- envFreshen assignees
-      let freshen     = Name.substituteAll assignees frAssignees
-          frPost      = freshen post
-          frFPost     = freshen fPost
-          frNames     = (namesToIntNames frAssignees)
-          existsPost  = A.Exists frNames frFPost
-          forallPost  = A.Forall frNames $ A.Imp frFPost frPost
-          wp          = A.And [fPre, existsPost, forallPost]
-      return $ case cvars of
+    VUniversal   -> do
+      return $ A.And [fPre, A.Imp frFPost frPost]
+    VExistential -> let
+      frNames     = (namesToIntNames frAssignees)
+      existsPost  = A.Exists frNames frFPost
+      forallPost  = A.Forall frNames $ A.Imp frFPost frPost
+      wp          = A.And [fPre, existsPost, forallPost]
+      in return $ case cvars of
         [] -> wp
         _  -> A.Exists cvars wp
 
@@ -317,16 +318,14 @@ namesToIntNames = fmap (\v -> TypedName v Name.Int)
 namesToIntVars :: Functor f => f Name -> f A.Arith
 namesToIntVars = (fmap A.Var) . namesToIntNames
 
-specAtCallsite :: Imp.CallId -> [Name] -> [Imp.AExp] -> Verification ([TypedName], Assertion, Assertion)
-specAtCallsite cid assignees callArgs = do
+specAtCallsite :: Imp.CallId -> [Imp.AExp] -> Verification ([TypedName], Assertion, Assertion)
+specAtCallsite cid callArgs = do
   (quant, specMap) <- envGetQSpecs
-  let assigneeVars = map Imp.AVar assignees
   case Map.lookup cid specMap of
     Nothing -> throwError $ "No " ++ (show quant) ++ " specification for " ++ show cid ++ ". "
                ++ "Specified " ++ (show quant) ++ " functions are: " ++ (show $ Map.keys specMap) ++ "."
     Just (Spec specParams cvars pre post) -> let
-      rets      = Spec.retVars $ length assignees
-      fromNames = map (\n -> TypedName n Name.Int) (rets ++ specParams)
-      toAriths  = map Imp.aexpToArith (assigneeVars ++ callArgs)
+      fromNames = map (\n -> TypedName n Name.Int) specParams
+      toAriths  = map Imp.aexpToArith callArgs
       bind a    = foldr (uncurry A.subArith) a (zip fromNames toAriths)
       in return (cvars, bind pre, bind post)

@@ -95,3 +95,16 @@ test_multipleReturns = let
     ]
   actual = inline idImpls prog
   in assertEqual expected actual
+
+test_selfUpdate = let
+  impls = Map.fromList [
+    ("plus5", FunImpl [x] (SAsgn y (AAdd (AVar x) (ALit 5))) [y])
+    ]
+  prog =  SCall "plus5" [AVar a] [a]
+  expected = Right $ SSeq [ -- SCall plus5
+      SAsgn (Name "x" 1) (AVar a)
+    , SAsgn (Name "y" 1) (AAdd (AVar (Name "x" 1)) (ALit 5))
+    , SAsgn a (AVar (Name "y" 1))
+    ]
+  actual = inline impls prog
+  in assertEqual expected actual
