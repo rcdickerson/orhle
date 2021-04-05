@@ -11,6 +11,7 @@ import           Control.Monad.Trans.State
 import           Data.Either ( partitionEithers )
 import           Data.List ( partition )
 import qualified Data.Map as Map
+import           Data.Maybe ( catMaybes )
 import qualified Data.Set as Set
 import           Orhle.Assertion ( Assertion )
 import qualified Orhle.Assertion as A
@@ -25,6 +26,8 @@ import qualified Orhle.SMT as SMT
 import           Orhle.Spec ( AESpecs(..), Spec(..), SpecMap )
 import qualified Orhle.Spec as Spec
 import           Orhle.Triple
+
+import Debug.Trace
 
 ------------------------------
 -- Verification Environment --
@@ -85,23 +88,6 @@ type Verifier = AESpecs -> FunImplEnv -> RhleTriple -> IO (Either Failure Succes
 data Failure  = Failure { failMessage :: String } deriving Show
 data Success  = Success { }
 
--- When reasoning backward, it's convenient to store programs in reverse order.
-type RevSeq = [Program]
-data RevRhleTriple = RevRhleTriple Assertion [RevSeq] [RevSeq] Assertion
-
-revSeq :: Program -> RevSeq
-revSeq program = case program of
-  SSkip                  -> []
-  SAsgn name aexp        -> [ SAsgn name aexp ]
-  SSeq progs             -> reverse . concat $ map revSeq progs
-  SIf c t e              -> [ SIf c t e ]
-  SWhile c body iv       -> [ SWhile c body iv ]
-  SCall cid args assigns -> [ SCall cid args assigns ]
-
-revTriple :: RhleTriple -> RevRhleTriple
-revTriple (RhleTriple pre aprogs eprogs post) =
-  RevRhleTriple pre (map revSeq aprogs) (map revSeq eprogs) post
-
 rhleVerifier :: Verifier
 rhleVerifier specs impls (RhleTriple pre aProgs eProgs post) =
   case doInline impls aProgs eProgs of
@@ -144,33 +130,32 @@ step triple = do
     Just triple' -> return triple'
 
 stepTemp :: RevRhleTriple -> Verification RevRhleTriple
-stepTemp triple@(RevRhleTriple pre aprogs eprogs post) =
-  case (aprogs, eprogs) of
+stepTemp t =
+  let triple@(RevRhleTriple pre aprogs eprogs post) = filterEmptyProgs t
+  in case (aprogs, eprogs) of
     ([], []) -> return triple
-    (_, (eprog:rest):esTail) -> do
+    (_, (eprog:rest)) -> do
       post' <- weakestPreQ VExistential eprog post
-      let eprogs' = (rest:esTail)
-      return $ RevRhleTriple pre aprogs eprogs' post'
-    ((aprog:rest):asTail, _) -> do
+      return $ RevRhleTriple pre aprogs rest post'
+    (aprog:rest, _) -> do
       post' <- weakestPreQ VUniversal aprog post
-      let aprogs' = (rest:asTail)
-      return $ RevRhleTriple pre aprogs' eprogs post'
+      return $ RevRhleTriple pre rest eprogs post'
 
 stepFirstNonLoop :: RevRhleTriple -> Verification (Maybe RevRhleTriple)
 stepFirstNonLoop triple = let
   RevRhleTriple pre aprogs eprogs post = filterEmptyProgs triple
-  (aloops, as) = partition (isLoop . head) aprogs
-  (eloops, es) = partition (isLoop . head) eprogs
+  (aloops, as) = partition isLoop aprogs
+  (eloops, es) = partition isLoop eprogs
   in case (as, es) of
     ([], []) -> return Nothing
-    (_, (eprog:rest):esTail) -> do
-      post' <- weakestPreQ VExistential eprog post
-      let eprogs' = (rest:esTail) ++ eloops
-      return $ Just $ RevRhleTriple pre aprogs eprogs' post'
-    ((aprog:rest):asTail, _) -> do
+    (_, eprog:rest) -> do
+      let (hd, eprog') = headProg eprog
+      post' <- weakestPreQ VExistential hd post
+      return $ Just $ RevRhleTriple pre aprogs (eprog':(rest ++ eloops)) post'
+    (aprog:rest, _) -> do
+      let (hd, aprog') = headProg aprog
       post' <- weakestPreQ VUniversal aprog post
-      let aprogs' = (rest:asTail) ++ aloops
-      return $ Just $ RevRhleTriple pre aprogs' eprogs post'
+      return $ Just $ RevRhleTriple pre (aprog':(rest ++ aloops)) eprogs post'
 
 fuseLoops :: RevRhleTriple -> Verification RevRhleTriple
 fuseLoops triple = let
@@ -181,28 +166,53 @@ fuseLoops triple = let
 
 extractLoops :: RevRhleTriple -> ( [(BExp, Program)], [(BExp, Program)], (Assertion, A.Arith), RevRhleTriple )
 extractLoops (RevRhleTriple pre aprogs eprogs post) = let
-  aloops = map head aprogs
-  eloops = map head eprogs
-  condBody (SWhile cond body _) = (cond, body)
-  (SWhile _ _ iv) = head . head $ aprogs ++ eprogs -- TODO: Match invars
-  in (map condBody aloops, map condBody eloops, iv, filterEmptyProgs $ RevRhleTriple pre (map tail aprogs) (map tail eprogs) post)
+  aloops = catMaybes $ map headLoop aprogs
+  eloops = catMaybes $ map headLoop eprogs
+  condBodyOf (cond, body, _, _) = (cond, body)
+  invarVarOf (_, _, iv, _)      = iv
+  restOf     (_, _, _, rest)    = rest
+  iv = invarVarOf $ head (aloops ++ eloops) -- TODO: Match invariants
+  triple' = filterEmptyProgs $ RevRhleTriple pre (map restOf aloops) (map restOf eloops) post
+  in (map condBodyOf aloops, map condBodyOf eloops, iv, triple')
+
+headProg :: Program -> (Program, Program)
+headProg prog = case prog of
+  SSkip        -> (prog, SSkip)
+  SAsgn _ _    -> (prog, SSkip)
+  SSeq []      -> (SSkip, SSkip)
+  SSeq (s:ss)  -> let (s', ss') = headProg s in (s', SSeq $ ss':ss)
+  SIf _ _ _    -> (prog, SSkip)
+  SWhile _ _ _ -> (prog, SSkip)
+  SCall _ _ _  -> (prog, SSkip)
 
 isLoop :: Program -> Bool
-isLoop prog = case prog of
-  SWhile _ _ _ -> True
-  _            -> False
+isLoop prog = case headLoop prog of
+  Nothing -> False
+  Just _  -> True
 
-isEmpty :: [Program] -> Bool
-isEmpty progs = case progs of
-  []          -> True
-  [ SSkip ]   -> True
-  [ SSeq ss ] -> isEmpty ss
-  _           -> False
+headLoop :: Program -> Maybe (BExp, Program, (Assertion, A.Arith), Program)
+headLoop prog = case filterEmpty prog of
+  Nothing                    -> Nothing
+  Just (SWhile cond body iv) -> Just (cond, body, iv, SSkip)
+  Just (SSeq (hd:_))         -> headLoop hd
+  _                          -> Nothing
+
+filterEmpty :: Program -> Maybe Program
+filterEmpty prog = case prog of
+  SSkip            -> Nothing
+  SAsgn _ _        -> Just prog
+  SSeq []          -> Nothing
+  SSeq ss          -> case catMaybes $ map filterEmpty ss of
+                        []  -> Nothing
+                        ss' -> Just $ SSeq ss'
+  SIf _ _ _        -> Just prog
+  SWhile c body iv -> (filterEmpty body) >>= \body' -> return $ SWhile c body' iv
+  SCall _ _ _      -> Just prog
 
 filterEmptyProgs :: RevRhleTriple -> RevRhleTriple
 filterEmptyProgs (RevRhleTriple pre aprogs eprogs post) =
-  let nonempty = filter $ not . isEmpty
-  in RevRhleTriple pre (nonempty aprogs) (nonempty eprogs) post
+  let filtered = catMaybes . (map filterEmpty)
+  in RevRhleTriple pre (filtered aprogs) (filtered eprogs) post
 
 ------------------------------------
 -- Weakest Precondition Semantics --
@@ -274,12 +284,18 @@ wpLoopFusion aloops eloops (invar, var) post = do
       allNConds = anconds ++ enconds
       varSet    = Set.unions $ map namesIn allConds ++ map namesIn allBodies
       vars      = Set.toList varSet
-      bodyTrip  = RhleTriple (A.And $ invar:allConds) abodies ebodies invar
+      bodyTrip  = RevRhleTriple (A.And $ invar:allConds) abodies ebodies invar
+  traceM $ "\n ***** bodyTrip (rev): " ++ ppRevRhleTriple bodyTrip
   freshVars    <- envFreshen vars
   let freshen   = Name.substituteAll vars freshVars
   let qNames    = namesToIntNames freshVars
   let impPost   = freshen $ A.Imp (A.And $ invar:allNConds) post
-  inductive    <- do result <- (stepUntilDone $ revTriple bodyTrip); return $ freshen result
+  inductive    <- (stepUntilDone bodyTrip) >>= (return . freshen)
+
+  unfreshInductive    <- (stepUntilDone bodyTrip)
+  traceM $ "\n ***** unfresh inductive VC: " ++ showSMT unfreshInductive
+  traceM $ "\n ***** inductive VC: " ++ showSMT inductive
+
   let sameIters = freshen $ A.Imp (A.And [invar, (A.Not $ A.And allConds)]) (A.And allNConds)
   -- TODO: Variant
   return $ A.And [ invar, A.Forall qNames impPost, A.Forall qNames inductive, A.Forall qNames sameIters]
