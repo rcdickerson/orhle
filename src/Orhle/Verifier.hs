@@ -27,8 +27,6 @@ import           Orhle.Spec ( AESpecs(..), Spec(..), SpecMap )
 import qualified Orhle.Spec as Spec
 import           Orhle.Triple
 
-import Debug.Trace
-
 ------------------------------
 -- Verification Environment --
 ------------------------------
@@ -194,7 +192,9 @@ headLoop :: Program -> Maybe (BExp, Program, (Assertion, A.Arith), Program)
 headLoop prog = case filterEmpty prog of
   Nothing                    -> Nothing
   Just (SWhile cond body iv) -> Just (cond, body, iv, SSkip)
-  Just (SSeq (hd:_))         -> headLoop hd
+  Just (SSeq (hd:rest))      -> do
+    (cond, loop, iv, rest') <- headLoop hd
+    return (cond, loop, iv, SSeq $ rest':rest)
   _                          -> Nothing
 
 filterEmpty :: Program -> Maybe Program
@@ -285,17 +285,11 @@ wpLoopFusion aloops eloops (invar, var) post = do
       varSet    = Set.unions $ map namesIn allConds ++ map namesIn allBodies
       vars      = Set.toList varSet
       bodyTrip  = RevRhleTriple (A.And $ invar:allConds) abodies ebodies invar
-  traceM $ "\n ***** bodyTrip (rev): " ++ ppRevRhleTriple bodyTrip
   freshVars    <- envFreshen vars
   let freshen   = Name.substituteAll vars freshVars
   let qNames    = namesToIntNames freshVars
   let impPost   = freshen $ A.Imp (A.And $ invar:allNConds) post
   inductive    <- (stepUntilDone bodyTrip) >>= (return . freshen)
-
-  unfreshInductive    <- (stepUntilDone bodyTrip)
-  traceM $ "\n ***** unfresh inductive VC: " ++ showSMT unfreshInductive
-  traceM $ "\n ***** inductive VC: " ++ showSMT inductive
-
   let sameIters = freshen $ A.Imp (A.And [invar, (A.Not $ A.And allConds)]) (A.And allNConds)
   -- TODO: Variant
   return $ A.And [ invar, A.Forall qNames impPost, A.Forall qNames inductive, A.Forall qNames sameIters]
