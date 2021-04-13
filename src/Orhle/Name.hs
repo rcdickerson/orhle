@@ -1,3 +1,5 @@
+ {-# LANGUAGE OverloadedStrings #-}
+
 module Orhle.Name
   ( CollectableNames(..)
   , Handle
@@ -17,15 +19,19 @@ module Orhle.Name
   , substituteAll
   , substituteHandle
   , substituteAllHandles
+  , toIntName
+  , toIntNames
   ) where
 
+import qualified Data.ByteString.Char8 as S8
 import           Data.List ( intercalate )
 import           Data.List.Split ( splitOn )
 import           Data.Map  ( Map, (!) )
 import qualified Data.Map as Map
+import           Data.Monoid ((<>))
 import           Data.Set  ( Set )
 import qualified Data.Set as Set
-import           Orhle.ShowSMT
+import           Orhle.SMTString
 
 -----------
 -- Names --
@@ -43,6 +49,9 @@ class CollectableNames a where
 class MappableNames a where
   mapNames :: (Name -> Name) -> a -> a
 
+instance MappableNames a => MappableNames [a] where
+  mapNames f = map (mapNames f)
+
 instance CollectableNames Name where
   namesIn = Set.singleton
 
@@ -53,9 +62,9 @@ instance Show Name where
   show (Name h 0) = h
   show (Name h i) = h ++ "!" ++ (show i)
 
-instance ShowSMT Name where
-  showSMT (Name h 0) = h
-  showSMT (Name h i) = h ++ "!" ++ (show i)
+instance SMTString Name where
+  toSMT (Name h 0) = S8.pack h
+  toSMT (Name h i) = (S8.pack h) <> "!" <> (S8.pack $ show i)
 
 liftHandleMap :: (String -> String) -> Name -> Name
 liftHandleMap f (Name h i) = Name (f h) i
@@ -132,10 +141,10 @@ instance Show Type where
     Bool -> "bool"
     Int  -> "int"
 
-instance ShowSMT Type where
-  showSMT ty = case ty of
-    Bool -> "bool"
-    Int  -> "int"
+instance SMTString Type where
+  toSMT ty = case ty of
+    Bool -> "Bool"
+    Int  -> "Int"
 
 data TypedName = TypedName { tnName :: Name
                            , tnType :: Type
@@ -144,11 +153,22 @@ data TypedName = TypedName { tnName :: Name
 instance Show TypedName where
   show (TypedName name _) = show name
 
-instance ShowSMT TypedName where
-  showSMT (TypedName name ty) = "(" ++ showSMT name ++ " " ++ showSMT ty ++ ")"
+instance SMTString TypedName where
+  toSMT (TypedName name ty) = "(" <> toSMT name <> " " <> toSMT ty <> ")"
 
 instance CollectableNames TypedName where
   namesIn (TypedName name _) = Set.singleton name
 
 instance MappableNames TypedName where
   mapNames f (TypedName name ty) = TypedName (f name) ty
+
+
+---------------
+-- Utilities --
+---------------
+
+toIntName :: Name -> TypedName
+toIntName name = TypedName name Int
+
+toIntNames :: Functor f => f Name -> f TypedName
+toIntNames = fmap toIntName

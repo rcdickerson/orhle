@@ -6,14 +6,14 @@
 // Test: https://github.com/c2mon/c2mon/blob/d80687b119c713dd177a58cf53a997d8cc5ca264/c2mon-daq/c2mon-daq-core/src/test/java/cern/c2mon/daq/filter/dynamic/DiffMovingAverageTest.java
 
 // Assert test is flaky.
-exists: testAverage[1], testAverage[2];
+exists: testAverageA, testAverageB;
 pre:    true;
-post:   (not (= test!1!success test!2!success));
+post:   (not (= testAverageA!success testAverageB!success));
 
 aspecs:
   // Any positive current time is possible.
   getCurrentTimeMs() {
-    post: (> 0 ret!)
+    post: (< 0 ret!)
   }
 
   // Sleep is not guaranteed to be precise, the only
@@ -25,9 +25,9 @@ aspecs:
 especs:
   // Treat all possible current times as realizable.
   getCurrentTimeMs() {
-    choiceVars: t;
-    pre:  (> 0 t);
-    post: (= ret! t);
+    choiceVars: currentTime;
+    pre:  (< 0 currentTime);
+    post: (= ret! currentTime);
   }
 
   // Although not precise, realistically sleep will be fairly
@@ -35,11 +35,11 @@ especs:
   // actually realizable. (The flaky test is likely caused
   // by developers underestimating this interval.)
   sleep(interval, currentTime) {
-    choiceVars: t;
-    pre:  (and (>= 0 t)
-               (<= (- interval 15) t)
-               (<= t (+ interval 15)));
-    post: (= ret! (+ currentTime t));
+    choiceVars: sleepTime;
+    pre:  (and (<= 0 sleepTime)
+               (<= (- interval 15) sleepTime)
+               (<= sleepTime (+ interval 15)));
+    post: (= ret! (+ currentTime sleepTime));
   }
 
 
@@ -48,54 +48,61 @@ especs:
 // heap state as inputs and return modifications as output. Hardcode
 // the window size to 5.
 
-fun recordTimestamp(currentTimeMs, curPosition, currentAverage, usedFields, lastValue, diffs[5]) {
+fun recordTimestamp(currentTimeMs, self_currentAverage, self_lastValue, self_usedFields, self_diffs[5]) {
   curTimestamp := currentTimeMs;
-  if (usedFields > 0) then
-    diff := curTimestamp - lastValue;
-    if (usedFields == 5) then
-      removedValue := call select(diffs[5], curPosition);
-      diffs[5] := call store(diffs[5], curPosition, diff);
-      (currentAverage, usedFields, timeDifference) := call calculateNewAverage(removedValue, diff, 0,
-       currentAverage, usedFields, timeDifference);
-      curPosition := call shiftEnd(curPosition, 5);
-    else
-      (currentAverage, usedFields, timeDifference) := call calculateNewAverage(0, diff, 1,
-       currentAverage, usedFields, timeDifference);
-      diffs[5] := call store(diffs[5], curPosition, diff);
-      curPosition := call shiftEnd(curPosition, 5);
-    endif
+  if (self_usedFields > 0) then
+//    diff := curTimestamp - self_lastValue;
+//    if (usedFields == 5) then
+//      removedValue := call select(diffs[5], curPosition);
+//      diffs[5] := call store(diffs[5], curPosition, diff);
+//      (currentAverage, usedFields, timeDifference) := call calculateNewAverage(removedValue, diff, 0,
+//       currentAverage, usedFields, timeDifference);
+//      curPosition := call shiftEnd(curPosition, 5);
+//    else
+//      (currentAverage, usedFields, timeDifference) := call calculateNewAverage(0, diff, 1,
+//       currentAverage, usedFields, timeDifference);
+//      diffs[5] := call store(diffs[5], curPosition, diff);
+//      curPosition := call shiftEnd(curPosition, 5);
+//    endif
+      skip;
   else
-    if (lastValue != -1) then
-      diff := curTimestamp - lastValue;
-      currentAverage := 0;
-      diffs[5] := call store(diffs[5], curPosition, diff);
-      (currentAverage, usedFields, timeDifference) := call calculateNewAverage(0, diff, 1,
-       currentAverage, usedFields, timeDifference);
-      curPosition := call shiftEnd(curPosition, 5);
+    if (self_lastValue != -1) then
+      diff := curTimestamp - self_lastValue;
+      self_currentAverage := 0;
+      diffs[5] := call store(self_diffs[5], curPosition, diff);
+      (self_currentAverage, self_usedFields) := call calculateNewAverage(0, diff, 1,
+       self_currentAverage, self_usedFields);
+      self_curPosition := call shiftEnd(
+      self_curPosition, 5);
     endif
   endif
-  lastValue := curTimestamp;
 
-  return (currentTimeMs, curPosition, currentAverage, usedFields, lastValue, diffs[5]);
+  self_lastValue := curTimestamp;
+
+  return (currentTimeMs, self_currentAverage, self_lastValue, self_usedFields, self_diffs[5]);
 }
 
 fun calculateNewAverage(removedValue, diff, increaseUsedFields,
-                        currentAverage, usedFields, timeDifference) {
-  oldSum := currentAverage * usedFields;
-  if (increaseUsedFields == 1) then
-    usedFields := usedFields + 1;
-  endif
-  currentAverage := (oldSum - removedValue + timeDifference) / usedFields;
-  return (currentAverage, usedFields, timeDifference);
+                        self_currentAverage, self_usedFields) {
+//  oldSum := currentAverage * usedFields;
+//  if (increaseUsedFields == 1) then
+//    usedFields := usedFields + 1;
+//  endif
+//  currentAverage := (oldSum - removedValue + timeDifference) / usedFields;
+////
+    self_currentAverage := diff;
+////
+
+  return (self_currentAverage, self_usedFields);
 }
 
-fun shiftEnd(curPosition, diffs_length) {
-  curPosition := (curPosition + 1) % diffs_length;
-  return curPosition;
+fun shiftEnd(self_curPosition, self_diffs_length) {
+  self_curPosition := (self_curPosition + 1) % self_diffs_length;
+  return self_curPosition;
 }
 
-fun getCurrentAverage(currentAverage) {
-  return currentAverage;
+fun getCurrentAverage(self_currentAverage) {
+  return self_currentAverage;
 }
 
 // Model array storage / selection.
@@ -119,36 +126,74 @@ fun store(arr[5], i, x) {
 
 
 // The flaky test:
-fun testAverage() {
-  // Mock out the object's initial heap state.
-  currentTime := call getCurrentTimeMs();
-  curPosition := 0;
-  currentAverage := -1;
-  usedFields := 0;
-  lastValue := -1;
-  diffs_0 := 0; diffs_1 := 0; diffs_2 := 0; diffs_3 := 0; diffs_4 := 0;
+fun testAverageA() {
+
+  // Mock the current time.
+  currentTimeMs := 112;
+
+  // Represent the object's heap state.
+  h_lastValue := 0;
+  h_currentAverage := 112;
+  h_usedFields := 0;
+  h_diffs_0 := 0; h_diffs_1 := 0; h_diffs_2 := 0; h_diffs_3 := 0; h_diffs_4 := 0;
 
   // Begin test code.
   counter := 0;
   while (counter < 5) do
-    @inv { (and
-              (=> (> testAverage!1!counter 0)
-                  (>  110 testAverage!1!currentAverage))
-              (=> (> testAverage!2!counter 0)
-                  (and
-                    (>= 90  testAverage!2!currentAverage)
-                    (<= 100 testAverage!2!currentAverage)))) }
     @var { (- 10 (+ testAverage!1!counter testAverage!2!counter)) }
 
-    (currentTimeMs, curPosition, currentAverage, usedFields, lastValue, diffs[5]) := call recordTimestamp(
-     currentTimeMs, curPosition, currentAverage, usedFields, lastValue, diffs[5]);
+    (currentTimeMs, h_currentAverage, h_lastValue, h_usedFields, h_diffs[5]) := call recordTimestamp(
+     currentTimeMs, h_currentAverage, h_lastValue, h_usedFields, h_diffs[5]);
 
-    currentTime := call sleep(100,
-    currentTime);
+    currentTimeMs := call sleep(100,
+    currentTimeMs);
 
     counter := counter + 1;
   end
-  currentAverage := call getCurrentAverage(currentAverage);
+  currentAverage := call getCurrentAverage(h_currentAverage);
+
+  if (currentAverage >= 90 && currentAverage <= 110)
+    then success := 1;
+    else success := 0;
+  endif
+
+  return success;
+}
+
+
+fun testAverageB() {
+
+  // Mock the current time.
+  currentTimeMs := 112;
+
+  // Represent the object's heap state.
+  h_lastValue := 12;
+  h_currentAverage := 100;
+  h_usedFields := 0;
+  h_diffs_0 := 0; h_diffs_1 := 0; h_diffs_2 := 0; h_diffs_3 := 0; h_diffs_4 := 0;
+
+  // Begin test code.
+  counter := 0;
+  while (counter < 5) do
+//    @inv { (and (<  110 testAverageA!h_currentAverage)
+//                (<= 90  testAverageB!h_currentAverage)
+//                (<= testAverageB!h_currentAverage 100)
+//                (= (- testAverageA!currentTimeMs testAverageA!h_lastValue) 112)
+//                (= testAverageA!h_currentAverage (- testAverageA!currentTimeMs testAverageA!h_lastValue))
+//                (= (- testAverageB!currentTimeMs testAverageB!h_lastValue) 100)
+//                (= testAverageB!h_currentAverage (- testAverageB!currentTimeMs testAverageB!h_lastValue))
+//                (= testAverageA!counter testAverageB!counter)) }
+    @var { (- 10 (+ testAverage!1!counter testAverage!2!counter)) }
+
+    (currentTimeMs, h_currentAverage, h_lastValue, h_usedFields, h_diffs[5]) := call recordTimestamp(
+     currentTimeMs, h_currentAverage, h_lastValue, h_usedFields, h_diffs[5]);
+
+    currentTimeMs := call sleep(100,
+    currentTimeMs);
+
+    counter := counter + 1;
+  end
+  currentAverage := call getCurrentAverage(h_currentAverage);
 
   if (currentAverage >= 90 && currentAverage <= 110)
     then success := 1;

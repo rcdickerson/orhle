@@ -1,13 +1,17 @@
 module Orhle.Assertion
   ( Arith(..)
   , Assertion(..)
+  , HoleId(..)
   , Name(..)
   , ParseError
   , freeVars
   , parseArith
   , parseAssertion
-  , showSMT
+  , parseGoals
+  , toSMT
   , subArith
+  , toIntVar
+  , toIntVars
   ) where
 
 import Orhle.Assertion.AssertionLanguage

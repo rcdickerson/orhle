@@ -22,8 +22,6 @@ especs:
 fun original() {
   sum := 0;
   while (sum <= 100) do
-    @inv { (and (=> (<= original!sum 100) (and (< 100 refinement!sum) (< refinement!sum 110)))
-                (=> (< 100 original!sum) (= original!sum refinement!sum))) }
     @var { (- 110 original!sum) }
     r := call rand();
     sum := sum + r;
@@ -34,7 +32,6 @@ fun original() {
 fun refinement() {
   sum := 0;
   while (sum <= 100) do
-    @inv { (and (<= 0 refinement!sum) (< refinement!sum 111)) }
     r := call biggerRand();
     sum := sum + r;
   end

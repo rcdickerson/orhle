@@ -4,9 +4,12 @@ module Orhle.Assertion.AssertionParser
   , assertionParser
   , parseArith
   , parseAssertion
+  , parseGoals
   ) where
 
 import           Data.Char ( toLower )
+import           Data.Map  ( Map )
+import qualified Data.Map as Map
 import           Orhle.Assertion.AssertionLanguage ( Arith, Assertion )
 import qualified Orhle.Assertion.AssertionLanguage as A
 import           Orhle.Name ( Name(..), Type(..), TypedName(..) )
@@ -15,7 +18,7 @@ import           Text.Parsec
 import           Text.Parsec.Language
 import qualified Text.Parsec.Token as Token
 
-languageDef :: LanguageDef ()
+languageDef :: LanguageDef Ctx
 languageDef = Token.LanguageDef
   { Token.caseSensitive   = True
   , Token.commentStart    = ""
@@ -33,7 +36,8 @@ languageDef = Token.LanguageDef
                              "get-assertions", "get-assignment", "get-info",
                              "get-option", "get-proof", "set-unsat-core",
                              "get-value", "pop", "push", "set-info",
-                             "set-logic", "set-option"
+                             "set-logic", "set-option",
+                             "goals", "goal"
                             ]
   , Token.reservedOpNames = [ "+", "-", "*", "/"
                             , "=", ">=", "<=", "<", ">"
@@ -53,17 +57,55 @@ comma      = Token.comma      lexer
 semi       = Token.semi       lexer
 whitespace = Token.whiteSpace lexer
 
-type AssertionParser = Parsec String () Assertion
-type ArithParser     = Parsec String () Arith
-type TNameParser     = Parsec String () TypedName
-type NameParser      = Parsec String () Name
-type TypeParser      = Parsec String () Type
+---- Parse context ----
+data Ctx = Ctx { ctx_letMapping :: Map String Assertion }
+
+emptyCtx = Ctx Map.empty
+
+ctxPutLetBinding :: String -> Assertion -> Parsec String Ctx ()
+ctxPutLetBinding name assertion = do
+  (Ctx letMapping) <- getState
+  putState (Ctx $ Map.insert name assertion letMapping)
+
+ctxGetLetBinding :: String -> Parsec String Ctx (Maybe Assertion)
+ctxGetLetBinding name = do
+  (Ctx letMapping) <- getState
+  return $ Map.lookup name letMapping
+-----------------------
+
+type AssertionParser     = Parsec String Ctx Assertion
+type AssertionListParser = Parsec String Ctx [Assertion]
+type ArithParser         = Parsec String Ctx Arith
+type GoalsParser         = Parsec String Ctx [[Assertion]]
+type TNameParser         = Parsec String Ctx TypedName
+type NameParser          = Parsec String Ctx Name
+type TypeParser          = Parsec String Ctx Type
 
 parseAssertion :: String -> Either ParseError Assertion
-parseAssertion assertStr = runParser assertionParser () "" assertStr
+parseAssertion assertStr = runParser assertionParser emptyCtx "" assertStr
 
 parseArith :: String -> Either ParseError Arith
-parseArith arithStr = runParser arithParser () "" arithStr
+parseArith arithStr = runParser arithParser emptyCtx "" arithStr
+
+parseGoals :: String -> Either ParseError [[Assertion]]
+parseGoals goalsStr = runParser goalsParser emptyCtx "" goalsStr
+
+goalsParser :: GoalsParser
+goalsParser = do
+  whitespace >> char '(' >> whitespace
+  reserved "goals"
+  goals <- many goal
+  whitespace >> char ')' >> whitespace
+  return goals
+
+goal :: AssertionListParser
+goal = do
+  whitespace >> char '(' >> whitespace
+  reserved "goal"
+  gs <- many assertionParser
+  _  <- many annotation
+  whitespace >> char ')' >> whitespace
+  return gs
 
 assertionParser :: AssertionParser
 assertionParser = whitespace >> boolExpr
@@ -71,12 +113,43 @@ assertionParser = whitespace >> boolExpr
 arithParser :: ArithParser
 arithParser = whitespace >> arithExpr
 
+letBinding :: AssertionParser
+letBinding = parens $ do
+  reserved "let"
+  parens $ many $ do
+    parens $ do
+      name <- identifier
+      whitespace
+      expr <- boolExpr
+      ctxPutLetBinding name expr
+  body <- boolExpr
+  return body
+
+letRef :: AssertionParser
+letRef = do
+  binding <- ctxGetLetBinding =<< identifier
+  case binding of
+    Just a  -> return a
+    Nothing -> fail $ "name not found"
+
 boolExpr :: AssertionParser
 boolExpr = try forall
        <|> try exists
        <|> try boolApp
        <|> try boolLit
+       <|> try letBinding
+       <|> try letRef
        <|> boolVar
+
+annotation :: Parsec String Ctx (String, String)
+annotation = do
+  whitespace
+  char ':'
+  name <- identifier
+  whitespace
+  value <- (identifier <|> (integer >>= return . show))
+  whitespace
+  return (name, value)
 
 arithExpr :: ArithParser
 arithExpr = try arithApp

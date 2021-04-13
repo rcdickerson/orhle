@@ -144,8 +144,9 @@ tryOrHole p = try p <|> hole
 hole :: ImpParser Assertion
 hole = do
   ParseCtx holeNum funImpls <- getState
+  let holeId = HoleId holeNum holeNum
   putState $ ParseCtx (holeNum + 1) funImpls
-  return $ Hole holeNum
+  return $ Hole holeId
 
 assignStmt :: ProgramParser
 assignStmt = do

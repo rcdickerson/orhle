@@ -11,6 +11,11 @@ pre: (and
        (<= play!handValue 20));
 post: (= play!handValue 21);
 
+aspecs:
+  draw() {
+    post: (and (>= ret! 1) (<= ret! 10));
+  }
+
 especs:
   draw() {
     choiceVars: c;
@@ -20,8 +25,8 @@ especs:
 
 fun play() {
   while (handValue < 21) do
-    @inv { (<= play!handValue 21) }
-    @var { (- 30 handValue) }
+//    @inv { (<= play!handValue 21) }
+//    @var { (- 30 handValue) }
 
     card := call draw();
     handValue := handValue + card;

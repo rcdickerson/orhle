@@ -2,17 +2,20 @@ module Orhle.Triple
   ( HlTriple(..)
   , HleTriple(..)
   , RhleTriple(..)
-  , ReverseProgram
+  , RevProgram(..)
   , RevRhleTriple(..)
+  , filterEmptyRev
+  , filterEmptyTrip
   , ppRhleTriple
   , ppRevRhleTriple
-  , revTriple
+  , reverseTriple
+  , reverseProgram
   ) where
 
 import Data.List ( intercalate )
 import Orhle.Assertion
 import Orhle.Imp
-import Orhle.ShowSMT ( showSMT )
+import Orhle.SMTString ( showSMT )
 
 data HlTriple = HlTriple
   { hlPre  :: Assertion
@@ -41,12 +44,16 @@ ppRhleTriple (RhleTriple pre aprogs eprogs post) =
     (intercalate "\n--------\n" $ map ppProg eprogs) ++ "\n\n" ++
     "<< " ++ showSMT post ++ " >>"
 
+filterEmptyTrip :: RhleTriple -> RhleTriple
+filterEmptyTrip (RhleTriple pre aprogs eprogs post) =
+  RhleTriple pre (filterEmpty aprogs) (filterEmpty eprogs) post
 
 
 -- When reasoning backward, it's convenient to store programs in reverse order.
-type ReverseProgram = Program
+type RevProgram = Program
 
-data RevRhleTriple = RevRhleTriple Assertion [ReverseProgram] [ReverseProgram] Assertion
+data RevRhleTriple = RevRhleTriple Assertion [RevProgram] [RevProgram] Assertion
+                     deriving Show
 
 ppRevRhleTriple :: RevRhleTriple -> String
 ppRevRhleTriple (RevRhleTriple pre aprogs eprogs post) =
@@ -56,12 +63,16 @@ ppRevRhleTriple (RevRhleTriple pre aprogs eprogs post) =
     (intercalate "\n--------\n" $ map ppProg eprogs) ++ "\n\n" ++
     "<< " ++ showSMT post ++ " >>"
 
-reverseProgram :: Program -> ReverseProgram
+reverseProgram :: Program -> RevProgram
 reverseProgram program = case program of
   SSeq progs       -> (SSeq . reverse) $ map reverseProgram progs
   SWhile c body iv -> SWhile c (reverseProgram body) iv
   _                -> program
 
-revTriple :: RhleTriple -> RevRhleTriple
-revTriple (RhleTriple pre aprogs eprogs post) =
+reverseTriple :: RhleTriple -> RevRhleTriple
+reverseTriple (RhleTriple pre aprogs eprogs post) =
   RevRhleTriple pre (map reverseProgram aprogs) (map reverseProgram eprogs) post
+
+filterEmptyRev :: RevRhleTriple -> RevRhleTriple
+filterEmptyRev (RevRhleTriple pre aprogs eprogs post) =
+  RevRhleTriple pre (filterEmpty aprogs) (filterEmpty eprogs) post

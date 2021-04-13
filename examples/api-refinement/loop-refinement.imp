@@ -12,6 +12,10 @@ aspecs:
     post: (and (<= 0 ret!) (< ret! 10) (= (mod ret! 2) 1));
   }
 
+  rand() {
+    post: (and (<= 0 ret!) (< ret! 10));
+  }
+
 especs:
   rand() {
     choiceVars: n;
@@ -22,7 +26,7 @@ especs:
 fun original() {
   sum := 0;
   while (sum <= 100) do
-    @inv { (=> (> original!sum 100) (= original!sum refinement!sum)) }
+    @inv { (= original!sum refinement!sum) }
     @var { (- 110 original!sum) }
     r := call rand();
     sum := sum + r;
@@ -33,7 +37,7 @@ fun original() {
 fun refinement() {
   sum := 0;
   while (sum <= 100) do
-    @inv { (and (<= 0 refinement!sum) (< refinement!sum 110)) }
+    @inv { (= original!sum refinement!sum) }
     r := call randOdd();
     sum := sum + r;
   end

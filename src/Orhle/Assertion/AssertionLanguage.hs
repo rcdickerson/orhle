@@ -1,20 +1,28 @@
+ {-# LANGUAGE OverloadedStrings #-}
+
 module Orhle.Assertion.AssertionLanguage
   ( Arith(..)
   , Assertion(..)
+  , HoleId(..)
   , Name(..)
   , freeVars
-  , showSMT
+  , toSMT
   , subArith
+  , toIntVar
+  , toIntVars
   ) where
 
-import           Data.List ( intercalate )
+import           Data.ByteString ( ByteString )
+import qualified Data.ByteString.Char8 as S8
+import           Data.Monoid ((<>))
 import           Data.Set  ( Set )
 import qualified Data.Set as Set
 import           Orhle.Name ( Name(..)
                             , TypedName(..)
                             , CollectableNames(..)
                             , MappableNames(..) )
-import           Orhle.ShowSMT
+import qualified Orhle.Name as Name
+import           Orhle.SMTString
 
 ----------------------------
 -- Arithmetic Expressions --
@@ -30,8 +38,8 @@ data Arith = Num Integer
            | Pow Arith Arith
            deriving (Show, Eq, Ord)
 
-toSexp :: ShowSMT a => String -> [a] -> String
-toSexp name as = "(" ++ name ++ " " ++ (intercalate " " $ map showSMT as) ++ ")"
+toSexp :: SMTString a => ByteString -> [a] -> ByteString
+toSexp name as = "(" <> name <> " "<> (S8.intercalate " " $ map toSMT as) <> ")"
 
 instance MappableNames Arith where
   mapNames f arith = case arith of
@@ -55,10 +63,10 @@ instance CollectableNames Arith where
     Mod a1 a2 -> Set.union (namesIn a1) (namesIn a2)
     Pow a1 a2 -> Set.union (namesIn a1) (namesIn a2)
 
-instance ShowSMT Arith where
-  showSMT arith = case arith of
-    Num n -> show n
-    Var tname -> showSMT $ tnName tname
+instance SMTString Arith where
+  toSMT arith = case arith of
+    Num n -> S8.pack $ show n
+    Var tname -> toSMT $ tnName tname
     Add as    -> toSexp "+"   as
     Sub as    -> toSexp "-"   as
     Mul as    -> toSexp "*"   as
@@ -85,8 +93,12 @@ data Assertion = ATrue
                | Gte      Arith Arith
                | Forall   [TypedName] Assertion
                | Exists   [TypedName] Assertion
-               | Hole     Int
+               | Hole     HoleId
                deriving (Eq, Ord, Show)
+
+data HoleId = HoleId { hole_id       :: Int
+                     , hole_fusionId :: Int
+                     } deriving (Eq, Ord, Show)
 
 instance MappableNames Assertion where
   mapNames f assertion = case assertion of
@@ -104,7 +116,7 @@ instance MappableNames Assertion where
     Gte a1 a2     -> Gte (mapNames f a1) (mapNames f a2)
     Forall vs a   -> Forall (map (mapNames f) vs) (mapNames f a)
     Exists vs a   -> Exists (map (mapNames f) vs) (mapNames f a)
-    Hole i        -> Hole i
+    Hole hid      -> Hole hid
 
 instance CollectableNames Assertion where
   namesIn assertion = case assertion of
@@ -122,13 +134,13 @@ instance CollectableNames Assertion where
     Gte a1 a2      -> Set.union (namesIn a1) (namesIn a2)
     Forall vs a    -> Set.unions $ (namesIn a):(map namesIn vs)
     Exists vs a    -> Set.unions $ (namesIn a):(map namesIn vs)
-    Hole i         -> Set.empty
+    Hole _         -> Set.empty
 
-instance ShowSMT Assertion where
-  showSMT assertion = case assertion of
+instance SMTString Assertion where
+  toSMT assertion = case assertion of
     ATrue           -> "true"
     AFalse          -> "false"
-    Atom tname      -> showSMT $ tnName tname
+    Atom tname      -> toSMT $ tnName tname
     Not a           -> toSexp "not" [a]
     And as          -> toSexp "and" as
     Or as           -> toSexp "or" as
@@ -142,10 +154,10 @@ instance ShowSMT Assertion where
     Exists vars a   -> quantToSMT "exists" vars a
     Hole _          -> error "Cannot convert an assertion with a hole to SMT."
     where
-      quantToSMT :: String -> [TypedName] -> Assertion -> String
+      quantToSMT :: ByteString -> [TypedName] -> Assertion -> ByteString
       quantToSMT name qvars body =
-        let qvarsSMT = intercalate " " $ map showSMT qvars
-        in "(" ++ name ++ " (" ++ qvarsSMT ++ ") " ++ (showSMT body) ++ ")"
+        let qvarsSMT = S8.intercalate " " $ map toSMT qvars
+        in "(" <> name <> " (" <> qvarsSMT <> ") " <> toSMT body <> ")"
 
 
 ------------------------------
@@ -172,21 +184,21 @@ instance SubstitutableArith Assertion where
   subArith from to assertion =
     let sub = subArith from to
     in case assertion of
-      ATrue           -> ATrue
-      AFalse          -> AFalse
-      (Atom tname)    -> Atom tname
-      (Not a)         -> Not $ sub a
-      (And as)        -> And $ map sub as
-      (Or as)         -> Or  $ map sub as
-      (Imp a1 a2)     -> Imp (sub a1) (sub a2)
-      (Eq a1 a2)      -> Eq  (subArith from to a1) (subArith from to a2)
-      (Lt a1 a2)      -> Lt  (subArith from to a1) (subArith from to a2)
-      (Gt a1 a2)      -> Gt  (subArith from to a1) (subArith from to a2)
-      (Lte a1 a2)     -> Lte (subArith from to a1) (subArith from to a2)
-      (Gte a1 a2)     -> Gte (subArith from to a1) (subArith from to a2)
-      (Forall vars a) -> Forall vars (sub a)
-      (Exists vars a) -> Exists vars (sub a)
-      (Hole i)        -> Hole i
+      ATrue         -> ATrue
+      AFalse        -> AFalse
+      Atom tname    -> Atom tname
+      Not a         -> Not $ sub a
+      And as        -> And $ map sub as
+      Or as         -> Or  $ map sub as
+      Imp a1 a2     -> Imp (sub a1) (sub a2)
+      Eq a1 a2      -> Eq  (subArith from to a1) (subArith from to a2)
+      Lt a1 a2      -> Lt  (subArith from to a1) (subArith from to a2)
+      Gt a1 a2      -> Gt  (subArith from to a1) (subArith from to a2)
+      Lte a1 a2     -> Lte (subArith from to a1) (subArith from to a2)
+      Gte a1 a2     -> Gte (subArith from to a1) (subArith from to a2)
+      Forall vars a -> Forall vars (sub a)
+      Exists vars a -> Exists vars (sub a)
+      Hole hid      -> Hole hid
 
 
 --------------------
@@ -224,3 +236,14 @@ instance FreeVariables Assertion where
     Forall ids a -> Set.difference (freeVars a) (Set.fromList ids)
     Exists ids a -> Set.difference (freeVars a) (Set.fromList ids)
     Hole _       -> Set.empty
+
+
+---------------
+-- Utilities --
+---------------
+
+toIntVar :: Name -> Arith
+toIntVar = Var . Name.toIntName
+
+toIntVars :: Functor f => f Name -> f Arith
+toIntVars = fmap toIntVar
