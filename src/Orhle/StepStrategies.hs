@@ -6,12 +6,17 @@ module Orhle.StepStrategies
   ) where
 
 import           Data.List ( partition )
+import           Data.Map  ( Map )
+import qualified Data.Map as Map
+import           Data.Maybe ( fromMaybe )
+import           Orhle.Assertion ( Assertion )
 import qualified Orhle.Assertion as A
 import           Orhle.Imp.ImpLanguage ( Program(..) )
 import qualified Orhle.Imp as Imp
 import qualified Orhle.PredTransSingle as PTS
 import qualified Orhle.PredTransRelational as PTR
 import           Orhle.PredTransTypes
+import           Orhle.SMTString ( showSMT )
 import           Orhle.Triple
 import           Orhle.VerifierEnv
 
@@ -35,34 +40,16 @@ backwardWithFusion rawTriple =
 
 backstepWithFusion :: RevRhleTriple -> Verification RevRhleTriple
 backstepWithFusion triple = do
-  result <- trySequence triple [ lookForBLoopFusion
-                               , lookForBStepNonLoop
+  result <- trySequence triple [ lookForBNonLoop
+                               , lookForBLoopFusion
                                , lookForBStepAny
                                ]
   case result of
     Just triple' -> return triple'
     Nothing      -> throwError "Could not find a step to take."
 
-lookForBLoopFusion :: RevRhleTriple -> Verification (Maybe RevRhleTriple)
-lookForBLoopFusion triple@(RevRhleTriple pre aprogs eprogs post) = let
-  (aLoops, aNonLoops) = partition Imp.headIsLoop aprogs
-  (eLoops, eNonLoops) = partition Imp.headIsLoop eprogs
-  in if (not $ null $ aNonLoops ++ eNonLoops)
-    then return Nothing
-    else do
-      let aheads = map Imp.headProg aprogs
-          eheads = map Imp.headProg eprogs
-          aloops = map (progToRevLoop . fst) aheads
-          eloops = map (progToRevLoop . fst) eheads
-          -- TODO: verify synchronous stepping
-          ((SWhile _ _ (inv, _)), _)  -- TODO: only fuse on identical invariants
-            = Imp.headProg $ head $ (aLoops ++ eLoops)
-          fusion = RevLoopFusion aloops eloops (map snd aheads) (map snd eheads) pre post triple inv
-      post' <- PTR.wpLoopFusion fusion post
-      return $ Just $ RevRhleTriple pre (rlf_arest fusion) (rlf_erest fusion) post'
-
-lookForBStepNonLoop :: RevRhleTriple -> Verification (Maybe RevRhleTriple)
-lookForBStepNonLoop (RevRhleTriple pre aprogs eprogs post) = let
+lookForBNonLoop :: RevRhleTriple -> Verification (Maybe RevRhleTriple)
+lookForBNonLoop (RevRhleTriple pre aprogs eprogs post) = let
   (aloops, as) = partition Imp.headIsLoop aprogs
   (eloops, es) = partition Imp.headIsLoop eprogs
   in case (as, es) of
@@ -75,6 +62,25 @@ lookForBStepNonLoop (RevRhleTriple pre aprogs eprogs post) = let
       let (hd, aprog') = Imp.headProg aprog
       post' <- PTS.weakestPreQ VUniversal hd post
       return $ Just $ RevRhleTriple pre (aprog':(rest ++ aloops)) eprogs post'
+
+lookForBLoopFusion :: RevRhleTriple -> Verification (Maybe RevRhleTriple)
+lookForBLoopFusion triple@(RevRhleTriple pre aprogs eprogs post) = let
+  (aLoops, aNonLoops) = partition Imp.headIsLoop aprogs
+  (eLoops, eNonLoops) = partition Imp.headIsLoop eprogs
+  in if (not $ null $ aNonLoops ++ eNonLoops)
+    then return Nothing
+    else do
+      let aheads       = map Imp.headProg aprogs
+          eheads       = map Imp.headProg eprogs
+          aloopMap     = categorizeByInvar $ map fst aheads
+          eloopMap     = categorizeByInvar $ map fst eheads
+          (tag, loops) = head $ Map.toAscList aloopMap ++ Map.toAscList eloopMap
+          invar        = rl_invar . head $ loops
+          aloops       = fromMaybe [] $ Map.lookup tag aloopMap
+          eloops       = fromMaybe [] $ Map.lookup tag eloopMap
+          fusion       = RevLoopFusion aloops eloops (map snd aheads) (map snd eheads) pre post triple invar
+      post' <- PTR.wpLoopFusion fusion post
+      return $ Just $ RevRhleTriple pre (rlf_arest fusion) (rlf_erest fusion) post'
 
 lookForBStepAny :: RevRhleTriple -> Verification (Maybe RevRhleTriple)
 lookForBStepAny (RevRhleTriple pre aprogs eprogs post) =
@@ -89,11 +95,19 @@ lookForBStepAny (RevRhleTriple pre aprogs eprogs post) =
       post' <- PTS.weakestPreQ VUniversal hd post
       return $ Just $ RevRhleTriple pre (aprog':rest) eprogs post'
 
-progToRevLoop :: RevProgram -> RevLoop
-progToRevLoop program = case program of
-  SWhile condB body (A.Hole (A.HoleId hid _), _) ->
-    RevLoop body (Imp.bexpToAssertion condB) condB hid
-  _ -> error $ "Program is not a loop with missing invariant: " ++ show program
+categorizeByInvar :: [RevProgram] -> Map String [RevLoop]
+categorizeByInvar programs = let
+  taggedLoop prog = case prog of
+    SWhile condB body (invar@(A.Hole (A.HoleId hid _)), _) -> ("hole", RevLoop body (Imp.bexpToAssertion condB) condB (Just hid) invar)
+    SWhile condB body (invar, _) -> (showSMT invar, RevLoop body (Imp.bexpToAssertion condB) condB Nothing invar)
+    _ -> error $ "Program is not a loop: " ++ show prog
+  addLoop loop maybeList = case maybeList of
+    Nothing -> Just [loop]
+    Just ls -> Just (loop:ls)
+  updateMap prog m =
+    let (tag, loop) = taggedLoop prog
+    in Map.alter (addLoop loop) tag m
+  in foldr updateMap Map.empty programs
 
 
 -------------------------
@@ -167,8 +181,8 @@ lookForFStepAny (RhleTriple pre aprogs eprogs post) =
 
 progToLoop :: Program -> Loop
 progToLoop program = case program of
-  SWhile condB body (A.Hole (A.HoleId hid _), _) ->
-    Loop body (Imp.bexpToAssertion condB) condB hid
+  SWhile condB body (invar@(A.Hole (A.HoleId hid _)), _) ->
+    Loop body (Imp.bexpToAssertion condB) condB (Just hid) invar
   _ -> error $ "Program is not a loop with missing invariant: " ++ show program
 
 

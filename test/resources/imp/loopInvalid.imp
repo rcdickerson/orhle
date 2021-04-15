@@ -1,0 +1,39 @@
+expected: invalid;
+
+forall: refinement;
+exists: original;
+
+post: (= original!sum refinement!sum);
+
+aspecs:
+  biggerRand() {
+    post: (and (<= 0 ret!) (< ret! 11));
+  }
+
+especs:
+  rand() {
+    choiceVars: n;
+    pre:  (and (<= 0 n) (< n 10));
+    post: (= ret! n);
+  }
+
+fun original() {
+  sum := 0;
+  while (sum <= 100) do
+    @inv { (= original!sum refinement!sum) }
+    @var { (- 110 original!sum) }
+    r := call rand();
+    sum := sum + r;
+  end
+  return sum;
+}
+
+fun refinement() {
+  sum := 0;
+  while (sum <= 100) do
+    @inv { (= original!sum refinement!sum) }
+    r := call biggerRand();
+    sum := sum + r;
+  end
+  return sum;
+}

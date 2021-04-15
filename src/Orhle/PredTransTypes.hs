@@ -13,14 +13,16 @@ data Loop = Loop
   { l_body          :: Program
   , l_condAssertion :: Assertion
   , l_condBExp      :: BExp
-  , l_holeId        :: Int
+  , l_holeId        :: Maybe Int
+  , l_invar         :: Assertion
   } deriving Show
 
 data RevLoop = RevLoop
   { rl_body          :: RevProgram
   , rl_condAssertion :: Assertion
   , rl_condBExp      :: BExp
-  , rl_holeId        :: Int
+  , rl_holeId        :: Maybe Int
+  , rl_invar         :: Assertion
   } deriving Show
 
 data LoopFusion = LoopFusion

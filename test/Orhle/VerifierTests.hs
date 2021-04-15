@@ -4,10 +4,8 @@ module Orhle.VerifierTests(htf_thisModulesTests) where
 
 import Test.Framework
 
-import Data.List        (isSuffixOf)
 import qualified Data.Map as Map
 import Orhle
-import System.Directory (getDirectoryContents)
 import System.FilePath
 
 assertVerifierResultMatches expected result =
@@ -31,5 +29,7 @@ testImpFile fileName = do
 
 test_deterministicInvalid = testImpFile "deterministicInvalid.imp"
 test_deterministicValid = testImpFile "deterministicValid.imp"
-test_simpleInvalid = testImpFile "simpleInvalid.imp"
+test_loopValid = testImpFile "loopValid.imp"
+test_loopInvalid = testImpFile "loopInvalid.imp"
 test_simpleValid = testImpFile "simpleValid.imp"
+test_simpleInvalid = testImpFile "simpleInvalid.imp"
