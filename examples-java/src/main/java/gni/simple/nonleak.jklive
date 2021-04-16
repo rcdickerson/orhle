@@ -1,8 +1,0 @@
-forall: Nonleak[1], Nonleak[2];
-exists: Nonleak[3];
-
-pre: (and
-       (= Nonleak!1!high  Nonleak!3!high)
-       (= Nonleak!1!low   Nonleak!2!low)
-       (= Nonleak!2!low   Nonleak!3!low));
-post:  (= Nonleak!2!return Nonleak!3!return);

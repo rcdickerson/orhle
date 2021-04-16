@@ -1,4 +1,0 @@
-forall: Nonrefinement;
-exists: Original;
-
-post: (= Original!return Nonrefinement!return);
