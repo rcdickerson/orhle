@@ -20,16 +20,9 @@ fun denning(f1_L, f2_L, f3_H, f4_H) {
   sum := 0;
   while (i <= 100) do
     @inv { (and
-(<= denning!A!f1_L (+ (* 1 denning!E!f1_L)))
-(<= denning!A!f2_L (+ (* 1 denning!E!f2_L)))
-(<= denning!A!i (+ (* 1 denning!E!i)))
-(<= denning!E!f1_L (+ (* 1 denning!A!f1_L)))
-(<= denning!E!f2_L (+ (* 1 denning!A!f2_L)))
-(<= denning!E!i (+ (* 1 denning!A!i)))
-
-(>= denning!E!n (+ (* 100 denning!A!n)))
-
-)}
+             (= denning!A!f1_L  denning!E!f1_L)
+             (= denning!A!f2_L  denning!E!f2_L)
+             (= denning!A!i denning!E!i))}
     flag := f1_L;
     f2_L := flag;
     x := f3_H;

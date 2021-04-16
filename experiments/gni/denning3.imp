@@ -3,22 +3,16 @@
 
 expected: invalid;
 
-forall: denning[1], denning[2];
-exists: denning[3];
+forall: denning[A];
+exists: denning[E];
+
+pre: (and
+        (= denning!A!i_L  denning!E!i_L)
+        (= denning!A!e_L  denning!E!e_L));
 
 post: (and
-        (= denning!1!x_H   denning!3!x_H)
-        (= denning!1!sum_H denning!3!sum_H)
-
-        (= denning!1!i_L denning!2!i_L)
-        (= denning!1!e_L denning!2!e_L)
-        (= denning!1!f_L denning!2!f_L)p
-
-        (= denning!2!i_L denning!3!i_L)
-        (= denning!2!e_L denning!3!e_L)
-        (= denning!2!f_L denning!3!f_L)
-
-        (= denning!2!ret denning!3!ret));
+        (= denning!A!i_L  denning!E!i_L)
+        (= denning!A!e_L  denning!E!e_L));
 
 fun denning(i_L, e_L, f_L, x_H, sum_H) {
   max_sum := 100;
@@ -28,14 +22,15 @@ fun denning(i_L, e_L, f_L, x_H, sum_H) {
   i_L := 0;
   e_L := 1;
   while ((e == 1) && (oob_error == 0)) do
-    @var { (- max_sum sum_H) }
+    @inv { (and
+             (= denning!A!f1_L  denning!E!f1_L)
+             (= denning!A!f2_L  denning!E!f2_L)
+             (= denning!A!i denning!E!i))}
     sum_H := sum_H + x_H;
     i_L := i_L + 1;
     f := i;
     if sum_H > max_sum then
       oob_error := 1;
-    else
-      skip;
     endif
   end
 
