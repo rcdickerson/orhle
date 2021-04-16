@@ -1,0 +1,54 @@
+
+*******************************************
+****               ORHLE               ****
+****     The Oracular RHLE Verifier    ****
+*******************************************
+
+:: Executions
+  unused[1] (forall)
+  unused[2] (exists)
+
+:: Universal Programs
+[ SSeq
+    [ SAsgn unused ! 1 ! ret (ALit 5)
+    , SAsgn unused ! 1 ! unused ! retVal (AVar unused ! 1 ! ret)
+    ]
+]
+
+:: Existential Programs
+[ SSeq
+    [ SAsgn unused ! 2 ! ret (ALit 5)
+    , SAsgn unused ! 2 ! unused ! retVal (AVar unused ! 2 ! ret)
+    ]
+]
+
+:: Universal Specifications
+fromList []
+
+:: Existential Specifications
+fromList []
+
+:: Precondition
+Not (Eq (Var unused ! 1 ! param) (Var unused ! 2 ! param))
+
+:: Postcondition
+Eq (Var unused ! 1 ! ret) (Var unused ! 2 ! ret)
+
+[send->] (set-option :print-success true )
+[<-recv] success
+[send->] (set-option :produce-models true )
+[<-recv] success
+[send->] (declare-const unused!1!param Int)
+[<-recv] success
+[send->] (declare-const unused!2!param Int)
+[<-recv] success
+[send->] (assert (not (=> (not (= unused!1!param unused!2!param)) (= 5 5))) )
+[<-recv] success
+[send->] (check-sat )
+[<-recv] unsat
+[send->] (exit )
+Valid.
+
+real	0m0.187s
+user	0m0.177s
+sys	0m0.008s

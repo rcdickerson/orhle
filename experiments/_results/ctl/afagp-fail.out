@@ -1,0 +1,73 @@
+
+*******************************************
+****               ORHLE               ****
+****     The Oracular RHLE Verifier    ****
+*******************************************
+
+:: Executions
+  body (exists)
+
+:: Universal Programs
+[]
+
+:: Existential Programs
+[ SSeq
+    [ SAsgn body ! p (ALit 0)
+    , SAsgn body ! start (ALit 0)
+    , SAsgn body ! start (ALit 1)
+    , SAsgn body ! start (ALit 0)
+    , SWhile
+        (BGt (AVar body ! x) (ALit 0))
+        (SSeq
+           [ SCall "body!nondet" [] [ body ! rho_1 ]
+           , SIf
+               (BGt (AVar body ! rho_1) (ALit 0))
+               (SAsgn body ! x (ASub (AVar body ! x) (ALit 1)))
+               (SAsgn body ! x (ASub (AVar body ! x) (ALit 2)))
+           ])
+        ( ATrue , Var body ! x )
+    , SAsgn body ! i (ALit 0)
+    , SWhile
+        (BLt (AVar body ! i) (AVar body ! loopn))
+        (SSeq
+           [ SCall "body!nondet" [] [ body ! rho_2 ]
+           , SIf
+               (BGt (AVar body ! rho_2) (ALit 0))
+               (SAsgn body ! p (ALit 1))
+               (SAsgn body ! p (ALit 0))
+           , SAsgn body ! i (AAdd (AVar body ! i) (ALit 1))
+           ])
+        ( ATrue , Sub [ Var body ! loopn , Var i ] )
+    , SAsgn body ! body ! retVal (ALit 0)
+    ]
+]
+
+:: Universal Specifications
+fromList []
+
+:: Existential Specifications
+fromList [("body!nondet",Spec {spec_params = [], spec_choiceVars = [body!n], spec_preCondition = Or [Eq (Num 0) (Var body!n),Eq (Num 1) (Var body!n)], spec_postCondition = Eq (Var ret!) (Var body!n)})]
+
+:: Precondition
+ATrue
+
+:: Postcondition
+Gt (Var body ! p) (Num 0)
+
+[send->] (set-option :print-success true )
+[<-recv] success
+[send->] (set-option :produce-models true )
+[<-recv] success
+[send->] (assert (not (=> true (and true (forall ((body!rho_1!1 Int) (body!x!1 Int)) (=> (and true (not (> body!x!1 0))) (and true (forall ((body!i!1 Int) (body!loopn!1 Int) (body!p!2 Int) (body!rho_2!1 Int)) (=> (and true (not (< body!i!1 body!loopn!1))) (> body!p!2 0))) (forall ((body!i!1 Int) (body!loopn!1 Int) (body!p!2 Int) (body!rho_2!1 Int)) (=> (and true (< body!i!1 body!loopn!1)) (exists ((body!n!1 Int)) (and (or (= 0 body!n!1) (= 1 body!n!1)) (exists ((body!rho_2!2 Int)) (= body!rho_2!2 body!n!1)) (forall ((body!rho_2!2 Int)) (=> (= body!rho_2!2 body!n!1) (and (=> (> body!rho_2!2 0) true) (=> (not (> body!rho_2!2 0)) true)))))))) (forall ((body!i!1 Int) (body!loopn!1 Int) (body!p!2 Int) (body!rho_2!1 Int)) (=> (and true (not (and (< body!i!1 body!loopn!1)))) (and (not (< body!i!1 body!loopn!1)))))))) (forall ((body!rho_1!1 Int) (body!x!1 Int)) (=> (and true (> body!x!1 0)) (exists ((body!n!2 Int)) (and (or (= 0 body!n!2) (= 1 body!n!2)) (exists ((body!rho_1!2 Int)) (= body!rho_1!2 body!n!2)) (forall ((body!rho_1!2 Int)) (=> (= body!rho_1!2 body!n!2) (and (=> (> body!rho_1!2 0) true) (=> (not (> body!rho_1!2 0)) true)))))))) (forall ((body!rho_1!1 Int) (body!x!1 Int)) (=> (and true (not (and (> body!x!1 0)))) (and (not (> body!x!1 0)))))))) )
+[<-recv] success
+[send->] (check-sat )
+[<-recv] sat
+[send->] (get-model )
+[<-recv] (model )
+[send->] (exit )
+Failure:
+  Verification conditions are invalid. Model: (model )
+
+real	0m0.189s
+user	0m0.174s
+sys	0m0.024s

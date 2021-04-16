@@ -1,0 +1,132 @@
+
+*******************************************
+****               ORHLE               ****
+****     The Oracular RHLE Verifier    ****
+*******************************************
+
+:: Executions
+  calc_avg[1] (forall)
+  calc_avg[2] (forall)
+  calc_avg[3] (exists)
+
+:: Universal Programs
+[ SSeq
+    [ SAsgn calc_avg ! 1 ! sum (ALit 0)
+    , SAsgn calc_avg !
+        1 !
+        sum (AAdd (AVar calc_avg ! 1 ! sum) (AVar calc_avg ! 1 ! salary1))
+    , SAsgn calc_avg !
+        1 !
+        sum (AAdd (AVar calc_avg ! 1 ! sum) (AVar calc_avg ! 1 ! salary2))
+    , SAsgn calc_avg !
+        1 !
+        sum (AAdd (AVar calc_avg ! 1 ! sum) (AVar calc_avg ! 1 ! salary3))
+    , SAsgn calc_avg !
+        1 ! avg (ADiv (AVar calc_avg ! 1 ! sum) (ALit 3))
+    , SAsgn calc_avg ! 1 ! calc_avg ! retVal (AVar calc_avg ! 1 ! avg)
+    ]
+, SSeq
+    [ SAsgn calc_avg ! 2 ! sum (ALit 0)
+    , SAsgn calc_avg !
+        2 !
+        sum (AAdd (AVar calc_avg ! 2 ! sum) (AVar calc_avg ! 2 ! salary1))
+    , SAsgn calc_avg !
+        2 !
+        sum (AAdd (AVar calc_avg ! 2 ! sum) (AVar calc_avg ! 2 ! salary2))
+    , SAsgn calc_avg !
+        2 !
+        sum (AAdd (AVar calc_avg ! 2 ! sum) (AVar calc_avg ! 2 ! salary3))
+    , SAsgn calc_avg !
+        2 ! avg (ADiv (AVar calc_avg ! 2 ! sum) (ALit 3))
+    , SAsgn calc_avg ! 2 ! calc_avg ! retVal (AVar calc_avg ! 2 ! avg)
+    ]
+]
+
+:: Existential Programs
+[ SSeq
+    [ SAsgn calc_avg ! 3 ! sum (ALit 0)
+    , SAsgn calc_avg !
+        3 !
+        sum (AAdd (AVar calc_avg ! 3 ! sum) (AVar calc_avg ! 3 ! salary1))
+    , SAsgn calc_avg !
+        3 !
+        sum (AAdd (AVar calc_avg ! 3 ! sum) (AVar calc_avg ! 3 ! salary2))
+    , SAsgn calc_avg !
+        3 !
+        sum (AAdd (AVar calc_avg ! 3 ! sum) (AVar calc_avg ! 3 ! salary3))
+    , SAsgn calc_avg !
+        3 ! avg (ADiv (AVar calc_avg ! 3 ! sum) (ALit 3))
+    , SAsgn calc_avg ! 3 ! calc_avg ! retVal (AVar calc_avg ! 3 ! avg)
+    ]
+]
+
+:: Universal Specifications
+fromList []
+
+:: Existential Specifications
+fromList []
+
+:: Precondition
+And
+  [ Eq (Var calc_avg ! 1 ! salary1) (Var calc_avg ! 3 ! salary1)
+  , Eq (Var calc_avg ! 1 ! salary2) (Var calc_avg ! 3 ! salary2)
+  , Eq (Var calc_avg ! 1 ! salary3) (Var calc_avg ! 3 ! salary3)
+  , Eq
+      (Add
+         [ Var calc_avg ! 1 ! salary1
+         , Var calc_avg ! 1 ! salary2
+         , Var calc_avg ! 1 ! salary3
+         ])
+      (Add
+         [ Var calc_avg ! 2 ! salary1
+         , Var calc_avg ! 2 ! salary2
+         , Var calc_avg ! 2 ! salary3
+         ])
+  , Eq
+      (Add
+         [ Var calc_avg ! 2 ! salary1
+         , Var calc_avg ! 2 ! salary2
+         , Var calc_avg ! 2 ! salary3
+         ])
+      (Add
+         [ Var calc_avg ! 3 ! salary1
+         , Var calc_avg ! 3 ! salary2
+         , Var calc_avg ! 3 ! salary3
+         ])
+  ]
+
+:: Postcondition
+Eq (Var calc_avg ! 2 ! avg) (Var calc_avg ! 3 ! avg)
+
+[send->] (set-option :print-success true )
+[<-recv] success
+[send->] (set-option :produce-models true )
+[<-recv] success
+[send->] (declare-const calc_avg!1!salary1 Int)
+[<-recv] success
+[send->] (declare-const calc_avg!1!salary2 Int)
+[<-recv] success
+[send->] (declare-const calc_avg!1!salary3 Int)
+[<-recv] success
+[send->] (declare-const calc_avg!2!salary1 Int)
+[<-recv] success
+[send->] (declare-const calc_avg!2!salary2 Int)
+[<-recv] success
+[send->] (declare-const calc_avg!2!salary3 Int)
+[<-recv] success
+[send->] (declare-const calc_avg!3!salary1 Int)
+[<-recv] success
+[send->] (declare-const calc_avg!3!salary2 Int)
+[<-recv] success
+[send->] (declare-const calc_avg!3!salary3 Int)
+[<-recv] success
+[send->] (assert (not (=> (and (= calc_avg!1!salary1 calc_avg!3!salary1) (= calc_avg!1!salary2 calc_avg!3!salary2) (= calc_avg!1!salary3 calc_avg!3!salary3) (= (+ calc_avg!1!salary1 calc_avg!1!salary2 calc_avg!1!salary3) (+ calc_avg!2!salary1 calc_avg!2!salary2 calc_avg!2!salary3)) (= (+ calc_avg!2!salary1 calc_avg!2!salary2 calc_avg!2!salary3) (+ calc_avg!3!salary1 calc_avg!3!salary2 calc_avg!3!salary3))) (= (/ (+ (+ (+ 0 calc_avg!2!salary1) calc_avg!2!salary2) calc_avg!2!salary3) 3) (/ (+ (+ (+ 0 calc_avg!3!salary1) calc_avg!3!salary2) calc_avg!3!salary3) 3)))) )
+[<-recv] success
+[send->] (check-sat )
+[<-recv] unsat
+[send->] (exit )
+Valid.
+
+real	0m0.220s
+user	0m0.371s
+sys	0m0.016s

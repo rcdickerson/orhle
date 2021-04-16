@@ -1,0 +1,67 @@
+
+*******************************************
+****               ORHLE               ****
+****     The Oracular RHLE Verifier    ****
+*******************************************
+
+:: Executions
+  nonleak[1] (forall)
+  nonleak[2] (exists)
+
+:: Universal Programs
+[ SSeq
+    [ SAsgn nonleak !
+        1 ! x (AAdd (AVar nonleak ! 1 ! low) (AVar nonleak ! 1 ! high))
+    , SAsgn nonleak !
+        1 ! ret (ASub (AVar nonleak ! 1 ! x) (AVar nonleak ! 1 ! high))
+    , SAsgn nonleak ! 1 ! nonleak ! retVal (AVar nonleak ! 1 ! ret)
+    ]
+]
+
+:: Existential Programs
+[ SSeq
+    [ SAsgn nonleak !
+        2 ! x (AAdd (AVar nonleak ! 2 ! low) (AVar nonleak ! 2 ! high))
+    , SAsgn nonleak !
+        2 ! ret (ASub (AVar nonleak ! 2 ! x) (AVar nonleak ! 2 ! high))
+    , SAsgn nonleak ! 2 ! nonleak ! retVal (AVar nonleak ! 2 ! ret)
+    ]
+]
+
+:: Universal Specifications
+fromList []
+
+:: Existential Specifications
+fromList []
+
+:: Precondition
+Eq (Var nonleak ! 1 ! low) (Var nonleak ! 2 ! low)
+
+:: Postcondition
+And
+  [ Eq (Var nonleak ! 1 ! low) (Var nonleak ! 2 ! low)
+  , Eq (Var nonleak ! 1 ! ret) (Var nonleak ! 2 ! ret)
+  ]
+
+[send->] (set-option :print-success true )
+[<-recv] success
+[send->] (set-option :produce-models true )
+[<-recv] success
+[send->] (declare-const nonleak!1!high Int)
+[<-recv] success
+[send->] (declare-const nonleak!1!low Int)
+[<-recv] success
+[send->] (declare-const nonleak!2!high Int)
+[<-recv] success
+[send->] (declare-const nonleak!2!low Int)
+[<-recv] success
+[send->] (assert (not (=> (= nonleak!1!low nonleak!2!low) (and (= nonleak!1!low nonleak!2!low) (= (- (+ nonleak!1!low nonleak!1!high) nonleak!1!high) (- (+ nonleak!2!low nonleak!2!high) nonleak!2!high))))) )
+[<-recv] success
+[send->] (check-sat )
+[<-recv] unsat
+[send->] (exit )
+Valid.
+
+real	0m0.187s
+user	0m0.156s
+sys	0m0.033s

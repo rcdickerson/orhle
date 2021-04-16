@@ -1,0 +1,61 @@
+
+*******************************************
+****               ORHLE               ****
+****     The Oracular RHLE Verifier    ****
+*******************************************
+
+:: Executions
+  body (exists)
+
+:: Universal Programs
+[]
+
+:: Existential Programs
+[ SSeq
+    [ SAsgn body ! p (ALit 0)
+    , SAsgn body ! x (ALit 5)
+    , SWhile
+        (BGe (AVar body ! x) (ALit 0))
+        (SAsgn body ! x (ASub (AVar body ! x) (ALit 1)))
+        ( ATrue , Var body ! x )
+    , SWhile
+        BTrue
+        (SSeq
+           [ SCall "body!nondet" [] [ body ! rho1 ]
+           , SIf
+               (BGt (AVar body ! rho1) (ALit 0)) (SAsgn body ! p (ALit 1)) SSkip
+           ])
+        ( ATrue , Num 0 )
+    , SAsgn body ! body ! retVal (ALit 0)
+    ]
+]
+
+:: Universal Specifications
+fromList []
+
+:: Existential Specifications
+fromList [("body!nondet",Spec {spec_params = [], spec_choiceVars = [body!n], spec_preCondition = Or [Eq (Num 0) (Var body!n),Eq (Num 1) (Var body!n)], spec_postCondition = Eq (Var ret!) (Var body!n)})]
+
+:: Precondition
+ATrue
+
+:: Postcondition
+Gt (Var body ! p) (Num 0)
+
+[send->] (set-option :print-success true )
+[<-recv] success
+[send->] (set-option :produce-models true )
+[<-recv] success
+[send->] (assert (not (=> true (and true (forall ((body!x!2 Int)) (=> (and true (not (>= body!x!2 0))) (and true (forall ((body!p!2 Int) (body!rho1!1 Int)) (=> (and true (not true)) (> body!p!2 0))) (forall ((body!p!2 Int) (body!rho1!1 Int)) (=> (and true true) (exists ((body!n!1 Int)) (and (or (= 0 body!n!1) (= 1 body!n!1)) (exists ((body!rho1!2 Int)) (= body!rho1!2 body!n!1)) (forall ((body!rho1!2 Int)) (=> (= body!rho1!2 body!n!1) (and (=> (> body!rho1!2 0) (and true (and (< 0 0)))) (=> (not (> body!rho1!2 0)) (and true (and (< 0 0))))))))))) (forall ((body!p!2 Int) (body!rho1!1 Int)) (=> (and true (not (and true))) (and (not true))))))) (forall ((body!x!2 Int)) (=> (and true (>= body!x!2 0)) (and true (and (< (- body!x!2 1) body!x!2))))) (forall ((body!x!2 Int)) (=> (and true (not (and (>= body!x!2 0)))) (and (not (>= body!x!2 0)))))))) )
+[<-recv] success
+[send->] (check-sat )
+[<-recv] sat
+[send->] (get-model )
+[<-recv] (model )
+[send->] (exit )
+Failure:
+  Verification conditions are invalid. Model: (model )
+
+real	0m0.189s
+user	0m0.164s
+sys	0m0.030s

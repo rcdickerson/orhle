@@ -1,0 +1,66 @@
+
+*******************************************
+****               ORHLE               ****
+****     The Oracular RHLE Verifier    ****
+*******************************************
+
+:: Executions
+  leak[1] (forall)
+  leak[2] (exists)
+
+:: Universal Programs
+[ SSeq
+    [ SAsgn leak !
+        1 ! ret (AAdd (AVar leak ! 1 ! high) (AVar leak ! 1 ! low))
+    , SAsgn leak ! 1 ! leak ! retVal (AVar leak ! 1 ! ret)
+    ]
+]
+
+:: Existential Programs
+[ SSeq
+    [ SAsgn leak !
+        2 ! ret (AAdd (AVar leak ! 2 ! high) (AVar leak ! 2 ! low))
+    , SAsgn leak ! 2 ! leak ! retVal (AVar leak ! 2 ! ret)
+    ]
+]
+
+:: Universal Specifications
+fromList []
+
+:: Existential Specifications
+fromList []
+
+:: Precondition
+Eq (Var leak ! 1 ! low) (Var leak ! 2 ! low)
+
+:: Postcondition
+And
+  [ Eq (Var leak ! 1 ! low) (Var leak ! 2 ! low)
+  , Eq (Var leak ! 1 ! ret) (Var leak ! 2 ! ret)
+  ]
+
+[send->] (set-option :print-success true )
+[<-recv] success
+[send->] (set-option :produce-models true )
+[<-recv] success
+[send->] (declare-const leak!1!high Int)
+[<-recv] success
+[send->] (declare-const leak!1!low Int)
+[<-recv] success
+[send->] (declare-const leak!2!high Int)
+[<-recv] success
+[send->] (declare-const leak!2!low Int)
+[<-recv] success
+[send->] (assert (not (=> (= leak!1!low leak!2!low) (and (= leak!1!low leak!2!low) (= (+ leak!1!high leak!1!low) (+ leak!2!high leak!2!low))))) )
+[<-recv] success
+[send->] (check-sat )
+[<-recv] sat
+[send->] (get-model )
+[<-recv] (model (define-fun leak!2!high () Int 0 ) (define-fun leak!1!high () Int 1 ) (define-fun leak!2!low () Int 0 ) (define-fun leak!1!low () Int 0 ) )
+[send->] (exit )
+Failure:
+  Verification conditions are invalid. Model: (model (define-fun leak!2!high () Int 0 ) (define-fun leak!1!high () Int 1 ) (define-fun leak!2!low () Int 0 ) (define-fun leak!1!low () Int 0 ) )
+
+real	0m0.223s
+user	0m0.189s
+sys	0m0.032s

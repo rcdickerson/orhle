@@ -1,0 +1,60 @@
+
+*******************************************
+****               ORHLE               ****
+****     The Oracular RHLE Verifier    ****
+*******************************************
+
+:: Executions
+  refinement (forall)
+  original (exists)
+
+:: Universal Programs
+[ SSeq
+    [ SCall "refinement!flipCoin" [] [ refinement ! r ]
+    , SIf
+        (BEq (AVar refinement ! r) (ALit 0))
+        (SAsgn refinement ! ret (ALit 20))
+        (SAsgn refinement ! ret (ALit 10))
+    , SAsgn refinement ! refinement ! retVal (AVar refinement ! ret)
+    ]
+]
+
+:: Existential Programs
+[ SSeq
+    [ SCall "original!flipCoin" [] [ original ! r ]
+    , SIf
+        (BEq (AVar original ! r) (ALit 0))
+        (SAsgn original ! ret (ALit 10))
+        (SAsgn original ! ret (ALit 20))
+    , SAsgn original ! original ! retVal (AVar original ! ret)
+    ]
+]
+
+:: Universal Specifications
+fromList [("refinement!flipCoin",Spec {spec_params = [], spec_choiceVars = [], spec_preCondition = ATrue, spec_postCondition = Or [Eq (Var ret!) (Num 0),Eq (Var ret!) (Num 1)]})]
+
+:: Existential Specifications
+fromList [("original!flipCoin",Spec {spec_params = [], spec_choiceVars = [original!n], spec_preCondition = Or [Eq (Var original!n) (Num 0),Eq (Var original!n) (Num 1)], spec_postCondition = Eq (Var ret!) (Var original!n)})]
+
+:: Precondition
+ATrue
+
+:: Postcondition
+Eq (Var original ! ret) (Var refinement ! ret)
+
+[send->] (set-option :print-success true )
+[<-recv] success
+[send->] (set-option :produce-models true )
+[<-recv] success
+[send->] (declare-const refinement!r!1 Int)
+[<-recv] success
+[send->] (assert (not (=> true (exists ((original!n!1 Int)) (and (or (= original!n!1 0) (= original!n!1 1)) (exists ((original!r!1 Int)) (= original!r!1 original!n!1)) (forall ((original!r!1 Int)) (=> (= original!r!1 original!n!1) (and (=> (= original!r!1 0) (and true (=> (or (= refinement!r!1 0) (= refinement!r!1 1)) (and (=> (= refinement!r!1 0) (= 10 20)) (=> (not (= refinement!r!1 0)) (= 10 10)))))) (=> (not (= original!r!1 0)) (and true (=> (or (= refinement!r!1 0) (= refinement!r!1 1)) (and (=> (= refinement!r!1 0) (= 20 20)) (=> (not (= refinement!r!1 0)) (= 20 10))))))))))))) )
+[<-recv] success
+[send->] (check-sat )
+[<-recv] unsat
+[send->] (exit )
+Valid.
+
+real	0m0.190s
+user	0m0.167s
+sys	0m0.028s

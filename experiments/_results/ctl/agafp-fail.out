@@ -1,0 +1,60 @@
+
+*******************************************
+****               ORHLE               ****
+****     The Oracular RHLE Verifier    ****
+*******************************************
+
+:: Executions
+  body (forall)
+
+:: Universal Programs
+[ SSeq
+    [ SAsgn body ! p (ALit 0)
+    , SIf
+        (BGt (AVar body ! x) (ALit 0))
+        (SAsgn body ! p (AAdd (AVar body ! p) (ALit 1)))
+        (SSeq
+           [ SWhile
+               (BGt (AVar body ! y) (ALit 0))
+               (SAsgn body ! y (ASub (AVar body ! y) (ALit 1)))
+               ( ATrue , Var y )
+           , SAsgn body ! p (ALit 0)
+           ])
+    , SAsgn body ! body ! retVal (ALit 0)
+    ]
+]
+
+:: Existential Programs
+[]
+
+:: Universal Specifications
+fromList []
+
+:: Existential Specifications
+fromList []
+
+:: Precondition
+ATrue
+
+:: Postcondition
+Gt (Var body ! p) (Num 0)
+
+[send->] (set-option :print-success true )
+[<-recv] success
+[send->] (set-option :produce-models true )
+[<-recv] success
+[send->] (declare-const body!x Int)
+[<-recv] success
+[send->] (assert (not (=> true (and (=> (> body!x 0) (> (+ 0 1) 0)) (=> (not (> body!x 0)) (and true (forall ((body!y!1 Int)) (=> (and (> body!y!1 0) true) true)) (forall ((body!y!1 Int)) (=> (and (not (> body!y!1 0)) true) (> 0 0)))))))) )
+[<-recv] success
+[send->] (check-sat )
+[<-recv] sat
+[send->] (get-model )
+[<-recv] (model (define-fun body!x () Int 0 ) )
+[send->] (exit )
+Failure:
+  Verification conditions are invalid. Model: (model (define-fun body!x () Int 0 ) )
+
+real	0m0.190s
+user	0m0.171s
+sys	0m0.020s

@@ -1,0 +1,73 @@
+
+*******************************************
+****               ORHLE               ****
+****     The Oracular RHLE Verifier    ****
+*******************************************
+
+:: Executions
+  nonleak[1] (forall)
+  nonleak[2] (exists)
+
+:: Universal Programs
+[ SSeq
+    [ SCall "nonleak!1!randInt" [] [ nonleak ! 1 ! r ]
+    , SIf
+        (BEq (AVar nonleak ! 1 ! r) (ALit 5000))
+        (SAsgn nonleak !
+           1 ! ret (AAdd (AVar nonleak ! 1 ! high) (AVar nonleak ! 1 ! low)))
+        (SAsgn nonleak ! 1 ! ret (AVar nonleak ! 1 ! low))
+    , SAsgn nonleak ! 1 ! nonleak ! retVal (AVar nonleak ! 1 ! ret)
+    ]
+]
+
+:: Existential Programs
+[ SSeq
+    [ SCall "nonleak!2!randInt" [] [ nonleak ! 2 ! r ]
+    , SIf
+        (BEq (AVar nonleak ! 2 ! r) (ALit 5000))
+        (SAsgn nonleak !
+           2 ! ret (AAdd (AVar nonleak ! 2 ! high) (AVar nonleak ! 2 ! low)))
+        (SAsgn nonleak ! 2 ! ret (AVar nonleak ! 2 ! low))
+    , SAsgn nonleak ! 2 ! nonleak ! retVal (AVar nonleak ! 2 ! ret)
+    ]
+]
+
+:: Universal Specifications
+fromList [("nonleak!1!randInt",Spec {spec_params = [], spec_choiceVars = [], spec_preCondition = ATrue, spec_postCondition = And [Gte (Var ret!) (Num 0),Lt (Var ret!) (Num 100)]})]
+
+:: Existential Specifications
+fromList [("nonleak!2!randInt",Spec {spec_params = [], spec_choiceVars = [nonleak!2!n], spec_preCondition = And [Gte (Var nonleak!2!n) (Num 0),Lt (Var nonleak!2!n) (Num 100)], spec_postCondition = Eq (Var ret!) (Var nonleak!2!n)})]
+
+:: Precondition
+Eq (Var nonleak ! 1 ! low) (Var nonleak ! 2 ! low)
+
+:: Postcondition
+And
+  [ Eq (Var nonleak ! 1 ! low) (Var nonleak ! 2 ! low)
+  , Eq (Var nonleak ! 1 ! ret) (Var nonleak ! 2 ! ret)
+  ]
+
+[send->] (set-option :print-success true )
+[<-recv] success
+[send->] (set-option :produce-models true )
+[<-recv] success
+[send->] (declare-const nonleak!1!high Int)
+[<-recv] success
+[send->] (declare-const nonleak!1!low Int)
+[<-recv] success
+[send->] (declare-const nonleak!1!r!1 Int)
+[<-recv] success
+[send->] (declare-const nonleak!2!high Int)
+[<-recv] success
+[send->] (declare-const nonleak!2!low Int)
+[<-recv] success
+[send->] (assert (not (=> (= nonleak!1!low nonleak!2!low) (exists ((nonleak!2!n!1 Int)) (and (and (>= nonleak!2!n!1 0) (< nonleak!2!n!1 100)) (exists ((nonleak!2!r!1 Int)) (= nonleak!2!r!1 nonleak!2!n!1)) (forall ((nonleak!2!r!1 Int)) (=> (= nonleak!2!r!1 nonleak!2!n!1) (and (=> (= nonleak!2!r!1 5000) (and true (=> (and (>= nonleak!1!r!1 0) (< nonleak!1!r!1 100)) (and (=> (= nonleak!1!r!1 5000) (and (= nonleak!1!low nonleak!2!low) (= (+ nonleak!1!high nonleak!1!low) (+ nonleak!2!high nonleak!2!low)))) (=> (not (= nonleak!1!r!1 5000)) (and (= nonleak!1!low nonleak!2!low) (= nonleak!1!low (+ nonleak!2!high nonleak!2!low)))))))) (=> (not (= nonleak!2!r!1 5000)) (and true (=> (and (>= nonleak!1!r!1 0) (< nonleak!1!r!1 100)) (and (=> (= nonleak!1!r!1 5000) (and (= nonleak!1!low nonleak!2!low) (= (+ nonleak!1!high nonleak!1!low) nonleak!2!low))) (=> (not (= nonleak!1!r!1 5000)) (and (= nonleak!1!low nonleak!2!low) (= nonleak!1!low nonleak!2!low)))))))))))))) )
+[<-recv] success
+[send->] (check-sat )
+[<-recv] unsat
+[send->] (exit )
+Valid.
+
+real	0m0.189s
+user	0m0.165s
+sys	0m0.031s

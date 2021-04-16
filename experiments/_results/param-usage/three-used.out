@@ -1,0 +1,153 @@
+
+*******************************************
+****               ORHLE               ****
+****     The Oracular RHLE Verifier    ****
+*******************************************
+
+:: Executions
+  used[1A] (forall)
+  used[2A] (forall)
+  used[3A] (forall)
+  used[1B] (exists)
+  used[2B] (exists)
+  used[3B] (exists)
+
+:: Universal Programs
+[ SSeq
+    [ SAsgn used !
+        1A !
+        ret
+          (ASub
+             (AAdd (AVar used ! 1A ! param1) (AVar used ! 1A ! param2))
+             (AVar used ! 1A ! param3))
+    , SAsgn used ! 1A ! used ! retVal (AVar used ! 1A ! ret)
+    ]
+, SSeq
+    [ SAsgn used !
+        2A !
+        ret
+          (ASub
+             (AAdd (AVar used ! 2A ! param1) (AVar used ! 2A ! param2))
+             (AVar used ! 2A ! param3))
+    , SAsgn used ! 2A ! used ! retVal (AVar used ! 2A ! ret)
+    ]
+, SSeq
+    [ SAsgn used !
+        3A !
+        ret
+          (ASub
+             (AAdd (AVar used ! 3A ! param1) (AVar used ! 3A ! param2))
+             (AVar used ! 3A ! param3))
+    , SAsgn used ! 3A ! used ! retVal (AVar used ! 3A ! ret)
+    ]
+]
+
+:: Existential Programs
+[ SSeq
+    [ SAsgn used !
+        1B !
+        ret
+          (ASub
+             (AAdd (AVar used ! 1B ! param1) (AVar used ! 1B ! param2))
+             (AVar used ! 1B ! param3))
+    , SAsgn used ! 1B ! used ! retVal (AVar used ! 1B ! ret)
+    ]
+, SSeq
+    [ SAsgn used !
+        2B !
+        ret
+          (ASub
+             (AAdd (AVar used ! 2B ! param1) (AVar used ! 2B ! param2))
+             (AVar used ! 2B ! param3))
+    , SAsgn used ! 2B ! used ! retVal (AVar used ! 2B ! ret)
+    ]
+, SSeq
+    [ SAsgn used !
+        3B !
+        ret
+          (ASub
+             (AAdd (AVar used ! 3B ! param1) (AVar used ! 3B ! param2))
+             (AVar used ! 3B ! param3))
+    , SAsgn used ! 3B ! used ! retVal (AVar used ! 3B ! ret)
+    ]
+]
+
+:: Universal Specifications
+fromList []
+
+:: Existential Specifications
+fromList []
+
+:: Precondition
+And
+  [ Not (Eq (Var used ! 1A ! param1) (Var used ! 1B ! param1))
+  , Eq (Var used ! 1A ! param2) (Var used ! 1B ! param2)
+  , Eq (Var used ! 1A ! param3) (Var used ! 1B ! param3)
+  , Eq (Var used ! 2A ! param1) (Var used ! 2B ! param1)
+  , Not (Eq (Var used ! 2A ! param2) (Var used ! 2B ! param2))
+  , Eq (Var used ! 2A ! param3) (Var used ! 2B ! param3)
+  , Eq (Var used ! 3A ! param1) (Var used ! 3B ! param1)
+  , Eq (Var used ! 3A ! param2) (Var used ! 3B ! param2)
+  , Not (Eq (Var used ! 3A ! param3) (Var used ! 3B ! param3))
+  ]
+
+:: Postcondition
+Or
+  [ Eq (Var used ! 1A ! ret) (Var used ! 1B ! ret)
+  , Eq (Var used ! 2A ! ret) (Var used ! 2B ! ret)
+  , Eq (Var used ! 3A ! ret) (Var used ! 3B ! ret)
+  ]
+
+[send->] (set-option :print-success true )
+[<-recv] success
+[send->] (set-option :produce-models true )
+[<-recv] success
+[send->] (declare-const used!1A!param1 Int)
+[<-recv] success
+[send->] (declare-const used!1A!param2 Int)
+[<-recv] success
+[send->] (declare-const used!1A!param3 Int)
+[<-recv] success
+[send->] (declare-const used!1B!param1 Int)
+[<-recv] success
+[send->] (declare-const used!1B!param2 Int)
+[<-recv] success
+[send->] (declare-const used!1B!param3 Int)
+[<-recv] success
+[send->] (declare-const used!2A!param1 Int)
+[<-recv] success
+[send->] (declare-const used!2A!param2 Int)
+[<-recv] success
+[send->] (declare-const used!2A!param3 Int)
+[<-recv] success
+[send->] (declare-const used!2B!param1 Int)
+[<-recv] success
+[send->] (declare-const used!2B!param2 Int)
+[<-recv] success
+[send->] (declare-const used!2B!param3 Int)
+[<-recv] success
+[send->] (declare-const used!3A!param1 Int)
+[<-recv] success
+[send->] (declare-const used!3A!param2 Int)
+[<-recv] success
+[send->] (declare-const used!3A!param3 Int)
+[<-recv] success
+[send->] (declare-const used!3B!param1 Int)
+[<-recv] success
+[send->] (declare-const used!3B!param2 Int)
+[<-recv] success
+[send->] (declare-const used!3B!param3 Int)
+[<-recv] success
+[send->] (assert (not (=> (and (not (= used!1A!param1 used!1B!param1)) (= used!1A!param2 used!1B!param2) (= used!1A!param3 used!1B!param3) (= used!2A!param1 used!2B!param1) (not (= used!2A!param2 used!2B!param2)) (= used!2A!param3 used!2B!param3) (= used!3A!param1 used!3B!param1) (= used!3A!param2 used!3B!param2) (not (= used!3A!param3 used!3B!param3))) (or (= (- (+ used!1A!param1 used!1A!param2) used!1A!param3) (- (+ used!1B!param1 used!1B!param2) used!1B!param3)) (= (- (+ used!2A!param1 used!2A!param2) used!2A!param3) (- (+ used!2B!param1 used!2B!param2) used!2B!param3)) (= (- (+ used!3A!param1 used!3A!param2) used!3A!param3) (- (+ used!3B!param1 used!3B!param2) used!3B!param3))))) )
+[<-recv] success
+[send->] (check-sat )
+[<-recv] sat
+[send->] (get-model )
+[<-recv] (model (define-fun used!3A!param3 () Int 0 ) (define-fun used!3B!param3 () Int 1 ) (define-fun used!2B!param2 () Int 0 ) (define-fun used!2A!param2 () Int 1 ) (define-fun used!1B!param1 () Int 0 ) (define-fun used!1A!param1 () Int 1 ) (define-fun used!3B!param2 () Int 0 ) (define-fun used!3A!param2 () Int 0 ) (define-fun used!3B!param1 () Int 0 ) (define-fun used!3A!param1 () Int 0 ) (define-fun used!2B!param3 () Int 0 ) (define-fun used!2A!param3 () Int 0 ) (define-fun used!2B!param1 () Int 0 ) (define-fun used!2A!param1 () Int 0 ) (define-fun used!1B!param3 () Int 0 ) (define-fun used!1A!param3 () Int 0 ) (define-fun used!1B!param2 () Int 0 ) (define-fun used!1A!param2 () Int 0 ) )
+[send->] (exit )
+Failure:
+  Verification conditions are invalid. Model: (model (define-fun used!3A!param3 () Int 0 ) (define-fun used!3B!param3 () Int 1 ) (define-fun used!2B!param2 () Int 0 ) (define-fun used!2A!param2 () Int 1 ) (define-fun used!1B!param1 () Int 0 ) (define-fun used!1A!param1 () Int 1 ) (define-fun used!3B!param2 () Int 0 ) (define-fun used!3A!param2 () Int 0 ) (define-fun used!3B!param1 () Int 0 ) (define-fun used!3A!param1 () Int 0 ) (define-fun used!2B!param3 () Int 0 ) (define-fun used!2A!param3 () Int 0 ) (define-fun used!2B!param1 () Int 0 ) (define-fun used!2A!param1 () Int 0 ) (define-fun used!1B!param3 () Int 0 ) (define-fun used!1A!param3 () Int 0 ) (define-fun used!1B!param2 () Int 0 ) (define-fun used!1A!param2 () Int 0 ) )
+
+real	0m0.188s
+user	0m0.167s
+sys	0m0.031s
