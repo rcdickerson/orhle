@@ -1,0 +1,62 @@
+// From:
+//   Sabelfeld, Andrei & Myers, Andrew. (2004).
+//   A Model for Delimited Information Release.
+//   Lecture Notes in Computer Science. 10.1007/978-3-540-37621-7_9.
+
+// -------------------------------------------
+// BROKEN:
+// This example likely fails because of a bad
+// loop invariant. (It fails, but for the wrong
+// reason.) Do not include in benchmarks until
+// fixed.
+// -------------------------------------------
+
+expected: invalid;
+
+forall: attack[1], attack[2];
+exists: attack[3];
+
+// High:
+//   funds
+// Low:
+//   spent
+//   cost
+// Delimited Release:
+//   funds >= cost
+//
+// NB: low values are over the initial state; whether or not funds >= cost
+// may no longer be declassified after their values are updated by the
+// program execution.
+
+pre: (and
+       // High
+       (= attack!1!funds attack!3!funds)
+
+       // Low
+       (= attack!1!spent attack!2!spent)
+       (= attack!1!cost attack!2!cost)
+       (= attack!2!spent attack!3!spent)
+       (= attack!2!cost attack!3!cost)
+
+       // Delimited Release
+       (= (>= attack!1!funds attack!1!cost) (>= attack!2!funds attack!2!cost))
+       (= (>= attack!2!funds attack!2!cost) (>= attack!3!funds attack!3!cost)));
+
+post: (= attack!2!spent attack!3!spent);
+
+// Leaks the (high) value of 'funds' one bit at a time into 'spent'.
+prog attack(funds, spent, cost):
+  spent := 0;
+  n := 32; // Assume a 32-bit funds value.
+  while (n > 0) do
+    @var{ n }
+    cost := 2 ^ (n - 1);
+    if (funds >= cost) then
+      funds := funds - cost;
+      spent := spent + cost;
+    else
+      skip;
+    end
+    n := n - 1;
+  end
+endp

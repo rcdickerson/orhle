@@ -1,0 +1,33 @@
+// A program that sometimes (but not
+// always) leaks high-security state.
+
+expected: invalid;
+
+forall: run[1];
+exists: run[2];
+
+pre:  (= run!1!low run!2!low);
+post: (= run!1!low run!2!low);
+
+aspecs:
+  flipCoin() {
+    pre:  true;
+    post: (or (= ret! 0) (= ret! 1));
+  }
+
+especs:
+  flipCoin() {
+    choiceVars: n;
+    pre:  (or (= n 0) (= n 1));
+    post: (= ret! n);
+  }
+
+fun run(high, low) {
+  flip := call flipCoin();
+  if (flip == 0) then
+    low := high + low;
+  else
+    skip;
+  endif
+  return low;
+}

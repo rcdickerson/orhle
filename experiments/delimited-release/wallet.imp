@@ -1,0 +1,37 @@
+// From:
+//   Sabelfeld, Andrei & Myers, Andrew. (2004).
+//   A Model for Delimited Information Release.
+//   Lecture Notes in Computer Science. 10.1007/978-3-540-37621-7_9.
+
+expected: valid;
+
+forall: buy[1];
+exists: buy[2];
+
+// High:
+//   funds
+// Low:
+//   spent
+//   cost
+// Delimited Release:
+//   funds >= cost
+
+pre: (and
+       (= buy!1!spent buy!2!spent)
+       (= buy!1!cost buy!2!cost)
+
+       // Delimited Release
+       (and (>= buy!1!funds buy!1!cost) (>= buy!2!funds buy!2!cost)));
+
+post: (= buy!1!spent buy!2!spent);
+
+
+fun buy(funds, spent, cost) {
+  if (funds >= cost) then
+    funds := funds - cost;
+    spent := spent + cost;
+  else
+    skip;
+  endif
+  return 0;
+}

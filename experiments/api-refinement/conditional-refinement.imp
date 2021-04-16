@@ -1,0 +1,42 @@
+// A refinement involving a simple conditional.
+
+expected: valid;
+
+forall: refinement;
+exists: original;
+
+pre:  true;
+post: (= original!ret refinement!ret);
+
+aspecs:
+  flipCoin() {
+    pre: true;
+    post: (or (= ret! 0) (= ret! 1));
+  }
+
+especs:
+  flipCoin() {
+    choiceVars: n;
+    pre: (or (= n 0) (= n 1));
+    post: (= ret! n);
+  }
+
+fun original() {
+  r := call flipCoin();
+  if (r == 0) then
+    ret := 10;
+  else
+    ret := 20;
+  endif
+  return ret;
+}
+
+fun refinement() {
+  r := call flipCoin();
+  if (r == 0) then
+    ret := 20;
+  else
+    ret := 10;
+  endif
+  return ret;
+}

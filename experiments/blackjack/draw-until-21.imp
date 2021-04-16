@@ -1,0 +1,34 @@
+// A blackjack strategy that draws until hitting 21 or going bust.
+// This strategy does guarantee the possibility of 21 for every
+// possible starting hand.
+
+expected: valid;
+
+exists: play;
+
+pre: (and
+       (>= play!handValue 2)
+       (<= play!handValue 20));
+post: (= play!handValue 21);
+
+aspecs:
+  draw() {
+    post: (and (>= ret! 1) (<= ret! 10));
+  }
+
+especs:
+  draw() {
+    choiceVars: c;
+    pre: (and (>= c 1) (<= c 10));
+    post: (= ret! c);
+  }
+
+fun play() {
+  while (handValue < 21) do
+    @inv { (<= play!handValue 21) }
+    @var { (- 30 handValue) }
+    card := call draw();
+    handValue := handValue + card;
+  end
+  return handValue;
+}

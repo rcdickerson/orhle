@@ -1,0 +1,151 @@
+// Example from IDoFT dataset:
+// http://mir.cs.illinois.edu/flakytests/tsoiso.html
+// CUT: https://github.com/c2mon/c2mon/blob/d80687b119c713dd177a58cf53a997d8cc5ca264/c2mon-daq/c2mon-daq-core/src/main/java/cern/c2mon/daq/filter/dynamic/DiffMovingAverage.java
+// Test: https://github.com/c2mon/c2mon/blob/d80687b119c713dd177a58cf53a997d8cc5ca264/c2mon-daq/c2mon-daq-core/src/test/java/cern/c2mon/daq/filter/dynamic/DiffMovingAverageTest.java
+// Assert test is flaky.
+exists: testAverageA, testAverageB;
+pre:    true;
+post:   (not (= testAverageA!success testAverageB!success));
+aspecs:
+  // Any positive current time is possible.
+  getCurrentTimeMs() {
+    post: (< 0 ret!)
+  }
+  // Sleep is not guaranteed to be precise, the only
+  // hard guarantee is current time does not decrease.
+  sleep(currentTime, interval) {
+    post: (>= ret! currentTime);
+  }
+especs:
+  // Treat all possible current times as realizable.
+  getCurrentTimeMs() {
+    choiceVars: currentTime;
+    pre:  (< 0 currentTime);
+    post: (= ret! currentTime);
+  }
+  // Although not precise, realistically sleep will be fairly
+  // close. Only consider times within a +/- 15ms window as
+  // actually realizable. (The flaky test is likely caused
+  // by developers underestimating this interval.)
+  sleep(interval, currentTime) {
+    choiceVars: sleepTime;
+    pre:  (and (<= 0 sleepTime)
+               (<= (- interval 15) sleepTime)
+               (<= sleepTime (+ interval 15)));
+    post: (= ret! (+ currentTime sleepTime));
+  }
+// ------------------------------------------------------------------
+// Model DiffMovingAverage as pure functions that accept all relevant
+// heap state as inputs and return modifications as output. Hardcode
+// the window size to 5.
+fun recordTimestamp(currentTimeMs, currentAverage, lastValue) {
+  curTimestamp := currentTimeMs;
+//  if (usedFields > 0) then
+//    diff := curTimestamp - lastValue;
+//    if (usedFields == 5) then
+//      removedValue := call select(diffs[5], curPosition);
+//      diffs[5] := call store(diffs[5], curPosition, diff);
+//      (currentAverage, usedFields, timeDifference) := call calculateNewAverage(removedValue, diff, 0,
+//       currentAverage, usedFields, timeDifference);
+//      curPosition := call shiftEnd(curPosition, 5);
+//    else
+//      (currentAverage, usedFields, timeDifference) := call calculateNewAverage(0, diff, 1,
+//       currentAverage, usedFields, timeDifference);
+//      diffs[5] := call store(diffs[5], curPosition, diff);
+//      curPosition := call shiftEnd(curPosition, 5);
+//    endif
+//  else
+//    if (lastValue != -1) then
+//      diff := curTimestamp - lastValue;
+//      currentAverage := 0;
+//      diffs[5] := call store(diffs[5], curPosition, diff);
+//      (currentAverage, usedFields, timeDifference) := call calculateNewAverage(0, diff, 1,
+//       currentAverage, usedFields, timeDifference);
+//      curPosition := call shiftEnd(curPosition, 5);
+//    endif
+//  endif
+////
+  currentAverage := curTimestamp - lastValue;
+////
+  lastValue := curTimestamp;
+  return (currentTimeMs, currentAverage, lastValue);
+}
+fun calculateNewAverage(removedValue, diff, increaseUsedFields,
+                        currentAverage, usedFields, timeDifference) {
+  oldSum := currentAverage * usedFields;
+  if (increaseUsedFields == 1) then
+    usedFields := usedFields + 1;
+  endif
+  currentAverage := (oldSum - removedValue + timeDifference) / usedFields;
+  return (currentAverage, usedFields, timeDifference);
+}
+fun shiftEnd(curPosition, diffs_length) {
+  curPosition := (curPosition + 1) % diffs_length;
+  return curPosition;
+}
+fun getCurrentAverage(currentAverage) {
+  return currentAverage;
+}
+// Model array storage / selection.
+fun select(arr[5], i) {
+  if (i == 0) then ret := arr_0; endif
+  if (i == 1) then ret := arr_1; endif
+  if (i == 2) then ret := arr_2; endif
+  if (i == 3) then ret := arr_3; endif
+  if (i == 4) then ret := arr_4; endif
+  return ret;
+}
+fun store(arr[5], i, x) {
+  if (i == 0) then arr_0 := x; endif
+  if (i == 1) then arr_1 := x; endif
+  if (i == 2) then arr_2 := x; endif
+  if (i == 3) then arr_3 := x; endif
+  if (i == 4) then arr_4 := x; endif
+  return arr[5];
+}
+// ------ End DiffMovingAverage -------------------------------------
+// The flaky test:
+fun testAverageA() {
+  // Mock out the object's initial heap state.
+//  lastValue := 0;
+//  currentTimeMs := lastValue + 112;
+  currentAverage := 112;
+  // Begin test code.
+  counter := 0;
+  while (counter < 5) do
+    @var { (- 10 (+ testAverage!1!counter testAverage!2!counter)) }
+//    (currentTimeMs, currentAverage, lastValue) := call recordTimestamp(
+//     currentTimeMs, currentAverage, lastValue);
+    currentTimeMs := call sleep(100,
+    currentTimeMs);
+    counter := counter + 1;
+  end
+//  currentAverage := call getCurrentAverage(currentAverage);
+  if (currentAverage >= 90 && currentAverage <= 110)
+    then success := 1;
+    else success := 0;
+  endif
+  return success;
+}
+fun testAverageB() {
+  // Mock out the object's initial heap state.
+//  lastValue := 0;
+//  currentTimeMs := lastValue + 95;
+  currentAverage := 95;
+  // Begin test code.
+  counter := 0;
+  while (counter < 5) do
+    @var { (- 10 (+ testAverage!1!counter testAverage!2!counter)) }
+//    (currentTimeMs, currentAverage, lastValue) := call recordTimestamp(
+//     currentTimeMs, currentAverage, lastValue);
+//    currentTimeMs := call sleep(100,
+//    currentTimeMs);
+    counter := counter + 1;
+  end
+//  currentAverage := call getCurrentAverage(currentAverage);
+  if (currentAverage >= 90 && currentAverage <= 110)
+    then success := 1;
+    else success := 0;
+  endif
+  return success;
+}

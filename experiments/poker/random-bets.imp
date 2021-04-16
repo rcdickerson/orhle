@@ -1,0 +1,28 @@
+// A poker betting strategy that just bets a random
+// amount between 1 and 10 each time. This strategy does
+// not reveal any information about the player's cards.
+
+expected: valid;
+
+forall: bet[1];
+exists: bet[2];
+
+post: (= bet!1!ret bet!2!ret);
+
+aspecs:
+  random(n) {
+    post: (and (>= ret! 1) (<= ret! n));
+  }
+
+especs:
+  random(n) {
+    choiceVars: r;
+    pre: (and (>= r 1) (<= r n));
+    post: (= ret! r);
+  }
+
+fun bet(hand[5]) {
+  maxBet := 10;
+  ret := call random(maxBet);
+  return ret;
+}
