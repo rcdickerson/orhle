@@ -5,7 +5,7 @@ module Orhle.PredTransTypes
   , RevLoopFusion(..)
   ) where
 
-import Orhle.Assertion ( Assertion(..) )
+import Orhle.Assertion ( Arith(..), Assertion(..) )
 import Orhle.Imp
 import Orhle.Triple
 
@@ -23,6 +23,7 @@ data RevLoop = RevLoop
   , rl_condBExp      :: BExp
   , rl_holeId        :: Maybe Int
   , rl_invar         :: Assertion
+  , rl_measure       :: Arith
   } deriving Show
 
 data LoopFusion = LoopFusion

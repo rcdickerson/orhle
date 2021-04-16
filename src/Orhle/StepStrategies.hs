@@ -98,8 +98,8 @@ lookForBStepAny (RevRhleTriple pre aprogs eprogs post) =
 categorizeByInvar :: [RevProgram] -> Map String [RevLoop]
 categorizeByInvar programs = let
   taggedLoop prog = case prog of
-    SWhile condB body (invar@(A.Hole (A.HoleId hid _)), _) -> ("hole", RevLoop body (Imp.bexpToAssertion condB) condB (Just hid) invar)
-    SWhile condB body (invar, _) -> (showSMT invar, RevLoop body (Imp.bexpToAssertion condB) condB Nothing invar)
+    SWhile condB body (invar@(A.Hole (A.HoleId hid _)), meas) -> ("hole", RevLoop body (Imp.bexpToAssertion condB) condB (Just hid) invar meas)
+    SWhile condB body (invar, meas) -> (showSMT invar, RevLoop body (Imp.bexpToAssertion condB) condB Nothing invar meas)
     _ -> error $ "Program is not a loop: " ++ show prog
   addLoop loop maybeList = case maybeList of
     Nothing -> Just [loop]

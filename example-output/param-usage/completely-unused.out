@@ -1,5 +1,0 @@
-orhle-exe: ./examples/param-usage/completely-unused.imp: openFile: does not exist (No such file or directory)
-
-real	0m0.221s
-user	0m0.189s
-sys	0m0.029s

@@ -30,13 +30,20 @@ wpLoopFusion fusion post = do
                dif <- envGetDefaultInvarFilter
                Inf.inferRevFusionInvariant (Inf.BackwardHoudini dif post) fusion
              _        -> return $ rlf_invar fusion
-  freshVars    <- envFreshenAll vars
-  let freshen   = Name.substituteAll vars freshVars
-  let qNames    = Name.toIntNames freshVars
-  let impPost   = freshen $ A.Imp (A.And $ invar:allNConds) post
-  let bodyTrip  = RevRhleTriple (A.And $ invar:allConds) abodies ebodies invar
-  stepStrat    <- envBackwardStepStrat
-  inductive    <- (stepStrat bodyTrip) >>= (return . freshen . uncurry A.Imp)
+  freshVars     <- envFreshenAll vars
+  let freshen    = Name.substituteAll vars freshVars
+  let qNames     = Name.toIntNames freshVars
+  let impPost    = freshen $ A.Imp (A.And $ invar:allNConds) post
+  let decMeasure = case abodies of
+                     [] -> let
+                       measures = map rl_measure $ rlf_eloops fusion
+                       nextMeasures = map (Name.substituteAll vars freshVars) measures
+                       decConds = map (uncurry A.Lt) $ zip measures nextMeasures
+                       in A.And decConds
+                     _  -> ATrue
+  let bodyTrip   = RevRhleTriple (A.And $ invar:allConds) abodies ebodies (A.And [invar, decMeasure])
+  stepStrat     <- envBackwardStepStrat
+  inductive     <- (stepStrat bodyTrip) >>= (return . freshen . uncurry A.Imp)
   let sameIters = freshen $ A.Imp (A.And [invar, (A.Not $ A.And allConds)]) (A.And allNConds)
   return $ A.And [ invar, A.Forall qNames impPost, A.Forall qNames inductive, A.Forall qNames sameIters]
 
