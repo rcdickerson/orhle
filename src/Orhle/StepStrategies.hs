@@ -54,14 +54,14 @@ lookForBNonLoop (RevRhleTriple pre aprogs eprogs post) = let
   (eloops, es) = partition Imp.headIsLoop eprogs
   in case (as, es) of
     ([], []) -> return Nothing
-    (_, eprog:rest) -> do
-      let (hd, eprog') = Imp.headProg eprog
-      post' <- PTS.weakestPreQ VExistential hd post
-      return $ Just $ RevRhleTriple pre aprogs (eprog':(rest ++ eloops)) post'
     (aprog:rest, _) -> do
       let (hd, aprog') = Imp.headProg aprog
       post' <- PTS.weakestPreQ VUniversal hd post
       return $ Just $ RevRhleTriple pre (aprog':(rest ++ aloops)) eprogs post'
+    (_, eprog:rest) -> do
+      let (hd, eprog') = Imp.headProg eprog
+      post' <- PTS.weakestPreQ VExistential hd post
+      return $ Just $ RevRhleTriple pre aprogs (eprog':(rest ++ eloops)) post'
 
 lookForBLoopFusion :: RevRhleTriple -> Verification (Maybe RevRhleTriple)
 lookForBLoopFusion triple@(RevRhleTriple pre aprogs eprogs post) = let
@@ -86,14 +86,14 @@ lookForBStepAny :: RevRhleTriple -> Verification (Maybe RevRhleTriple)
 lookForBStepAny (RevRhleTriple pre aprogs eprogs post) =
   case (aprogs, eprogs) of
     ([], []) -> return Nothing
-    (_, eprog:rest) -> do
-      let (hd, eprog') = Imp.headProg eprog
-      post' <- PTS.weakestPreQ VExistential hd post
-      return $ Just $ RevRhleTriple pre aprogs (eprog':rest) post'
     (aprog:rest, _) -> do
       let (hd, aprog') = Imp.headProg aprog
       post' <- PTS.weakestPreQ VUniversal hd post
       return $ Just $ RevRhleTriple pre (aprog':rest) eprogs post'
+    (_, eprog:rest) -> do
+      let (hd, eprog') = Imp.headProg eprog
+      post' <- PTS.weakestPreQ VExistential hd post
+      return $ Just $ RevRhleTriple pre aprogs (eprog':rest) post'
 
 categorizeByInvar :: [RevProgram] -> Map String [RevLoop]
 categorizeByInvar programs = let

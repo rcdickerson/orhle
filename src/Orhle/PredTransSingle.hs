@@ -55,11 +55,11 @@ wpIf condB tBranch eBranch post = do
 wpCall :: CallId -> [AExp] -> [Name] -> Assertion -> Verification Assertion
 wpCall cid callArgs assignees post = do
   (cvars, fPre, fPost) <- specAtCallsite cid callArgs
-  let retVars     = Spec.retVars $ length assignees
-  frAssignees    <- envFreshenAll assignees
-  let frPost      = Name.substituteAll assignees frAssignees post
-  let frFPost     = Name.substituteAll retVars   frAssignees fPost
-  (quant, _)     <- envGetQSpecs
+  let retVars  = Spec.retVars $ length assignees
+  frAssignees <- envFreshenAll assignees
+  let frPost   = Name.substituteAll assignees frAssignees post
+  let frFPost  = Name.substituteAll retVars   frAssignees fPost
+  (quant, _)  <- envGetQSpecs
   case quant of
     VUniversal   -> return $ A.And [fPre, A.Imp frFPost frPost]
     VExistential -> let
