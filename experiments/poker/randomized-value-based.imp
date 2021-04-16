@@ -24,7 +24,6 @@ fun bet(hand[5]):
 
   i := 0;
   while (i < 5) do
-    @var {(- 5 i)}
     if (i == 0 && hand_0 == 1) then count_1 := count_1 + 1; else skip; end
     if (i == 0 && hand_0 == 2) then count_2 := count_2 + 1; else skip; end
     if (i == 0 && hand_0 == 3) then count_3 := count_3 + 1; else skip; end

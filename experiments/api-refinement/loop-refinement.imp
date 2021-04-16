@@ -27,7 +27,6 @@ fun original() {
   sum := 0;
   while (sum <= 100) do
     @inv { (= original!sum refinement!sum) }
-    @var { (- 110 original!sum) }
     r := call rand();
     sum := sum + r;
   end
