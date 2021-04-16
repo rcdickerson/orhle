@@ -23,7 +23,9 @@ pre: (and
        // Delimited Release
        (and (>= buy!1!funds buy!1!cost) (>= buy!2!funds buy!2!cost)));
 
-post: (= buy!1!spent buy!2!spent);
+post: (and
+        (= buy!1!spent buy!2!spent)
+        (= buy!1!cost  buy!2!cost));
 
 
 fun buy(funds, spent, cost) {

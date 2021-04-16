@@ -32,8 +32,6 @@ fun run(high, low) {
   flip := call flipCoin();
   if (flip == 0) then
     low := 1 - low;  // Flip low.
-  else
-    skip;
   endif
   return low;
 }

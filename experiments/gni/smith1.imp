@@ -3,11 +3,10 @@
 
 expected: invalid;
 
-forall: smith[1], smith[2];
-exists: smith[3];
+forall: smith[1];
+exists: smith[2];
 
-pre:  (= smith!1!secret smith!3!secret);
-post: (= smith!2!ret smith!3!ret);
+post: (= smith!1!ret smith!2!ret);
 
 fun smith(secret) {
   if (secret % 2 == 0) then

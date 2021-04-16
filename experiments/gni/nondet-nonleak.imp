@@ -3,14 +3,13 @@
 
 expected: valid;
 
-forall: nonleak[1], nonleak[2];
-exists: nonleak[3];
+forall: nonleak[1];
+exists: nonleak[2];
 
-pre: (and
-       (= nonleak!1!high nonleak!3!high)
-       (= nonleak!1!low  nonleak!2!low)
-       (= nonleak!2!low  nonleak!3!low));
-post:  (= nonleak!2!ret  nonleak!3!ret);
+pre: (= nonleak!1!low nonleak!2!low);
+post: (and
+        (= nonleak!1!low nonleak!2!low)
+        (= nonleak!1!ret nonleak!2!ret));
 
 aspecs:
   randInt() {

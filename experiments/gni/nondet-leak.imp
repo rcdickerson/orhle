@@ -2,14 +2,13 @@
 
 expected: invalid;
 
-forall: leak[1], leak[2];
-exists: leak[3];
+forall: leak[1];
+exists: leak[2];
 
-pre: (and
-       (= leak!1!high leak!3!high)
-       (= leak!1!low  leak!2!low)
-       (= leak!2!low  leak!3!low));
-post:  (= leak!2!ret  leak!3!ret);
+pre:  (= leak!1!low  leak!2!low);
+post: (and
+        (= leak!1!low leak!2!low)
+        (= leak!1!ret leak!2!ret));
 
 aspecs:
   randInt() {
