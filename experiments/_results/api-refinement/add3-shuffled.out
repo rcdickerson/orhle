@@ -193,5 +193,5 @@ Failure:
   Verification conditions are invalid. Model: (model (define-fun refinement!list_1 () Int 4 ) (define-fun refinement!shuffled_1!1 () Int 0 ) (define-fun refinement!shuffled_0!1 () Int 4 ) (define-fun refinement!list_0 () Int 0 ) (define-fun refinement!list_2 () Int 2 ) (define-fun refinement!shuffled_2!1 () Int 2 ) (define-fun original!list_2 () Int 2 ) (define-fun original!list_1 () Int 4 ) (define-fun original!list_0 () Int 0 ) )
 
 real	0m0.198s
-user	0m0.205s
-sys	0m0.014s
+user	0m0.215s
+sys	0m0.005s

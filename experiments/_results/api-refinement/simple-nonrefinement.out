@@ -51,5 +51,5 @@ Failure:
   Verification conditions are invalid. Model: (model (define-fun refinement!x!1 () Int 20 ) )
 
 real	0m0.187s
-user	0m0.178s
-sys	0m0.012s
+user	0m0.173s
+sys	0m0.017s

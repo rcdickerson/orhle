@@ -55,5 +55,5 @@ Eq (Var play ! handValue) (Num 21)
 Valid.
 
 real	0m0.187s
-user	0m0.176s
-sys	0m0.017s
+user	0m0.174s
+sys	0m0.019s

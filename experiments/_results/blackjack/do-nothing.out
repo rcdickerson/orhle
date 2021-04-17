@@ -46,5 +46,5 @@ Failure:
   Verification conditions are invalid. Model: (model (define-fun play!handValue () Int 19 ) )
 
 real	0m0.188s
-user	0m0.168s
-sys	0m0.016s
+user	0m0.182s
+sys	0m0.004s

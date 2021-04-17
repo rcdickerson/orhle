@@ -55,6 +55,6 @@ Gt (Var body ! p) (Num 0)
 Failure:
   Verification conditions are invalid. Model: (model (define-fun body!x () Int 0 ) )
 
-real	0m0.190s
-user	0m0.171s
-sys	0m0.020s
+real	0m0.216s
+user	0m0.189s
+sys	0m0.030s

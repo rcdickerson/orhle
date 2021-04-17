@@ -58,6 +58,6 @@ Eq (Var smith ! 1 ! ret) (Var smith ! 2 ! ret)
 Failure:
   Verification conditions are invalid. Model: (model (define-fun smith!1!secret () Int (- 2 ) ) (define-fun smith!2!secret () Int 3 ) )
 
-real	0m0.188s
-user	0m0.166s
-sys	0m0.021s
+real	0m0.215s
+user	0m0.185s
+sys	0m0.029s

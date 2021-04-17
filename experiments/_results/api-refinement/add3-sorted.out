@@ -193,6 +193,6 @@ And
 [send->] (exit )
 Valid.
 
-real	0m0.218s
-user	0m0.243s
-sys	0m0.039s
+real	0m0.207s
+user	0m0.214s
+sys	0m0.009s

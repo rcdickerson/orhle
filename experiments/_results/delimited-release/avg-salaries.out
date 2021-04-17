@@ -127,6 +127,6 @@ Eq (Var calc_avg ! 2 ! avg) (Var calc_avg ! 3 ! avg)
 [send->] (exit )
 Valid.
 
-real	0m0.220s
-user	0m0.371s
-sys	0m0.016s
+real	0m0.187s
+user	0m0.171s
+sys	0m0.025s

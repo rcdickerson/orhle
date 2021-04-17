@@ -101,6 +101,6 @@ Eq (Var cond ! 2 ! ret) (Var cond ! 3 ! ret)
 Failure:
   Verification conditions are invalid. Model: (model (define-fun cond!2!h2 () Int 2 ) (define-fun cond!2!h1 () Int 3 ) (define-fun cond!3!h2 () Int 2 ) (define-fun cond!3!h1 () Int 2 ) (define-fun cond!3!l () Int 1 ) (define-fun cond!1!l () Int 1 ) (define-fun cond!2!l () Int 1 ) (define-fun cond!1!h2 () Int 2 ) (define-fun cond!1!h1 () Int 2 ) )
 
-real	0m0.191s
-user	0m0.188s
-sys	0m0.017s
+real	0m0.188s
+user	0m0.185s
+sys	0m0.013s

@@ -68,6 +68,6 @@ Eq (Var parity ! 1 ! l) (Var parity ! 2 ! l)
 Failure:
   Verification conditions are invalid. Model: (model (define-fun parity!2!h () Int 2 ) (define-fun parity!1!h () Int (- 3 ) ) (define-fun parity!2!l () Int 0 ) (define-fun parity!1!l () Int 0 ) )
 
-real	0m0.189s
-user	0m0.173s
-sys	0m0.018s
+real	0m0.188s
+user	0m0.163s
+sys	0m0.028s

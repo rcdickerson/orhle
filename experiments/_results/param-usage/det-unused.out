@@ -49,6 +49,6 @@ Eq (Var unused ! 1 ! ret) (Var unused ! 2 ! ret)
 [send->] (exit )
 Valid.
 
-real	0m0.187s
-user	0m0.177s
-sys	0m0.008s
+real	0m0.213s
+user	0m0.190s
+sys	0m0.021s

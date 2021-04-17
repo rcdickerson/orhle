@@ -70,6 +70,6 @@ Eq (Var parity ! 1 ! l) (Var parity ! 2 ! l)
 [send->] (exit )
 Valid.
 
-real	0m0.189s
-user	0m0.179s
-sys	0m0.012s
+real	0m0.187s
+user	0m0.174s
+sys	0m0.016s

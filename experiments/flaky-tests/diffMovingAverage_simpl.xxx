@@ -113,7 +113,11 @@ fun testAverageA() {
   // Begin test code.
   counter := 0;
   while (counter < 5) do
-    @var { (- 10 (+ testAverage!1!counter testAverage!2!counter)) }
+    @inv { (and (<  110 testAverageA!currentAverage)
+                (<= 90  testAverageB!currentAverage)
+                (<= testAverageB!currentAverage 100)
+                (= testAverageA!counter testAverageB!counter)) }
+    @var { (- 10 (+ testAverageA!counter testAverageB!counter)) }
 //    (currentTimeMs, currentAverage, lastValue) := call recordTimestamp(
 //     currentTimeMs, currentAverage, lastValue);
     currentTimeMs := call sleep(100,
@@ -135,6 +139,9 @@ fun testAverageB() {
   // Begin test code.
   counter := 0;
   while (counter < 5) do
+    @inv { (and (<  110 testAverageA!currentAverage)
+                (<= 90  testAverageB!currentAverage)
+                (<= testAverageB!currentAverage 100)) }
     @var { (- 10 (+ testAverage!1!counter testAverage!2!counter)) }
 //    (currentTimeMs, currentAverage, lastValue) := call recordTimestamp(
 //     currentTimeMs, currentAverage, lastValue);

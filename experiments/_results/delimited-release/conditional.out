@@ -98,6 +98,6 @@ Eq (Var cond ! 2 ! ret) (Var cond ! 3 ! ret)
 [send->] (exit )
 Valid.
 
-real	0m0.208s
-user	0m0.326s
-sys	0m0.020s
+real	0m0.188s
+user	0m0.167s
+sys	0m0.030s

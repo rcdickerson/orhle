@@ -68,6 +68,6 @@ Eq (Var run ! 1 ! low) (Var run ! 2 ! low)
 Failure:
   Verification conditions are invalid. Model: (model (define-fun run!1!flip!1 () Int 0 ) (define-fun run!2!high () Int 2 ) (define-fun run!1!high () Int 3 ) (define-fun run!2!low () Int 0 ) (define-fun run!1!low () Int 0 ) )
 
-real	0m0.188s
-user	0m0.178s
-sys	0m0.014s
+real	0m0.187s
+user	0m0.187s
+sys	0m0.004s

@@ -72,5 +72,5 @@ Failure:
   Verification conditions are invalid. Model: (model (define-fun leak!1!r!1 () Int 50 ) (define-fun leak!2!high () Int 1 ) (define-fun leak!1!high () Int 2 ) (define-fun leak!2!low () Int 0 ) (define-fun leak!1!low () Int 0 ) )
 
 real	0m0.188s
-user	0m0.168s
-sys	0m0.027s
+user	0m0.158s
+sys	0m0.036s

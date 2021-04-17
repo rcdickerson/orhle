@@ -47,6 +47,6 @@ Eq (Var original ! x) (Var refinement ! x)
 [send->] (exit )
 Valid.
 
-real	0m0.188s
-user	0m0.178s
-sys	0m0.034s
+real	0m0.187s
+user	0m0.173s
+sys	0m0.017s

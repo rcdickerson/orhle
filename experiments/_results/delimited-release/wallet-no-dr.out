@@ -80,5 +80,5 @@ Failure:
   Verification conditions are invalid. Model: (model (define-fun buy!2!cost () Int (- 1 ) ) (define-fun buy!1!funds () Int (- 2 ) ) (define-fun buy!2!funds () Int (- 1 ) ) (define-fun buy!1!cost () Int (- 1 ) ) (define-fun buy!2!spent () Int 0 ) (define-fun buy!1!spent () Int 0 ) )
 
 real	0m0.188s
-user	0m0.184s
-sys	0m0.008s
+user	0m0.182s
+sys	0m0.011s

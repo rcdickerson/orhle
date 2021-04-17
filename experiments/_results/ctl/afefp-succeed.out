@@ -58,5 +58,5 @@ Gt (Var body ! p) (Num 0)
 Valid.
 
 real	0m0.188s
-user	0m0.175s
-sys	0m0.017s
+user	0m0.189s
+sys	0m0.010s

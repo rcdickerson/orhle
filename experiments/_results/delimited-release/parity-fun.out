@@ -68,5 +68,5 @@ Eq (Var run ! 1 ! l) (Var run ! 2 ! l)
 Valid.
 
 real	0m0.188s
-user	0m0.188s
-sys	0m0.006s
+user	0m0.171s
+sys	0m0.022s

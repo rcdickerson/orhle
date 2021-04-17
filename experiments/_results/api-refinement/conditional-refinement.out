@@ -55,6 +55,6 @@ Eq (Var original ! ret) (Var refinement ! ret)
 [send->] (exit )
 Valid.
 
-real	0m0.190s
-user	0m0.167s
+real	0m0.187s
+user	0m0.163s
 sys	0m0.028s

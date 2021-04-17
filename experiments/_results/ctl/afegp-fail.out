@@ -56,6 +56,6 @@ Gt (Var body ! p) (Num 0)
 Failure:
   Verification conditions are invalid. Model: (model )
 
-real	0m0.189s
-user	0m0.164s
-sys	0m0.030s
+real	0m0.188s
+user	0m0.174s
+sys	0m0.018s

@@ -124,6 +124,6 @@ And
 Failure:
   Solver returned unknown.
 
-real	0m0.211s
-user	0m0.264s
-sys	0m0.029s
+real	0m0.201s
+user	0m0.191s
+sys	0m0.028s

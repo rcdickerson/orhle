@@ -66,6 +66,6 @@ Eq (Var original ! sum) (Var refinement ! sum)
 Failure:
   Verification conditions are invalid. Model: (model (define-fun refinement!r!2 () Int 10 ) )
 
-real	0m0.191s
-user	0m0.180s
-sys	0m0.018s
+real	0m0.187s
+user	0m0.163s
+sys	0m0.031s

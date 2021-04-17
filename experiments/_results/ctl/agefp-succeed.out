@@ -52,6 +52,6 @@ Gt (Var body ! p) (Num 0)
 [send->] (exit )
 Valid.
 
-real	0m0.189s
-user	0m0.171s
-sys	0m0.020s
+real	0m0.187s
+user	0m0.187s
+sys	0m0.004s

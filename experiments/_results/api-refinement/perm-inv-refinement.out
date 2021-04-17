@@ -138,6 +138,6 @@ Eq (Var original ! sum) (Var refinement ! sum)
 [send->] (exit )
 Valid.
 
-real	0m0.189s
-user	0m0.191s
-sys	0m0.012s
+real	0m0.187s
+user	0m0.183s
+sys	0m0.017s
