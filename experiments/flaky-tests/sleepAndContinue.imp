@@ -1,0 +1,83 @@
+// Inspired by examples in the IDoFT dataset:
+// http://mir.cs.illinois.edu/flakytests/tsoiso.html
+
+// Assert test is flaky.
+exists: test[1], test[2];
+pre:    true;
+post:   (not (= test!1!success test!2!success));
+
+aspecs:
+  // Any positive current time is possible.
+  getCurrentTimeMs() {
+    post: (< 0 ret!)
+  }
+
+  // Sleep is not guaranteed to be precise, the only
+  // hard guarantee is current time does not decrease.
+  sleep(currentTime, interval) {
+    post: (>= ret! currentTime);
+  }
+
+especs:
+  // Treat all possible current times as realizable.
+  getCurrentTimeMs() {
+    choiceVars: currentTime;
+    pre:  (< 0 currentTime);
+    post: (= ret! currentTime);
+  }
+
+  // Although not precise, realistically sleep will be fairly
+  // close. Only consider times within a +/- 20ms window as
+  // actually realizable. (The flaky test is likely caused
+  // by developers underestimating this interval.)
+  sleep(interval, currentTime) {
+    choiceVars: sleepTime;
+    pre:  (and (<= 0 sleepTime)
+               (<= (- interval 20) sleepTime)
+               (<= sleepTime (+ interval 20)));
+    post: (= ret! (+ currentTime sleepTime));
+  }
+
+// CUT: Compute a total of the elapsed time between calls.
+fun recordTimestamp(currentTime, currentTotal, lastTime) {
+  if ( lastTime >= 0 ) then
+    elapsedTime := currentTime - lastTime;
+    currentTotal := currentTotal + elapsedTime;
+  endif
+  lastTime := currentTime;
+  return (currentTotal, lastTime);
+}
+
+// The test:
+fun test() {
+  currentTime := 0;// call getCurrentTimeMs();
+  lastTime := -1;
+  currentTotal := 0;
+
+  // Prime the timer.
+  (currentTotal, lastTime) := call recordTimestamp(currentTime, currentTotal, lastTime);
+  currentTime := call sleep(100, currentTime);
+
+  counter := 0;
+  while (counter < 5) do
+    @inv { (and
+             (= (* 100 test!1!counter) test!1!currentTotal)
+             (= 100 (- test!1!currentTime test!1!lastTime))
+             (<= 0 test!1!lastTime)
+             (= (* 101 test!2!counter) test!2!currentTotal)
+             (= 101 (- test!2!currentTime test!2!lastTime))
+             (<= 0 test!2!lastTime)
+             (= test!1!counter test!2!counter)
+             (<= test!1!counter 5)) }
+    @var { (- 10 test!1!counter) }
+    (currentTotal, lastTime) := call recordTimestamp(currentTime, currentTotal, lastTime);
+    currentTime := call sleep(100, currentTime);
+    counter := counter + 1;
+  end
+
+  if (currentTotal == 500)
+    then success := 1;
+    else success := 0;
+    endif
+  return success;
+}
