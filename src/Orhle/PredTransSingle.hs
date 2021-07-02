@@ -6,13 +6,13 @@ module Orhle.PredTransSingle
   , weakestPreQ
   ) where
 
+import           Ceili.Assertion ( Assertion(..) )
+import qualified Ceili.Assertion as A
+import           Ceili.Language.FunImp
+import           Ceili.Name  ( Name, TypedName(..) )
+import qualified Ceili.Name as Name
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import           Orhle.Assertion ( Assertion(..) )
-import qualified Orhle.Assertion as A
-import           Orhle.Imp
-import           Orhle.Name  ( Name, TypedName(..) )
-import qualified Orhle.Name as Name
 import           Orhle.PredTransTypes ( Loop(..) )
 import           Orhle.Spec ( Spec(..) )
 import qualified Orhle.Spec as Spec

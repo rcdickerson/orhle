@@ -3,14 +3,28 @@ module Orhle.PredTransRelational
   , spLoopFusion
   ) where
 
+import           Ceili.Assertion ( Assertion(..) )
+import qualified Ceili.Assertion as A
+import qualified Ceili.InvariantInference.Pie as Pie
+import qualified Ceili.Name as Name
 import qualified Data.Set as Set
-import           Orhle.Assertion ( Assertion(..) )
-import qualified Orhle.Assertion as A
-import qualified Orhle.InvariantInference as Inf
-import qualified Orhle.Name as Name
 import           Orhle.PredTransTypes
 import           Orhle.Triple
 import           Orhle.VerifierEnv
+
+-------------
+-- AESpecs --
+-------------
+
+data AESpecs = AESpecs
+  { aspecs :: SpecMap
+  , especs :: SpecMap
+  }
+
+instance CollectableNames AESpecs where
+  namesIn (AESpecs as es) = Set.union (allNames as) (allNames es)
+    where allNames = Map.foldr (Set.union . namesIn) Set.empty
+
 
 wpLoopFusion :: RevLoopFusion -> Assertion -> Verification Assertion
 wpLoopFusion fusion post = do

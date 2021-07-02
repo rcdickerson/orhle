@@ -11,7 +11,6 @@ module Orhle.VerifierEnv
   , envFork
   , envForwardStepStrat
   , envFreshen
-  , envFreshenAll
   , envGetDefaultInvarFilter
   , envGetQSpecs
   , envGetQuant
@@ -19,21 +18,19 @@ module Orhle.VerifierEnv
   , envSetDefaultInvarFilter
   , envSetQuant
   , envWithChoice
-  , runBackwardAnalysis
-  , runForwardAnalysis
   , runVerificationTask
   , throwError
   ) where
 
+import           Ceili.Assertion ( Assertion(..) )
+import qualified Ceili.Assertion as A
+import           Ceili.Name ( FreshableNames(..), Name(..), TypedName(..), NextFreshIds, namesIn )
+import qualified Ceili.Name as Name
 import           Control.Monad.IO.Class ( liftIO )
 import           Control.Monad.Except ( ExceptT, runExceptT, throwError )
 import           Control.Monad.Trans.State
 import           Data.Set  ( Set )
 import qualified Data.Set as Set
-import           Orhle.Assertion ( Assertion(..) )
-import qualified Orhle.Assertion as A
-import           Orhle.Name  ( Name(..), TypedName(..), NextFreshIds, namesIn )
-import qualified Orhle.Name as Name
 import           Orhle.Spec ( AESpecs(..), SpecMap )
 import           Orhle.Triple
 import           System.IO ( hFlush, stdout )
@@ -42,8 +39,8 @@ data VQuant = VUniversal
             | VExistential
             deriving (Eq, Ord, Show)
 
-type ForwardStepStrategy  = RhleTriple    -> Verification (Assertion, Assertion)
-type BackwardStepStrategy = RevRhleTriple -> Verification (Assertion, Assertion)
+type ForwardStepStrategy  = RhleTriple -> Verification (Assertion, Assertion)
+type BackwardStepStrategy = RhleTriple -> Verification (Assertion, Assertion)
 
 data Env = Env { env_quant              :: VQuant
                , env_specs              :: AESpecs
@@ -59,15 +56,15 @@ type Verification a = StateT Env (ExceptT String IO) a
 runVerificationTask :: Env -> Verification a -> IO (Either String a)
 runVerificationTask task env = runExceptT (evalStateT env task)
 
-runBackwardAnalysis :: Env -> RhleTriple -> IO (Either String Assertion)
-runBackwardAnalysis env triple =
-  let task = envImpWithChoice =<< (env_bStepStrat env $ reverseTriple triple)
-  in runVerificationTask env task
+-- runBackwardAnalysis :: Env -> RhleTriple -> IO (Either String Assertion)
+-- runBackwardAnalysis env triple =
+--   let task = envImpWithChoice =<< (env_bStepStrat env $ reverseTriple triple)
+--   in runVerificationTask env task
 
-runForwardAnalysis :: Env -> RhleTriple -> IO (Either String Assertion)
-runForwardAnalysis env triple =
-  let task = envImpWithChoice =<< (env_fStepStrat env $ triple)
-  in runVerificationTask env task
+-- runForwardAnalysis :: Env -> RhleTriple -> IO (Either String Assertion)
+-- runForwardAnalysis env triple =
+--   let task = envImpWithChoice =<< (env_fStepStrat env $ triple)
+--   in runVerificationTask env task
 
 buildEnv :: AESpecs
          -> RhleTriple
@@ -83,26 +80,19 @@ buildEnv specs (RhleTriple pre aprogs eprogs post) bStepStrat fStepStrat =
                        , namesIn post
                        , namesIn specs
                        ]
-    freshMap = Name.buildNextFreshIds names
+    freshMap = Name.buildFreshIds names
 
 envFork :: Verification Env
 envFork = do
   Env quant specs freshMap cvars bss fss dif <- get
   return $ Env quant specs freshMap cvars bss fss dif
 
-envFreshen :: Name -> Verification Name
+envFreshen :: FreshableNames a => a -> Verification a
 envFreshen name = do
   Env quant specs freshMap cvars bss fss dif <- get
-  let (freshName, freshMap') = Name.nextFreshName name freshMap
+  let (freshMap', freshName) = Name.runFreshen freshMap name
   put $ Env quant specs freshMap' cvars bss fss dif
   return freshName
-
-envFreshenAll :: Traversable t => t Name -> Verification (t Name)
-envFreshenAll names = do
-  Env quant specs freshMap cvars bss fss dif <- get
-  let (freshNames, freshMap') = Name.freshen names freshMap
-  put $ Env quant specs freshMap' cvars bss fss dif
-  return freshNames
 
 envSetQuant :: VQuant -> Verification ()
 envSetQuant quant = do

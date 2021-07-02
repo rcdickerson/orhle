@@ -1,3 +1,7 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+
 module Orhle.OrhleParser
   ( Exec(..)
   , ExecId
@@ -5,19 +9,21 @@ module Orhle.OrhleParser
   , parseOrhle
   ) where
 
-import           Control.Monad          ( liftM )
-import qualified Data.Map              as Map
-import           Orhle.Assertion        ( Assertion(..) )
-import qualified Orhle.Assertion       as A
-import qualified Orhle.Imp             as Imp
-import           Orhle.Name             ( Name(..), TypedName(..) )
-import qualified Orhle.Name            as Name
-import           Orhle.Spec             ( Spec(..) )
-import qualified Orhle.Spec            as S
-import           Orhle.Triple
-import           Text.Parsec
-import           Text.Parsec.Language
-import qualified Text.Parsec.Token     as Token
+import Ceili.Assertion ( Assertion(..) )
+import qualified Ceili.Assertion as A
+import Ceili.Language.Compose ( (:+:)(..) )
+import Ceili.Language.FunImp
+import Ceili.Language.FunImpParser
+import Ceili.Name ( Name(..), TypedName(..) )
+import qualified Ceili.Name as Name
+import Control.Monad ( liftM )
+import qualified Data.Map as Map
+import Orhle.Spec ( Spec(..) )
+import qualified Orhle.Spec as S
+import Orhle.Triple
+import Text.Parsec
+import Text.Parsec.Language
+import qualified Text.Parsec.Token as Token
 
 data Exec   = ExecForall String ExecId
             | ExecExists String ExecId
@@ -57,10 +63,10 @@ whiteSpace = Token.whiteSpace lexer
 
 type OrhleAppParser a = Parsec String Int a
 
-parseOrhle :: String -> Either ParseError ([Exec], Imp.FunImplEnv, S.AESpecs, RhleTriple, ExpectedResult)
+parseOrhle :: String -> Either ParseError ([Exec], FunImplEnv, S.AESpecs, RhleTriple, ExpectedResult)
 parseOrhle str = runParser orhleParser 0 "" str
 
-orhleParser :: OrhleAppParser ([Exec], Imp.FunImplEnv, S.AESpecs, RhleTriple, ExpectedResult)
+orhleParser :: OrhleAppParser ([Exec], FunImplEnv, S.AESpecs, RhleTriple, ExpectedResult)
 orhleParser = do
   whiteSpace
   expectedResult <- option ExpectSuccess $
@@ -84,9 +90,9 @@ orhleParser = do
 
   -- TODO: better is to compose the parser combinators
   rest <- manyTill anyChar eof
-  impls <- case Imp.parseImp rest of
-    Left err        -> fail $ show err
-    Right (_, funs) -> return funs
+  impls <- case parseFunImp rest of
+    Left err   -> fail $ show err
+    Right funs -> return funs
 
   -- Add per-execution prefixed versions of each function implementation to
   -- ensure names are unique across executions. This keeps the verifier from
@@ -113,20 +119,40 @@ orhleParser = do
            , RhleTriple pre aProgs eProgs post
            , expectedResult)
 
-prefixImpl :: String -> Imp.FunImpl -> Imp.FunImpl
-prefixImpl prefix (Imp.FunImpl params body rets) = let
+prefixImpl :: String -> FunImpl -> FunImpl
+prefixImpl prefix (FunImpl params body rets) = let
   pParams   = map (Name.prefix prefix) params
-  pBody     = Name.prefix prefix $ Imp.mapCallIds (prefix ++) body
+  pBody     = (Name.prefix prefix) . (prefixCallIds prefix) $ body
   pRets     = map (Name.prefix prefix) rets
-  in Imp.FunImpl pParams pBody pRets
+  in FunImpl pParams pBody pRets
 
-lookupExecBody :: Imp.FunImplEnv -> Exec -> OrhleAppParser Imp.Program
+class CallIdPrefixer a where
+  prefixCallIds :: String -> a -> a
+instance CallIdPrefixer (ImpSkip e) where
+  prefixCallIds _ = id
+instance CallIdPrefixer (ImpAsgn e) where
+  prefixCallIds _ = id
+instance CallIdPrefixer e => CallIdPrefixer (ImpSeq e) where
+  prefixCallIds pre (ImpSeq stmts) = ImpSeq $ map (prefixCallIds pre) stmts
+instance CallIdPrefixer e => CallIdPrefixer (ImpIf e) where
+  prefixCallIds pre (ImpIf c t e) = ImpIf c (prefixCallIds pre t) (prefixCallIds pre t)
+instance CallIdPrefixer e => CallIdPrefixer (ImpWhile e) where
+  prefixCallIds pre (ImpWhile c body meta) = ImpWhile c (prefixCallIds pre body) meta
+instance CallIdPrefixer e => CallIdPrefixer (ImpCall e) where
+  prefixCallIds pre (ImpCall cid params asgns) = ImpCall (pre ++ cid) params asgns
+instance (CallIdPrefixer (f e), CallIdPrefixer (g e)) => CallIdPrefixer ((f :+: g) e) where
+  prefixCallIds pre (Inl f) = Inl $ prefixCallIds pre f
+  prefixCallIds pre (Inr g) = Inr $ prefixCallIds pre g
+instance CallIdPrefixer FunImpProgram where
+  prefixCallIds pre (In f) = In $ prefixCallIds pre f
+
+lookupExecBody :: FunImplEnv -> Exec -> OrhleAppParser FunImpProgram
 lookupExecBody funs exec =
   let
     name = (execPrefix exec) ++ (getExecName exec)
   in case Map.lookup name funs of
     Nothing   -> fail   $ "Function definition not found: " ++ name
-    Just impl -> return $ Imp.fimpl_body impl
+    Just impl -> return $ fimpl_body impl
 
 execPrefix :: Exec -> String
 execPrefix exec =
