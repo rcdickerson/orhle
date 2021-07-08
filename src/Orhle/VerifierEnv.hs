@@ -3,7 +3,6 @@ module Orhle.VerifierEnv
   , BackwardStepStrategy
   , ForwardStepStrategy
   , Verification
-  , VQuant(..)
   , buildEnv
   , envAddChoiceVar
   , envAddChoiceVars
@@ -12,7 +11,6 @@ module Orhle.VerifierEnv
   , envForwardStepStrat
   , envFreshen
   , envGetDefaultInvarFilter
-  , envGetQSpecs
   , envGetQuant
   , envLog
   , envSetDefaultInvarFilter
@@ -24,26 +22,21 @@ module Orhle.VerifierEnv
 
 import           Ceili.Assertion ( Assertion(..) )
 import qualified Ceili.Assertion as A
-import           Ceili.Name ( FreshableNames(..), Name(..), TypedName(..), NextFreshIds, namesIn )
-import qualified Ceili.Name as Name
+import           Ceili.Name
 import           Control.Monad.IO.Class ( liftIO )
 import           Control.Monad.Except ( ExceptT, runExceptT, throwError )
 import           Control.Monad.Trans.State
 import           Data.Set  ( Set )
 import qualified Data.Set as Set
-import           Orhle.Spec ( AESpecs(..), SpecMap )
+import           Orhle.SpecImp
 import           Orhle.Triple
 import           System.IO ( hFlush, stdout )
-
-data VQuant = VUniversal
-            | VExistential
-            deriving (Eq, Ord, Show)
 
 type ForwardStepStrategy  = RhleTriple -> Verification (Assertion, Assertion)
 type BackwardStepStrategy = RhleTriple -> Verification (Assertion, Assertion)
 
-data Env = Env { env_quant              :: VQuant
-               , env_specs              :: AESpecs
+data Env = Env { env_quant              :: SpecImpQuant
+               , env_specs              :: SpecImpEnv
                , env_freshMap           :: NextFreshIds
                , env_choiceVars         :: Set TypedName
                , env_bStepStrat         :: BackwardStepStrategy
@@ -66,13 +59,13 @@ runVerificationTask task env = runExceptT (evalStateT env task)
 --   let task = envImpWithChoice =<< (env_fStepStrat env $ triple)
 --   in runVerificationTask env task
 
-buildEnv :: AESpecs
+buildEnv :: SpecImpEnv
          -> RhleTriple
          -> BackwardStepStrategy
          -> ForwardStepStrategy
          -> Env
 buildEnv specs (RhleTriple pre aprogs eprogs post) bStepStrat fStepStrat =
-  Env VUniversal specs freshMap Set.empty bStepStrat fStepStrat A.ATrue
+  Env SIQ_Universal specs freshMap Set.empty bStepStrat fStepStrat A.ATrue
   where
     names = Set.unions [ namesIn pre
                        , Set.unions $ map namesIn aprogs
@@ -80,7 +73,7 @@ buildEnv specs (RhleTriple pre aprogs eprogs post) bStepStrat fStepStrat =
                        , namesIn post
                        , namesIn specs
                        ]
-    freshMap = Name.buildFreshIds names
+    freshMap = buildFreshIds names
 
 envFork :: Verification Env
 envFork = do
@@ -90,26 +83,17 @@ envFork = do
 envFreshen :: FreshableNames a => a -> Verification a
 envFreshen name = do
   Env quant specs freshMap cvars bss fss dif <- get
-  let (freshMap', freshName) = Name.runFreshen freshMap name
+  let (freshMap', freshName) = runFreshen freshMap name
   put $ Env quant specs freshMap' cvars bss fss dif
   return freshName
 
-envSetQuant :: VQuant -> Verification ()
+envSetQuant :: SpecImpQuant -> Verification ()
 envSetQuant quant = do
   Env _ specs freshMap cvars bss fss dif <- get
   put $ Env quant specs freshMap cvars bss fss dif
 
-envGetQuant :: Verification VQuant
+envGetQuant :: Verification SpecImpQuant
 envGetQuant = get >>= return . env_quant
-
-envGetQSpecs :: Verification (VQuant, SpecMap)
-envGetQSpecs = do
-  quant           <- get >>= return . env_quant
-  (AESpecs as es) <- get >>= return . env_specs
-  let specs = case quant of
-                VUniversal   -> as
-                VExistential -> es
-  return (quant, specs)
 
 envAddChoiceVar :: TypedName -> Verification ()
 envAddChoiceVar var = do
@@ -122,9 +106,6 @@ envAddChoiceVars vars = do
   Env quant specs freshMap cvars bss fss dif <- get
   let cvars' = foldr Set.insert cvars vars
   put $ Env quant specs freshMap cvars' bss fss dif
-
-envImpWithChoice :: (Assertion, Assertion) -> Verification Assertion
-envImpWithChoice (pre, post) = envWithChoice $ Imp pre post
 
 envWithChoice :: Assertion -> Verification Assertion
 envWithChoice assertion = do

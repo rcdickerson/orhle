@@ -8,7 +8,7 @@
 module Orhle.SpecImp
   ( SpecImpEnv(..)
   , SpecImpProgram
-  , SpecImpQuant
+  , SpecImpQuant(..)
   , Specification(..)
   , SpecMap
   , impSpecCall
@@ -62,6 +62,12 @@ data SpecImpQuant = SIQ_Universal | SIQ_Existential
 data SpecImpEnv   = SpecImpEnv { sie_impls  :: FunImplEnv
                                , sie_aspecs :: SpecMap
                                , sie_especs :: SpecMap }
+
+instance CollectableNames SpecImpEnv where
+  namesIn (SpecImpEnv impls aspecs especs) =
+    Set.unions [ Set.unions $ map namesIn (Map.elems impls)
+               , Set.unions $ map namesIn (Map.elems aspecs)
+               , Set.unions $ map namesIn (Map.elems especs) ]
 
 sie_specs :: SpecImpEnv -> SpecImpQuant -> SpecMap
 sie_specs env quant = case quant of
