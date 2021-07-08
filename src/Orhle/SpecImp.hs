@@ -6,11 +6,11 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Orhle.SpecImp
-  ( FunSpecEnv
-  , SpecImpEnv(..)
+  ( SpecImpEnv(..)
   , SpecImpProgram
   , SpecImpQuant
   , Specification(..)
+  , SpecMap
   , impSpecCall
   , returnVars
   ) where
@@ -57,14 +57,16 @@ instance MappableNames Specification where
 -- Specification Environment --
 -------------------------------
 
-type FunSpecEnv   = Map Handle Specification
+type SpecMap      = Map Handle Specification
 data SpecImpQuant = SIQ_Universal | SIQ_Existential
-data SpecImpEnv   = SpecImpEnv { sie_impls :: FunImplEnv
-                               , sie_specs :: FunSpecEnv
-                               , sie_quant :: SpecImpQuant }
+data SpecImpEnv   = SpecImpEnv { sie_impls  :: FunImplEnv
+                               , sie_aspecs :: SpecMap
+                               , sie_especs :: SpecMap }
 
-instance FunImplLookup SpecImpEnv where
-  lookupFunImpl env name = lookupFunImpl (sie_impls env) name
+sie_specs :: SpecImpEnv -> SpecImpQuant -> SpecMap
+sie_specs env quant = case quant of
+  SIQ_Universal   -> sie_aspecs env
+  SIQ_Existential -> sie_especs env
 
 returnVars :: Int -> [Name]
 returnVars 0   = []
@@ -118,22 +120,26 @@ instance FreshableNames SpecImpProgram where
 impSpecCall :: (ImpSpecCall :<: f) => CallId -> [AExp] -> [Name] -> ImpExpr f
 impSpecCall cid args assignees = inject $ ImpSpecCall cid args assignees
 
+
 ----------------------------------
 -- Backward Predicate Transform --
 ----------------------------------
 
-instance ImpBackwardPT SpecImpEnv SpecImpProgram where
+instance FunImplLookup (SpecImpQuant, SpecImpEnv) where
+  lookupFunImpl (_, env) name = lookupFunImpl (sie_impls env) name
+
+instance ImpBackwardPT (SpecImpQuant, SpecImpEnv) SpecImpProgram where
   impBackwardPT ctx (In f) post = impBackwardPT ctx f post
 
-instance ImpBackwardPT SpecImpEnv (ImpSpecCall e) where
-  impBackwardPT env call@(ImpSpecCall cid args assignees) post =
-    case (Map.lookup cid $ sie_impls env, Map.lookup cid $ sie_specs env) of
+instance ImpBackwardPT (SpecImpQuant, SpecImpEnv) (ImpSpecCall e) where
+  impBackwardPT (quant, env) call@(ImpSpecCall cid args assignees) post =
+    case (Map.lookup cid $ sie_impls env, Map.lookup cid $ sie_specs env quant) of
       (Nothing, Nothing) ->
         throwError $ "No implementation or specification for " ++ cid
       (Just _, _) ->
-        impBackwardPT env (ImpCall cid args assignees) post
+        impBackwardPT (quant, env) (ImpCall cid args assignees) post
       (_, Just spec) ->
-        case sie_quant env of
+        case quant of
           SIQ_Universal   -> universalSpecPT spec call post
           SIQ_Existential -> existentialSpecPT spec call post
 

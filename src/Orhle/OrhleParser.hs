@@ -14,12 +14,11 @@ import qualified Ceili.Assertion as A
 import Ceili.Language.Compose ( (:+:)(..) )
 import Ceili.Language.FunImp
 import Ceili.Language.FunImpParser
-import Ceili.Name ( Name(..), TypedName(..) )
+import Ceili.Name ( Name(..), TypedName(..), prefix )
 import qualified Ceili.Name as Name
 import Control.Monad ( liftM )
 import qualified Data.Map as Map
-import Orhle.Spec ( Spec(..) )
-import qualified Orhle.Spec as S
+import Orhle.SpecImp
 import Orhle.Triple
 import Text.Parsec
 import Text.Parsec.Language
@@ -63,10 +62,10 @@ whiteSpace = Token.whiteSpace lexer
 
 type OrhleAppParser a = Parsec String Int a
 
-parseOrhle :: String -> Either ParseError ([Exec], FunImplEnv, S.AESpecs, RhleTriple, ExpectedResult)
+parseOrhle :: String -> Either ParseError ([Exec], SpecImpEnv, RhleTriple, ExpectedResult)
 parseOrhle str = runParser orhleParser 0 "" str
 
-orhleParser :: OrhleAppParser ([Exec], FunImplEnv, S.AESpecs, RhleTriple, ExpectedResult)
+orhleParser :: OrhleAppParser ([Exec], SpecImpEnv, RhleTriple, ExpectedResult)
 orhleParser = do
   whiteSpace
   expectedResult <- option ExpectSuccess $
@@ -79,11 +78,11 @@ orhleParser = do
   pre  <- option A.ATrue $ labeledAssertion "pre"
   post <- option A.ATrue $ labeledAssertion "post"
 
-  aSpecs <- option S.emptySpecMap $ do
+  aSpecs <- option Map.empty $ do
     reserved "aspecs" >> whiteSpace >> char ':' >> whiteSpace
     specs <- many $ try specification
     return $ Map.unions specs
-  eSpecs <- option S.emptySpecMap $ do
+  eSpecs <- option Map.empty $ do
     reserved "especs" >> whiteSpace >> char ':' >> whiteSpace
     specs <- many $ try specification
     return $ Map.unions specs
@@ -103,19 +102,18 @@ orhleParser = do
   let execPrefixes         = map execPrefix (aExecs ++ eExecs)
   let allPrefixes key impl = map (\p -> (p ++ key, prefixImpl p impl)) execPrefixes
   let prefixedAssocs       = concat $ map (uncurry allPrefixes) (Map.assocs impls)
-  let impls'               = Map.fromList prefixedAssocs
+  let prefixedImpls        = Map.fromList prefixedAssocs
 
   -- Similarly, prefix the specifications.
-  let prefixExecId specMap exec = S.prefixSpecs (execPrefix exec) specMap
+  let prefixExecId specMap exec = Map.map (prefix $ execPrefix exec) $
+                                  Map.mapKeys (execPrefix exec ++) specMap
   let prefixedASpecs = Map.unions $ map (prefixExecId aSpecs) aExecs
   let prefixedESpecs = Map.unions $ map (prefixExecId eSpecs) eExecs
-  let specs = S.AESpecs prefixedASpecs prefixedESpecs
 
-  aProgs <- mapM (lookupExecBody impls') aExecs
-  eProgs <- mapM (lookupExecBody impls') eExecs
+  aProgs <- mapM (lookupExecBody prefixedImpls) aExecs
+  eProgs <- mapM (lookupExecBody prefixedImpls) eExecs
   return $ ((aExecs ++ eExecs)
-           , impls'
-           , specs
+           , SpecImpEnv prefixedImpls prefixedASpecs prefixedESpecs
            , RhleTriple pre aProgs eProgs post
            , expectedResult)
 
@@ -198,7 +196,7 @@ execId = do
   whiteSpace >> char ']' >> whiteSpace
   return eid
 
-specification :: OrhleAppParser S.SpecMap
+specification :: OrhleAppParser SpecMap
 specification = do
   callId <- identifier
   params <- (liftM concat) . parens $ sepBy varArray comma
@@ -211,8 +209,8 @@ specification = do
   pre  <- option A.ATrue $ labeledAssertion "pre"
   post <- option A.ATrue $ labeledAssertion "post"
   whiteSpace >> char '}' >> whiteSpace
-  let spec = Spec params choiceVars pre post
-  return $ S.addSpec callId spec S.emptySpecMap
+  let spec = Specification params choiceVars pre post
+  return $ Map.fromList[ (callId, spec) ]
 
 name :: OrhleAppParser Name
 name = identifier >>= (return . Name.fromString)
