@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -5,20 +6,21 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Orhle.SpecImp
-  ( FunImpProgram
+  ( FunSpecEnv
+  , SpecImpEnv(..)
+  , SpecImpProgram
+  , SpecImpQuant
   , Specification(..)
-  , prefixSpecifications
+  , impSpecCall
   , returnVars
   ) where
 
 import Ceili.Assertion
 import Ceili.CeiliEnv
 import Ceili.Language.AExp
-import Ceili.Language.BExp
 import Ceili.Language.Compose
 import Ceili.Language.FunImp
 import Ceili.Name
-import Data.List ( isPrefixOf )
 import Data.Map ( Map )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -55,7 +57,14 @@ instance MappableNames Specification where
 -- Specification Environment --
 -------------------------------
 
-type FunSpecEnv = Map Handle Specification
+type FunSpecEnv   = Map Handle Specification
+data SpecImpQuant = SIQ_Universal | SIQ_Existential
+data SpecImpEnv   = SpecImpEnv { sie_impls :: FunImplEnv
+                               , sie_specs :: FunSpecEnv
+                               , sie_quant :: SpecImpQuant }
+
+instance FunImplLookup SpecImpEnv where
+  lookupFunImpl env name = lookupFunImpl (sie_impls env) name
 
 returnVars :: Int -> [Name]
 returnVars 0   = []
@@ -63,97 +72,93 @@ returnVars 1   = [Name "ret!" 0]
 returnVars len = map (\i -> Name "ret" i) [0..(len - 1)]
 
 
----------------------------------------------
--- Backward Predicate Transform: Universal --
----------------------------------------------
+------------------------------
+-- Specified Function Calls --
+------------------------------
 
-class ImpBackwardPTA c p where
-  impBackwardPTA :: c -> p -> Assertion -> Ceili Assertion
+data ImpSpecCall e = ImpSpecCall CallId [AExp] [Name]
+  deriving (Eq, Ord, Show, Functor)
 
-instance ImpBackwardPTA (FunImplEnv, FunSpecEnv) (ImpSkip e) where
-  impBackwardPTA (impls, _) skip post = impBackwardPT impls skip post
+instance CollectableNames (ImpSpecCall e) where
+  namesIn (ImpSpecCall _ args assignees) =
+    Set.union (namesIn args) (namesIn assignees)
 
-instance ImpBackwardPTA (FunImplEnv, FunSpecEnv) (ImpAsgn e) where
-  impBackwardPTA (impls, _) asgn post = impBackwardPT impls asgn post
+instance FreshableNames (ImpSpecCall e) where
+  freshen (ImpSpecCall cid args assignees) = do
+    args'      <- freshen args
+    assignees' <- freshen assignees
+    return $ ImpSpecCall cid args' assignees'
 
-instance ImpBackwardPTA (FunImplEnv, FunSpecEnv) e =>
-  ImpBackwardPTA (FunImplEnv, FunSpecEnv) (ImpSeq e) where
-    impBackwardPTA ctx (ImpSeq stmts) post = case stmts of
-      []     -> return post
-      (s:ss) -> do
-        post' <- impBackwardPTA ctx (ImpSeq ss) post
-        impBackwardPTA ctx s post'
+instance MappableNames (ImpSpecCall e) where
+  mapNames f (ImpSpecCall cid args assignees) =
+    ImpSpecCall cid (map (mapNames f) args) (map f assignees)
 
-instance (ImpBackwardPTA FunImplEnv e) =>
-  ImpBackwardPTA (FunImplEnv, FunSpecEnv) (ImpIf e) where
-    impBackwardPTA ctx (ImpIf c t e) post = do
-      wpT <- impBackwardPTA ctx t post
-      wpE <- impBackwardPTA ctx e post
-      let cond   = bexpToAssertion c
-          ncond  = Not $ cond
-      return $ And [Imp cond wpT, Imp ncond wpE]
 
-instance (CollectableNames e, ImpBackwardPT FunImplEnv e, ImpForwardPT FunImplEnv e) =>
-  ImpBackwardPTA (FunImplEnv, FunSpecEnv) (ImpWhile e) where
-    impBackwardPTA (impls, _) while post = impBackwardPT impls while post
+---------------------
+-- SpecImp Language --
+---------------------
 
-instance ImpBackwardPTA (FunImplEnv, FunSpecEnv) (ImpCall e) where
-  impBackwardPTA (impls, specs) (ImpCall cid args assignees) post =
-    case (Map.lookup cid impls, Map.lookup cid specs) of
+type SpecImpProgram = ImpExpr ( ImpSpecCall
+                            :+: ImpCall
+                            :+: ImpSkip
+                            :+: ImpAsgn
+                            :+: ImpSeq
+                            :+: ImpIf
+                            :+: ImpWhile )
+
+instance CollectableNames SpecImpProgram where
+  namesIn (In f) = namesIn f
+
+instance MappableNames SpecImpProgram where
+  mapNames func (In f) = In $ mapNames func f
+
+instance FreshableNames SpecImpProgram where
+  freshen (In f) = return . In =<< freshen f
+
+impSpecCall :: (ImpSpecCall :<: f) => CallId -> [AExp] -> [Name] -> ImpExpr f
+impSpecCall cid args assignees = inject $ ImpSpecCall cid args assignees
+
+----------------------------------
+-- Backward Predicate Transform --
+----------------------------------
+
+instance ImpBackwardPT SpecImpEnv SpecImpProgram where
+  impBackwardPT ctx (In f) post = impBackwardPT ctx f post
+
+instance ImpBackwardPT SpecImpEnv (ImpSpecCall e) where
+  impBackwardPT env call@(ImpSpecCall cid args assignees) post =
+    case (Map.lookup cid $ sie_impls env, Map.lookup cid $ sie_specs env) of
       (Nothing, Nothing) ->
         throwError $ "No implementation or specification for " ++ cid
-      (Just impl, _) -> impBackwardPT impls (ImpCall cid args assignees) post
-      (_, Just spec) -> do
-        (cvars, fPre, fPost) <- specAtCallsite spec args
-        let retVars  = returnVars $ length assignees
-        frAssignees <- envFreshen assignees
-        let frPost   = substituteAll assignees frAssignees post
-        let frFPost  = substituteAll retVars   frAssignees fPost
-        return $ And [fPre, Imp frFPost frPost]
+      (Just _, _) ->
+        impBackwardPT env (ImpCall cid args assignees) post
+      (_, Just spec) ->
+        case sie_quant env of
+          SIQ_Universal   -> universalSpecPT spec call post
+          SIQ_Existential -> existentialSpecPT spec call post
 
-instance (ImpBackwardPTA c (f e), ImpBackwardPTA c (g e)) =>
-  ImpBackwardPTA c ((f :+: g) e) where
-    impBackwardPTA ctx (Inl f) post = impBackwardPTA ctx f post
-    impBackwardPTA ctx (Inl g) post = impBackwardPTA ctx g post
+universalSpecPT :: Specification -> (ImpSpecCall e) -> Assertion -> Ceili Assertion
+universalSpecPT spec (ImpSpecCall _ args assignees) post = do
+  (_, fPre, fPost) <- specAtCallsite spec args
+  let retVars  = returnVars $ length assignees
+  frAssignees <- envFreshen assignees
+  let frPost   = substituteAll assignees frAssignees post
+  let frFPost  = substituteAll retVars   frAssignees fPost
+  return $ And [fPre, Imp frFPost frPost]
 
-instance ImpBackwardPTA (FunImplEnv, FunSpecEnv) FunImpProgram where
-  impBackwardPTA ctx (In f) post = impBackwardPTA ctx f post
-
-
------------------------------------------------
--- Backward Predicate Transform: Existential --
------------------------------------------------
-
-class ImpBackwardPTE c p where
-  impBackwardPTE :: c -> p -> Assertion -> Ceili Assertion
-
-instance ImpBackwardPTE (FunImplEnv, FunSpecEnv) (ImpCall e) where
-  impBackwardPTE (impls, specs) (ImpCall cid args assignees) post =
-    case (Map.lookup cid impls, Map.lookup cid specs) of
-      (Nothing, Nothing) ->
-        throwError $ "No implementation or specification for " ++ cid
-      (Just impl, _) -> impBackwardPT impls (ImpCall cid args assignees) post
-      (_, Just spec) -> do
-        (cvars, fPre, fPost) <- specAtCallsite spec args
-        let retVars  = returnVars $ length assignees
-        frAssignees <- envFreshen assignees
-        let frPost     = substituteAll assignees frAssignees post
-            frFPost    = substituteAll retVars   frAssignees fPost
-            frNames    = map (\n -> TypedName n Int) frAssignees
-            existsPost = Exists frNames frFPost
-            forallPost = Forall frNames $ Imp frFPost frPost
-        return $ case (length cvars) of
-                   0 -> And [fPre, existsPost, forallPost]
-                   _ -> Exists cvars $ And [fPre, existsPost, forallPost]
-
-
-instance ImpBackwardPTE (FunImplEnv, FunSpecEnv) FunImpProgram where
-  impBackwardPTE ctx (In f) post = impBackwardPTE ctx f post
-
-
----------------
--- Utilities --
----------------
+existentialSpecPT :: Specification -> (ImpSpecCall e) -> Assertion -> Ceili Assertion
+existentialSpecPT spec (ImpSpecCall _ args assignees) post = do
+  (cvars, fPre, fPost) <- specAtCallsite spec args
+  let retVars  = returnVars $ length assignees
+  frAssignees <- envFreshen assignees
+  let frPost     = substituteAll assignees frAssignees post
+      frFPost    = substituteAll retVars   frAssignees fPost
+      frNames    = map (\n -> TypedName n Int) frAssignees
+      existsPost = Exists frNames frFPost
+      forallPost = Forall frNames $ Imp frFPost frPost
+  return $ case (length cvars) of
+    0 -> And [fPre, existsPost, forallPost]
+    _ -> Exists cvars $ And [fPre, existsPost, forallPost]
 
 specAtCallsite :: Specification -> [AExp] -> Ceili ([TypedName], Assertion, Assertion)
 specAtCallsite (Specification specParams cvars pre post) callArgs = let
