@@ -6,11 +6,42 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Orhle.SpecImp
-  ( SpecImpEnv(..)
+  ( AExp(..)
+  , BExp(..)
+  , CallId
+  , EvalImp(..)
+  , Fuel(..)
+  , FuelTank(..)
+  , FunEvalContext(..)
+  , FunImpl(..)
+  , FunImplEnv
+  , FunImplLookup(..)
+  , FunImpProgram
+  , ImpAsgn(..)
+  , ImpBackwardPT(..)
+  , ImpCall(..)
+  , ImpExpr(..)
+  , ImpForwardPT(..)
+  , ImpIf(..)
+  , ImpSkip(..)
+  , ImpSeq(..)
+  , ImpSpecCall(..)
+  , ImpWhile(..)
+  , ImpWhileMetadata(..)
+  , Name(..)
+  , SpecImpEnv(..)
   , SpecImpProgram
   , SpecImpQuant(..)
   , Specification(..)
   , SpecMap
+  , State
+  , impAsgn
+  , impCall
+  , impIf
+  , impSeq
+  , impSkip
+  , impWhile
+  , impWhileWithMeta
   , impSpecCall
   , returnVars
   ) where

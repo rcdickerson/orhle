@@ -5,23 +5,23 @@ module Orhle.Triple
   ) where
 
 import Ceili.Assertion
-import Ceili.Language.FunImp
+import Orhle.SpecImp
 
 data HlTriple = HlTriple
   { hlPre  :: Assertion
-  , hlProg :: FunImpProgram
+  , hlProg :: SpecImpProgram
   , hlPost :: Assertion
   } deriving (Show)
 
 data HleTriple = HleTriple
   { hlePre  :: Assertion
-  , hleProg :: FunImpProgram
+  , hleProg :: SpecImpProgram
   , hlePost :: Assertion
   } deriving (Show)
 
 data RhleTriple = RhleTriple
   { rhlePre    :: Assertion
-  , rhleAProgs :: [FunImpProgram]
-  , rhleEProgs :: [FunImpProgram]
+  , rhleAProgs :: [SpecImpProgram]
+  , rhleEProgs :: [SpecImpProgram]
   , rhlePost   :: Assertion
   } deriving (Show)

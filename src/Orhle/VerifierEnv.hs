@@ -1,14 +1,10 @@
 module Orhle.VerifierEnv
   ( Env(..)
-  , BackwardStepStrategy
-  , ForwardStepStrategy
   , Verification
   , buildEnv
   , envAddChoiceVar
   , envAddChoiceVars
-  , envBackwardStepStrat
   , envFork
-  , envForwardStepStrat
   , envFreshen
   , envGetDefaultInvarFilter
   , envGetQuant
@@ -32,15 +28,10 @@ import           Orhle.SpecImp
 import           Orhle.Triple
 import           System.IO ( hFlush, stdout )
 
-type ForwardStepStrategy  = RhleTriple -> Verification (Assertion, Assertion)
-type BackwardStepStrategy = RhleTriple -> Verification (Assertion, Assertion)
-
 data Env = Env { env_quant              :: SpecImpQuant
                , env_specs              :: SpecImpEnv
                , env_freshMap           :: NextFreshIds
                , env_choiceVars         :: Set TypedName
-               , env_bStepStrat         :: BackwardStepStrategy
-               , env_fStepStrat         :: ForwardStepStrategy
                , env_defaultInvarFilter :: Assertion
                } -- TODO: Optics
 
@@ -61,11 +52,9 @@ runVerificationTask task env = runExceptT (evalStateT env task)
 
 buildEnv :: SpecImpEnv
          -> RhleTriple
-         -> BackwardStepStrategy
-         -> ForwardStepStrategy
          -> Env
-buildEnv specs (RhleTriple pre aprogs eprogs post) bStepStrat fStepStrat =
-  Env SIQ_Universal specs freshMap Set.empty bStepStrat fStepStrat A.ATrue
+buildEnv specs (RhleTriple pre aprogs eprogs post) =
+  Env SIQ_Universal specs freshMap Set.empty A.ATrue
   where
     names = Set.unions [ namesIn pre
                        , Set.unions $ map namesIn aprogs
@@ -77,35 +66,35 @@ buildEnv specs (RhleTriple pre aprogs eprogs post) bStepStrat fStepStrat =
 
 envFork :: Verification Env
 envFork = do
-  Env quant specs freshMap cvars bss fss dif <- get
-  return $ Env quant specs freshMap cvars bss fss dif
+  Env quant specs freshMap cvars dif <- get
+  return $ Env quant specs freshMap cvars dif
 
 envFreshen :: FreshableNames a => a -> Verification a
 envFreshen name = do
-  Env quant specs freshMap cvars bss fss dif <- get
+  Env quant specs freshMap cvars dif <- get
   let (freshMap', freshName) = runFreshen freshMap name
-  put $ Env quant specs freshMap' cvars bss fss dif
+  put $ Env quant specs freshMap' cvars dif
   return freshName
 
 envSetQuant :: SpecImpQuant -> Verification ()
 envSetQuant quant = do
-  Env _ specs freshMap cvars bss fss dif <- get
-  put $ Env quant specs freshMap cvars bss fss dif
+  Env _ specs freshMap cvars dif <- get
+  put $ Env quant specs freshMap cvars dif
 
 envGetQuant :: Verification SpecImpQuant
 envGetQuant = get >>= return . env_quant
 
 envAddChoiceVar :: TypedName -> Verification ()
 envAddChoiceVar var = do
-  Env quant specs freshMap cvars bss fss dif <- get
+  Env quant specs freshMap cvars dif <- get
   let cvars' = Set.insert var cvars
-  put $ Env quant specs freshMap cvars' bss fss dif
+  put $ Env quant specs freshMap cvars' dif
 
 envAddChoiceVars :: [TypedName] -> Verification ()
 envAddChoiceVars vars = do
-  Env quant specs freshMap cvars bss fss dif <- get
+  Env quant specs freshMap cvars dif <- get
   let cvars' = foldr Set.insert cvars vars
-  put $ Env quant specs freshMap cvars' bss fss dif
+  put $ Env quant specs freshMap cvars' dif
 
 envWithChoice :: Assertion -> Verification Assertion
 envWithChoice assertion = do
@@ -114,16 +103,10 @@ envWithChoice assertion = do
              0 -> assertion
              _ -> Exists cvars $ assertion
 
-envForwardStepStrat :: Verification ForwardStepStrategy
-envForwardStepStrat = get >>= return . env_fStepStrat
-
-envBackwardStepStrat :: Verification BackwardStepStrategy
-envBackwardStepStrat = get >>= return . env_bStepStrat
-
 envSetDefaultInvarFilter :: Assertion -> Verification ()
 envSetDefaultInvarFilter dif = do
-  Env quant specs freshMap cvars bss fss _ <- get
-  put $ Env quant specs freshMap cvars bss fss dif
+  Env quant specs freshMap cvars _ <- get
+  put $ Env quant specs freshMap cvars dif
 
 envGetDefaultInvarFilter :: Verification Assertion
 envGetDefaultInvarFilter = get >>= return . env_defaultInvarFilter
