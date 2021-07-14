@@ -12,7 +12,6 @@ module Orhle.StepStrategies
 
 import Ceili.CeiliEnv
 import Ceili.Language.Compose
-import Data.List ( partition )
 import Data.Maybe ( catMaybes )
 import Orhle.SpecImp
 
@@ -60,21 +59,17 @@ backwardWithFusion aprogs eprogs =
 
 loopFusion :: PossibleStep
 loopFusion aprogs eprogs =
-  case partition isLoop aprogs of
-    (_, []) -> case partition isLoop eprogs of
-                 (_, []) -> Nothing
-                 _       -> fusionStep
-    _ -> Nothing
-  where
+  if      any (not . isLoop) aprogs then Nothing
+  else if any (not . isLoop) eprogs then Nothing
+  else let
     alasts  = map lastStatement aprogs
     elasts  = map lastStatement eprogs
     aloops  = catMaybes $ map (getLoop . ls_last) alasts
     eloops  = catMaybes $ map (getLoop . ls_last) elasts
     aprogs' = catMaybes $ map ls_rest alasts
     eprogs' = catMaybes $ map ls_rest elasts
-    fusionStep = Just $ Step (LoopFusion aloops eloops) aprogs' eprogs'
+  in Just $ Step (LoopFusion aloops eloops) aprogs' eprogs'
 
--- Look for a single step on the existential side.
 stepExistential :: PossibleStep
 stepExistential aprogs eprogs =
   case map lastStatement eprogs of
@@ -85,7 +80,6 @@ stepExistential aprogs eprogs =
                       Just r  -> r:(map ls_full ss)
       in Just $ Step (ExistentialStatement $ ls_last s) aprogs eprogs'
 
--- Look for a single step on the universal side.
 stepUniversal :: PossibleStep
 stepUniversal aprogs eprogs =
   case map lastStatement aprogs of
