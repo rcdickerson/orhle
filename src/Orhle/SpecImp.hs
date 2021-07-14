@@ -25,10 +25,10 @@ module Orhle.SpecImp
   , ImpIf(..)
   , ImpSkip(..)
   , ImpSeq(..)
-  , ImpSpecCall(..)
   , ImpWhile(..)
   , ImpWhileMetadata(..)
   , Name(..)
+  , SpecCall(..)
   , SpecImpEnv(..)
   , SpecImpProgram
   , SpecImpQuant(..)
@@ -115,29 +115,29 @@ returnVars len = map (\i -> Name "ret" i) [0..(len - 1)]
 -- Specified Function Calls --
 ------------------------------
 
-data ImpSpecCall e = ImpSpecCall CallId [AExp] [Name]
+data SpecCall e = SpecCall CallId [AExp] [Name]
   deriving (Eq, Ord, Show, Functor)
 
-instance CollectableNames (ImpSpecCall e) where
-  namesIn (ImpSpecCall _ args assignees) =
+instance CollectableNames (SpecCall e) where
+  namesIn (SpecCall _ args assignees) =
     Set.union (namesIn args) (namesIn assignees)
 
-instance FreshableNames (ImpSpecCall e) where
-  freshen (ImpSpecCall cid args assignees) = do
+instance FreshableNames (SpecCall e) where
+  freshen (SpecCall cid args assignees) = do
     args'      <- freshen args
     assignees' <- freshen assignees
-    return $ ImpSpecCall cid args' assignees'
+    return $ SpecCall cid args' assignees'
 
-instance MappableNames (ImpSpecCall e) where
-  mapNames f (ImpSpecCall cid args assignees) =
-    ImpSpecCall cid (map (mapNames f) args) (map f assignees)
+instance MappableNames (SpecCall e) where
+  mapNames f (SpecCall cid args assignees) =
+    SpecCall cid (map (mapNames f) args) (map f assignees)
 
 
 ---------------------
 -- SpecImp Language --
 ---------------------
 
-type SpecImpProgram = ImpExpr ( ImpSpecCall
+type SpecImpProgram = ImpExpr ( SpecCall
                             :+: ImpCall
                             :+: ImpSkip
                             :+: ImpAsgn
@@ -154,8 +154,8 @@ instance MappableNames SpecImpProgram where
 instance FreshableNames SpecImpProgram where
   freshen (In f) = return . In =<< freshen f
 
-impSpecCall :: (ImpSpecCall :<: f) => CallId -> [AExp] -> [Name] -> ImpExpr f
-impSpecCall cid args assignees = inject $ ImpSpecCall cid args assignees
+impSpecCall :: (SpecCall :<: f) => CallId -> [AExp] -> [Name] -> ImpExpr f
+impSpecCall cid args assignees = inject $ SpecCall cid args assignees
 
 
 ----------------------------------
@@ -168,8 +168,8 @@ instance FunImplLookup (SpecImpQuant, SpecImpEnv) where
 instance ImpBackwardPT (SpecImpQuant, SpecImpEnv) SpecImpProgram where
   impBackwardPT ctx (In f) post = impBackwardPT ctx f post
 
-instance ImpBackwardPT (SpecImpQuant, SpecImpEnv) (ImpSpecCall e) where
-  impBackwardPT (quant, env) call@(ImpSpecCall cid args assignees) post =
+instance ImpBackwardPT (SpecImpQuant, SpecImpEnv) (SpecCall e) where
+  impBackwardPT (quant, env) call@(SpecCall cid args assignees) post =
     case (Map.lookup cid $ sie_impls env, Map.lookup cid $ sie_specs env quant) of
       (Nothing, Nothing) ->
         throwError $ "No implementation or specification for " ++ cid
@@ -180,8 +180,8 @@ instance ImpBackwardPT (SpecImpQuant, SpecImpEnv) (ImpSpecCall e) where
           SIQ_Universal   -> universalSpecPT spec call post
           SIQ_Existential -> existentialSpecPT spec call post
 
-universalSpecPT :: Specification -> (ImpSpecCall e) -> Assertion -> Ceili Assertion
-universalSpecPT spec (ImpSpecCall _ args assignees) post = do
+universalSpecPT :: Specification -> (SpecCall e) -> Assertion -> Ceili Assertion
+universalSpecPT spec (SpecCall _ args assignees) post = do
   (_, fPre, fPost) <- specAtCallsite spec args
   let retVars  = returnVars $ length assignees
   frAssignees <- envFreshen assignees
@@ -189,8 +189,8 @@ universalSpecPT spec (ImpSpecCall _ args assignees) post = do
   let frFPost  = substituteAll retVars   frAssignees fPost
   return $ And [fPre, Imp frFPost frPost]
 
-existentialSpecPT :: Specification -> (ImpSpecCall e) -> Assertion -> Ceili Assertion
-existentialSpecPT spec (ImpSpecCall _ args assignees) post = do
+existentialSpecPT :: Specification -> (SpecCall e) -> Assertion -> Ceili Assertion
+existentialSpecPT spec (SpecCall _ args assignees) post = do
   (cvars, fPre, fPost) <- specAtCallsite spec args
   let retVars  = returnVars $ length assignees
   frAssignees <- envFreshen assignees
