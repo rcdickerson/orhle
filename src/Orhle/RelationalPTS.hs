@@ -51,7 +51,7 @@ relBackwardPT' stepStrategy env (ProgramRelation aprogs eprogs) post = do
         Just inv -> return inv
         Nothing -> do
           log_i "Unable to infer loop invariant, proceeding with False"
-          return AFalse
+          return AFalse -- TODO: Fall back to single stepping over loops.
     NoSelectionFound -> case (aprogs', eprogs') of
                           ([], []) -> return post
                           _ -> throwError "Unable to find step"
