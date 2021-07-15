@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Orhle.StepStrategies
+module Orhle.StepStrategy
   ( BackwardStepStrategy
   , Selection(..)
   , Step(..)
@@ -14,7 +14,6 @@ import Ceili.CeiliEnv
 import Ceili.Language.Compose
 import Data.Maybe ( catMaybes )
 import Orhle.SpecImp
-
 
 type BackwardStepStrategy = [SpecImpProgram] -> [SpecImpProgram] -> Ceili Step
 

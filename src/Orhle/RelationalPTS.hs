@@ -1,23 +1,22 @@
 module Orhle.RelationalPTS
-  (
+  ( relBackwardPTS
   ) where
 
 import Ceili.Assertion
 import Ceili.CeiliEnv
 import qualified Ceili.InvariantInference.Pie as Pie
-import Ceili.Name as Name
-import qualified Data.Set as Set
 import Orhle.SpecImp
-import Orhle.Triple
+import Orhle.StepStrategy
 
 
-relBackwardPTS :: [SpecImpProgram] -> [SpecImpProgram] -> Assertion -> Ceili Assertion
-relBackwardPTS aprogs eprogs post = do
+relBackwardPTS :: BackwardStepStrategy
+               -> SpecImpEnv
+               -> [SpecImpProgram]
+               -> [SpecImpProgram]
+               -> Assertion
+               -> Ceili Assertion
+relBackwardPTS stepStrategy specs aprogs eprogs post = do
   error "unimplemented"
-
-isEmpty :: SpecImpProgram -> Bool
-isEmpty prog = case prog of
-  ImpSkip -> True
 
 -- wpLoopFusion :: LoopFusion -> Assertion -> Verification Assertion
 -- wpLoopFusion fusion post = do

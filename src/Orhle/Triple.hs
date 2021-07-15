@@ -5,6 +5,8 @@ module Orhle.Triple
   ) where
 
 import Ceili.Assertion
+import Ceili.Name
+import qualified Data.Set as Set
 import Orhle.SpecImp
 
 data HlTriple = HlTriple
@@ -25,3 +27,10 @@ data RhleTriple = RhleTriple
   , rhleEProgs :: [SpecImpProgram]
   , rhlePost   :: Assertion
   } deriving (Show)
+
+instance CollectableNames RhleTriple where
+  namesIn (RhleTriple pre aprogs eprogs post) =
+    Set.unions [ namesIn pre
+               , namesIn aprogs
+               , namesIn eprogs
+               , namesIn post]

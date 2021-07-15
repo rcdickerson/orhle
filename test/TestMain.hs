@@ -3,6 +3,7 @@ module Main where
 
 import Test.Framework
 import {-@ HTF_TESTS @-} Orhle.InlinerTests
+import {-@ HTF_TESTS @-} Orhle.StepStrategiesTest
 import {-@ HTF_TESTS @-} Orhle.VerifierTests
 
 main = htfMain htf_importedTests
