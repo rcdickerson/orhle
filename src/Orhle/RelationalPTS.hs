@@ -42,11 +42,11 @@ relBackwardPT' stepStrategy env (ProgramRelation aprogs eprogs) post = do
     LoopFusion aloops eloops -> do
       let bodies = ProgramRelation (map body aloops) (map body eloops)
       let conds = And $ map condA (aloops ++ eloops)
-      let pts = relBackwardPT' stepStrategy
-      loopTests <- case catMaybes $ map tests (aloops ++ eloops) of
-                     [] -> throwError "No test states for while loop, did you run populateTestStates?"
-                     t  -> return $ Set.toList $ Set.unions t
-      pieResult <- Pie.loopInvGen pts env conds bodies post loopTests
+      let extractTests = Set.toList . Set.unions . catMaybes . map tests
+      headStates <- case extractTests (aloops ++ eloops) of
+        [] -> throwError "No test head states for while loop, did you run populateTestStates?"
+        t  -> return t
+      pieResult <- Pie.loopInvGen (relBackwardPT' stepStrategy) env conds bodies post headStates
       case pieResult of
         Just inv -> return inv
         Nothing -> do
