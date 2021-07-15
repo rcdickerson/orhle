@@ -18,7 +18,7 @@ data Success  = Success { }
 rhleVerifier :: SpecImpEnv -> RhleTriple -> IO (Either Failure Success)
 rhleVerifier specs triple@(RhleTriple pre aprogs eprogs post) = do
   wpResult <- runCeili (mkEnv triple) $
-              relBackwardPTS backwardWithFusion specs aprogs eprogs post
+              relBackwardPT backwardWithFusion specs aprogs eprogs post
   case wpResult of
     Left msg  -> return $ Left $ Failure msg
     Right wp -> do

@@ -141,7 +141,7 @@ instance CallIdPrefixer e => CallIdPrefixer (ImpCall e) where
 instance (CallIdPrefixer (f e), CallIdPrefixer (g e)) => CallIdPrefixer ((f :+: g) e) where
   prefixCallIds pre (Inl f) = Inl $ prefixCallIds pre f
   prefixCallIds pre (Inr g) = Inr $ prefixCallIds pre g
-instance CallIdPrefixer FunImpProgram where
+instance CallIdPrefixer SpecImpProgram where
   prefixCallIds pre (In f) = In $ prefixCallIds pre f
 
 lookupExecBody :: FunImplEnv -> Exec -> OrhleAppParser FunImpProgram

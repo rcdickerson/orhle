@@ -6,7 +6,6 @@ import Test.Framework
 
 import qualified Data.Map as Map
 import Orhle
-import Orhle.Imp
 
 -- Some dummy names / aexps
 a = (Name "a" 0)
