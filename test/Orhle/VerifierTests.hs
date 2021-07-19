@@ -19,8 +19,8 @@ assertVerifierResultMatches expected result =
 
 parseAndTest progStr = case parseOrhle progStr of
   Left  err -> assertFailure $ "Parse error: " ++ (show err)
-  Right (_, _, specs, triple, expected) -> do
-    result <- verify specs Map.empty triple
+  Right (OrhleParseResult _ impls specs triple expected) -> do
+    result <- verify (SpecImpEnv impls specs) triple
     assertVerifierResultMatches expected result
 
 testImpFile fileName = do

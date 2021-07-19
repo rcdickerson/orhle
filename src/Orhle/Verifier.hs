@@ -15,7 +15,7 @@ import Orhle.Triple
 data Failure  = Failure { failMessage :: String } deriving Show
 data Success  = Success { }
 
-rhleVerifier :: SpecImpEnv -> RhleTriple -> IO (Either Failure Success)
+rhleVerifier :: SpecImpEnv SpecImpProgram -> RhleTriple -> IO (Either Failure Success)
 rhleVerifier specs triple@(RhleTriple pre aprogs eprogs post) = do
   wpResult <- runCeili (mkEnv triple) $
               relBackwardPT backwardWithFusion specs aprogs eprogs post

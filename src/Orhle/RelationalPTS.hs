@@ -16,7 +16,7 @@ import Orhle.StepStrategy
 
 
 relBackwardPT :: BackwardStepStrategy
-               -> SpecImpEnv
+               -> SpecImpEnv SpecImpProgram
                -> [SpecImpProgram]
                -> [SpecImpProgram]
                -> Assertion
@@ -26,7 +26,7 @@ relBackwardPT stepStrategy env aprogs eprogs post =
 
 
 relBackwardPT' :: BackwardStepStrategy
-               -> SpecImpEnv
+               -> SpecImpEnv SpecImpProgram
                -> ProgramRelation
                -> Assertion
                -> Ceili Assertion

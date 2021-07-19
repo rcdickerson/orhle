@@ -127,10 +127,8 @@ instance FindLastStatement (ImpIf SpecImpProgram) where
   lastStatement (ImpIf c t e) = singleStatement (impIf c t e)
 instance FindLastStatement (ImpWhile SpecImpProgram) where
   lastStatement (ImpWhile c body meta) = singleStatement (impWhileWithMeta c body meta)
-instance FindLastStatement (ImpCall SpecImpProgram) where
-  lastStatement (ImpCall cid params assignees) = singleStatement (impCall cid params assignees)
 instance FindLastStatement (SpecCall SpecImpProgram) where
-  lastStatement (SpecCall cid params assignees) = singleStatement (impSpecCall cid params assignees)
+  lastStatement (SpecCall cid params assignees) = singleStatement (specCall cid params assignees)
 
 splitTail :: [a] -> ([a], a)
 splitTail list = case list of

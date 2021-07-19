@@ -6,6 +6,7 @@ module Orhle.OrhleParser
   ( Exec(..)
   , ExecId
   , ExpectedResult(..)
+  , OrhleParseResult(..)
   , parseOrhle
   ) where
 
