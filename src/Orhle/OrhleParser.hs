@@ -62,10 +62,17 @@ whiteSpace = Token.whiteSpace lexer
 
 type OrhleAppParser a = Parsec String Int a
 
-parseOrhle :: String -> Either ParseError ([Exec], SpecImpEnv, RhleTriple, ExpectedResult)
+data OrhleParseResult = OrhleParseResult { opr_execs    :: [Exec]
+                                         , opr_impls    :: FunImplEnv SpecImpProgram
+                                         , opr_specs    :: FunSpecEnv
+                                         , opr_triple   :: RhleTriple
+                                         , opr_expected :: ExpectedResult
+                                         }
+
+parseOrhle :: String -> Either ParseError OrhleParseResult
 parseOrhle str = runParser orhleParser 0 "" str
 
-orhleParser :: OrhleAppParser ([Exec], SpecImpEnv, RhleTriple, ExpectedResult)
+orhleParser :: OrhleAppParser OrhleParseResult
 orhleParser = do
   whiteSpace
   expectedResult <- option ExpectSuccess $
@@ -112,12 +119,14 @@ orhleParser = do
 
   aProgs <- mapM (lookupExecBody prefixedImpls) aExecs
   eProgs <- mapM (lookupExecBody prefixedImpls) eExecs
-  return $ ((aExecs ++ eExecs)
-           , SpecImpEnv prefixedImpls prefixedASpecs prefixedESpecs
-           , RhleTriple pre aProgs eProgs post
-           , expectedResult)
+  return $ OrhleParseResult { opr_execs    = (aExecs ++ eExecs)
+                            , opr_impls    = prefixedImpls
+                            , opr_specs    = FunSpecEnv prefixedASpecs prefixedESpecs
+                            , opr_triple   = RhleTriple pre aProgs eProgs post
+                            , opr_expected = expectedResult
+                            }
 
-prefixImpl :: String -> FunImpl -> FunImpl
+prefixImpl :: String -> FunImpl SpecImpProgram -> FunImpl SpecImpProgram
 prefixImpl prefix (FunImpl params body rets) = let
   pParams   = map (Name.prefix prefix) params
   pBody     = (Name.prefix prefix) . (prefixCallIds prefix) $ body
@@ -144,7 +153,7 @@ instance (CallIdPrefixer (f e), CallIdPrefixer (g e)) => CallIdPrefixer ((f :+: 
 instance CallIdPrefixer SpecImpProgram where
   prefixCallIds pre (In f) = In $ prefixCallIds pre f
 
-lookupExecBody :: FunImplEnv -> Exec -> OrhleAppParser FunImpProgram
+lookupExecBody :: FunImplEnv SpecImpProgram -> Exec -> OrhleAppParser SpecImpProgram
 lookupExecBody funs exec =
   let
     name = (execPrefix exec) ++ (getExecName exec)

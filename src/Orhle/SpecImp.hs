@@ -17,6 +17,7 @@ module Orhle.SpecImp
   , FunImplEnv
   , FunImplLookup(..)
   , FunImpProgram
+  , FunSpecEnv(..)
   , ImpAsgn(..)
   , ImpBackwardPT(..)
   , ImpCall(..)
@@ -90,20 +91,18 @@ instance MappableNames Specification where
 
 type SpecMap      = Map Handle Specification
 data SpecImpQuant = SIQ_Universal | SIQ_Existential
-data SpecImpEnv   = SpecImpEnv { sie_impls  :: FunImplEnv
-                               , sie_aspecs :: SpecMap
-                               , sie_especs :: SpecMap }
+data FunSpecEnv   = FunSpecEnv { fse_aspecs :: SpecMap
+                               , fse_especs :: SpecMap }
 
-instance CollectableNames SpecImpEnv where
-  namesIn (SpecImpEnv impls aspecs especs) =
-    Set.unions [ Set.unions $ map namesIn (Map.elems impls)
-               , Set.unions $ map namesIn (Map.elems aspecs)
+instance CollectableNames FunSpecEnv where
+  namesIn (FunSpecEnv aspecs especs) =
+    Set.unions [ Set.unions $ map namesIn (Map.elems aspecs)
                , Set.unions $ map namesIn (Map.elems especs) ]
 
-sie_specs :: SpecImpEnv -> SpecImpQuant -> SpecMap
-sie_specs env quant = case quant of
-  SIQ_Universal   -> sie_aspecs env
-  SIQ_Existential -> sie_especs env
+fse_qspecs :: FunSpecEnv -> SpecImpQuant -> SpecMap
+fse_qspecs env quant = case quant of
+  SIQ_Universal   -> fse_aspecs env
+  SIQ_Existential -> fse_especs env
 
 returnVars :: Int -> [Name]
 returnVars 0   = []
@@ -115,7 +114,10 @@ returnVars len = map (\i -> Name "ret" i) [0..(len - 1)]
 -- Specified Function Calls --
 ------------------------------
 
-data SpecCall e = SpecCall CallId [AExp] [Name]
+data SpecCall e = SpecCall { sc_callId    :: CallId
+                           , sc_args      :: [AExp]
+                           , sc_assignees :: [Name]
+                           }
   deriving (Eq, Ord, Show, Functor)
 
 instance CollectableNames (SpecCall e) where
@@ -138,7 +140,6 @@ instance MappableNames (SpecCall e) where
 ---------------------
 
 type SpecImpProgram = ImpExpr ( SpecCall
-                            :+: ImpCall
                             :+: ImpSkip
                             :+: ImpAsgn
                             :+: ImpSeq
@@ -157,24 +158,36 @@ instance FreshableNames SpecImpProgram where
 impSpecCall :: (SpecCall :<: f) => CallId -> [AExp] -> [Name] -> ImpExpr f
 impSpecCall cid args assignees = inject $ SpecCall cid args assignees
 
+toImpCall :: SpecCall e -> ImpCall e
+toImpCall (SpecCall cid args assignees) = ImpCall cid args assignees
 
 ----------------------------------
 -- Backward Predicate Transform --
 ----------------------------------
 
-instance FunImplLookup (SpecImpQuant, SpecImpEnv) where
-  lookupFunImpl (_, env) name = lookupFunImpl (sie_impls env) name
+data SpecImpEnv e = SpecImpEnv { sie_impls :: FunImplEnv e
+                               , sie_specs :: FunSpecEnv
+                               }
 
-instance ImpBackwardPT (SpecImpQuant, SpecImpEnv) SpecImpProgram where
+sie_qspecs :: SpecImpEnv e -> SpecImpQuant -> SpecMap
+sie_qspecs = fse_qspecs . sie_specs
+
+instance FunImplLookup (SpecImpQuant, SpecImpEnv e) e where
+  lookupFunImpl (_, env) = lookupFunImpl (sie_impls env)
+
+instance ImpBackwardPT (SpecImpQuant, SpecImpEnv SpecImpProgram) SpecImpProgram where
   impBackwardPT ctx (In f) post = impBackwardPT ctx f post
 
-instance ImpBackwardPT (SpecImpQuant, SpecImpEnv) (SpecCall e) where
-  impBackwardPT (quant, env) call@(SpecCall cid args assignees) post =
-    case (Map.lookup cid $ sie_impls env, Map.lookup cid $ sie_specs env quant) of
+instance (ImpBackwardPT (SpecImpQuant, SpecImpEnv e) e, FreshableNames e) =>
+         ImpBackwardPT (SpecImpQuant, SpecImpEnv e) (SpecCall e) where
+  impBackwardPT (quant, env) call post =
+    let cid = sc_callId call
+    in case (Map.lookup cid $ sie_impls env,
+             Map.lookup cid $ sie_qspecs env quant) of
       (Nothing, Nothing) ->
         throwError $ "No implementation or specification for " ++ cid
       (Just _, _) ->
-        impBackwardPT (quant, env) (ImpCall cid args assignees) post
+        impBackwardPT (quant, env) (toImpCall call) post
       (_, Just spec) ->
         case quant of
           SIQ_Universal   -> universalSpecPT spec call post
