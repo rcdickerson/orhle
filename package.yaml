@@ -38,6 +38,10 @@ library:
     - src
   exposed-modules:
     - Orhle
+    - Orhle.OrhleParser
+    - Orhle.RelationalPTS
+    - Orhle.SpecImp
+    - Orhle.StepStrategy
 
 executables:
   orhle-exe:
