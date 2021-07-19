@@ -98,7 +98,7 @@ orhleParser = do
   rest <- manyTill anyChar eof
   impls <- case parseFunImp rest of
     Left err   -> fail $ show err
-    Right funs -> return funs
+    Right funs -> return $ Map.map funImplToSpecImp funs
 
   -- Add per-execution prefixed versions of each function implementation to
   -- ensure names are unique across executions. This keeps the verifier from
@@ -126,6 +126,29 @@ orhleParser = do
                             , opr_expected = expectedResult
                             }
 
+class ToSpecImp a where
+  toSpecImp :: a -> SpecImpProgram
+instance ToSpecImp (ImpSkip e) where
+  toSpecImp _ = impSkip
+instance ToSpecImp (ImpAsgn e) where
+  toSpecImp (ImpAsgn lhs rhs) = impAsgn lhs rhs
+instance ToSpecImp e => ToSpecImp (ImpSeq e) where
+  toSpecImp (ImpSeq stmts) = impSeq $ map toSpecImp stmts
+instance ToSpecImp e => ToSpecImp (ImpIf e) where
+  toSpecImp (ImpIf c t e) = impIf c (toSpecImp t) (toSpecImp e)
+instance ToSpecImp e => ToSpecImp (ImpWhile e) where
+  toSpecImp (ImpWhile c body meta) = impWhileWithMeta c (toSpecImp body) meta
+instance ToSpecImp e => ToSpecImp (ImpCall e) where
+  toSpecImp (ImpCall cid args assignees) = specCall cid args assignees
+instance (ToSpecImp (f e), ToSpecImp (g e)) => ToSpecImp ((f :+: g) e) where
+  toSpecImp (Inl f) = toSpecImp f
+  toSpecImp (Inr g) = toSpecImp g
+instance ToSpecImp FunImpProgram where
+  toSpecImp (In p) = toSpecImp p
+
+funImplToSpecImp :: FunImpl FunImpProgram -> FunImpl SpecImpProgram
+funImplToSpecImp (FunImpl params body returns) = FunImpl params (toSpecImp body) returns
+
 prefixImpl :: String -> FunImpl SpecImpProgram -> FunImpl SpecImpProgram
 prefixImpl prefix (FunImpl params body rets) = let
   pParams   = map (Name.prefix prefix) params
@@ -145,8 +168,8 @@ instance CallIdPrefixer e => CallIdPrefixer (ImpIf e) where
   prefixCallIds pre (ImpIf c t e) = ImpIf c (prefixCallIds pre t) (prefixCallIds pre t)
 instance CallIdPrefixer e => CallIdPrefixer (ImpWhile e) where
   prefixCallIds pre (ImpWhile c body meta) = ImpWhile c (prefixCallIds pre body) meta
-instance CallIdPrefixer e => CallIdPrefixer (ImpCall e) where
-  prefixCallIds pre (ImpCall cid params asgns) = ImpCall (pre ++ cid) params asgns
+instance CallIdPrefixer e => CallIdPrefixer (SpecCall e) where
+  prefixCallIds pre (SpecCall cid params asgns) = SpecCall (pre ++ cid) params asgns
 instance (CallIdPrefixer (f e), CallIdPrefixer (g e)) => CallIdPrefixer ((f :+: g) e) where
   prefixCallIds pre (Inl f) = Inl $ prefixCallIds pre f
   prefixCallIds pre (Inr g) = Inr $ prefixCallIds pre g

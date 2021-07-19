@@ -43,8 +43,8 @@ module Orhle.SpecImp
   , impSkip
   , impWhile
   , impWhileWithMeta
-  , impSpecCall
   , returnVars
+  , specCall
   ) where
 
 import Ceili.Assertion
@@ -155,11 +155,12 @@ instance MappableNames SpecImpProgram where
 instance FreshableNames SpecImpProgram where
   freshen (In f) = return . In =<< freshen f
 
-impSpecCall :: (SpecCall :<: f) => CallId -> [AExp] -> [Name] -> ImpExpr f
-impSpecCall cid args assignees = inject $ SpecCall cid args assignees
+specCall :: (SpecCall :<: f) => CallId -> [AExp] -> [Name] -> ImpExpr f
+specCall cid args assignees = inject $ SpecCall cid args assignees
 
 toImpCall :: SpecCall e -> ImpCall e
 toImpCall (SpecCall cid args assignees) = ImpCall cid args assignees
+
 
 ----------------------------------
 -- Backward Predicate Transform --
