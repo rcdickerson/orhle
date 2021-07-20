@@ -21,6 +21,11 @@ loop1 = impWhile (BLt (AVar x) (ALit 10)) incX
 loop2 = impWhile (BLt (AVar y) (ALit 10)) incY
 loop3 = impWhile (BLt (AVar z) (ALit 10)) incZ
 
+toLoop :: SpecImpProgram -> ImpWhile SpecImpProgram
+toLoop prog = case getLoop prog of
+  Nothing -> error $ "Not a loop: " ++ show prog
+  Just loop -> loop
+
 env = mkEnv [ incX, incY, incZ
             , loop1, loop2, loop3 ]
 
@@ -87,9 +92,19 @@ test_backwardWithFusion_pickingExistentialPreservesRestOfSeq =
       Right step -> assertEqual expected step
 
 test_backwardWithFusion_allLoopsPicksFusion =
-  let expected = Step (ExistentialStatement incZ) [] [impSeq [incX, incY]]
+  let
+    aprogs = [ impSeq [incX, loop1]
+             , loop1
+             ]
+    eprogs = [ impSeq [incY, loop2]
+             , loop2
+             ]
+    expected = Step (LoopFusion [toLoop loop1, toLoop loop1]
+                                [toLoop loop2, toLoop loop2])
+                    [impSeq [incX]]
+                    [impSeq [incY]]
   in do
-    result <- runCeili env $ backwardWithFusion [] [impSeq [incX, incY, incZ]]
+    result <- runCeili env $ backwardWithFusion aprogs eprogs
     case result of
       Left err -> assertFailure err
       Right step -> assertEqual expected step

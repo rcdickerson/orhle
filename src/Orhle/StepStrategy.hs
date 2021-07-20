@@ -62,16 +62,17 @@ backwardWithFusion aprogs eprogs =
 
 loopFusion :: PossibleStep
 loopFusion aprogs eprogs =
-  if      any (not . isLoop) aprogs then Nothing
-  else if any (not . isLoop) eprogs then Nothing
-  else let
+  let
     alasts  = map lastStatement aprogs
     elasts  = map lastStatement eprogs
     aloops  = catMaybes $ map (getLoop . ls_last) alasts
     eloops  = catMaybes $ map (getLoop . ls_last) elasts
     aprogs' = catMaybes $ map ls_rest alasts
     eprogs' = catMaybes $ map ls_rest elasts
-  in Just $ Step (LoopFusion aloops eloops) aprogs' eprogs'
+  in
+    if      any (not . isLoop . ls_last) alasts then Nothing
+    else if any (not . isLoop . ls_last) elasts then Nothing
+    else Just $ Step (LoopFusion aloops eloops) aprogs' eprogs'
 
 stepExistentialNonLoop :: PossibleStep
 stepExistentialNonLoop aprogs eprogs =
@@ -191,23 +192,7 @@ instance IsSkip (ImpWhile e) where isSkip _ = False
 instance IsSkip (ImpCall e)  where isSkip _ = False
 instance IsSkip (SpecCall e) where isSkip _ = False
 
-class GetLoop e where
-  getLoop :: e -> Maybe (ImpWhile SpecImpProgram)
-instance (GetLoop (f e), GetLoop (g e)) => GetLoop ((f :+: g) e) where
-  getLoop (Inl f) = getLoop f
-  getLoop (Inr g) = getLoop g
-instance GetLoop SpecImpProgram where
-  getLoop (In p) = getLoop p
-instance GetLoop (ImpSkip e)  where getLoop _ = Nothing
-instance GetLoop (ImpAsgn e)  where getLoop _ = Nothing
-instance GetLoop (ImpSeq e)   where getLoop _ = Nothing
-instance GetLoop (ImpIf e)    where getLoop _ = Nothing
-instance GetLoop (ImpCall e)  where getLoop _ = Nothing
-instance GetLoop (SpecCall e) where getLoop _ = Nothing
-instance GetLoop (ImpWhile SpecImpProgram) where getLoop = Just
-
 isLoop :: SpecImpProgram -> Bool
-isLoop p =
-  case getLoop p of
-    Nothing -> False
-    Just _  -> True
+isLoop p = case getLoop p of
+  Nothing -> False
+  Just _  -> True

@@ -18,6 +18,7 @@ module Orhle.SpecImp
   , FunImplLookup(..)
   , FunImpProgram
   , FunSpecEnv(..)
+  , GetLoop(..)
   , ImpAsgn(..)
   , ImpBackwardPT(..)
   , ImpCall(..)
@@ -161,6 +162,25 @@ specCall cid args assignees = inject $ SpecCall cid args assignees
 toImpCall :: SpecCall e -> ImpCall e
 toImpCall (SpecCall cid args assignees) = ImpCall cid args assignees
 
+
+---------------
+-- Utilities --
+---------------
+
+class GetLoop e where
+  getLoop :: e -> Maybe (ImpWhile SpecImpProgram)
+instance (GetLoop (f e), GetLoop (g e)) => GetLoop ((f :+: g) e) where
+  getLoop (Inl f) = getLoop f
+  getLoop (Inr g) = getLoop g
+instance GetLoop SpecImpProgram where
+  getLoop (In p) = getLoop p
+instance GetLoop (ImpSkip e)  where getLoop _ = Nothing
+instance GetLoop (ImpAsgn e)  where getLoop _ = Nothing
+instance GetLoop (ImpSeq e)   where getLoop _ = Nothing
+instance GetLoop (ImpIf e)    where getLoop _ = Nothing
+instance GetLoop (ImpCall e)  where getLoop _ = Nothing
+instance GetLoop (SpecCall e) where getLoop _ = Nothing
+instance GetLoop (ImpWhile SpecImpProgram) where getLoop = Just
 
 ----------------------------------
 -- Backward Predicate Transform --
