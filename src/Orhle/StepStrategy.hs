@@ -28,12 +28,13 @@ backwardDisallowed _ _ = throwError "Backward stepping not allowed."
 data Step = Step { step_selection :: Selection
                  , step_aprogs    :: [SpecImpProgram]
                  , step_eprogs    :: [SpecImpProgram]
-                 }
+                 } deriving (Show, Eq)
 
 data Selection = UniversalStatement SpecImpProgram
                | ExistentialStatement SpecImpProgram
                | LoopFusion [ImpWhile SpecImpProgram] [ImpWhile SpecImpProgram]
                | NoSelectionFound
+               deriving (Show, Eq)
 
 type PossibleStep = [SpecImpProgram] -> [SpecImpProgram] -> Maybe Step
 
@@ -87,7 +88,7 @@ stepUniversal aprogs eprogs =
       let aprogs' = case ls_rest s of
                       Nothing -> map ls_full ss
                       Just r  -> r:(map ls_full ss)
-      in Just $ Step (ExistentialStatement $ ls_last s) aprogs' eprogs
+      in Just $ Step (UniversalStatement $ ls_last s) aprogs' eprogs
 
 
 
