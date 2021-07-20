@@ -20,13 +20,14 @@ loop1 = impWhile (BLt (AVar x) (ALit 10)) incX
 loop2 = impWhile (BLt (AVar y) (ALit 10)) incY
 loop3 = impWhile (BLt (AVar z) (ALit 10)) incZ
 
+env = mkEnv [ incX, incY, incZ
+            , loop1, loop2, loop3 ]
+
 toLoop :: SpecImpProgram -> ImpWhile SpecImpProgram
 toLoop prog = case getLoop prog of
   Nothing -> error $ "Not a loop: " ++ show prog
   Just loop -> loop
 
-env = mkEnv [ incX, incY, incZ
-            , loop1, loop2, loop3 ]
 
 test_backwardDisallowed = do
   result <- runCeili defaultEnv $ backwardDisallowed [] []
@@ -41,6 +42,15 @@ test_backwardWithFusion_emptySeqTreatedAsSkip =
     case result of
       Left err -> assertFailure err
       Right step -> assertEqual expected step
+
+test_backwardWithFusion_noProgramsReturnsNoSelectionFound =
+  let expected = Step NoSelectionFound [] []
+  in do
+    result <- runCeili env $ backwardWithFusion [] []
+    case result of
+      Left err -> assertFailure err
+      Right step -> assertEqual expected step
+
 
 test_backwardWithFusion_emptyUniversalsPicksExistential =
   let expected = Step (ExistentialStatement incX) [] []

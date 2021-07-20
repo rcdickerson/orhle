@@ -53,15 +53,20 @@ scanPossibleSteps aprogs eprogs options =
 
 backwardWithFusion :: BackwardStepStrategy
 backwardWithFusion aprogs eprogs =
-  return $ scanPossibleSteps aprogs eprogs [ loopFusion
+  return $ scanPossibleSteps aprogs eprogs [ finished
+                                           , stepLoopFusion
                                            , stepExistentialNonLoop
                                            , stepUniversalNonLoop
                                            , stepExistentialAny
                                            , stepUniversalAny
                                            ]
 
-loopFusion :: PossibleStep
-loopFusion aprogs eprogs =
+finished :: PossibleStep
+finished [] [] = Just $ Step NoSelectionFound [] []
+finished _  _  = Nothing
+
+stepLoopFusion :: PossibleStep
+stepLoopFusion aprogs eprogs =
   let
     alasts  = map lastStatement aprogs
     elasts  = map lastStatement eprogs
