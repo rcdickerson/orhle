@@ -12,6 +12,7 @@ module Orhle.StepStrategy
 
 import Ceili.CeiliEnv
 import Ceili.Language.Compose
+import Data.List ( partition )
 import Data.Maybe ( catMaybes )
 import Orhle.SpecImp
 
@@ -53,8 +54,10 @@ scanPossibleSteps aprogs eprogs options =
 backwardWithFusion :: BackwardStepStrategy
 backwardWithFusion aprogs eprogs =
   return $ scanPossibleSteps aprogs eprogs [ loopFusion
-                                           , stepExistential
-                                           , stepUniversal
+                                           , stepExistentialNonLoop
+                                           , stepUniversalNonLoop
+                                           , stepExistentialAny
+                                           , stepUniversalAny
                                            ]
 
 loopFusion :: PossibleStep
@@ -70,8 +73,38 @@ loopFusion aprogs eprogs =
     eprogs' = catMaybes $ map ls_rest elasts
   in Just $ Step (LoopFusion aloops eloops) aprogs' eprogs'
 
-stepExistential :: PossibleStep
-stepExistential aprogs eprogs =
+stepExistentialNonLoop :: PossibleStep
+stepExistentialNonLoop aprogs eprogs =
+  let
+    lasts = map lastStatement eprogs
+    (loops, nonloops) = partition (isLoop . ls_last) lasts
+  in case nonloops of
+    []     -> Nothing
+    (s:ss) ->
+      let
+        eprogs'NonS = (map ls_full loops) ++ (map ls_full ss)
+        eprogs' = case ls_rest s of
+                    Nothing -> eprogs'NonS
+                    Just r  -> r:eprogs'NonS
+      in Just $ Step (ExistentialStatement $ ls_last s) aprogs eprogs'
+
+stepUniversalNonLoop :: PossibleStep
+stepUniversalNonLoop aprogs eprogs =
+  let
+    lasts = map lastStatement aprogs
+    (loops, nonloops) = partition (isLoop . ls_last) lasts
+  in case nonloops of
+    []     -> Nothing
+    (s:ss) ->
+      let
+        aprogs'NonS = (map ls_full loops) ++ (map ls_full ss)
+        aprogs' = case ls_rest s of
+                    Nothing -> aprogs'NonS
+                    Just r  -> r:aprogs'NonS
+      in Just $ Step (UniversalStatement $ ls_last s) aprogs' eprogs
+
+stepExistentialAny :: PossibleStep
+stepExistentialAny aprogs eprogs =
   case map lastStatement eprogs of
     []     -> Nothing
     (s:ss) ->
@@ -80,8 +113,8 @@ stepExistential aprogs eprogs =
                       Just r  -> r:(map ls_full ss)
       in Just $ Step (ExistentialStatement $ ls_last s) aprogs eprogs'
 
-stepUniversal :: PossibleStep
-stepUniversal aprogs eprogs =
+stepUniversalAny :: PossibleStep
+stepUniversalAny aprogs eprogs =
   case map lastStatement aprogs of
     []     -> Nothing
     (s:ss) ->
