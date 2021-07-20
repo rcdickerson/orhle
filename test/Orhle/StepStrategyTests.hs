@@ -13,7 +13,6 @@ x = Name "x" 0
 y = Name "y" 0
 z = Name "z" 0
 
-emptyProg = impSeq [] :: SpecImpProgram
 incX = impAsgn x $ AAdd (AVar x) (ALit 1)
 incY = impAsgn y $ AAdd (AVar y) (ALit 1)
 incZ = impAsgn z $ AAdd (AVar z) (ALit 1)
@@ -34,6 +33,14 @@ test_backwardDisallowed = do
   case result of
     Left  _ -> return () -- Pass
     Right _ -> assertFailure "Unexpected success from backwardDisallowed strategy"
+
+test_backwardWithFusion_emptySeqTreatedAsSkip =
+  let expected = Step (ExistentialStatement impSkip) [incX] []
+  in do
+    result <- runCeili env $ backwardWithFusion [incX] [impSeq []]
+    case result of
+      Left err -> assertFailure err
+      Right step -> assertEqual expected step
 
 test_backwardWithFusion_emptyUniversalsPicksExistential =
   let expected = Step (ExistentialStatement incX) [] []
