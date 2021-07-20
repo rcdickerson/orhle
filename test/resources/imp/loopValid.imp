@@ -26,7 +26,7 @@ fun original() {
   while (sum <= 100) do
     @inv { (= original!sum refinement!sum) }
     @var { (- 110 original!sum) }
-    r := call rand();
+    r := rand();
     sum := sum + r;
   end
   return sum;
@@ -36,7 +36,7 @@ fun refinement() {
   sum := 0;
   while (sum <= 100) do
     @inv { (= original!sum refinement!sum) }
-    r := call randOdd();
+    r := randOdd();
     sum := sum + r;
   end
   return sum;

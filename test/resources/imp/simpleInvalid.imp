@@ -24,7 +24,7 @@ fun A() {
 }
 
 fun E() {
-  x := call randOdd();
+  x := randOdd();
   if x == 3 then
     y := 3;
   else

@@ -4,7 +4,6 @@ module Orhle.VerifierTests(htf_thisModulesTests) where
 
 import Test.Framework
 
-import qualified Data.Map as Map
 import Orhle
 import System.FilePath
 
