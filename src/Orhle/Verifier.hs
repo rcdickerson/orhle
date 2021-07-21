@@ -22,7 +22,7 @@ rhleVerifier specs triple@(RhleTriple pre aprogs eprogs post) = do
   case wpResult of
     Left msg  -> return $ Left $ Failure msg
     Right wp -> do
-      result <- SMT.checkValid $ Imp wp pre
+      result <- SMT.checkValid $ Imp pre wp
       return $ case result of
         SMT.Valid         -> Right $ Success
         SMT.Invalid model -> Left  $ Failure $ "Verification conditions are invalid. Model: " ++ model

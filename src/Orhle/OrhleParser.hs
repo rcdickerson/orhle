@@ -166,7 +166,7 @@ instance CallIdPrefixer (ImpAsgn e) where
 instance CallIdPrefixer e => CallIdPrefixer (ImpSeq e) where
   prefixCallIds pre (ImpSeq stmts) = ImpSeq $ map (prefixCallIds pre) stmts
 instance CallIdPrefixer e => CallIdPrefixer (ImpIf e) where
-  prefixCallIds pre (ImpIf c t e) = ImpIf c (prefixCallIds pre t) (prefixCallIds pre t)
+  prefixCallIds pre (ImpIf c t e) = ImpIf c (prefixCallIds pre t) (prefixCallIds pre e)
 instance CallIdPrefixer e => CallIdPrefixer (ImpWhile e) where
   prefixCallIds pre (ImpWhile c body meta) = ImpWhile c (prefixCallIds pre body) meta
 instance CallIdPrefixer e => CallIdPrefixer (SpecCall e) where
