@@ -187,6 +187,9 @@ data SpecImpEnv e = SpecImpEnv { sie_impls :: FunImplEnv e
                                , sie_specs :: FunSpecEnv
                                }
 
+instance CollectableNames e => CollectableNames (SpecImpEnv e) where
+  namesIn (SpecImpEnv impls specs) = Set.union (namesIn impls) (namesIn specs)
+
 sie_qspecs :: SpecImpEnv e -> SpecImpQuant -> SpecMap
 sie_qspecs = fse_qspecs . sie_specs
 
@@ -233,7 +236,8 @@ specAtCallsite (SpecCall _ args assignees) (Specification params retVars choiceV
   else do
     freshChoiceVars <- envFreshen choiceVars
     let subCallsite = (instantiateParams params args) .
-                      (substituteAll retVars assignees)
+                      (substituteAll retVars assignees) .
+                      (substituteAll (map tnName choiceVars) (map tnName freshChoiceVars))
     let callsitePre = subCallsite pre
     let callsitePost = subCallsite post
     return (freshChoiceVars, callsitePre, callsitePost)
