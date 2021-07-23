@@ -18,7 +18,9 @@ import Ceili.Language.FunImpParser
 import Ceili.Name ( Name(..), TypedName(..), prefix )
 import qualified Ceili.Name as Name
 import Control.Monad ( liftM )
+import Data.List ( isPrefixOf )
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Orhle.SpecImp
 import Orhle.Triple
 import Text.Parsec
@@ -242,8 +244,15 @@ specification = do
   pre  <- option A.ATrue $ labeledAssertion "pre"
   post <- option A.ATrue $ labeledAssertion "post"
   whiteSpace >> char '}' >> whiteSpace
-  let spec = Specification params choiceVars pre post
+  let spec = Specification params (getReturnVars post) choiceVars pre post
   return $ Map.fromList[ (callId, spec) ]
+
+getReturnVars :: Assertion -> [Name]
+getReturnVars assertion =
+  let
+    isRetName (Name n _) = isPrefixOf "ret!" n
+    assertionNames = Set.toList $ Name.namesIn assertion
+  in filter isRetName assertionNames
 
 name :: OrhleAppParser Name
 name = identifier >>= (return . Name.fromString)

@@ -44,7 +44,6 @@ module Orhle.SpecImp
   , impSkip
   , impWhile
   , impWhileWithMeta
-  , returnVars
   , specCall
   ) where
 
@@ -65,22 +64,25 @@ import qualified Data.Set as Set
 
 data Specification = Specification
   { spec_params        :: [Name]
+  , spec_returnVars    :: [Name]
   , spec_choiceVars    :: [TypedName]
   , spec_preCondition  :: Assertion
   , spec_postCondition :: Assertion
   } deriving Show
 
 instance CollectableNames Specification where
-  namesIn (Specification ps cs pre post) = Set.unions allNames
+  namesIn (Specification ps rets cs pre post) = Set.unions allNames
     where
       allNames = [ Set.fromList ps
+                 , namesIn rets
                  , Set.unions $ map namesIn cs
                  , namesIn pre
                  , namesIn post ]
 
 instance MappableNames Specification where
-  mapNames f (Specification ps cs pre post) =
+  mapNames f (Specification ps rets cs pre post) =
     Specification (mapNames f ps)
+                  (mapNames f rets)
                   (mapNames f cs)
                   (mapNames f pre)
                   (mapNames f post)
@@ -104,11 +106,6 @@ fse_qspecs :: FunSpecEnv -> SpecImpQuant -> SpecMap
 fse_qspecs env quant = case quant of
   SIQ_Universal   -> fse_aspecs env
   SIQ_Existential -> fse_especs env
-
-returnVars :: Int -> [Name]
-returnVars 0   = []
-returnVars 1   = [Name "ret!" 0]
-returnVars len = map (\i -> Name "ret" i) [0..(len - 1)]
 
 
 ------------------------------
@@ -215,36 +212,35 @@ instance (ImpBackwardPT (SpecImpQuant, SpecImpEnv e) e, FreshableNames e) =>
           SIQ_Existential -> existentialSpecPT spec call post
 
 universalSpecPT :: Specification -> (SpecCall e) -> Assertion -> Ceili Assertion
-universalSpecPT spec (SpecCall _ args assignees) post = do
-  (_, fPre, fPost) <- specAtCallsite spec args
-  let retVars  = returnVars $ length assignees
-  frAssignees <- envFreshen assignees
-  let frPost   = substituteAll assignees frAssignees post
-  let frFPost  = substituteAll retVars   frAssignees fPost
-  return $ And [fPre, Imp frFPost frPost]
+universalSpecPT spec call post = do
+  (_, callsitePre, callsitePost) <- specAtCallsite call spec
+  return $ And [callsitePre, Imp callsitePost post]
 
 existentialSpecPT :: Specification -> (SpecCall e) -> Assertion -> Ceili Assertion
-existentialSpecPT spec (SpecCall _ args assignees) post = do
-  (cvars, fPre, fPost) <- specAtCallsite spec args
-  let retVars  = returnVars $ length assignees
-  frAssignees <- envFreshen assignees
-  let frPost     = substituteAll assignees frAssignees post
-      frFPost    = substituteAll retVars   frAssignees fPost
-      frNames    = map (\n -> TypedName n Int) frAssignees
-      existsPost = Exists frNames frFPost
-      forallPost = Forall frNames $ Imp frFPost frPost
-  return $ case (length cvars) of
-    0 -> And [fPre, existsPost, forallPost]
-    _ -> Exists cvars $ And [fPre, existsPost, forallPost]
+existentialSpecPT spec call post = do
+  (choiceVars, callsitePre, callsitePost) <- specAtCallsite call spec
+  let tnAssignees = map (\n -> TypedName n Int) (sc_assignees call)
+      existsPost = Exists tnAssignees callsitePost
+      forallPost = Forall tnAssignees $ Imp callsitePost post
+  return $ case (length choiceVars) of
+    0 -> And [callsitePre, existsPost, forallPost]
+    _ -> Exists choiceVars $ And [callsitePre, existsPost, forallPost]
 
-specAtCallsite :: Specification -> [AExp] -> Ceili ([TypedName], Assertion, Assertion)
-specAtCallsite (Specification specParams cvars pre post) callArgs = let
-  fromNames   = map (\n -> TypedName n Int) specParams
-  toAriths    = map aexpToArith callArgs
-  bind a      = foldr (uncurry subArith) a (zip fromNames toAriths)
-  cvarNames   = map tnName cvars
-  in do
-    frCvarNames <- envFreshen cvarNames
-    let frCvars = map (substituteAll cvarNames frCvarNames) cvars
-    let freshenCvars = substituteAll cvarNames frCvarNames
-    return (frCvars, freshenCvars $ bind pre, freshenCvars $ bind post)
+specAtCallsite :: SpecCall e -> Specification -> Ceili ([TypedName], Assertion, Assertion)
+specAtCallsite (SpecCall _ args assignees) (Specification params retVars choiceVars pre post) =
+  if      length args /= length params       then throwError "Argument / parameter length mismatch"
+  else if length assignees /= length retVars then throwError "Assignees / returns length mismatch"
+  else do
+    freshChoiceVars <- envFreshen choiceVars
+    let subCallsite = (instantiateParams params args) .
+                      (substituteAll retVars assignees)
+    let callsitePre = subCallsite pre
+    let callsitePost = subCallsite post
+    return (freshChoiceVars, callsitePre, callsitePost)
+
+instantiateParams :: SubstitutableArith a => [Name] -> [AExp] -> a -> a
+instantiateParams params args a =
+  let
+    fromNames = map (\n -> TypedName n Int) params
+    toAriths  = map aexpToArith args
+  in foldr (uncurry subArith) a (zip fromNames toAriths)
