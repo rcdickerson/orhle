@@ -213,7 +213,7 @@ specification = do
 getReturnVars :: Assertion -> [Name]
 getReturnVars assertion =
   let
-    isRetName (Name n _) = n == "ret"
+    isRetName (Name n _) = n == "ret" || n == "ret!"
     assertionNames = Set.toList $ Name.namesIn assertion
   in filter isRetName assertionNames
 
