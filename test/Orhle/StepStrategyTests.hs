@@ -20,8 +20,8 @@ loop1 = impWhile (BLt (AVar x) (ALit 10)) incX
 loop2 = impWhile (BLt (AVar y) (ALit 10)) incY
 loop3 = impWhile (BLt (AVar z) (ALit 10)) incZ
 
-env = mkEnv [ incX, incY, incZ
-            , loop1, loop2, loop3 ]
+env = defaultEnv [ incX, incY, incZ
+                 , loop1, loop2, loop3 ]
 
 toLoop :: SpecImpProgram -> ImpWhile SpecImpProgram
 toLoop prog = case getLoop prog of
@@ -30,7 +30,7 @@ toLoop prog = case getLoop prog of
 
 
 test_backwardDisallowed = do
-  result <- runCeili defaultEnv $ backwardDisallowed [] []
+  result <- runCeili emptyEnv $ backwardDisallowed [] []
   case result of
     Left  _ -> return () -- Pass
     Right _ -> assertFailure "Unexpected success from backwardDisallowed strategy"

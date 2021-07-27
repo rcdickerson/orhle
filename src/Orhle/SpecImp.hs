@@ -30,8 +30,10 @@ module Orhle.SpecImp
   , ImpWhile(..)
   , ImpWhileMetadata(..)
   , Name(..)
+  , PopulateTestStates(..)
   , SpecCall(..)
   , SpecImpEnv(..)
+  , SpecImpEvalContext(..)
   , SpecImpProgram
   , SpecImpQuant(..)
   , Specification(..)
@@ -53,6 +55,8 @@ import Ceili.Language.AExp
 import Ceili.Language.Compose
 import Ceili.Language.FunImp
 import Ceili.Name
+import qualified Ceili.SMT as SMT
+import Ceili.SMTString
 import Data.Map ( Map )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -108,9 +112,29 @@ fse_qspecs env quant = case quant of
   SIQ_Existential -> fse_especs env
 
 
-------------------------------
--- Specified Function Calls --
-------------------------------
+---------------------------------------------------------
+-- Combined Specification + Implementation Environment --
+---------------------------------------------------------
+
+data SpecImpEnv e = SpecImpEnv { sie_impls :: FunImplEnv e
+                               , sie_specs :: FunSpecEnv
+                               }
+
+instance CollectableNames e => CollectableNames (SpecImpEnv e) where
+  namesIn (SpecImpEnv impls specs) = Set.union (namesIn impls) (namesIn specs)
+
+sie_qspecs :: SpecImpEnv e -> SpecImpQuant -> SpecMap
+sie_qspecs = fse_qspecs . sie_specs
+
+
+--------------------
+-- Function Calls --
+--------------------
+
+-- Structurally identical to FunImp's ImpCall, but
+-- we will give it a different predicate transform
+-- semantics which looks for either an implementation
+-- or a specification.
 
 data SpecCall e = SpecCall { sc_callId    :: CallId
                            , sc_args      :: [AExp]
@@ -160,6 +184,102 @@ toImpCall :: SpecCall e -> ImpCall e
 toImpCall (SpecCall cid args assignees) = ImpCall cid args assignees
 
 
+-----------------
+-- Interpreter --
+-----------------
+
+data SpecImpEvalContext e = SpecImpEvalContext { siec_fuel  :: Fuel
+                                               , siec_env   :: SpecImpEnv e
+                                               }
+
+instance FuelTank (SpecImpEvalContext e) where
+  getFuel = siec_fuel
+  setFuel (SpecImpEvalContext _ env) fuel = SpecImpEvalContext fuel env
+
+instance FunImplLookup (SpecImpEvalContext e) e where
+  lookupFunImpl ctx name =
+    let impls = (sie_impls . siec_env) ctx
+    in case Map.lookup name impls of
+      Nothing   -> throwError $ "No implementation for " ++ name
+      Just impl -> return impl
+
+instance EvalImp (SpecImpEvalContext e) e => EvalImp (SpecImpEvalContext e) (SpecCall e) where
+  evalImp ctx st call =
+    let
+      env = siec_env ctx
+      cid = sc_callId call
+    in case (Map.lookup cid $ sie_impls env,
+             Map.lookup cid $ sie_qspecs env SIQ_Universal,
+             Map.lookup cid $ sie_qspecs env SIQ_Existential) of
+      (Just _, _, _)     -> evalImp ctx st (toImpCall call)
+      (_, Just aspec, _) -> evalSpec st aspec call
+      (_, _, Just espec) -> evalSpec st espec call
+      _ -> throwError $ "No implementation or specification for " ++ cid
+
+evalSpec :: State -> Specification -> SpecCall e -> Ceili (Maybe State)
+evalSpec st spec call = do
+  (choiceVars, pre, post) <- specAtCallsite call spec
+--  log_i $ "*** Start state: "
+--  _ <- ppSt st
+--  log_i $ "*** Eval pre: " ++ showSMT pre
+--  log_i $ "*** Eval post: " ++ showSMT post
+  preIsValid <- checkValidWithLog LogLevelNone $ assertionAtState st pre
+  case preIsValid of
+    SMT.Invalid _    -> return Nothing
+    SMT.ValidUnknown -> return Nothing
+    SMT.Valid -> do
+      postSat <- checkSatWithLog LogLevelNone post
+      case postSat of
+        SMT.SatUnknown -> return Nothing
+        SMT.Unsat      -> return Nothing
+        SMT.Sat model  -> do
+--          log_i $ "*** Model: " ++ model
+--          log_i $ "*** Model state: "
+--          _ <- ppSt $ modelToState model
+--          log_i $ "*** Returned state: "
+--          _ <- ppSt $ Map.union (modelToState model) st
+--          log_i "------------------"
+          return $ Just $ Map.union (modelToState model) st
+
+ppSt :: State -> Ceili [()]
+ppSt st = do
+  let lines = map (\(k, v) -> "    " ++ (showSMT k) ++ " -> " ++ (show v)) $ Map.toList st
+  mapM log_i lines
+
+-- TODO: This is janky.
+modelToState :: String -> State
+modelToState modelStr = case parseAssertion modelStr of
+  Left err -> error $ "Parse error: " ++ show err
+  Right assertion -> extractState assertion
+  where
+    extractState assertion = case assertion of
+      Eq lhs rhs -> Map.fromList [(extractName lhs, extractInt rhs)]
+      And as     -> Map.unions $ map extractState as
+      _ -> error $ "Unexpected assertion in SAT model: " ++ show assertion
+    extractName arith = case arith of
+      Var (TypedName name _) -> name
+      _ -> error $ "Unexpected arith in SAT model (expected name): " ++ show arith
+    extractInt arith = case arith of
+      Num n -> n
+      _ -> error $ "Unexpected arith in SAT model (expected int): " ++ show arith
+
+
+-- TODO: Evaluating a function call should cost fuel to prevent infinite recursion.
+
+instance EvalImp (SpecImpEvalContext SpecImpProgram) SpecImpProgram where
+  evalImp ctx st (In f) = evalImp ctx st f
+
+-----------------
+-- Test States --
+-----------------
+
+instance EvalImp (SpecImpEvalContext e) e => PopulateTestStates (SpecImpEvalContext e) (SpecCall e) where
+  populateTestStates _ _ = return . id
+
+instance PopulateTestStates (SpecImpEvalContext SpecImpProgram) SpecImpProgram where
+  populateTestStates ctx sts (In f) = populateTestStates ctx sts f >>= return . In
+
+
 ---------------
 -- Utilities --
 ---------------
@@ -179,19 +299,10 @@ instance GetLoop (ImpCall e)  where getLoop _ = Nothing
 instance GetLoop (SpecCall e) where getLoop _ = Nothing
 instance GetLoop (ImpWhile SpecImpProgram) where getLoop = Just
 
+
 ----------------------------------
 -- Backward Predicate Transform --
 ----------------------------------
-
-data SpecImpEnv e = SpecImpEnv { sie_impls :: FunImplEnv e
-                               , sie_specs :: FunSpecEnv
-                               }
-
-instance CollectableNames e => CollectableNames (SpecImpEnv e) where
-  namesIn (SpecImpEnv impls specs) = Set.union (namesIn impls) (namesIn specs)
-
-sie_qspecs :: SpecImpEnv e -> SpecImpQuant -> SpecMap
-sie_qspecs = fse_qspecs . sie_specs
 
 instance FunImplLookup (SpecImpQuant, SpecImpEnv e) e where
   lookupFunImpl (_, env) = lookupFunImpl (sie_impls env)
