@@ -20,6 +20,7 @@ description:         Please see the README on GitHub at <https://github.com/rcdi
 dependencies:
 - base >= 4.7 && < 5
 - bytestring
+- ceili
 - containers
 - mtl
 - parsec
@@ -37,8 +38,10 @@ library:
     - src
   exposed-modules:
     - Orhle
-    - Orhle.Assertion
-    - Orhle.Imp
+    - Orhle.OrhleParser
+    - Orhle.RelationalPTS
+    - Orhle.SpecImp
+    - Orhle.StepStrategy
 
 executables:
   orhle-exe:

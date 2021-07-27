@@ -4,49 +4,13 @@
 ****     The Oracular RHLE Verifier    ****
 *******************************************
 
-:: Executions
-  refinement (forall)
-  original (exists)
+Parse error: (line 31, column 2):
+unexpected end of input
+expecting end of input
+(line 2, column 13):
+unexpected "o"
+expecting operator or ";"
 
-:: Universal Programs
-[ SSeq
-    [ SCall "refinement!refinedRand" [] [ refinement ! x ]
-    , SAsgn refinement ! refinement ! retVal (AVar refinement ! x)
-    ]
-]
-
-:: Existential Programs
-[ SSeq
-    [ SCall "original!originalRand" [] [ original ! x ]
-    , SAsgn original ! original ! retVal (AVar original ! x)
-    ]
-]
-
-:: Universal Specifications
-fromList [("refinement!refinedRand",Spec {spec_params = [], spec_choiceVars = [], spec_preCondition = ATrue, spec_postCondition = And [Gte (Var ret!) (Num 0),Lt (Var ret!) (Num 20),Eq (Mod (Var ret!) (Num 2)) (Num 1)]})]
-
-:: Existential Specifications
-fromList [("original!originalRand",Spec {spec_params = [], spec_choiceVars = [original!n], spec_preCondition = And [Gte (Var original!n) (Num 0),Lt (Var original!n) (Num 20)], spec_postCondition = Eq (Var ret!) (Var original!n)})]
-
-:: Precondition
-ATrue
-
-:: Postcondition
-Eq (Var original ! x) (Var refinement ! x)
-
-[send->] (set-option :print-success true )
-[<-recv] success
-[send->] (set-option :produce-models true )
-[<-recv] success
-[send->] (declare-const refinement!x!1 Int)
-[<-recv] success
-[send->] (assert (not (=> true (exists ((original!n!1 Int)) (and (and (>= original!n!1 0) (< original!n!1 20)) (exists ((original!x!1 Int)) (= original!x!1 original!n!1)) (forall ((original!x!1 Int)) (=> (= original!x!1 original!n!1) (and true (=> (and (>= refinement!x!1 0) (< refinement!x!1 20) (= (mod refinement!x!1 2) 1)) (= original!x!1 refinement!x!1))))))))) )
-[<-recv] success
-[send->] (check-sat )
-[<-recv] unsat
-[send->] (exit )
-Valid.
-
-real	0m0.187s
-user	0m0.173s
-sys	0m0.017s
+real	0m0.191s
+user	0m0.178s
+sys	0m0.023s

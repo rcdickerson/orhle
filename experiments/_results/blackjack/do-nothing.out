@@ -1,3 +1,5 @@
+Populating test states for loop invariant inference...
+Running backward relational analysis...
 
 *******************************************
 ****               ORHLE               ****
@@ -11,23 +13,79 @@
 []
 
 :: Existential Programs
-[ SAsgn play ! play ! retVal (AVar play ! handValue)
+[ ImpSeq
+    [ ImpAsgn
+        Name { nHandle = "play!play!retVal" , nId = 0 }
+        (AVar Name { nHandle = "play!handValue" , nId = 0 })
+    ]
 ]
 
 :: Universal Specifications
 fromList []
 
 :: Existential Specifications
-fromList [("play!draw",Spec {spec_params = [], spec_choiceVars = [play!c], spec_preCondition = And [Gte (Var play!c) (Num 1),Lte (Var play!c) (Num 10)], spec_postCondition = Eq (Var ret!) (Var play!c)})]
+fromList
+  [ ( "play!draw"
+    , Specification
+        { spec_params = []
+        , spec_returnVars = [ Name { nHandle = "play!ret!" , nId = 0 } ]
+        , spec_choiceVars =
+            [ TypedName
+                { tnName = Name { nHandle = "play!c" , nId = 0 } , tnType = Int }
+            ]
+        , spec_preCondition =
+            And
+              [ Gte
+                  (Var
+                     TypedName
+                       { tnName = Name { nHandle = "play!c" , nId = 0 } , tnType = Int })
+                  (Num 1)
+              , Lte
+                  (Var
+                     TypedName
+                       { tnName = Name { nHandle = "play!c" , nId = 0 } , tnType = Int })
+                  (Num 10)
+              ]
+        , spec_postCondition =
+            Eq
+              (Var
+                 TypedName
+                   { tnName = Name { nHandle = "play!ret!" , nId = 0 }
+                   , tnType = Int
+                   })
+              (Var
+                 TypedName
+                   { tnName = Name { nHandle = "play!c" , nId = 0 } , tnType = Int })
+        }
+    )
+  ]
 
 :: Precondition
 And
-  [ Gte (Var play ! handValue) (Num 2)
-  , Lte (Var play ! handValue) (Num 20)
+  [ Gte
+      (Var
+         TypedName
+           { tnName = Name { nHandle = "play!handValue" , nId = 0 }
+           , tnType = Int
+           })
+      (Num 2)
+  , Lte
+      (Var
+         TypedName
+           { tnName = Name { nHandle = "play!handValue" , nId = 0 }
+           , tnType = Int
+           })
+      (Num 20)
   ]
 
 :: Postcondition
-Eq (Var play ! handValue) (Num 21)
+Eq
+  (Var
+     TypedName
+       { tnName = Name { nHandle = "play!handValue" , nId = 0 }
+       , tnType = Int
+       })
+  (Num 21)
 
 [send->] (set-option :print-success true )
 [<-recv] success
@@ -45,6 +103,6 @@ Eq (Var play ! handValue) (Num 21)
 Failure:
   Verification conditions are invalid. Model: (model (define-fun play!handValue () Int 19 ) )
 
-real	0m0.188s
-user	0m0.182s
-sys	0m0.004s
+real	0m0.206s
+user	0m0.195s
+sys	0m0.026s

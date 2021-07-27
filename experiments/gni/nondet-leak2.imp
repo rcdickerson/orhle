@@ -23,7 +23,7 @@ especs:
   }
 
 fun run(high, low) {
-  flip := call flipCoin();
+  flip := flipCoin();
   if (flip == 0) then
     low := high + low;
   else

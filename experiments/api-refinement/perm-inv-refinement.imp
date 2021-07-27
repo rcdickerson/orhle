@@ -47,13 +47,13 @@ especs:
   }
 
 fun original() {
-   list[3] := call originalGetValues();
+   list[3] := originalGetValues();
    sum := list_0 + list_1 + list_2;
    return sum;
 }
 
 fun refinement() {
-   list[3] := call refinedGetValues();
+   list[3] := refinedGetValues();
    sum := list_0 + list_1 + list_2;
    return sum;
 }

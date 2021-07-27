@@ -4,7 +4,6 @@ module Orhle.VerifierTests(htf_thisModulesTests) where
 
 import Test.Framework
 
-import qualified Data.Map as Map
 import Orhle
 import System.FilePath
 
@@ -19,8 +18,8 @@ assertVerifierResultMatches expected result =
 
 parseAndTest progStr = case parseOrhle progStr of
   Left  err -> assertFailure $ "Parse error: " ++ (show err)
-  Right (_, _, specs, triple, expected) -> do
-    result <- verify specs Map.empty triple
+  Right (OrhleParseResult _ impls specs triple expected) -> do
+    result <- verify (SpecImpEnv impls specs) triple
     assertVerifierResultMatches expected result
 
 testImpFile fileName = do

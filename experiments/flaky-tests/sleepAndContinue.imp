@@ -50,13 +50,13 @@ fun recordTimestamp(currentTime, currentTotal, lastTime) {
 
 // The test:
 fun test() {
-  currentTime := 0;// call getCurrentTimeMs();
+  currentTime := getCurrentTimeMs();
   lastTime := -1;
   currentTotal := 0;
 
   // Prime the timer.
-  (currentTotal, lastTime) := call recordTimestamp(currentTime, currentTotal, lastTime);
-  currentTime := call sleep(100, currentTime);
+  (currentTotal, lastTime) := recordTimestamp(currentTime, currentTotal, lastTime);
+  currentTime := sleep(100, currentTime);
 
   counter := 0;
   while (counter < 5) do

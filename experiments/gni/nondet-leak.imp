@@ -24,7 +24,7 @@ especs:
   }
 
 fun leak(high, low) {
-  r := call randInt();
+  r := randInt();
   if (r == 50) then
     ret := high + low;
   else

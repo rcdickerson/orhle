@@ -42,7 +42,7 @@ especs:
 
 // Code under test reports whether or not a call returns 200:
 fun makeRequest(url) {
-  response := call service(url);
+  response := service(url);
   if response == 200 then
     result := 1;
   else
@@ -54,7 +54,7 @@ fun makeRequest(url) {
 // The flaky test (behavior depends on service response):
 fun test() {
   url := 1111;
-  response := call makeRequest(url);
+  response := makeRequest(url);
   if (response == 0) then
     success := 0;
   else

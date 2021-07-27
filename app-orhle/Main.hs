@@ -1,6 +1,6 @@
 module Main where
 
-import Orhle ( AESpecs(..), FunImplEnv(..), RhleTriple(..), parseOrhle )
+import Orhle ( OrhleParseResult(..), RhleTriple(..), FunSpecEnv(..) )
 import qualified Orhle
 import System.Environment
 import System.Exit
@@ -31,40 +31,40 @@ run orhle = do
   putStrLn "****     The Oracular RHLE Verifier    ****"
   putStrLn "*******************************************"
   putStrLn ""
-  case parseOrhle orhle of
+  case Orhle.parseOrhle orhle of
     Left err -> do
       putStrLn $ "Parse error: " ++ err
       return False
-    Right (execs, impls, specs, triple, expected) -> do
-      printQuery execs impls specs triple
-      result <- Orhle.verify specs impls triple
+    Right parseResult -> do
+      printParseResult parseResult
+      let env = Orhle.SpecImpEnv (opr_impls parseResult) (opr_specs parseResult)
+      result <- Orhle.verify env (opr_triple parseResult)
       case result of
         Left failure -> do
           printFailure failure
-          return $ expected == Orhle.ExpectFailure
+          return $ (opr_expected parseResult) == Orhle.ExpectFailure
         Right success -> do
           printSuccess success
-          return $ expected == Orhle.ExpectSuccess
+          return $ (opr_expected parseResult) == Orhle.ExpectSuccess
 
-printQuery :: [Orhle.Exec] -> FunImplEnv -> AESpecs -> RhleTriple -> IO ()
-printQuery execs
-           impls
-           (AESpecs aSpecs eSpecs)
-           (RhleTriple pre aProgs eProgs post) = do
+printParseResult :: OrhleParseResult -> IO ()
+printParseResult result = do
+  let (RhleTriple pre aprogs eprogs post) = opr_triple result
+  let (FunSpecEnv aspecs especs) = opr_specs result
   putStrLn ":: Executions"
-  mapM_ printExec execs
+  mapM_ printExec (opr_execs result)
   putStrLn ""
   putStrLn $ ":: Universal Programs"
-  pPrintList aProgs
+  pPrintList aprogs
   putStrLn ""
   putStrLn $ ":: Existential Programs"
-  pPrintList eProgs
+  pPrintList eprogs
   putStrLn ""
   putStrLn $ ":: Universal Specifications"
-  pPrint aSpecs
+  pPrint aspecs
   putStrLn ""
   putStrLn $ ":: Existential Specifications"
-  pPrint eSpecs
+  pPrint especs
   putStrLn ""
   putStrLn $ ":: Precondition"
   pPrint pre

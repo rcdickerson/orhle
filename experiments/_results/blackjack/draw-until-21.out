@@ -4,56 +4,13 @@
 ****     The Oracular RHLE Verifier    ****
 *******************************************
 
-:: Executions
-  play (exists)
+Parse error: (line 34, column 2):
+unexpected end of input
+expecting end of input
+(line 5, column 18):
+unexpected "d"
+expecting operator or ";"
 
-:: Universal Programs
-[]
-
-:: Existential Programs
-[ SSeq
-    [ SWhile
-        (BLt (AVar play ! handValue) (ALit 21))
-        (SSeq
-           [ SCall "play!draw" [] [ play ! card ]
-           , SAsgn play !
-               handValue (AAdd (AVar play ! handValue) (AVar play ! card))
-           ])
-        ( Lte (Var play ! handValue) (Num 21)
-        , Sub [ Num 30 , Var play ! handValue ]
-        )
-    , SAsgn play ! play ! retVal (AVar play ! handValue)
-    ]
-]
-
-:: Universal Specifications
-fromList []
-
-:: Existential Specifications
-fromList [("play!draw",Spec {spec_params = [], spec_choiceVars = [play!c], spec_preCondition = And [Gte (Var play!c) (Num 1),Lte (Var play!c) (Num 10)], spec_postCondition = Eq (Var ret!) (Var play!c)})]
-
-:: Precondition
-And
-  [ Gte (Var play ! handValue) (Num 2)
-  , Lte (Var play ! handValue) (Num 20)
-  ]
-
-:: Postcondition
-Eq (Var play ! handValue) (Num 21)
-
-[send->] (set-option :print-success true )
-[<-recv] success
-[send->] (set-option :produce-models true )
-[<-recv] success
-[send->] (declare-const play!handValue Int)
-[<-recv] success
-[send->] (assert (not (=> (and (>= play!handValue 2) (<= play!handValue 20)) (and (<= play!handValue 21) (forall ((play!card!1 Int) (play!handValue!1 Int)) (=> (and (<= play!handValue!1 21) (not (< play!handValue!1 21))) (= play!handValue!1 21))) (forall ((play!card!1 Int) (play!handValue!1 Int)) (=> (and (<= play!handValue!1 21) (< play!handValue!1 21)) (exists ((play!c!1 Int)) (and (and (>= play!c!1 1) (<= play!c!1 10)) (exists ((play!card!2 Int)) (= play!card!2 play!c!1)) (forall ((play!card!2 Int)) (=> (= play!card!2 play!c!1) (and (<= (+ play!handValue!1 play!card!2) 21) (and (< (- 30 (+ play!handValue!1 play!card!2)) (- 30 play!handValue!1)))))))))) (forall ((play!card!1 Int) (play!handValue!1 Int)) (=> (and (<= play!handValue!1 21) (not (and (< play!handValue!1 21)))) (and (not (< play!handValue!1 21)))))))) )
-[<-recv] success
-[send->] (check-sat )
-[<-recv] unsat
-[send->] (exit )
-Valid.
-
-real	0m0.187s
-user	0m0.174s
-sys	0m0.019s
+real	0m0.196s
+user	0m0.188s
+sys	0m0.018s

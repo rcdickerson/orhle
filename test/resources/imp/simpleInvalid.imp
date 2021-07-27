@@ -8,9 +8,9 @@ post: (= A!y E!y);
 
 especs:
  randOdd() {
-   choiceVars: n;
-   pre: (= (mod n 2) 1);
-   post: (= ret! n);
+   choiceVars: c;
+   pre: (= (mod c 2) 1);
+   post: (= ret! c);
  }
 
 fun A() {
@@ -24,7 +24,7 @@ fun A() {
 }
 
 fun E() {
-  x := call randOdd();
+  x := randOdd();
   if x == 3 then
     y := 3;
   else

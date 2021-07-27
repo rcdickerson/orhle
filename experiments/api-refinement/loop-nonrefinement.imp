@@ -23,7 +23,7 @@ fun original() {
   sum := 0;
   while (sum <= 100) do
     @inv { (= original!sum refinement!sum) }
-    r := call rand();
+    r := rand();
     sum := sum + r;
   end
   return sum;
@@ -33,7 +33,7 @@ fun refinement() {
   sum := 0;
   while (sum <= 100) do
     @inv { (= original!sum refinement!sum) }
-    r := call biggerRand();
+    r := biggerRand();
     sum := sum + r;
   end
   return sum;

@@ -27,7 +27,7 @@ fun play() {
   while (handValue < 21) do
     @inv { (<= play!handValue 21) }
     @var { (- 30 play!handValue) }
-    card := call draw();
+    card := draw();
     handValue := handValue + card;
   end
   return handValue;
