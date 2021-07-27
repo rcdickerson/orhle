@@ -15,12 +15,13 @@ import qualified Ceili.Assertion as A
 import Ceili.Language.Compose ( (:+:)(..) )
 import Ceili.Language.FunImp
 import Ceili.Language.FunImpParser
-import Ceili.Name ( Name(..), TypedName(..), prefix )
+import Ceili.Name ( Name(..), TypedName(..) )
 import qualified Ceili.Name as Name
 import Control.Monad ( liftM )
 import Data.List ( isPrefixOf )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Orhle.OrhleParserPrefix
 import Orhle.SpecImp
 import Orhle.Triple
 import Text.Parsec
@@ -103,22 +104,12 @@ orhleParser = do
     Left err   -> fail $ show err
     Right funs -> return $ Map.map funImplToSpecImp funs
 
-  -- Add per-execution prefixed versions of each function implementation to
-  -- ensure names are unique across executions. This keeps the verifier from
-  -- needing to worry about polluting cross-execution namespaces when
-  -- constructing relational verification conditions, and ensures prefixed call
-  -- names in each program have appropriate entries in the implementation
-  -- environment.
-  let execPrefixes         = map execPrefix (aExecs ++ eExecs)
-  let allPrefixes key impl = map (\p -> (p ++ key, prefixImpl p impl)) execPrefixes
-  let prefixedAssocs       = concat $ map (uncurry allPrefixes) (Map.assocs impls)
-  let prefixedImpls        = Map.fromList prefixedAssocs
-
-  -- Similarly, prefix the specifications.
-  let prefixExecId specMap exec = Map.map (prefix $ execPrefix exec) $
-                                  Map.mapKeys (execPrefix exec ++) specMap
-  let prefixedASpecs = Map.unions $ map (prefixExecId aSpecs) aExecs
-  let prefixedESpecs = Map.unions $ map (prefixExecId eSpecs) eExecs
+  -- Add per-execution prefixed versions of each function implementation and
+  -- specification to ensure names are unique across executions.
+  let (aExecPrefixes, eExecPrefixes) = (map execPrefix aExecs, map execPrefix eExecs)
+  let prefixedImpls   = Map.unions $ map (\eid -> prefixExecId eid impls) (aExecPrefixes ++ eExecPrefixes)
+  let prefixedASpecs  = Map.unions $ map (\eid -> prefixExecId eid aSpecs) aExecPrefixes
+  let prefixedESpecs  = Map.unions $ map (\eid -> prefixExecId eid eSpecs) eExecPrefixes
 
   aProgs <- mapM (lookupExecBody prefixedImpls) aExecs
   eProgs <- mapM (lookupExecBody prefixedImpls) eExecs
@@ -151,33 +142,6 @@ instance ToSpecImp FunImpProgram where
 
 funImplToSpecImp :: FunImpl FunImpProgram -> FunImpl SpecImpProgram
 funImplToSpecImp (FunImpl params body returns) = FunImpl params (toSpecImp body) returns
-
-prefixImpl :: String -> FunImpl SpecImpProgram -> FunImpl SpecImpProgram
-prefixImpl prefix (FunImpl params body rets) = let
-  pParams   = map (Name.prefix prefix) params
-  pBody     = (Name.prefix prefix) . (prefixCallIds prefix) $ body
-  pRets     = map (Name.prefix prefix) rets
-  in FunImpl pParams pBody pRets
-
-class CallIdPrefixer a where
-  prefixCallIds :: String -> a -> a
-instance CallIdPrefixer (ImpSkip e) where
-  prefixCallIds _ = id
-instance CallIdPrefixer (ImpAsgn e) where
-  prefixCallIds _ = id
-instance CallIdPrefixer e => CallIdPrefixer (ImpSeq e) where
-  prefixCallIds pre (ImpSeq stmts) = ImpSeq $ map (prefixCallIds pre) stmts
-instance CallIdPrefixer e => CallIdPrefixer (ImpIf e) where
-  prefixCallIds pre (ImpIf c t e) = ImpIf c (prefixCallIds pre t) (prefixCallIds pre e)
-instance CallIdPrefixer e => CallIdPrefixer (ImpWhile e) where
-  prefixCallIds pre (ImpWhile c body meta) = ImpWhile c (prefixCallIds pre body) meta
-instance CallIdPrefixer e => CallIdPrefixer (SpecCall e) where
-  prefixCallIds pre (SpecCall cid params asgns) = SpecCall (pre ++ cid) params asgns
-instance (CallIdPrefixer (f e), CallIdPrefixer (g e)) => CallIdPrefixer ((f :+: g) e) where
-  prefixCallIds pre (Inl f) = Inl $ prefixCallIds pre f
-  prefixCallIds pre (Inr g) = Inr $ prefixCallIds pre g
-instance CallIdPrefixer SpecImpProgram where
-  prefixCallIds pre (In f) = In $ prefixCallIds pre f
 
 lookupExecBody :: FunImplEnv SpecImpProgram -> Exec -> OrhleAppParser SpecImpProgram
 lookupExecBody funs exec =
