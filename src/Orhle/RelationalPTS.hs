@@ -16,11 +16,11 @@ import Orhle.StepStrategy
 
 
 relBackwardPT :: BackwardStepStrategy
-               -> SpecImpEnv SpecImpProgram
-               -> [SpecImpProgram]
-               -> [SpecImpProgram]
-               -> Assertion
-               -> Ceili Assertion
+              -> SpecImpEnv SpecImpProgram
+              -> [SpecImpProgram]
+              -> [SpecImpProgram]
+              -> Assertion
+              -> Ceili Assertion
 relBackwardPT stepStrategy env aprogs eprogs post =
   relBackwardPT' stepStrategy env (ProgramRelation aprogs eprogs) post
 
@@ -46,22 +46,41 @@ relBackwardPT' stepStrategy env (ProgramRelation aprogs eprogs) post = do
     LoopFusion aloops eloops -> do
       let annotatedInvars = catMaybes $ (map invar aloops) ++ (map invar eloops)
       case annotatedInvars of
-        (_:_) -> relBackwardPT stepStrategy env aprogs' eprogs' $ And annotatedInvars
-        [] -> do
-          inferResult <- inferInvariant stepStrategy env aloops eloops post
-          case inferResult of
-            Just inv -> relBackwardPT stepStrategy env aprogs' eprogs' inv
-            Nothing -> do
-              log_i "Unable to infer loop invariant, proceeding with False"
-              return AFalse -- TODO: Fall back to single stepping over loops.
+        (_:_) -> useAnnotatedInvariant (And annotatedInvars) stepStrategy env aloops eloops aprogs' eprogs' post
+        []    -> inferInvariant stepStrategy env aloops eloops aprogs' eprogs' post
+
+
+useAnnotatedInvariant :: Assertion
+                      -> BackwardStepStrategy
+                      -> SpecImpEnv SpecImpProgram
+                      -> [ImpWhile SpecImpProgram]
+                      -> [ImpWhile SpecImpProgram]
+                      -> [SpecImpProgram]
+                      -> [SpecImpProgram]
+                      -> Assertion
+                      -> Ceili Assertion
+useAnnotatedInvariant invariant stepStrategy env aloops eloops aprogs' eprogs' post = do
+  wpInvar <- relBackwardPT stepStrategy env (map body aloops) (map body eloops) invariant
+  isSufficient <- checkValidB $ Imp invariant post
+  isInvariant  <- checkValidB $ Imp invariant wpInvar
+  case (isSufficient, isInvariant) of
+    (True, True) -> relBackwardPT stepStrategy env aprogs' eprogs' invariant
+    (False, _)   -> do
+      log_i "Annotated loop invariant insufficient to establish post"
+      return AFalse
+    (_, False)   -> do
+      log_i "Annotated loop invariant is not actually invariant on loop body"
+      return AFalse
 
 inferInvariant :: BackwardStepStrategy
                -> SpecImpEnv SpecImpProgram
                -> [ImpWhile SpecImpProgram]
                -> [ImpWhile SpecImpProgram]
+               -> [SpecImpProgram]
+               -> [SpecImpProgram]
                -> Assertion
-               -> Ceili (Maybe Assertion)
-inferInvariant stepStrategy env aloops eloops post =
+               -> Ceili Assertion
+inferInvariant stepStrategy env aloops eloops aprogs' eprogs' post =
   let
     bodies = ProgramRelation (map body aloops) (map body eloops)
     conds = And $ map condA (aloops ++ eloops)
@@ -71,7 +90,13 @@ inferInvariant stepStrategy env aloops eloops post =
                  Set.cartesianProduct (extractTests aloops) (extractTests eloops)
   in case headStates of
     [] -> throwError "Insufficient test head states for while loop, did you run populateTestStates?"
-    _  -> Pie.loopInvGen (relBackwardPT' stepStrategy) env conds bodies post headStates
+    _  -> do
+      result <- Pie.loopInvGen (relBackwardPT' stepStrategy) env conds bodies post headStates
+      case result of
+        Just inv -> relBackwardPT stepStrategy env aprogs' eprogs' inv
+        Nothing -> do
+          log_i "Unable to infer loop invariant, proceeding with False"
+          return AFalse -- TODO: Fall back to single stepping over loops.
 
 body :: ImpWhile e -> e
 body (ImpWhile _ b _) = b
