@@ -7,6 +7,7 @@ module Orhle
     , Failure(..)
     , FunImpl(..)
     , FunImplEnv
+    , FunSpecEnv(..)
     , Name(..)
     , OrhleParseResult(..)
     , SpecImpEnv(..)

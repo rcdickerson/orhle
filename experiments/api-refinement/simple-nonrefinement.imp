@@ -21,11 +21,11 @@ especs:
   }
 
 fun original() {
-  x := call originalRand();
+  x := originalRand();
   return x;
 }
 
 fun refinement() {
-  x := call refinedRand();
+  x := refinedRand();
   return x;
 }

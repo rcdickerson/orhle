@@ -22,7 +22,7 @@ especs:
   }
 
 fun original() {
-  r := call flipCoin();
+  r := flipCoin();
   if (r == 0) then
     ret := 10;
   else
@@ -32,7 +32,7 @@ fun original() {
 }
 
 fun refinement() {
-  r := call flipCoin();
+  r := flipCoin();
   if (r == 0) then
     ret := 20;
   else

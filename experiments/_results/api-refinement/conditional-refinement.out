@@ -1,3 +1,5 @@
+Populating test states for loop invariant inference...
+Running backward relational analysis...
 
 *******************************************
 ****               ORHLE               ****
@@ -9,52 +11,152 @@
   original (exists)
 
 :: Universal Programs
-[ SSeq
-    [ SCall "refinement!flipCoin" [] [ refinement ! r ]
-    , SIf
-        (BEq (AVar refinement ! r) (ALit 0))
-        (SAsgn refinement ! ret (ALit 20))
-        (SAsgn refinement ! ret (ALit 10))
-    , SAsgn refinement ! refinement ! retVal (AVar refinement ! ret)
+[ ImpSeq
+    [ SpecCall
+        { sc_callId = "refinement!flipCoin"
+        , sc_args = []
+        , sc_assignees = [ Name { nHandle = "refinement!r" , nId = 0 } ]
+        }
+    , ImpIf
+        (BEq (AVar Name { nHandle = "refinement!r" , nId = 0 }) (ALit 0))
+        ImpAsgn
+        Name { nHandle = "refinement!ret" , nId = 0 }
+        (ALit 20)
+        ImpAsgn
+        Name { nHandle = "refinement!ret" , nId = 0 }
+        (ALit 10)
+    , ImpAsgn
+        Name { nHandle = "refinement!refinement!retVal" , nId = 0 }
+        (AVar Name { nHandle = "refinement!ret" , nId = 0 })
     ]
 ]
 
 :: Existential Programs
-[ SSeq
-    [ SCall "original!flipCoin" [] [ original ! r ]
-    , SIf
-        (BEq (AVar original ! r) (ALit 0))
-        (SAsgn original ! ret (ALit 10))
-        (SAsgn original ! ret (ALit 20))
-    , SAsgn original ! original ! retVal (AVar original ! ret)
+[ ImpSeq
+    [ SpecCall
+        { sc_callId = "original!flipCoin"
+        , sc_args = []
+        , sc_assignees = [ Name { nHandle = "original!r" , nId = 0 } ]
+        }
+    , ImpIf
+        (BEq (AVar Name { nHandle = "original!r" , nId = 0 }) (ALit 0))
+        ImpAsgn
+        Name { nHandle = "original!ret" , nId = 0 }
+        (ALit 10)
+        ImpAsgn
+        Name { nHandle = "original!ret" , nId = 0 }
+        (ALit 20)
+    , ImpAsgn
+        Name { nHandle = "original!original!retVal" , nId = 0 }
+        (AVar Name { nHandle = "original!ret" , nId = 0 })
     ]
 ]
 
 :: Universal Specifications
-fromList [("refinement!flipCoin",Spec {spec_params = [], spec_choiceVars = [], spec_preCondition = ATrue, spec_postCondition = Or [Eq (Var ret!) (Num 0),Eq (Var ret!) (Num 1)]})]
+fromList
+  [ ( "refinement!flipCoin"
+    , Specification
+        { spec_params = []
+        , spec_returnVars =
+            [ Name { nHandle = "refinement!ret!" , nId = 0 } ]
+        , spec_choiceVars = []
+        , spec_preCondition = ATrue
+        , spec_postCondition =
+            Or
+              [ Eq
+                  (Var
+                     TypedName
+                       { tnName = Name { nHandle = "refinement!ret!" , nId = 0 }
+                       , tnType = Int
+                       })
+                  (Num 0)
+              , Eq
+                  (Var
+                     TypedName
+                       { tnName = Name { nHandle = "refinement!ret!" , nId = 0 }
+                       , tnType = Int
+                       })
+                  (Num 1)
+              ]
+        }
+    )
+  ]
 
 :: Existential Specifications
-fromList [("original!flipCoin",Spec {spec_params = [], spec_choiceVars = [original!n], spec_preCondition = Or [Eq (Var original!n) (Num 0),Eq (Var original!n) (Num 1)], spec_postCondition = Eq (Var ret!) (Var original!n)})]
+fromList
+  [ ( "original!flipCoin"
+    , Specification
+        { spec_params = []
+        , spec_returnVars =
+            [ Name { nHandle = "original!ret!" , nId = 0 } ]
+        , spec_choiceVars =
+            [ TypedName
+                { tnName = Name { nHandle = "original!n" , nId = 0 }
+                , tnType = Int
+                }
+            ]
+        , spec_preCondition =
+            Or
+              [ Eq
+                  (Var
+                     TypedName
+                       { tnName = Name { nHandle = "original!n" , nId = 0 }
+                       , tnType = Int
+                       })
+                  (Num 0)
+              , Eq
+                  (Var
+                     TypedName
+                       { tnName = Name { nHandle = "original!n" , nId = 0 }
+                       , tnType = Int
+                       })
+                  (Num 1)
+              ]
+        , spec_postCondition =
+            Eq
+              (Var
+                 TypedName
+                   { tnName = Name { nHandle = "original!ret!" , nId = 0 }
+                   , tnType = Int
+                   })
+              (Var
+                 TypedName
+                   { tnName = Name { nHandle = "original!n" , nId = 0 }
+                   , tnType = Int
+                   })
+        }
+    )
+  ]
 
 :: Precondition
 ATrue
 
 :: Postcondition
-Eq (Var original ! ret) (Var refinement ! ret)
+Eq
+  (Var
+     TypedName
+       { tnName = Name { nHandle = "original!ret" , nId = 0 }
+       , tnType = Int
+       })
+  (Var
+     TypedName
+       { tnName = Name { nHandle = "refinement!ret" , nId = 0 }
+       , tnType = Int
+       })
 
 [send->] (set-option :print-success true )
 [<-recv] success
 [send->] (set-option :produce-models true )
 [<-recv] success
-[send->] (declare-const refinement!r!1 Int)
+[send->] (declare-const refinement!r Int)
 [<-recv] success
-[send->] (assert (not (=> true (exists ((original!n!1 Int)) (and (or (= original!n!1 0) (= original!n!1 1)) (exists ((original!r!1 Int)) (= original!r!1 original!n!1)) (forall ((original!r!1 Int)) (=> (= original!r!1 original!n!1) (and (=> (= original!r!1 0) (and true (=> (or (= refinement!r!1 0) (= refinement!r!1 1)) (and (=> (= refinement!r!1 0) (= 10 20)) (=> (not (= refinement!r!1 0)) (= 10 10)))))) (=> (not (= original!r!1 0)) (and true (=> (or (= refinement!r!1 0) (= refinement!r!1 1)) (and (=> (= refinement!r!1 0) (= 20 20)) (=> (not (= refinement!r!1 0)) (= 20 10))))))))))))) )
+[send->] (assert (not (=> true (and true (=> (or (= refinement!r 0) (= refinement!r 1)) (and (=> (= refinement!r 0) (exists ((original!n!4 Int)) (and (or (= original!n!4 0) (= original!n!4 1)) (exists ((original!r Int)) (= original!r original!n!4)) (forall ((original!r Int)) (=> (= original!r original!n!4) (and (=> (= original!r 0) (= 10 20)) (=> (not (= original!r 0)) (= 20 20)))))))) (=> (not (= refinement!r 0)) (exists ((original!n!4 Int)) (and (or (= original!n!4 0) (= original!n!4 1)) (exists ((original!r Int)) (= original!r original!n!4)) (forall ((original!r Int)) (=> (= original!r original!n!4) (and (=> (= original!r 0) (= 10 10)) (=> (not (= original!r 0)) (= 20 10))))))))))))) )
 [<-recv] success
 [send->] (check-sat )
 [<-recv] unsat
 [send->] (exit )
 Valid.
 
-real	0m0.187s
-user	0m0.163s
-sys	0m0.028s
+real	0m0.327s
+user	0m0.551s
+sys	0m0.030s

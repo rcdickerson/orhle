@@ -29,7 +29,7 @@ fun run(high, low) {
     low := 1;
   endif
 
-  flip := call flipCoin();
+  flip := flipCoin();
   if (flip == 0) then
     low := 1 - low;  // Flip low.
   endif

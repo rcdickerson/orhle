@@ -4,65 +4,13 @@
 ****     The Oracular RHLE Verifier    ****
 *******************************************
 
-:: Executions
-  refinement (forall)
-  original (exists)
+Parse error: (line 45, column 1):
+unexpected end of input
+expecting end of input
+(line 5, column 15):
+unexpected "r"
+expecting operator or ";"
 
-:: Universal Programs
-[ SSeq
-    [ SAsgn refinement ! sum (ALit 0)
-    , SWhile
-        (BLe (AVar refinement ! sum) (ALit 100))
-        (SSeq
-           [ SCall "refinement!randOdd" [] [ refinement ! r ]
-           , SAsgn refinement !
-               sum (AAdd (AVar refinement ! sum) (AVar refinement ! r))
-           ])
-        ( Eq (Var original ! sum) (Var refinement ! sum) , Num 0 )
-    , SAsgn refinement ! refinement ! retVal (AVar refinement ! sum)
-    ]
-]
-
-:: Existential Programs
-[ SSeq
-    [ SAsgn original ! sum (ALit 0)
-    , SWhile
-        (BLe (AVar original ! sum) (ALit 100))
-        (SSeq
-           [ SCall "original!rand" [] [ original ! r ]
-           , SAsgn original !
-               sum (AAdd (AVar original ! sum) (AVar original ! r))
-           ])
-        ( Eq (Var original ! sum) (Var refinement ! sum) , Num 0 )
-    , SAsgn original ! original ! retVal (AVar original ! sum)
-    ]
-]
-
-:: Universal Specifications
-fromList [("refinement!rand",Spec {spec_params = [], spec_choiceVars = [], spec_preCondition = ATrue, spec_postCondition = And [Lte (Num 0) (Var ret!),Lt (Var ret!) (Num 10)]}),("refinement!randOdd",Spec {spec_params = [], spec_choiceVars = [], spec_preCondition = ATrue, spec_postCondition = And [Lte (Num 0) (Var ret!),Lt (Var ret!) (Num 10),Eq (Mod (Var ret!) (Num 2)) (Num 1)]})]
-
-:: Existential Specifications
-fromList [("original!rand",Spec {spec_params = [], spec_choiceVars = [original!n], spec_preCondition = And [Lte (Num 0) (Var original!n),Lt (Var original!n) (Num 10)], spec_postCondition = Eq (Var ret!) (Var original!n)})]
-
-:: Precondition
-ATrue
-
-:: Postcondition
-Eq (Var original ! sum) (Var refinement ! sum)
-
-[send->] (set-option :print-success true )
-[<-recv] success
-[send->] (set-option :produce-models true )
-[<-recv] success
-[send->] (declare-const refinement!r!2 Int)
-[<-recv] success
-[send->] (assert (not (=> true (and (= 0 0) (forall ((original!r!1 Int) (original!sum!3 Int) (refinement!r!1 Int) (refinement!sum!2 Int)) (=> (and (= original!sum!3 refinement!sum!2) (not (<= refinement!sum!2 100)) (not (<= original!sum!3 100))) (= original!sum!3 refinement!sum!2))) (forall ((original!r!1 Int) (original!sum!3 Int) (refinement!r!1 Int) (refinement!sum!2 Int)) (=> (and (= original!sum!3 refinement!sum!2) (<= refinement!sum!2 100) (<= original!sum!3 100)) (exists ((original!n!1 Int)) (and (and (<= 0 original!n!1) (< original!n!1 10)) (exists ((original!r!2 Int)) (= original!r!2 original!n!1)) (forall ((original!r!2 Int)) (=> (= original!r!2 original!n!1) (and true (=> (and (<= 0 refinement!r!2) (< refinement!r!2 10) (= (mod refinement!r!2 2) 1)) (and (= (+ original!sum!3 original!r!2) (+ refinement!sum!2 refinement!r!2)) true))))))))) (forall ((original!r!1 Int) (original!sum!3 Int) (refinement!r!1 Int) (refinement!sum!2 Int)) (=> (and (= original!sum!3 refinement!sum!2) (not (and (<= refinement!sum!2 100) (<= original!sum!3 100)))) (and (not (<= refinement!sum!2 100)) (not (<= original!sum!3 100)))))))) )
-[<-recv] success
-[send->] (check-sat )
-[<-recv] unsat
-[send->] (exit )
-Valid.
-
-real	0m0.187s
-user	0m0.200s
-sys	0m0.015s
+real	0m0.192s
+user	0m0.173s
+sys	0m0.031s

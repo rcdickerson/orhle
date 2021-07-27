@@ -19,7 +19,7 @@ especs:
   }
 
 fun play() {
-  card := call draw();
+  card := draw();
   handValue := handValue + card;
   return handValue;
 }
