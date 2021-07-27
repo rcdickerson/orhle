@@ -17,10 +17,12 @@ module Orhle
     , SpecMap
     , Success(..)
     , Orhle.parseOrhle
+    , showSMT
     , verify
     ) where
 
 import Ceili.Name
+import Ceili.SMTString ( showSMT )
 import Orhle.OrhleParser
 import Orhle.SpecImp
 import Orhle.Triple

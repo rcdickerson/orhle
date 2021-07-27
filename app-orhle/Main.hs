@@ -67,10 +67,10 @@ printParseResult result = do
   pPrint especs
   putStrLn ""
   putStrLn $ ":: Precondition"
-  pPrint pre
+  putStrLn $ Orhle.showSMT pre
   putStrLn ""
   putStrLn $ ":: Postcondition"
-  pPrint post
+  putStrLn $ Orhle.showSMT post
   putStrLn ""
 
 printFailure :: Orhle.Failure -> IO ()

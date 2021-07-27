@@ -18,7 +18,6 @@ import Ceili.Language.FunImpParser
 import Ceili.Name ( Name(..), TypedName(..) )
 import qualified Ceili.Name as Name
 import Control.Monad ( liftM )
-import Data.List ( isPrefixOf )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Orhle.OrhleParserPrefix
@@ -214,7 +213,7 @@ specification = do
 getReturnVars :: Assertion -> [Name]
 getReturnVars assertion =
   let
-    isRetName (Name n _) = isPrefixOf "ret!" n
+    isRetName (Name n _) = n == "ret"
     assertionNames = Set.toList $ Name.namesIn assertion
   in filter isRetName assertionNames
 

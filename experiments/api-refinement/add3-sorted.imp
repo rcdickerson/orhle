@@ -13,7 +13,7 @@ post: (and
         (= original!ret_2 refinement!ret_2));
 
 aspecs:
-  sort(list) {
+  sort(list[3]) {
     post: (and (<= ret!0 ret!1)
                (<= ret!1 ret!2)
                (or (and (= ret!0 list_0)
@@ -37,7 +37,7 @@ aspecs:
   }
 
 especs:
-  shuffle(list) {
+  shuffle(list[3]) {
     choiceVars: n0, n1, n2;
     pre: (or (and (= n0 list_0)
                   (= n1 list_1)
