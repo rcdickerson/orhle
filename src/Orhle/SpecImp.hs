@@ -56,10 +56,10 @@ import Ceili.Language.Compose
 import Ceili.Language.FunImp
 import Ceili.Name
 import qualified Ceili.SMT as SMT
-import Ceili.SMTString
 import Data.Map ( Map )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Prettyprinter
 
 
 --------------------
@@ -218,11 +218,7 @@ instance EvalImp (SpecImpEvalContext e) e => EvalImp (SpecImpEvalContext e) (Spe
 
 evalSpec :: State -> Specification -> SpecCall e -> Ceili (Maybe State)
 evalSpec st spec call = do
-  (choiceVars, pre, post) <- specAtCallsite call spec
---  log_i $ "*** Start state: "
---  _ <- ppSt st
---  log_i $ "*** Eval pre: " ++ showSMT pre
---  log_i $ "*** Eval post: " ++ showSMT post
+  (_, pre, post) <- specAtCallsite call spec
   preIsValid <- checkValidWithLog LogLevelNone $ assertionAtState st pre
   case preIsValid of
     SMT.Invalid _    -> return Nothing
@@ -233,18 +229,7 @@ evalSpec st spec call = do
         SMT.SatUnknown -> return Nothing
         SMT.Unsat      -> return Nothing
         SMT.Sat model  -> do
---          log_i $ "*** Model: " ++ model
---          log_i $ "*** Model state: "
---          _ <- ppSt $ modelToState model
---          log_i $ "*** Returned state: "
---          _ <- ppSt $ Map.union (modelToState model) st
---          log_i "------------------"
           return $ Just $ Map.union (modelToState model) st
-
-ppSt :: State -> Ceili [()]
-ppSt st = do
-  let lines = map (\(k, v) -> "    " ++ (showSMT k) ++ " -> " ++ (show v)) $ Map.toList st
-  mapM log_i lines
 
 -- TODO: This is janky.
 modelToState :: String -> State
@@ -278,6 +263,18 @@ instance EvalImp (SpecImpEvalContext e) e => PopulateTestStates (SpecImpEvalCont
 
 instance PopulateTestStates (SpecImpEvalContext SpecImpProgram) SpecImpProgram where
   populateTestStates ctx sts (In f) = populateTestStates ctx sts f >>= return . In
+
+
+--------------------
+-- Pretty Printer --
+--------------------
+
+instance Pretty (SpecCall e) where
+  pretty (SpecCall callId args assignees) =
+    prettyAssignees assignees <+> pretty ":=" <+> pretty callId <> prettyArgs args
+
+instance Pretty SpecImpProgram where
+  pretty (In p) = pretty p
 
 
 ---------------

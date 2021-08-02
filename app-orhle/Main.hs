@@ -4,7 +4,7 @@ import Orhle ( OrhleParseResult(..), RhleTriple(..), FunSpecEnv(..) )
 import qualified Orhle
 import System.Environment
 import System.Exit
-import Text.Show.Pretty ( pPrint, pPrintList )
+import Prettyprinter
 
 main :: IO ()
 main = do
@@ -55,22 +55,22 @@ printParseResult result = do
   mapM_ printExec (opr_execs result)
   putStrLn ""
   putStrLn $ ":: Universal Programs"
-  pPrintList aprogs
+  putStrLn (show $ indent 4 $ vsep $ map (\p -> pretty "--------" <> hardline <> pretty p) aprogs)
   putStrLn ""
   putStrLn $ ":: Existential Programs"
-  pPrintList eprogs
+  putStrLn (show $ indent 4 $ vsep $ map (\p -> pretty "--------" <> hardline <> pretty p) eprogs)
   putStrLn ""
-  putStrLn $ ":: Universal Specifications"
-  pPrint aspecs
-  putStrLn ""
-  putStrLn $ ":: Existential Specifications"
-  pPrint especs
-  putStrLn ""
+--  putStrLn $ ":: Universal Specifications"
+--  putStrLn $ show aspecs
+--  putStrLn ""
+--  putStrLn $ ":: Existential Specifications"
+--  putStrLn $ show especs
+--  putStrLn ""
   putStrLn $ ":: Precondition"
-  putStrLn $ Orhle.showSMT pre
+  putStrLn $ show $ pretty pre
   putStrLn ""
   putStrLn $ ":: Postcondition"
-  putStrLn $ Orhle.showSMT post
+  putStrLn $ show $ pretty post
   putStrLn ""
 
 printFailure :: Orhle.Failure -> IO ()

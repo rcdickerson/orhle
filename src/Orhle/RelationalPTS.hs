@@ -5,7 +5,6 @@ module Orhle.RelationalPTS
 import Ceili.Assertion
 import Ceili.CeiliEnv
 import Ceili.Language.BExp ( bexpToAssertion )
-import Ceili.Language.Imp ( ImpWhileMetadata(..) )
 import Ceili.Name
 import qualified Ceili.InvariantInference.Pie as Pie
 import Data.Maybe ( catMaybes )
@@ -13,6 +12,7 @@ import Data.Set ( Set )
 import qualified Data.Set as Set
 import Orhle.SpecImp
 import Orhle.StepStrategy
+import Prettyprinter
 
 
 relBackwardPT :: BackwardStepStrategy
@@ -31,6 +31,14 @@ relBackwardPT' :: BackwardStepStrategy
                -> Assertion
                -> Ceili Assertion
 relBackwardPT' stepStrategy env (ProgramRelation aprogs eprogs) post = do
+  log_i   "[RelationalPTS]--------------------------------"
+  log_i   "[RelationalPTS] Taking step on:"
+  log_i $ "[RelationalPTS] Post: " ++ (show $ pretty post)
+  log_i $ "[RelationalPTS] Universal programs:"
+  log_i $ show $ indent 20 $ vsep (map (\p -> pretty "--------" <> hardline <> pretty p) aprogs)
+  log_i $ "[RelationalPTS] Existential programs:"
+  log_i $ show $ indent 20 $ vsep (map (\p -> pretty "--------" <> hardline <> pretty p) eprogs)
+  log_i   "[RelationalPTS] --------------------------------"
   Step selection aprogs' eprogs' <- stepStrategy aprogs eprogs
   case selection of
     NoSelectionFound ->

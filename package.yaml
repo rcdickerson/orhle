@@ -24,7 +24,6 @@ dependencies:
 - containers
 - mtl
 - parsec
-- pretty
 - prettyprinter
 - simple-smt
 - smtLib
@@ -53,7 +52,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - orhle
-    - pretty-show
+    - prettyprinter
 
 tests:
   orhle-test:
