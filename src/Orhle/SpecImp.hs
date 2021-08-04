@@ -344,7 +344,7 @@ specAtCallsite (SpecCall _ args assignees) (Specification params retVars choiceV
   else do
     freshChoiceVars <- envFreshen choiceVars
     let subCallsite = (instantiateParams params args) .
-                      (substituteAll retVars assignees) .
+                      (substituteAll retVars assignees) . -- TODO: This substitution is off.
                       (substituteAll (map tnName choiceVars) (map tnName freshChoiceVars))
     let callsitePre = subCallsite pre
     let callsitePost = subCallsite post
