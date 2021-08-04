@@ -61,15 +61,15 @@ fun test() {
   counter := 0;
   while (counter < 5) do
     @inv { (and
-             (= (* 100 test!1!counter) test!1!currentTotal)
-             (= 100 (- test!1!currentTime test!1!lastTime))
-             (<= 0 test!1!lastTime)
-             (= (* 101 test!2!counter) test!2!currentTotal)
-             (= 101 (- test!2!currentTime test!2!lastTime))
-             (<= 0 test!2!lastTime)
-             (= test!1!counter test!2!counter)
-             (<= test!1!counter 5)) }
-    @var { (- 10 test!1!counter) }
+             (<= test!1!counter 5)
+             (<= test!2!counter 5)
+             (>= test!1!lastTime 0)
+             (>= test!2!lastTime 0)
+             (= (- test!1!currentTime test!1!lastTime) 100)
+             (= (- test!2!currentTime test!2!lastTime) 101)
+             (= test!1!currentTotal (* 100 test!1!counter))
+             (= test!2!currentTotal (* 101 test!2!counter)))}
+    @var { (- 5 counter) }
     (currentTotal, lastTime) := recordTimestamp(currentTime, currentTotal, lastTime);
     currentTime := sleep(100, currentTime);
     counter := counter + 1;

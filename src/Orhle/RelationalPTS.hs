@@ -31,15 +31,16 @@ relBackwardPT' :: BackwardStepStrategy
                -> Assertion
                -> Ceili Assertion
 relBackwardPT' stepStrategy env (ProgramRelation aprogs eprogs) post = do
-  log_i   "[RelationalPTS]--------------------------------"
+  log_i   "[RelationalPTS] --------------------------------"
   log_i   "[RelationalPTS] Taking step on:"
   log_i $ "[RelationalPTS] Post: " ++ (show $ pretty post)
   log_i $ "[RelationalPTS] Universal programs:"
-  log_i $ show $ indent 20 $ vsep (map (\p -> pretty "--------" <> hardline <> pretty p) aprogs)
+  log_i $ show $ indent 16 $ vsep (map (\p -> pretty "--------" <> hardline <> pretty p) aprogs) <> hardline
   log_i $ "[RelationalPTS] Existential programs:"
-  log_i $ show $ indent 20 $ vsep (map (\p -> pretty "--------" <> hardline <> pretty p) eprogs)
-  log_i   "[RelationalPTS] --------------------------------"
+  log_i $ show $ indent 16 $ vsep (map (\p -> pretty "--------" <> hardline <> pretty p) eprogs) <> hardline
   Step selection aprogs' eprogs' <- stepStrategy aprogs eprogs
+  log_i $ "[RelationalPTS] Step: " ++ (show $ pretty selection)
+  log_i   "[RelationalPTS] --------------------------------"
   case selection of
     NoSelectionFound ->
       case (aprogs', eprogs') of
@@ -52,7 +53,7 @@ relBackwardPT' stepStrategy env (ProgramRelation aprogs eprogs) post = do
       post' <- impBackwardPT (SIQ_Existential, env) stmt post
       relBackwardPT stepStrategy env aprogs' eprogs' post'
     LoopFusion aloops eloops -> do
-      let annotatedInvars = catMaybes $ (map invar aloops) ++ (map invar eloops)
+      let annotatedInvars = Set.toList . Set.fromList . catMaybes $ (map invar aloops) ++ (map invar eloops)
       case annotatedInvars of
         (_:_) -> useAnnotatedInvariant (And annotatedInvars) stepStrategy env aloops eloops aprogs' eprogs' post
         []    -> inferInvariant stepStrategy env aloops eloops aprogs' eprogs' post
@@ -69,15 +70,18 @@ useAnnotatedInvariant :: Assertion
                       -> Ceili Assertion
 useAnnotatedInvariant invariant stepStrategy env aloops eloops aprogs' eprogs' post = do
   wpInvar <- relBackwardPT stepStrategy env (map body aloops) (map body eloops) invariant
-  isSufficient <- checkValidB $ Imp invariant post
-  isInvariant  <- checkValidB $ Imp invariant wpInvar
+  let conds = map condA (aloops ++ eloops)
+  isSufficient <- checkValidB $ Imp (And $ invariant:(map Not conds)) post
+  isInvariant  <- checkValidB $ Imp (And $ invariant:conds) wpInvar
+  -- TODO: Lockstep
+  -- TODO: Variant
   case (isSufficient, isInvariant) of
     (True, True) -> relBackwardPT stepStrategy env aprogs' eprogs' invariant
     (False, _)   -> do
       log_i "Annotated loop invariant insufficient to establish post"
       return AFalse
     (_, False)   -> do
-      log_i "Annotated loop invariant is not actually invariant on loop body"
+      log_i "Annotated loop invariant is not invariant on loop body"
       return AFalse
 
 inferInvariant :: BackwardStepStrategy
@@ -92,6 +96,8 @@ inferInvariant stepStrategy env aloops eloops aprogs' eprogs' post =
   let
     bodies = ProgramRelation (map body aloops) (map body eloops)
     conds = And $ map condA (aloops ++ eloops)
+    -- TODO: Lockstep
+    -- TODO: Variant
     extractTests = Set.unions . catMaybes . map tests
     headStates = map (\(x, y) -> And [x, y]) $
                  Set.toList $

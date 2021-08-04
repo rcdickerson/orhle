@@ -15,6 +15,7 @@ import Ceili.Language.Compose
 import Data.List ( partition )
 import Data.Maybe ( catMaybes )
 import Orhle.SpecImp
+import Prettyprinter
 
 type BackwardStepStrategy = [SpecImpProgram] -> [SpecImpProgram] -> Ceili Step
 
@@ -45,6 +46,18 @@ scanPossibleSteps aprogs eprogs options =
   in case steps of
        []     -> Step NoSelectionFound aprogs eprogs
        step:_ -> step
+
+
+---------------------
+-- Pretty Printing --
+---------------------
+instance Pretty Selection where
+  pretty selection =
+    case selection of
+      UniversalStatement stmt   -> pretty "Universal:" <+> pretty stmt
+      ExistentialStatement stmt -> pretty "Existential:" <+> pretty stmt
+      LoopFusion _ _            -> pretty "Loop Fusion"
+      NoSelectionFound          -> pretty "No Selection Found"
 
 
 --------------------------
