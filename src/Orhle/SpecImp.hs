@@ -324,19 +324,48 @@ instance (ImpBackwardPT (SpecImpQuant, SpecImpEnv e) e, FreshableNames e) =>
           SIQ_Existential -> existentialSpecPT spec call post
 
 universalSpecPT :: Specification -> (SpecCall e) -> Assertion -> Ceili Assertion
-universalSpecPT spec call post = do
-  Specification _ _ _ callsitePre callsitePost <- specAtCallsite call spec
-  return $ And [callsitePre, Imp callsitePost post]
+universalSpecPT spec@(Specification params retVars _ specPre specPost)
+                call@(SpecCall _ args assignees)
+                post =
+  do
+    checkArglists spec call
+    freshAssignees  <- envFreshen assignees
+    let callsitePre  = instantiateParams params args specPre
+    let callsitePost = substituteAll retVars freshAssignees
+                     $ instantiateParams params args specPost
+    let sitePost = substituteAll assignees freshAssignees post
+    return $ And [ callsitePre
+                 , Forall (intNames freshAssignees) $ Imp callsitePost sitePost
+                 ]
 
 existentialSpecPT :: Specification -> (SpecCall e) -> Assertion -> Ceili Assertion
-existentialSpecPT spec call post = do
-  Specification _ _ choiceVars callsitePre callsitePost <- specAtCallsite call spec
-  let tnAssignees = map (\n -> TypedName n Int) (sc_assignees call)
-      existsPost = Exists tnAssignees callsitePost
-      forallPost = Forall tnAssignees $ Imp callsitePost post
-  return $ case (length choiceVars) of
-    0 -> And [callsitePre, existsPost, forallPost]
-    _ -> Exists choiceVars $ And [callsitePre, existsPost, forallPost]
+existentialSpecPT spec@(Specification params retVars choiceVars specPre specPost)
+                  call@(SpecCall _ args assignees)
+                  post =
+  do
+    checkArglists spec call
+    freshChoiceVars <- envFreshen choiceVars
+    freshAssignees  <- envFreshen assignees
+    let callsitePre  = substituteAll (map tnName choiceVars) (map tnName freshChoiceVars)
+                     $ instantiateParams params args specPre
+    let callsitePost = substituteAll (map tnName choiceVars) (map tnName freshChoiceVars)
+                     $ substituteAll retVars freshAssignees
+                     $ instantiateParams params args specPost
+    let sitePost = substituteAll assignees freshAssignees post
+    let wp = And [ callsitePre
+                 , Exists (intNames freshAssignees) callsitePost
+                 , Forall (intNames freshAssignees) $ Imp callsitePost sitePost
+                 ]
+    return $ case choiceVars of
+      [] -> wp
+      _  -> Exists freshChoiceVars wp
+
+
+checkArglists :: Specification -> (SpecCall e) -> Ceili ()
+checkArglists (Specification params retVars _ _ _) (SpecCall _ args assignees) =
+  if      length args /= length params then throwError "Argument / parameter length mismatch"
+  else if length assignees /= length retVars then throwError "Assignees / returns length mismatch"
+  else return ()
 
 specAtCallsite :: SpecCall e -> Specification -> Ceili Specification
 specAtCallsite (SpecCall _ args assignees) (Specification params retVars choiceVars pre post) =
@@ -356,6 +385,9 @@ specAtCallsite (SpecCall _ args assignees) (Specification params retVars choiceV
 instantiateParams :: SubstitutableArith a => [Name] -> [AExp] -> a -> a
 instantiateParams params args a =
   let
-    fromNames = map (\n -> TypedName n Int) params
+    fromNames = intNames params
     toAriths  = map aexpToArith args
   in foldr (uncurry subArith) a (zip fromNames toAriths)
+
+intNames :: [Name] -> [TypedName]
+intNames = map (\n -> TypedName n Int)

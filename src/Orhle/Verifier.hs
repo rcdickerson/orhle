@@ -23,7 +23,7 @@ data Success  = Success { }
 
 rhleVerifier :: SpecImpEnv SpecImpProgram -> RhleTriple -> IO (Either Failure Success)
 rhleVerifier funEnv triple@(RhleTriple pre aprogs eprogs post) = do
-  let env = mkEnv LogLevelInfo
+  let env = mkEnv LogLevelDebug
                   (TripleWithEnv (funEnv, triple))
                   2000
   wpResult <- runCeili env $ do

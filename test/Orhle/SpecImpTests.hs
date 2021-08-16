@@ -36,6 +36,7 @@ x_v  = Var x_i
 
 env = defaultEnv [a, b, c, r, x, y, z]
 
+
 test_specAtCallsite = do
   let call = SpecCall "dummy_cid" [AVar b] [a]
   let spec = Specification [x] [r] [c_i] ATrue (Eq r_v $ Add [x_v, Num 1])
