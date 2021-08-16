@@ -31,16 +31,16 @@ relBackwardPT' :: BackwardStepStrategy
                -> Assertion
                -> Ceili Assertion
 relBackwardPT' stepStrategy env (ProgramRelation aprogs eprogs) post = do
-  log_i   "[RelationalPTS] --------------------------------"
-  log_i   "[RelationalPTS] Taking step on:"
-  log_i $ "[RelationalPTS] Post: " ++ (show $ pretty post)
-  log_i $ "[RelationalPTS] Universal programs:"
-  log_i $ show $ indent 16 $ vsep (map (\p -> pretty "--------" <> hardline <> pretty p) aprogs) <> hardline
-  log_i $ "[RelationalPTS] Existential programs:"
-  log_i $ show $ indent 16 $ vsep (map (\p -> pretty "--------" <> hardline <> pretty p) eprogs) <> hardline
+  log_d   "[RelationalPTS] --------------------------------"
+  log_d   "[RelationalPTS] Taking step on:"
+  log_d $ "[RelationalPTS] Post: " ++ (show $ pretty post)
+  log_d $ "[RelationalPTS] Universal programs:"
+  log_d $ show $ indent 16 $ vsep (map (\p -> pretty "--------" <> hardline <> pretty p) aprogs) <> hardline
+  log_d $ "[RelationalPTS] Existential programs:"
+  log_d $ show $ indent 16 $ vsep (map (\p -> pretty "--------" <> hardline <> pretty p) eprogs) <> hardline
   Step selection aprogs' eprogs' <- stepStrategy aprogs eprogs
-  log_i $ "[RelationalPTS] Step: " ++ (show $ pretty selection)
-  log_i   "[RelationalPTS] --------------------------------"
+  log_d $ "[RelationalPTS] Step: " ++ (show $ pretty selection)
+  log_d   "[RelationalPTS] --------------------------------"
   case selection of
     NoSelectionFound ->
       case (aprogs', eprogs') of
@@ -76,12 +76,14 @@ useAnnotatedInvariant invariant stepStrategy env aloops eloops aprogs' eprogs' p
   -- TODO: Lockstep
   -- TODO: Variant
   case (isSufficient, isInvariant) of
-    (True, True) -> relBackwardPT stepStrategy env aprogs' eprogs' invariant
+    (True, True) -> do
+      log_d "[RelationalPTS] Annotated loop invariant is sufficient and invariant"
+      relBackwardPT stepStrategy env aprogs' eprogs' invariant
     (False, _)   -> do
-      log_i "Annotated loop invariant insufficient to establish post"
+      log_e "[RelationalPTS] Annotated loop invariant insufficient to establish post"
       return AFalse
     (_, False)   -> do
-      log_i "Annotated loop invariant is not invariant on loop body"
+      log_e "[RelationalPTS] Annotated loop invariant is not invariant on loop body"
       return AFalse
 
 inferInvariant :: BackwardStepStrategy
@@ -109,7 +111,7 @@ inferInvariant stepStrategy env aloops eloops aprogs' eprogs' post =
       case result of
         Just inv -> relBackwardPT stepStrategy env aprogs' eprogs' inv
         Nothing -> do
-          log_i "Unable to infer loop invariant, proceeding with False"
+          log_e "Unable to infer loop invariant, proceeding with False"
           return AFalse -- TODO: Fall back to single stepping over loops.
 
 body :: ImpWhile e -> e

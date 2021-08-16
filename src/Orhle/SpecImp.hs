@@ -46,6 +46,7 @@ module Orhle.SpecImp
   , impSkip
   , impWhile
   , impWhileWithMeta
+  , specAtCallsite
   , specCall
   ) where
 
@@ -218,7 +219,7 @@ instance EvalImp (SpecImpEvalContext e) e => EvalImp (SpecImpEvalContext e) (Spe
 
 evalSpec :: State -> Specification -> SpecCall e -> Ceili (Maybe State)
 evalSpec st spec call = do
-  (_, pre, post) <- specAtCallsite call spec
+  Specification _ _ _ pre post <- specAtCallsite call spec
   preIsValid <- checkValidWithLog LogLevelNone $ assertionAtState st pre
   case preIsValid of
     SMT.Invalid _    -> return Nothing
@@ -324,12 +325,12 @@ instance (ImpBackwardPT (SpecImpQuant, SpecImpEnv e) e, FreshableNames e) =>
 
 universalSpecPT :: Specification -> (SpecCall e) -> Assertion -> Ceili Assertion
 universalSpecPT spec call post = do
-  (_, callsitePre, callsitePost) <- specAtCallsite call spec
+  Specification _ _ _ callsitePre callsitePost <- specAtCallsite call spec
   return $ And [callsitePre, Imp callsitePost post]
 
 existentialSpecPT :: Specification -> (SpecCall e) -> Assertion -> Ceili Assertion
 existentialSpecPT spec call post = do
-  (choiceVars, callsitePre, callsitePost) <- specAtCallsite call spec
+  Specification _ _ choiceVars callsitePre callsitePost <- specAtCallsite call spec
   let tnAssignees = map (\n -> TypedName n Int) (sc_assignees call)
       existsPost = Exists tnAssignees callsitePost
       forallPost = Forall tnAssignees $ Imp callsitePost post
@@ -337,18 +338,20 @@ existentialSpecPT spec call post = do
     0 -> And [callsitePre, existsPost, forallPost]
     _ -> Exists choiceVars $ And [callsitePre, existsPost, forallPost]
 
-specAtCallsite :: SpecCall e -> Specification -> Ceili ([TypedName], Assertion, Assertion)
+specAtCallsite :: SpecCall e -> Specification -> Ceili Specification
 specAtCallsite (SpecCall _ args assignees) (Specification params retVars choiceVars pre post) =
   if      length args /= length params       then throwError "Argument / parameter length mismatch"
   else if length assignees /= length retVars then throwError "Assignees / returns length mismatch"
   else do
     freshChoiceVars <- envFreshen choiceVars
-    let subCallsite = (instantiateParams params args) .
-                      (substituteAll retVars assignees) . -- TODO: This substitution is off.
+    freshAssignees  <- envFreshen assignees
+    let subCallsite = (substituteAll retVars assignees) .
+                      (substituteAll assignees freshAssignees) .
+                      (instantiateParams params args) .
                       (substituteAll (map tnName choiceVars) (map tnName freshChoiceVars))
     let callsitePre = subCallsite pre
     let callsitePost = subCallsite post
-    return (freshChoiceVars, callsitePre, callsitePost)
+    return $ Specification params retVars freshChoiceVars callsitePre callsitePost
 
 instantiateParams :: SubstitutableArith a => [Name] -> [AExp] -> a -> a
 instantiateParams params args a =
