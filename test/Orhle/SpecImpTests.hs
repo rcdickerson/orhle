@@ -37,28 +37,28 @@ x_v  = Var x_i
 env = defaultEnv [a, b, c, r, x, y, z]
 
 
-test_specAtCallsite = do
-  let call = SpecCall "dummy_cid" [AVar b] [a]
-  let spec = Specification [x] [r] [c_i] ATrue (Eq r_v $ Add [x_v, Num 1])
-  result <- runCeili env $ specAtCallsite call spec
-  case result of
-    Left err -> assertFailure err
-    Right (Specification params retVars choiceVars pre post) -> do
-      assertEqual [x] params
-      assertEqual [r] retVars
-      assertEqual [c1_i] choiceVars
-      assertEqual ATrue pre
-      assertEqual (Eq a_v $ Add [b_v, Num 1]) post
+-- test_specAtCallsite = do
+--   let call = SpecCall "dummy_cid" [AVar b] [a]
+--   let spec = Specification [x] [r] [c_i] ATrue (Eq r_v $ Add [x_v, Num 1])
+--   result <- runCeili env $ specAtCallsite call spec
+--   case result of
+--     Left err -> assertFailure err
+--     Right (Specification params retVars choiceVars pre post) -> do
+--       assertEqual [x] params
+--       assertEqual [r] retVars
+--       assertEqual [c1_i] choiceVars
+--       assertEqual ATrue pre
+--       assertEqual (Eq a_v $ Add [b_v, Num 1]) post
 
-test_specAtCallsite_assignToArg = do
-  let call = SpecCall "dummy_cid" [AVar a] [a]
-  let spec = Specification [x] [r] [c_i] ATrue (Eq r_v $ Add [x_v, Num 1])
-  result <- runCeili env $ specAtCallsite call spec
-  case result of
-    Left err -> assertFailure err
-    Right (Specification params retVars choiceVars pre post) -> do
-      assertEqual [x] params
-      assertEqual [r] retVars
-      assertEqual [c1_i] choiceVars
-      assertEqual ATrue pre
-      assertEqual (Eq a_v $ Add [a1_v, Num 1]) post
+-- test_specAtCallsite_assignToArg = do
+--   let call = SpecCall "dummy_cid" [AVar a] [a]
+--   let spec = Specification [x] [r] [c_i] ATrue (Eq r_v $ Add [x_v, Num 1])
+--   result <- runCeili env $ specAtCallsite call spec
+--   case result of
+--     Left err -> assertFailure err
+--     Right (Specification params retVars choiceVars pre post) -> do
+--       assertEqual [x] params
+--       assertEqual [r] retVars
+--       assertEqual [c1_i] choiceVars
+--       assertEqual ATrue pre
+--       assertEqual (Eq a_v $ Add [a1_v, Num 1]) post

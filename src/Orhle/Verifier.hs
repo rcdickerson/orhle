@@ -23,13 +23,13 @@ data Success  = Success { }
 
 rhleVerifier :: SpecImpEnv SpecImpProgram -> RhleTriple -> IO (Either Failure Success)
 rhleVerifier funEnv triple@(RhleTriple pre aprogs eprogs post) = do
-  let env = mkEnv LogLevelDebug
+  let env = mkEnv LogLevelInfo
                   (TripleWithEnv (funEnv, triple))
                   2000
   wpResult <- runCeili env $ do
---    log_i $ "Populating test states for loop invariant inference..."
-    aprogsWithTests <- return aprogs --mapM (withTestStates funEnv) aprogs
-    eprogsWithTests <- return eprogs --mapM (withTestStates funEnv) eprogs
+    log_i $ "Populating test states for loop invariant inference..."
+    aprogsWithTests <- mapM (withTestStates funEnv) aprogs
+    eprogsWithTests <- mapM (withTestStates funEnv) eprogs
     log_i $ "Running backward relational analysis..."
     relBackwardPT backwardWithFusion funEnv aprogsWithTests eprogsWithTests post
   case wpResult of

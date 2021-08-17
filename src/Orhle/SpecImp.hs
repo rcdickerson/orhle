@@ -46,7 +46,6 @@ module Orhle.SpecImp
   , impSkip
   , impWhile
   , impWhileWithMeta
-  , specAtCallsite
   , specCall
   ) where
 
@@ -218,19 +217,28 @@ instance EvalImp (SpecImpEvalContext e) e => EvalImp (SpecImpEvalContext e) (Spe
       _ -> throwError $ "No implementation or specification for " ++ cid
 
 evalSpec :: State -> Specification -> SpecCall e -> Ceili (Maybe State)
-evalSpec st spec call = do
-  Specification _ _ _ pre post <- specAtCallsite call spec
-  preIsValid <- checkValidWithLog LogLevelNone $ assertionAtState st pre
-  case preIsValid of
-    SMT.Invalid _    -> return Nothing
-    SMT.ValidUnknown -> return Nothing
-    SMT.Valid -> do
-      postSat <- checkSatWithLog LogLevelNone post
-      case postSat of
-        SMT.SatUnknown -> return Nothing
-        SMT.Unsat      -> return Nothing
-        SMT.Sat model  -> do
-          return $ Just $ Map.union (modelToState model) st
+evalSpec st
+         spec@(Specification params retVars choiceVars specPre specPost)
+         call@(SpecCall _ args assignees) =
+  do
+    checkArglists spec call
+    let callsitePre  = assertionAtState st
+                     $ instantiateParams params args specPre
+    let callsitePost = substituteAll retVars assignees
+                     $ assertionAtState st
+                     $ instantiateParams params args specPost
+    sat <- checkSatWithLog LogLevelNone
+         $ Exists choiceVars $ And [callsitePre, callsitePost]
+    case sat of
+      SMT.SatUnknown -> do
+        log_e "[SpecImpEval] Spec call query sat unknown"
+        return Nothing
+      SMT.Unsat -> do
+        log_e "[SpecImpEval] Spec call unsat"
+        return Nothing
+      SMT.Sat model -> do
+        let assigneeSt = Map.filterWithKey (\k -> \_ -> k `elem` assignees) (modelToState model)
+        return $ Just $ Map.union assigneeSt st
 
 -- TODO: This is janky.
 modelToState :: String -> State
@@ -366,21 +374,6 @@ checkArglists (Specification params retVars _ _ _) (SpecCall _ args assignees) =
   if      length args /= length params then throwError "Argument / parameter length mismatch"
   else if length assignees /= length retVars then throwError "Assignees / returns length mismatch"
   else return ()
-
-specAtCallsite :: SpecCall e -> Specification -> Ceili Specification
-specAtCallsite (SpecCall _ args assignees) (Specification params retVars choiceVars pre post) =
-  if      length args /= length params       then throwError "Argument / parameter length mismatch"
-  else if length assignees /= length retVars then throwError "Assignees / returns length mismatch"
-  else do
-    freshChoiceVars <- envFreshen choiceVars
-    freshAssignees  <- envFreshen assignees
-    let subCallsite = (substituteAll retVars assignees) .
-                      (substituteAll assignees freshAssignees) .
-                      (instantiateParams params args) .
-                      (substituteAll (map tnName choiceVars) (map tnName freshChoiceVars))
-    let callsitePre = subCallsite pre
-    let callsitePost = subCallsite post
-    return $ Specification params retVars freshChoiceVars callsitePre callsitePost
 
 instantiateParams :: SubstitutableArith a => [Name] -> [AExp] -> a -> a
 instantiateParams params args a =
