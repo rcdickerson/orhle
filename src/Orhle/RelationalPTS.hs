@@ -101,9 +101,14 @@ inferInvariant stepStrategy env aloops eloops aprogs' eprogs' post =
     -- TODO: Lockstep
     -- TODO: Variant
     extractTests = Set.unions . catMaybes . map tests
-    headStates = map (\(x, y) -> And [x, y]) $
-                 Set.toList $
-                 Set.cartesianProduct (extractTests aloops) (extractTests eloops)
+    atests = extractTests aloops
+    etests = extractTests eloops
+    headStates = case (Set.null atests, Set.null etests) of
+      (True,  True)  -> []
+      (False, True)  -> Set.toList atests
+      (True,  False) -> Set.toList etests
+      (False, False) -> map (\(x, y) -> And [x, y])
+                        $ Set.toList $ Set.cartesianProduct atests etests
   in case headStates of
     [] -> throwError "Insufficient test head states for while loop, did you run populateTestStates?"
     _  -> do
