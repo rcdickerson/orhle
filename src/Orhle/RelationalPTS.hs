@@ -9,6 +9,7 @@ import Ceili.Name
 import qualified Ceili.InvariantInference.Pie as Pie
 import Data.Maybe ( catMaybes )
 import Data.Set ( Set )
+import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Orhle.SpecImp
 import Orhle.StepStrategy
@@ -107,7 +108,7 @@ inferInvariant stepStrategy env aloops eloops aprogs' eprogs' post =
       (True,  True)  -> []
       (False, True)  -> Set.toList atests
       (True,  False) -> Set.toList etests
-      (False, False) -> map (\(x, y) -> And [x, y])
+      (False, False) -> map (\(x, y) -> Map.union x y)
                         $ Set.toList $ Set.cartesianProduct atests etests
   in case headStates of
     [] -> throwError "Insufficient test head states for while loop, did you run populateTestStates?"
@@ -125,7 +126,7 @@ body (ImpWhile _ b _) = b
 condA :: ImpWhile e -> Assertion
 condA (ImpWhile c _ _) = bexpToAssertion c
 
-tests :: ImpWhile e -> Maybe (Set Assertion)
+tests :: ImpWhile e -> Maybe (Set State)
 tests (ImpWhile _ _ meta) = iwm_testStates meta
 
 invar :: ImpWhile e -> Maybe Assertion

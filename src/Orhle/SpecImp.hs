@@ -54,6 +54,7 @@ import Ceili.CeiliEnv
 import Ceili.Language.AExp
 import Ceili.Language.Compose
 import Ceili.Language.FunImp
+import Ceili.Literal
 import Ceili.Name
 import qualified Ceili.SMT as SMT
 import Data.Map ( Map )
@@ -83,6 +84,9 @@ instance CollectableNames Specification where
                  , namesIn pre
                  , namesIn post ]
 
+instance CollectableTypedNames Specification where
+  typedNamesIn spec = Set.map (\n -> TypedName n Int) $ namesIn spec
+
 instance MappableNames Specification where
   mapNames f (Specification ps rets cs pre post) =
     Specification (mapNames f ps)
@@ -91,6 +95,8 @@ instance MappableNames Specification where
                   (mapNames f pre)
                   (mapNames f post)
 
+instance CollectableLiterals Specification where
+  litsIn (Specification _ _ _ pre post) = Set.union (litsIn pre) (litsIn post)
 
 -------------------------------
 -- Specification Environment --
@@ -105,6 +111,14 @@ instance CollectableNames FunSpecEnv where
   namesIn (FunSpecEnv aspecs especs) =
     Set.unions [ Set.unions $ map namesIn (Map.elems aspecs)
                , Set.unions $ map namesIn (Map.elems especs) ]
+
+instance CollectableTypedNames FunSpecEnv where
+  typedNamesIn spec = Set.map (\n -> TypedName n Int) $ namesIn spec
+
+instance CollectableLiterals FunSpecEnv where
+  litsIn (FunSpecEnv aspecs especs) =
+    Set.union (litsIn $ Map.elems aspecs)
+              (litsIn $ Map.elems especs)
 
 fse_qspecs :: FunSpecEnv -> SpecImpQuant -> SpecMap
 fse_qspecs env quant = case quant of
@@ -122,6 +136,14 @@ data SpecImpEnv e = SpecImpEnv { sie_impls :: FunImplEnv e
 
 instance CollectableNames e => CollectableNames (SpecImpEnv e) where
   namesIn (SpecImpEnv impls specs) = Set.union (namesIn impls) (namesIn specs)
+
+instance CollectableTypedNames e => CollectableTypedNames (SpecImpEnv e) where
+  typedNamesIn (SpecImpEnv impls specs) =
+    Set.union (typedNamesIn $ Map.elems impls) (typedNamesIn specs)
+
+instance CollectableLiterals e => CollectableLiterals (SpecImpEnv e) where
+  litsIn (SpecImpEnv impls specs) =
+    Set.union (litsIn $ Map.elems impls) (litsIn specs)
 
 sie_qspecs :: SpecImpEnv e -> SpecImpQuant -> SpecMap
 sie_qspecs = fse_qspecs . sie_specs
@@ -146,6 +168,11 @@ instance CollectableNames (SpecCall e) where
   namesIn (SpecCall _ args assignees) =
     Set.union (namesIn args) (namesIn assignees)
 
+instance CollectableTypedNames (SpecCall e) where
+  typedNamesIn (SpecCall _ args assignees) =
+    Set.union (typedNamesIn args)
+              (Set.fromList $ map (\n -> TypedName n Int) assignees)
+
 instance FreshableNames (SpecCall e) where
   freshen (SpecCall cid args assignees) = do
     args'      <- freshen args
@@ -155,6 +182,9 @@ instance FreshableNames (SpecCall e) where
 instance MappableNames (SpecCall e) where
   mapNames f (SpecCall cid args assignees) =
     SpecCall cid (map (mapNames f) args) (map f assignees)
+
+instance CollectableLiterals (SpecCall e) where
+  litsIn (SpecCall _ args _) = litsIn args
 
 
 ---------------------
@@ -171,11 +201,17 @@ type SpecImpProgram = ImpExpr ( SpecCall
 instance CollectableNames SpecImpProgram where
   namesIn (In f) = namesIn f
 
+instance CollectableTypedNames SpecImpProgram where
+  typedNamesIn (In f) = typedNamesIn f
+
 instance MappableNames SpecImpProgram where
   mapNames func (In f) = In $ mapNames func f
 
 instance FreshableNames SpecImpProgram where
   freshen (In f) = return . In =<< freshen f
+
+instance CollectableLiterals SpecImpProgram where
+  litsIn (In f) = litsIn f
 
 specCall :: (SpecCall :<: f) => CallId -> [AExp] -> [Name] -> ImpExpr f
 specCall cid args assignees = inject $ SpecCall cid args assignees
@@ -354,9 +390,9 @@ existentialSpecPT spec@(Specification params retVars choiceVars specPre specPost
     checkArglists spec call
     freshChoiceVars <- envFreshen choiceVars
     freshAssignees  <- envFreshen assignees
-    let callsitePre  = substituteAll (map tnName choiceVars) (map tnName freshChoiceVars)
+    let callsitePre  = substituteAll (map tn_name choiceVars) (map tn_name freshChoiceVars)
                      $ instantiateParams params args specPre
-    let callsitePost = substituteAll (map tnName choiceVars) (map tnName freshChoiceVars)
+    let callsitePost = substituteAll (map tn_name choiceVars) (map tn_name freshChoiceVars)
                      $ substituteAll retVars freshAssignees
                      $ instantiateParams params args specPost
     let sitePost = substituteAll assignees freshAssignees post

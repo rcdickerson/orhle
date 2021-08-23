@@ -5,6 +5,7 @@ module Orhle.Triple
   ) where
 
 import Ceili.Assertion
+import Ceili.Literal
 import Ceili.Name
 import qualified Data.Set as Set
 import Orhle.SpecImp
@@ -34,3 +35,17 @@ instance CollectableNames RhleTriple where
                , namesIn aprogs
                , namesIn eprogs
                , namesIn post]
+
+instance CollectableTypedNames RhleTriple where
+  typedNamesIn (RhleTriple pre aprogs eprogs post) =
+    Set.unions [ typedNamesIn pre
+               , typedNamesIn aprogs
+               , typedNamesIn eprogs
+               , typedNamesIn post]
+
+instance CollectableLiterals RhleTriple where
+  litsIn (RhleTriple pre aprogs eprogs post) =
+    Set.unions [ litsIn pre
+               , litsIn aprogs
+               , litsIn eprogs
+               , litsIn post]

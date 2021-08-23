@@ -8,6 +8,7 @@ module Orhle.Verifier
 
 import Ceili.Assertion
 import Ceili.CeiliEnv
+import Ceili.Literal
 import Ceili.Name
 import qualified Ceili.SMT as SMT
 import Control.Monad ( mapM )
@@ -23,13 +24,16 @@ data Success  = Success { }
 
 rhleVerifier :: SpecImpEnv SpecImpProgram -> RhleTriple -> IO (Either Failure Success)
 rhleVerifier funEnv triple@(RhleTriple pre aprogs eprogs post) = do
-  let env = mkEnv LogLevelInfo
-                  (TripleWithEnv (funEnv, triple))
+  let tripleWithEnv = TripleWithEnv (funEnv, triple)
+  let env = mkEnv LogLevelDebug
+                  (typedNamesIn tripleWithEnv)
+                  (litsIn tripleWithEnv)
                   2000
   wpResult <- runCeili env $ do
     log_i $ "Populating test states for loop invariant inference..."
     aprogsWithTests <- mapM (withTestStates funEnv) aprogs
     eprogsWithTests <- mapM (withTestStates funEnv) eprogs
+--    log_i $ "eprogsWithTests: " ++ show eprogsWithTests
     log_i $ "Running backward relational analysis..."
     relBackwardPT backwardWithFusion funEnv aprogsWithTests eprogsWithTests post
   case wpResult of
@@ -42,8 +46,10 @@ rhleVerifier funEnv triple@(RhleTriple pre aprogs eprogs post) = do
         SMT.ValidUnknown  -> Left  $ Failure "Solver returned unknown."
 
 newtype TripleWithEnv e = TripleWithEnv (SpecImpEnv e, RhleTriple)
-instance CollectableNames e => CollectableNames (TripleWithEnv e) where
-  namesIn (TripleWithEnv (funEnv, trip)) = Set.union (namesIn funEnv) (namesIn trip)
+instance CollectableTypedNames e => CollectableTypedNames (TripleWithEnv e) where
+  typedNamesIn (TripleWithEnv (funEnv, trip)) = Set.union (typedNamesIn funEnv) (typedNamesIn trip)
+instance CollectableLiterals e => CollectableLiterals (TripleWithEnv e) where
+  litsIn (TripleWithEnv (funEnv, trip)) = Set.union (litsIn funEnv) (litsIn trip)
 
 withTestStates :: SpecImpEnv SpecImpProgram -> SpecImpProgram -> Ceili SpecImpProgram
 withTestStates env prog = do
