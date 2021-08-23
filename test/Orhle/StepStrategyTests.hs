@@ -5,6 +5,8 @@ module Orhle.StepStrategyTests(htf_thisModulesTests) where
 import Test.Framework
 
 import Ceili.CeiliEnv
+import Ceili.Name
+import qualified Data.Set as Set
 import Orhle.SpecImp
 import Orhle.StepStrategy
 
@@ -20,8 +22,9 @@ loop1 = impWhile (BLt (AVar x) (ALit 10)) incX
 loop2 = impWhile (BLt (AVar y) (ALit 10)) incY
 loop3 = impWhile (BLt (AVar z) (ALit 10)) incZ
 
-env = defaultEnv [ incX, incY, incZ
-                 , loop1, loop2, loop3 ]
+env = defaultEnv
+      (typedNamesIn [ incX, incY, incZ, loop1, loop2, loop3 ])
+      (Set.fromList [1, 10])
 
 toLoop :: SpecImpProgram -> ImpWhile SpecImpProgram
 toLoop prog = case getLoop prog of

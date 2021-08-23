@@ -263,8 +263,10 @@ evalSpec st
     let callsitePost = substituteAll retVars assignees
                      $ assertionAtState st
                      $ instantiateParams params args specPost
-    sat <- checkSatWithLog LogLevelNone
-         $ Exists choiceVars $ And [callsitePre, callsitePost]
+    let query = case choiceVars of
+          [] -> And [callsitePre, callsitePost]
+          _  -> Exists choiceVars $ And [callsitePre, callsitePost]
+    sat <- checkSatWithLog LogLevelNone query
     case sat of
       SMT.SatUnknown -> do
         log_e "[SpecImpEval] Spec call query sat unknown"
@@ -291,6 +293,7 @@ modelToState modelStr = case parseAssertion modelStr of
       _ -> error $ "Unexpected arith in SAT model (expected name): " ++ show arith
     extractInt arith = case arith of
       Num n -> n
+      Sub [Num n] -> -n
       _ -> error $ "Unexpected arith in SAT model (expected int): " ++ show arith
 
 
@@ -298,6 +301,7 @@ modelToState modelStr = case parseAssertion modelStr of
 
 instance EvalImp (SpecImpEvalContext SpecImpProgram) SpecImpProgram where
   evalImp ctx st (In f) = evalImp ctx st f
+
 
 -----------------
 -- Test States --

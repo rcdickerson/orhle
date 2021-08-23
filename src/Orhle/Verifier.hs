@@ -25,7 +25,7 @@ data Success  = Success { }
 rhleVerifier :: SpecImpEnv SpecImpProgram -> RhleTriple -> IO (Either Failure Success)
 rhleVerifier funEnv triple@(RhleTriple pre aprogs eprogs post) = do
   let tripleWithEnv = TripleWithEnv (funEnv, triple)
-  let env = mkEnv LogLevelDebug
+  let env = mkEnv LogLevelInfo
                   (typedNamesIn tripleWithEnv)
                   (litsIn tripleWithEnv)
                   2000

@@ -7,6 +7,7 @@ import Test.Framework
 import Ceili.Assertion
 import Ceili.CeiliEnv
 import Ceili.Name
+import qualified Data.Set as Set
 import Orhle.SpecImp
 
 
@@ -27,6 +28,8 @@ c_i  = TypedName c  Int
 c1_i = TypedName c1 Int
 r_i  = TypedName r  Int
 x_i  = TypedName x  Int
+y_i  = TypedName y  Int
+z_i  = TypedName z  Int
 
 a_v  = Var a_i
 a1_v = Var a1_i
@@ -34,7 +37,7 @@ b_v  = Var b_i
 r_v  = Var r_i
 x_v  = Var x_i
 
-env = defaultEnv [a, b, c, r, x, y, z]
+env = defaultEnv (Set.fromList [a_i, b_i, c_i, r_i, x_i, y_i, z_i]) Set.empty
 
 
 -- test_specAtCallsite = do
