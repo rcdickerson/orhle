@@ -11,7 +11,6 @@ import Ceili.CeiliEnv
 import Ceili.Literal
 import Ceili.Name
 import qualified Ceili.SMT as SMT
-import Control.Monad ( mapM )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Orhle.RelationalPTS
@@ -33,7 +32,6 @@ rhleVerifier funEnv triple@(RhleTriple pre aprogs eprogs post) = do
     log_i $ "Populating test states for loop invariant inference..."
     aprogsWithTests <- mapM (withTestStates funEnv) aprogs
     eprogsWithTests <- mapM (withTestStates funEnv) eprogs
---    log_i $ "eprogsWithTests: " ++ show eprogsWithTests
     log_i $ "Running backward relational analysis..."
     relBackwardPT backwardWithFusion funEnv aprogsWithTests eprogsWithTests post
   case wpResult of

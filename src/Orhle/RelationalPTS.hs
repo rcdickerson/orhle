@@ -5,10 +5,10 @@ module Orhle.RelationalPTS
 import Ceili.Assertion
 import Ceili.CeiliEnv
 import Ceili.Language.BExp ( bexpToAssertion )
+import Ceili.Language.Imp ( IterStateMap )
 import Ceili.Name
 import qualified Ceili.InvariantInference.Pie as Pie
 import Data.Maybe ( catMaybes )
-import Data.Set ( Set )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Orhle.SpecImp
@@ -101,24 +101,24 @@ inferInvariant stepStrategy env aloops eloops aprogs' eprogs' post =
     conds = And $ map condA (aloops ++ eloops)
     -- TODO: Lockstep
     -- TODO: Variant
-    extractTests = Set.unions . catMaybes . map tests
+    extractTests = catMaybes . map tests
     atests = extractTests aloops
     etests = extractTests eloops
-    headStates = case (Set.null atests, Set.null etests) of
-      (True,  True)  -> []
-      (False, True)  -> Set.toList atests
-      (True,  False) -> Set.toList etests
-      (False, False) -> map (\(x, y) -> Map.union x y)
-                        $ Set.toList $ Set.cartesianProduct atests etests
-  in case headStates of
-    [] -> throwError "Insufficient test head states for while loop, did you run populateTestStates?"
-    _  -> do
-      result <- Pie.loopInvGen (relBackwardPT' stepStrategy) env conds bodies post headStates
+    headStates = combineIterStateMaps $ atests ++ etests
+  in case Map.null headStates of
+    True  -> throwError "Insufficient test head states for while loop, did you run populateTestStates?"
+    False -> do
+      let stateList = Set.toList . Set.unions . Map.elems $ headStates
+      result <- Pie.loopInvGen (relBackwardPT' stepStrategy) env conds bodies post stateList
       case result of
         Just inv -> relBackwardPT stepStrategy env aprogs' eprogs' inv
         Nothing -> do
           log_e "Unable to infer loop invariant, proceeding with False"
           return AFalse -- TODO: Fall back to single stepping over loops.
+
+combineIterStateMaps :: [IterStateMap] -> IterStateMap
+combineIterStateMaps = Map.unionsWith $ \left right ->
+  Set.map (uncurry Map.union) $ Set.cartesianProduct left right
 
 body :: ImpWhile e -> e
 body (ImpWhile _ b _) = b
@@ -126,7 +126,7 @@ body (ImpWhile _ b _) = b
 condA :: ImpWhile e -> Assertion
 condA (ImpWhile c _ _) = bexpToAssertion c
 
-tests :: ImpWhile e -> Maybe (Set State)
+tests :: ImpWhile e -> Maybe IterStateMap
 tests (ImpWhile _ _ meta) = iwm_testStates meta
 
 invar :: ImpWhile e -> Maybe Assertion
