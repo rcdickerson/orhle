@@ -60,6 +60,7 @@ import Ceili.Name
 import Ceili.ProgState
 import qualified Ceili.SMT as SMT
 import Ceili.SMTString
+import Ceili.StatePredicate
 import Data.Map ( Map )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -73,7 +74,7 @@ import Prettyprinter
 data Specification t = Specification
   { spec_params        :: [Name]
   , spec_returnVars    :: [Name]
-  , spec_choiceVars    :: [TypedName]
+  , spec_choiceVars    :: [Name]
   , spec_preCondition  :: Assertion t
   , spec_postCondition :: Assertion t
   } deriving Show
@@ -86,9 +87,6 @@ instance CollectableNames (Specification t) where
                  , Set.unions $ map namesIn cs
                  , namesIn pre
                  , namesIn post ]
-
-instance Integral t => CollectableTypedNames (Specification t) where
-  typedNamesIn spec = Set.map (\n -> TypedName n Int) $ namesIn spec
 
 instance MappableNames (Specification t) where
   mapNames f (Specification ps rets cs pre post) =
@@ -116,9 +114,6 @@ instance CollectableNames (FunSpecEnv t) where
     Set.unions [ Set.unions $ map namesIn (Map.elems aspecs)
                , Set.unions $ map namesIn (Map.elems especs) ]
 
-instance Integral t => CollectableTypedNames (FunSpecEnv t) where
-  typedNamesIn spec = Set.map (\n -> TypedName n Int) $ namesIn spec
-
 instance Ord t => CollectableLiterals (FunSpecEnv t) t where
   litsIn (FunSpecEnv aspecs especs) =
     Set.union (litsIn $ Map.elems aspecs)
@@ -140,10 +135,6 @@ data SpecImpEnv t e = SpecImpEnv { sie_impls :: FunImplEnv e
 
 instance CollectableNames e => CollectableNames (SpecImpEnv t e) where
   namesIn (SpecImpEnv impls specs) = Set.union (namesIn impls) (namesIn specs)
-
-instance (Integral t, CollectableTypedNames e) => CollectableTypedNames (SpecImpEnv t e) where
-  typedNamesIn (SpecImpEnv impls specs) =
-    Set.union (typedNamesIn $ Map.elems impls) (typedNamesIn specs)
 
 instance (Ord t, CollectableLiterals e t) => CollectableLiterals (SpecImpEnv t e) t where
   litsIn (SpecImpEnv impls specs) =
@@ -172,11 +163,6 @@ instance CollectableNames (SpecCall t e) where
   namesIn (SpecCall _ args assignees) =
     Set.union (namesIn args) (namesIn assignees)
 
-instance Integral t => CollectableTypedNames (SpecCall t e) where
-  typedNamesIn (SpecCall _ args assignees) =
-    Set.union (typedNamesIn args)
-              (Set.fromList $ map (\n -> TypedName n Int) assignees)
-
 instance FreshableNames (SpecCall t e) where
   freshen (SpecCall cid args assignees) = do
     args'      <- freshen args
@@ -204,9 +190,6 @@ type SpecImpProgram t = ImpExpr t ( SpecCall t
 
 instance CollectableNames (SpecImpProgram t) where
   namesIn (In f) = namesIn f
-
-instance Integral t => CollectableTypedNames (SpecImpProgram t) where
-  typedNamesIn (In f) = typedNamesIn f
 
 instance MappableNames (SpecImpProgram t) where
   mapNames func (In f) = In $ mapNames func f
@@ -243,8 +226,9 @@ instance FunImplLookup (SpecImpEvalContext t e) e where
       Nothing   -> throwError $ "No implementation for " ++ name
       Just impl -> return impl
 
-instance ( Integral t
+instance ( Num t
          , SMTString t
+         , SMTTypeString t
          , AssertionParseable t
          , Evaluable (SpecImpEvalContext t e) t (AExp t) t
          , Evaluable (SpecImpEvalContext t e) t e (ImpStep t)
@@ -261,8 +245,9 @@ instance ( Integral t
       (_, _, Just espec) -> evalSpec st espec call
       _ -> throwError $ "No implementation or specification for " ++ cid
 
-evalSpec :: ( Integral t
+evalSpec :: ( Num t
             , SMTString t
+            , SMTTypeString t
             , AssertionParseable t
             )
          => ProgState t
@@ -296,8 +281,9 @@ evalSpec st
 
 -- TODO: This is janky.
 modelToState :: ( Num t
-                , AssertionParseable t
                 , SMTString t
+                , SMTTypeString t
+                , AssertionParseable t
                 )
              => String
              -> ProgState t
@@ -310,7 +296,7 @@ modelToState modelStr = case parseAssertion modelStr of
       And as     -> Map.unions $ map extractState as
       _ -> error $ "Unexpected assertion in SAT model: " ++ show assertion
     extractName arith = case arith of
-      Var (TypedName name _) -> name
+      Var name -> name
       _ -> error $ "Unexpected arith in SAT model (expected name): " ++ show arith
     extractInt arith = case arith of
       Num n -> n
@@ -328,11 +314,10 @@ instance Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (SpecImpProgram t
 -- Test States --
 -----------------
 
-instance Evaluable (SpecImpEvalContext t e) t e t
-      => CollectLoopHeadStates (SpecImpEvalContext t e) (SpecCall t e) t where
+instance CollectLoopHeadStates (SpecImpEvalContext t e) (SpecCall t e) t where
   collectLoopHeadStates _ _ _ = return Map.empty
 
-instance CollectLoopHeadStates (SpecImpEvalContext t (SpecImpProgram t)) (SpecImpProgram t) t where
+instance Ord t => CollectLoopHeadStates (SpecImpEvalContext t (SpecImpProgram t)) (SpecImpProgram t) t where
   collectLoopHeadStates ctx sts (In f) = collectLoopHeadStates ctx sts f
 
 
@@ -340,11 +325,11 @@ instance CollectLoopHeadStates (SpecImpEvalContext t (SpecImpProgram t)) (SpecIm
 -- Pretty Printer --
 --------------------
 
-instance Pretty (SpecCall t e) where
+instance Pretty t => Pretty (SpecCall t e) where
   pretty (SpecCall callId args assignees) =
     prettyAssignees assignees <+> pretty ":=" <+> pretty callId <> prettyArgs args
 
-instance Pretty (SpecImpProgram t) where
+instance Pretty t => Pretty (SpecImpProgram t) where
   pretty (In p) = pretty p
 
 
@@ -372,23 +357,38 @@ instance GetLoop (ImpWhile t (SpecImpProgram t)) t where getLoop = Just
 -- Backward Predicate Transform --
 ----------------------------------
 
-instance FunImplLookup (SpecImpQuant, SpecImpEnv t e) e where
-  lookupFunImpl (_, env) = lookupFunImpl (sie_impls env)
+data FunImpPTSContext t e = FunImpPTSContext { fipc_quant :: SpecImpQuant
+                                             , fipc_specEnv :: SpecImpEnv t e
+                                             }
 
-instance ImpBackwardPT (SpecImpQuant, SpecImpEnv t (SpecImpProgram t)) (SpecImpProgram t) t where
+instance FunImplLookup (FunImpPTSContext t e) (FunImpProgram t) where
+  lookupFunImpl ctx = error "" -- lookupFunImpl (sie_impls . fipc_specEnv $ ctx)
+
+instance ImpPieContextProvider (FunImpPTSContext t e) t where
+  impPieCtx ctx = error ""
+
+instance ( Num t
+         , Ord t
+         , SMTString t
+         , SMTTypeString t
+         , AssertionParseable t
+         , StatePredicate (Assertion t) t
+         ) => ImpBackwardPT (FunImpPTSContext t e) (SpecImpProgram t) t where
   impBackwardPT ctx (In f) post = impBackwardPT ctx f post
 
-instance ( ImpBackwardPT (SpecImpQuant, SpecImpEnv t e) e t
+instance ( ImpBackwardPT (FunImpPTSContext t e) e t
          , FreshableNames e )
-         => ImpBackwardPT (SpecImpQuant, SpecImpEnv t e) (SpecCall t e) t where
-  impBackwardPT (quant, env) call post =
-    let cid = sc_callId call
-    in case (Map.lookup cid $ sie_impls env,
-             Map.lookup cid $ sie_qspecs env quant) of
+         => ImpBackwardPT (FunImpPTSContext t e) (SpecCall t e) t where
+  impBackwardPT ctx call post =
+    let cid     = sc_callId call
+        quant   = fipc_quant ctx
+        specEnv = fipc_specEnv ctx
+    in case ( Map.lookup cid $ sie_impls specEnv
+            , Map.lookup cid $ sie_qspecs specEnv quant) of
       (Nothing, Nothing) ->
         throwError $ "No implementation or specification for " ++ cid
       (Just _, _) ->
-        impBackwardPT (quant, env) (toImpCall call) post
+        impBackwardPT ctx (toImpCall call) post
       (_, Just spec) ->
         case quant of
           SIQ_Universal   -> universalSpecPT spec call post
@@ -406,7 +406,7 @@ universalSpecPT spec@(Specification params retVars _ specPre specPost)
                      $ instantiateParams params args specPost
     let sitePost = substituteAll assignees freshAssignees post
     return $ And [ callsitePre
-                 , Forall (intNames freshAssignees) $ Imp callsitePost sitePost
+                 , Forall freshAssignees $ Imp callsitePost sitePost
                  ]
 
 existentialSpecPT :: Specification t -> (SpecCall t e) -> Assertion t -> Ceili (Assertion t)
@@ -417,15 +417,15 @@ existentialSpecPT spec@(Specification params retVars choiceVars specPre specPost
     checkArglists spec call
     freshChoiceVars <- envFreshen choiceVars
     freshAssignees  <- envFreshen assignees
-    let callsitePre  = substituteAll (map tn_name choiceVars) (map tn_name freshChoiceVars)
+    let callsitePre  = substituteAll choiceVars freshChoiceVars
                      $ instantiateParams params args specPre
-    let callsitePost = substituteAll (map tn_name choiceVars) (map tn_name freshChoiceVars)
+    let callsitePost = substituteAll choiceVars freshChoiceVars
                      $ substituteAll retVars freshAssignees
                      $ instantiateParams params args specPost
     let sitePost = substituteAll assignees freshAssignees post
     let wp = And [ callsitePre
-                 , Exists (intNames freshAssignees) callsitePost
-                 , Forall (intNames freshAssignees) $ Imp callsitePost sitePost
+                 , Exists (freshAssignees) callsitePost
+                 , Forall (freshAssignees) $ Imp callsitePost sitePost
                  ]
     return $ case choiceVars of
       [] -> wp
@@ -441,9 +441,5 @@ checkArglists (Specification params retVars _ _ _) (SpecCall _ args assignees) =
 instantiateParams :: SubstitutableArith t a => [Name] -> [AExp t] -> a -> a
 instantiateParams params args a =
   let
-    fromNames = intNames params
     toAriths  = map aexpToArith args
-  in foldr (uncurry subArith) a (zip fromNames toAriths)
-
-intNames :: [Name] -> [TypedName]
-intNames = map (\n -> TypedName n Int)
+  in foldr (uncurry subArith) a (zip params toAriths)
