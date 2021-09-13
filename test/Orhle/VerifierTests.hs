@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -F -pgmF htfpp #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Orhle.VerifierTests(htf_thisModulesTests) where
 
@@ -16,7 +17,7 @@ assertVerifierResultMatches expected result =
     (ExpectFailure, Right _) -> assertFailure
       $ "Expected INVALID but was VALID"
 
-parseAndTest progStr = case parseOrhle progStr of
+parseAndTest progStr = case parseOrhle @Integer progStr of
   Left  err -> assertFailure $ "Parse error: " ++ (show err)
   Right (OrhleParseResult _ impls specs triple expected) -> do
     result <- verify (SpecImpEnv impls specs) triple

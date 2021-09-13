@@ -1,4 +1,7 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Orhle.Verifier
   ( Failure(..)
@@ -8,32 +11,45 @@ module Orhle.Verifier
 
 import Ceili.Assertion
 import Ceili.CeiliEnv
+import Ceili.Evaluation
 import Ceili.Literal
 import Ceili.Name
 import qualified Ceili.SMT as SMT
+import Ceili.SMTString
+import Ceili.StatePredicate
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Orhle.RelationalPTS
 import Orhle.SpecImp
 import Orhle.StepStrategy
 import Orhle.Triple
+import Prettyprinter
 
 data Failure  = Failure { failMessage :: String } deriving Show
 data Success  = Success { }
 
-rhleVerifier :: SpecImpEnv SpecImpProgram -> RhleTriple -> IO (Either Failure Success)
-rhleVerifier funEnv triple@(RhleTriple pre aprogs eprogs post) = do
-  let tripleWithEnv = TripleWithEnv (funEnv, triple)
-  let env = mkEnv LogLevelInfo
-                  (typedNamesIn tripleWithEnv)
-                  (litsIn tripleWithEnv)
-                  2000
+rhleVerifier :: ( Num t
+                , Ord t
+                , SMTString t
+                , SMTTypeString t
+                , AssertionParseable t
+                , Pretty t
+                , Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (AExp t) t
+                , Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (BExp t) Bool
+                , StatePredicate (Assertion t) t
+                ) => SpecImpEnv t (SpecImpProgram t) -> RhleTriple t -> IO (Either Failure Success)
+rhleVerifier funEnv (RhleTriple pre aprogs eprogs post) = do
+  let names = Set.union (namesIn aprogs) (namesIn eprogs)
+  let lits  = Set.union (litsIn  aprogs) (litsIn  eprogs)
+  let env = mkEnv LogLevelInfo 2000 names
   wpResult <- runCeili env $ do
-    log_i $ "Populating test states for loop invariant inference..."
-    aprogsWithTests <- mapM (withTestStates funEnv) aprogs
-    eprogsWithTests <- mapM (withTestStates funEnv) eprogs
+    log_i $ "Collecting loop head states for loop invariant inference..."
+    aLoopHeads <- mapM (headStates funEnv) aprogs
+    eLoopHeads <- mapM (headStates funEnv) eprogs
+    let loopHeads = Map.unions $ aLoopHeads ++ eLoopHeads
     log_i $ "Running backward relational analysis..."
-    relBackwardPT backwardWithFusion funEnv aprogsWithTests eprogsWithTests post
+    let ptsContext = RelSpecImpPTSContext funEnv loopHeads names lits
+    relBackwardPT backwardWithFusion ptsContext aprogs eprogs post
   case wpResult of
     Left msg  -> return $ Left $ Failure msg
     Right wp -> do
@@ -43,17 +59,18 @@ rhleVerifier funEnv triple@(RhleTriple pre aprogs eprogs post) = do
         SMT.Invalid model -> Left  $ Failure $ "Verification conditions are invalid. Model: " ++ model
         SMT.ValidUnknown  -> Left  $ Failure "Solver returned unknown."
 
-newtype TripleWithEnv e = TripleWithEnv (SpecImpEnv e, RhleTriple)
-instance CollectableTypedNames e => CollectableTypedNames (TripleWithEnv e) where
-  typedNamesIn (TripleWithEnv (funEnv, trip)) = Set.union (typedNamesIn funEnv) (typedNamesIn trip)
-instance CollectableLiterals e => CollectableLiterals (TripleWithEnv e) where
-  litsIn (TripleWithEnv (funEnv, trip)) = Set.union (litsIn funEnv) (litsIn trip)
-
-withTestStates :: SpecImpEnv SpecImpProgram -> SpecImpProgram -> Ceili SpecImpProgram
-withTestStates env prog = do
+headStates :: ( Num t
+              , Ord t
+              , SMTString t
+              , SMTTypeString t
+              , AssertionParseable t
+              , Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (AExp t) t
+              , Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (BExp t) Bool
+              ) => SpecImpEnv t (SpecImpProgram t) -> SpecImpProgram t -> Ceili (LoopHeadStates t)
+headStates env prog = do
   let ctx = SpecImpEvalContext (Fuel 100) env
   let names = Set.toList $ namesIn prog
   let sts = [ Map.fromList $ map (\n -> (n, -1)) names
             , Map.fromList $ map (\n -> (n, 0))  names
             , Map.fromList $ map (\n -> (n, 1))  names ]
-  populateTestStates ctx sts prog
+  collectLoopHeadStates ctx sts prog

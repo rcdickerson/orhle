@@ -1,6 +1,13 @@
+{-# LANGUAGE TypeApplications #-}
+
 module Main where
 
-import Orhle ( OrhleParseResult(..), RhleTriple(..), FunSpecEnv(..) )
+import Orhle ( FunSpecEnv(..)
+             , OrhleParseResult(..)
+             , RhleTriple(..)
+             , SMTString(..)
+             , SMTTypeString(..)
+             )
 import qualified Orhle
 import System.Environment
 import System.Exit
@@ -31,7 +38,7 @@ run orhle = do
   putStrLn "****     The Oracular RHLE Verifier    ****"
   putStrLn "*******************************************"
   putStrLn ""
-  case Orhle.parseOrhle orhle of
+  case Orhle.parseOrhle @Integer orhle of
     Left err -> do
       putStrLn $ "Parse error: " ++ err
       return False
@@ -47,7 +54,10 @@ run orhle = do
           printSuccess success
           return $ (opr_expected parseResult) == Orhle.ExpectSuccess
 
-printParseResult :: OrhleParseResult -> IO ()
+printParseResult :: ( SMTString t
+                    , SMTTypeString t
+                    , Pretty t )
+                 => OrhleParseResult t -> IO ()
 printParseResult result = do
   let (RhleTriple pre aprogs eprogs post) = opr_triple result
   let (FunSpecEnv aspecs especs) = opr_specs result

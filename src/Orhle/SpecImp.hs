@@ -1,18 +1,21 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Orhle.SpecImp
   ( AExp(..)
   , BExp(..)
   , CallId
-  , EvalImp(..)
+  , CollectLoopHeadStates(..)
   , Fuel(..)
   , FuelTank(..)
-  , FunEvalContext(..)
   , FunImpl(..)
   , FunImplEnv
   , FunImplLookup(..)
@@ -29,16 +32,17 @@ module Orhle.SpecImp
   , ImpSeq(..)
   , ImpWhile(..)
   , ImpWhileMetadata(..)
+  , LoopHeadStates
   , Name(..)
-  , PopulateTestStates(..)
   , SpecCall(..)
   , SpecImpEnv(..)
   , SpecImpEvalContext(..)
   , SpecImpProgram
+  , SpecImpPTSContext(..)
   , SpecImpQuant(..)
+  , SpecImpQuantProvider(..)
   , Specification(..)
   , SpecMap
-  , State
   , impAsgn
   , impCall
   , impIf
@@ -63,6 +67,7 @@ import Ceili.SMTString
 import Ceili.StatePredicate
 import Data.Map ( Map )
 import qualified Data.Map as Map
+import Data.Set ( Set )
 import qualified Data.Set as Set
 import Prettyprinter
 
@@ -306,7 +311,13 @@ modelToState modelStr = case parseAssertion modelStr of
 
 -- TODO: Evaluating a function call should cost fuel to prevent infinite recursion.
 
-instance Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (SpecImpProgram t) t where
+instance ( Num t
+         , SMTString t
+         , SMTTypeString t
+         , AssertionParseable t
+         , Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (AExp t) t
+         , Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (BExp t) Bool
+         ) => Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (SpecImpProgram t) (ImpStep t) where
   eval ctx st (In f) = eval ctx st f
 
 
@@ -317,7 +328,14 @@ instance Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (SpecImpProgram t
 instance CollectLoopHeadStates (SpecImpEvalContext t e) (SpecCall t e) t where
   collectLoopHeadStates _ _ _ = return Map.empty
 
-instance Ord t => CollectLoopHeadStates (SpecImpEvalContext t (SpecImpProgram t)) (SpecImpProgram t) t where
+instance ( Num t
+         , Ord t
+         , SMTString t
+         , SMTTypeString t
+         , AssertionParseable t
+         , Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (AExp t) t
+         , Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (BExp t) Bool
+         ) => CollectLoopHeadStates (SpecImpEvalContext t (SpecImpProgram t)) (SpecImpProgram t) t where
   collectLoopHeadStates ctx sts (In f) = collectLoopHeadStates ctx sts f
 
 
@@ -337,52 +355,76 @@ instance Pretty t => Pretty (SpecImpProgram t) where
 -- Utilities --
 ---------------
 
-class GetLoop e t where
+class GetLoop t e where
   getLoop :: e -> Maybe (ImpWhile t (SpecImpProgram t))
-instance (GetLoop (f e) t, GetLoop (g e) t) => GetLoop ((f :+: g) e) t where
+instance (GetLoop t (f e), GetLoop t (g e)) => GetLoop t ((f :+: g) e) where
   getLoop (Inl f) = getLoop f
   getLoop (Inr g) = getLoop g
-instance GetLoop (SpecImpProgram t) t where
+instance GetLoop t (SpecImpProgram t) where
   getLoop (In p) = getLoop p
-instance GetLoop (ImpSkip t e) t  where getLoop _ = Nothing
-instance GetLoop (ImpAsgn t e) t  where getLoop _ = Nothing
-instance GetLoop (ImpSeq t e) t   where getLoop _ = Nothing
-instance GetLoop (ImpIf t e) t    where getLoop _ = Nothing
-instance GetLoop (ImpCall t e) t  where getLoop _ = Nothing
-instance GetLoop (SpecCall t e) t where getLoop _ = Nothing
-instance GetLoop (ImpWhile t (SpecImpProgram t)) t where getLoop = Just
+instance GetLoop t (ImpSkip t e)  where getLoop _ = Nothing
+instance GetLoop t (ImpAsgn t e)  where getLoop _ = Nothing
+instance GetLoop t (ImpSeq t e)   where getLoop _ = Nothing
+instance GetLoop t (ImpIf t e)    where getLoop _ = Nothing
+instance GetLoop t (ImpCall t e)  where getLoop _ = Nothing
+instance GetLoop t (SpecCall t e) where getLoop _ = Nothing
+instance GetLoop t (ImpWhile t (SpecImpProgram t)) where getLoop = Just
 
 
 ----------------------------------
 -- Backward Predicate Transform --
 ----------------------------------
 
-data FunImpPTSContext t e = FunImpPTSContext { fipc_quant :: SpecImpQuant
-                                             , fipc_specEnv :: SpecImpEnv t e
-                                             }
+data SpecImpPTSContext t e = SpecImpPTSContext { fipc_quant          :: SpecImpQuant
+                                               , fipc_specEnv        :: SpecImpEnv t e
+                                               , fipc_loopHeadStates :: LoopHeadStates t
+                                               , fipc_programNames   :: Set Name
+                                               , fipc_programLits    :: Set t
+                                               }
 
-instance FunImplLookup (FunImpPTSContext t e) (FunImpProgram t) where
-  lookupFunImpl ctx = error "" -- lookupFunImpl (sie_impls . fipc_specEnv $ ctx)
+instance FunImplLookup (SpecImpPTSContext t (SpecImpProgram t)) (SpecImpProgram t) where
+  lookupFunImpl ctx = lookupFunImpl (sie_impls . fipc_specEnv $ ctx)
 
-instance ImpPieContextProvider (FunImpPTSContext t e) t where
-  impPieCtx ctx = error ""
+instance ImpPieContextProvider (SpecImpPTSContext t (SpecImpProgram t)) t where
+  impPieCtx ctx = ImpPieContext
+    { pc_loopHeadStates = fipc_loopHeadStates ctx
+    , pc_programNames   = fipc_programNames ctx
+    , pc_programLits    = fipc_programLits ctx
+    }
+
+class SpecImpEnvProvider a t e where
+  getSpecImpEnv :: a -> SpecImpEnv t e
+instance SpecImpEnvProvider (SpecImpPTSContext t e) t e where
+  getSpecImpEnv = fipc_specEnv
+
+class SpecImpQuantProvider a where
+  getSpecImpQuant :: a -> SpecImpQuant
+instance SpecImpQuantProvider (SpecImpPTSContext t e) where
+  getSpecImpQuant = fipc_quant
 
 instance ( Num t
          , Ord t
          , SMTString t
          , SMTTypeString t
          , AssertionParseable t
+         , SpecImpQuantProvider c
+         , SpecImpEnvProvider c t (SpecImpProgram t)
+         , FunImplLookup c (SpecImpProgram t)
          , StatePredicate (Assertion t) t
-         ) => ImpBackwardPT (FunImpPTSContext t e) (SpecImpProgram t) t where
+         , ImpPieContextProvider c t
+         ) => ImpBackwardPT c (SpecImpProgram t) t where
   impBackwardPT ctx (In f) post = impBackwardPT ctx f post
 
-instance ( ImpBackwardPT (FunImpPTSContext t e) e t
+instance ( ImpBackwardPT c e t
+         , SpecImpQuantProvider c
+         , SpecImpEnvProvider c t e
+         , FunImplLookup c e
          , FreshableNames e )
-         => ImpBackwardPT (FunImpPTSContext t e) (SpecCall t e) t where
+         => ImpBackwardPT c (SpecCall t e) t where
   impBackwardPT ctx call post =
     let cid     = sc_callId call
-        quant   = fipc_quant ctx
-        specEnv = fipc_specEnv ctx
+        quant   = getSpecImpQuant ctx
+        specEnv = getSpecImpEnv @c @t @e ctx
     in case ( Map.lookup cid $ sie_impls specEnv
             , Map.lookup cid $ sie_qspecs specEnv quant) of
       (Nothing, Nothing) ->

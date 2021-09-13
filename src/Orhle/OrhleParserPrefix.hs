@@ -29,29 +29,27 @@ instance (ExecIdPrefixer v) => ExecIdPrefixer (Map String v) where
 
 instance ExecIdPrefixer Name where
   prefixExecId eid name = Name.prefix eid name
-instance ExecIdPrefixer Name.TypedName where
-  prefixExecId eid tname = Name.prefix eid tname
-instance ExecIdPrefixer AExp where
+instance ExecIdPrefixer (AExp t) where
   prefixExecId eid aexp = Name.prefix eid aexp
-instance ExecIdPrefixer BExp where
+instance ExecIdPrefixer (BExp t) where
   prefixExecId eid bexp = Name.prefix eid bexp
-instance ExecIdPrefixer Assertion where
+instance ExecIdPrefixer (Assertion t) where
   prefixExecId eid assertion = Name.prefix eid assertion
 
 
-instance ExecIdPrefixer (ImpSkip e) where
+instance ExecIdPrefixer (ImpSkip t e) where
   prefixExecId _ = id
-instance ExecIdPrefixer e => ExecIdPrefixer (ImpAsgn e) where
+instance ExecIdPrefixer e => ExecIdPrefixer (ImpAsgn t e) where
   prefixExecId eid (ImpAsgn lhs rhs) = ImpAsgn (prefixExecId eid lhs) (prefixExecId eid rhs)
-instance ExecIdPrefixer e => ExecIdPrefixer (ImpSeq e) where
+instance ExecIdPrefixer e => ExecIdPrefixer (ImpSeq t e) where
   prefixExecId eid (ImpSeq stmts) = ImpSeq $ map (prefixExecId eid) stmts
-instance ExecIdPrefixer e => ExecIdPrefixer (ImpIf e) where
+instance ExecIdPrefixer e => ExecIdPrefixer (ImpIf t e) where
   prefixExecId eid (ImpIf c t e) = ImpIf (prefixExecId eid c) (prefixExecId eid t) (prefixExecId eid e)
-instance ExecIdPrefixer e => ExecIdPrefixer (ImpWhile e) where
+instance ExecIdPrefixer e => ExecIdPrefixer (ImpWhile t e) where
   prefixExecId eid (ImpWhile cond body meta) =
     -- While-loop metadata annotations are already addressed by their execution ID.
     ImpWhile (prefixExecId eid cond) (prefixExecId eid body) meta
-instance ExecIdPrefixer (SpecCall e) where
+instance ExecIdPrefixer (SpecCall t e) where
   prefixExecId eid (SpecCall cid params asgns) =
     SpecCall (eid ++ cid) (prefixExecId eid params) (prefixExecId eid asgns)
 
@@ -59,7 +57,7 @@ instance ExecIdPrefixer e => ExecIdPrefixer (FunImpl e) where
   prefixExecId eid (FunImpl params body returns) = FunImpl (prefixExecId eid params)
                                                            (prefixExecId eid body)
                                                            (prefixExecId eid returns)
-instance ExecIdPrefixer Specification where
+instance ExecIdPrefixer (Specification t) where
   prefixExecId eid (Specification params rets cvars pre post) =
     Specification (prefixExecId eid params)
                   (prefixExecId eid rets)
@@ -70,5 +68,5 @@ instance ExecIdPrefixer Specification where
 instance (ExecIdPrefixer (f e), ExecIdPrefixer (g e)) => ExecIdPrefixer ((f :+: g) e) where
   prefixExecId eid (Inl f) = Inl $ prefixExecId eid f
   prefixExecId eid (Inr g) = Inr $ prefixExecId eid g
-instance ExecIdPrefixer SpecImpProgram where
+instance ExecIdPrefixer (SpecImpProgram t) where
   prefixExecId eid (In f) = In $ prefixExecId eid f
