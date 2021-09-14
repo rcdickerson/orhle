@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
@@ -12,10 +13,10 @@ module Orhle.OrhleParser
 
 import Ceili.Assertion ( Assertion(..) )
 import qualified Ceili.Assertion as A
+import Ceili.Language.AExpParser ( AExpParseable )
 import Ceili.Language.Compose ( (:+:)(..) )
 import Ceili.Language.FunImp
 import Ceili.Language.FunImpParser
-import Ceili.Name ( Name(..), TypedName(..) )
 import qualified Ceili.Name as Name
 import Control.Monad ( liftM )
 import qualified Data.Map as Map
@@ -65,17 +66,23 @@ whiteSpace = Token.whiteSpace lexer
 
 type OrhleAppParser a = Parsec String Int a
 
-data OrhleParseResult = OrhleParseResult { opr_execs    :: [Exec]
-                                         , opr_impls    :: FunImplEnv SpecImpProgram
-                                         , opr_specs    :: FunSpecEnv
-                                         , opr_triple   :: RhleTriple
-                                         , opr_expected :: ExpectedResult
-                                         }
+data OrhleParseResult t = OrhleParseResult { opr_execs    :: [Exec]
+                                           , opr_impls    :: FunImplEnv (SpecImpProgram t)
+                                           , opr_specs    :: FunSpecEnv t
+                                           , opr_triple   :: RhleTriple t
+                                           , opr_expected :: ExpectedResult
+                                           }
 
-parseOrhle :: String -> Either ParseError OrhleParseResult
+parseOrhle :: ( Num t
+              , AExpParseable t
+              , A.AssertionParseable t
+              ) => String -> Either ParseError (OrhleParseResult t)
 parseOrhle str = runParser orhleParser 0 "" str
 
-orhleParser :: OrhleAppParser OrhleParseResult
+orhleParser :: ( Num t
+               , AExpParseable t
+               , A.AssertionParseable t
+               ) => OrhleAppParser (OrhleParseResult t)
 orhleParser = do
   whiteSpace
   expectedResult <- option ExpectSuccess $
@@ -119,30 +126,30 @@ orhleParser = do
                             , opr_expected = expectedResult
                             }
 
-class ToSpecImp a where
-  toSpecImp :: a -> SpecImpProgram
-instance ToSpecImp (ImpSkip e) where
+class ToSpecImp t a where
+  toSpecImp :: a -> SpecImpProgram t
+instance ToSpecImp t (ImpSkip t e) where
   toSpecImp _ = impSkip
-instance ToSpecImp (ImpAsgn e) where
+instance ToSpecImp t (ImpAsgn t e) where
   toSpecImp (ImpAsgn lhs rhs) = impAsgn lhs rhs
-instance ToSpecImp e => ToSpecImp (ImpSeq e) where
+instance ToSpecImp t e => ToSpecImp t (ImpSeq t e) where
   toSpecImp (ImpSeq stmts) = impSeq $ map toSpecImp stmts
-instance ToSpecImp e => ToSpecImp (ImpIf e) where
+instance ToSpecImp t e => ToSpecImp t (ImpIf t e) where
   toSpecImp (ImpIf c t e) = impIf c (toSpecImp t) (toSpecImp e)
-instance ToSpecImp e => ToSpecImp (ImpWhile e) where
+instance ToSpecImp t e => ToSpecImp t (ImpWhile t e) where
   toSpecImp (ImpWhile c body meta) = impWhileWithMeta c (toSpecImp body) meta
-instance ToSpecImp e => ToSpecImp (ImpCall e) where
+instance ToSpecImp t e => ToSpecImp t (ImpCall t e) where
   toSpecImp (ImpCall cid args assignees) = specCall cid args assignees
-instance (ToSpecImp (f e), ToSpecImp (g e)) => ToSpecImp ((f :+: g) e) where
+instance (ToSpecImp t (f e), ToSpecImp t (g e)) => ToSpecImp t ((f :+: g) e) where
   toSpecImp (Inl f) = toSpecImp f
   toSpecImp (Inr g) = toSpecImp g
-instance ToSpecImp FunImpProgram where
+instance ToSpecImp t (FunImpProgram t) where
   toSpecImp (In p) = toSpecImp p
 
-funImplToSpecImp :: FunImpl FunImpProgram -> FunImpl SpecImpProgram
+funImplToSpecImp :: FunImpl (FunImpProgram t) -> FunImpl (SpecImpProgram t)
 funImplToSpecImp (FunImpl params body returns) = FunImpl params (toSpecImp body) returns
 
-lookupExecBody :: FunImplEnv SpecImpProgram -> Exec -> OrhleAppParser SpecImpProgram
+lookupExecBody :: FunImplEnv (SpecImpProgram t) -> Exec -> OrhleAppParser (SpecImpProgram t)
 lookupExecBody funs exec =
   let
     name = (execPrefix exec) ++ (getExecName exec)
@@ -194,7 +201,7 @@ execId = do
   whiteSpace >> char ']' >> whiteSpace
   return eid
 
-specification :: OrhleAppParser SpecMap
+specification :: A.AssertionParseable t => OrhleAppParser (SpecMap t)
 specification = do
   callId <- identifier
   params <- (liftM concat) . parens $ sepBy varArray comma
@@ -203,14 +210,14 @@ specification = do
     reserved "choiceVars" >> whiteSpace >> char ':' >> whiteSpace
     vars <- sepBy name comma
     whiteSpace >> char ';' >> whiteSpace
-    return $ map (\n -> TypedName n Name.Int) vars
+    return vars
   pre  <- option A.ATrue $ labeledAssertion "pre"
   post <- option A.ATrue $ labeledAssertion "post"
   whiteSpace >> char '}' >> whiteSpace
   let spec = Specification params (getReturnVars post) choiceVars pre post
   return $ Map.fromList[ (callId, spec) ]
 
-getReturnVars :: Assertion -> [Name]
+getReturnVars :: Assertion t -> [Name]
 getReturnVars assertion =
   let
     isRetName (Name n _) = n == "ret" || n == "ret!"
@@ -220,7 +227,7 @@ getReturnVars assertion =
 name :: OrhleAppParser Name
 name = identifier >>= (return . Name.fromString)
 
-labeledAssertion :: String -> OrhleAppParser Assertion
+labeledAssertion :: A.AssertionParseable t => String -> OrhleAppParser (Assertion t)
 labeledAssertion label = do
   reserved label >> whiteSpace >> char ':' >> whiteSpace
   str <- untilSemi

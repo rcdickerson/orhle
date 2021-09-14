@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -F -pgmF htfpp #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Orhle.StepStrategyTests(htf_thisModulesTests) where
 
@@ -23,10 +24,9 @@ loop2 = impWhile (BLt (AVar y) (ALit 10)) incY
 loop3 = impWhile (BLt (AVar z) (ALit 10)) incZ
 
 env = defaultEnv
-      (typedNamesIn [ incX, incY, incZ, loop1, loop2, loop3 ])
-      (Set.fromList [1, 10])
+      (namesIn [ incX, incY, incZ, loop1, loop2, loop3 ])
 
-toLoop :: SpecImpProgram -> ImpWhile SpecImpProgram
+toLoop :: SpecImpProgram Integer -> ImpWhile Integer (SpecImpProgram Integer)
 toLoop prog = case getLoop prog of
   Nothing -> error $ "Not a loop: " ++ show prog
   Just loop -> loop
@@ -47,7 +47,7 @@ test_backwardWithFusion_emptySeqTreatedAsSkip =
       Right step -> assertEqual expected step
 
 test_backwardWithFusion_noProgramsReturnsNoSelectionFound =
-  let expected = Step NoSelectionFound [] []
+  let expected = Step @Integer NoSelectionFound [] []
   in do
     result <- runCeili env $ backwardWithFusion [] []
     case result of

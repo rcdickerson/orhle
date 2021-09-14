@@ -21,23 +21,13 @@ x  = Name "x" 0
 y  = Name "y" 0
 z  = Name "z" 0
 
-a_i  = TypedName a  Int
-a1_i = TypedName a1 Int
-b_i  = TypedName b  Int
-c_i  = TypedName c  Int
-c1_i = TypedName c1 Int
-r_i  = TypedName r  Int
-x_i  = TypedName x  Int
-y_i  = TypedName y  Int
-z_i  = TypedName z  Int
+a_v  = Var a
+a1_v = Var a1
+b_v  = Var b
+r_v  = Var r
+x_v  = Var x
 
-a_v  = Var a_i
-a1_v = Var a1_i
-b_v  = Var b_i
-r_v  = Var r_i
-x_v  = Var x_i
-
-env = defaultEnv (Set.fromList [a_i, b_i, c_i, r_i, x_i, y_i, z_i]) Set.empty
+env = defaultEnv $ Set.fromList [a, b, c, r, x, y, z]
 
 
 -- test_specAtCallsite = do

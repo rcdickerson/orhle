@@ -31,6 +31,7 @@ dependencies:
 - text
 - transformers
 - unbounded-delays
+- uuid
 
 library:
   source-dirs:
@@ -41,6 +42,7 @@ library:
     - Orhle.RelationalPTS
     - Orhle.SpecImp
     - Orhle.StepStrategy
+    - Orhle.Triple
 
 executables:
   orhle-exe:

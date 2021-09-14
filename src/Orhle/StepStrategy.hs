@@ -1,5 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Orhle.StepStrategy
@@ -17,9 +19,9 @@ import Data.Maybe ( catMaybes )
 import Orhle.SpecImp
 import Prettyprinter
 
-type BackwardStepStrategy = [SpecImpProgram] -> [SpecImpProgram] -> Ceili Step
+type BackwardStepStrategy t = [SpecImpProgram t] -> [SpecImpProgram t] -> Ceili (Step t)
 
-backwardDisallowed :: BackwardStepStrategy
+backwardDisallowed :: BackwardStepStrategy t
 backwardDisallowed _ _ = throwError "Backward stepping not allowed."
 
 
@@ -27,20 +29,20 @@ backwardDisallowed _ _ = throwError "Backward stepping not allowed."
 -- Steps --
 -----------
 
-data Step = Step { step_selection :: Selection
-                 , step_aprogs    :: [SpecImpProgram]
-                 , step_eprogs    :: [SpecImpProgram]
-                 } deriving (Show, Eq)
+data Step t = Step { step_selection :: Selection t
+                   , step_aprogs    :: [SpecImpProgram t]
+                   , step_eprogs    :: [SpecImpProgram t]
+                   } deriving (Show, Eq)
 
-data Selection = UniversalStatement SpecImpProgram
-               | ExistentialStatement SpecImpProgram
-               | LoopFusion [ImpWhile SpecImpProgram] [ImpWhile SpecImpProgram]
-               | NoSelectionFound
+data Selection t = UniversalStatement (SpecImpProgram t)
+                 | ExistentialStatement (SpecImpProgram t)
+                 | LoopFusion [ImpWhile t (SpecImpProgram t)] [ImpWhile t (SpecImpProgram t)]
+                 | NoSelectionFound
                deriving (Show, Eq)
 
-type PossibleStep = [SpecImpProgram] -> [SpecImpProgram] -> Maybe Step
+type PossibleStep t = [SpecImpProgram t] -> [SpecImpProgram t] -> Maybe (Step t)
 
-scanPossibleSteps :: [SpecImpProgram] -> [SpecImpProgram] -> [PossibleStep] -> Step
+scanPossibleSteps :: [SpecImpProgram t] -> [SpecImpProgram t] -> [PossibleStep t] -> Step t
 scanPossibleSteps aprogs eprogs options =
   let steps = catMaybes $ map (\try -> try aprogs eprogs) options
   in case steps of
@@ -51,7 +53,8 @@ scanPossibleSteps aprogs eprogs options =
 ---------------------
 -- Pretty Printing --
 ---------------------
-instance Pretty Selection where
+
+instance Pretty t => Pretty (Selection t) where
   pretty selection =
     case selection of
       UniversalStatement stmt   -> pretty "Universal:" <+> pretty stmt
@@ -64,7 +67,7 @@ instance Pretty Selection where
 -- Backward with Fusion --
 --------------------------
 
-backwardWithFusion :: BackwardStepStrategy
+backwardWithFusion :: BackwardStepStrategy t
 backwardWithFusion aprogs eprogs =
   return $ scanPossibleSteps aprogs eprogs [ finished
                                            , stepLoopFusion
@@ -74,11 +77,11 @@ backwardWithFusion aprogs eprogs =
                                            , stepUniversalAny
                                            ]
 
-finished :: PossibleStep
+finished :: PossibleStep t
 finished [] [] = Just $ Step NoSelectionFound [] []
 finished _  _  = Nothing
 
-stepLoopFusion :: PossibleStep
+stepLoopFusion :: PossibleStep t
 stepLoopFusion aprogs eprogs =
   let
     alasts  = map lastStatement aprogs
@@ -92,7 +95,7 @@ stepLoopFusion aprogs eprogs =
     else if any (not . isLoop . ls_last) elasts then Nothing
     else Just $ Step (LoopFusion aloops eloops) aprogs' eprogs'
 
-stepExistentialNonLoop :: PossibleStep
+stepExistentialNonLoop :: PossibleStep t
 stepExistentialNonLoop aprogs eprogs =
   let
     lasts = map lastStatement eprogs
@@ -107,7 +110,7 @@ stepExistentialNonLoop aprogs eprogs =
                     Just r  -> r:eprogs'NonS
       in Just $ Step (ExistentialStatement $ ls_last s) aprogs eprogs'
 
-stepUniversalNonLoop :: PossibleStep
+stepUniversalNonLoop :: PossibleStep t
 stepUniversalNonLoop aprogs eprogs =
   let
     lasts = map lastStatement aprogs
@@ -122,7 +125,7 @@ stepUniversalNonLoop aprogs eprogs =
                     Just r  -> r:aprogs'NonS
       in Just $ Step (UniversalStatement $ ls_last s) aprogs' eprogs
 
-stepExistentialAny :: PossibleStep
+stepExistentialAny :: PossibleStep t
 stepExistentialAny aprogs eprogs =
   case map lastStatement eprogs of
     []     -> Nothing
@@ -132,7 +135,7 @@ stepExistentialAny aprogs eprogs =
                       Just r  -> r:(map ls_full ss)
       in Just $ Step (ExistentialStatement $ ls_last s) aprogs eprogs'
 
-stepUniversalAny :: PossibleStep
+stepUniversalAny :: PossibleStep t
 stepUniversalAny aprogs eprogs =
   case map lastStatement aprogs of
     []     -> Nothing
@@ -148,26 +151,26 @@ stepUniversalAny aprogs eprogs =
 -- Last Statements --
 ---------------------
 
-data LastStatement = LastStatement { ls_last :: SpecImpProgram
-                                   , ls_rest :: Maybe SpecImpProgram
-                                   , ls_full :: SpecImpProgram
-                                   }
+data LastStatement t = LastStatement { ls_last :: SpecImpProgram t
+                                     , ls_rest :: Maybe (SpecImpProgram t)
+                                     , ls_full :: SpecImpProgram t
+                                     }
 
-singleStatement :: SpecImpProgram -> LastStatement
+singleStatement :: SpecImpProgram t -> LastStatement t
 singleStatement stmt = LastStatement stmt Nothing stmt
 
-class FindLastStatement e where
-  lastStatement :: e -> LastStatement
-instance (FindLastStatement (f e), FindLastStatement (g e)) => FindLastStatement ((f :+: g) e) where
+class FindLastStatement t e where
+  lastStatement :: e -> LastStatement t
+instance (FindLastStatement t (f e), FindLastStatement t (g e)) => FindLastStatement t ((f :+: g) e) where
   lastStatement (Inl f) = lastStatement f
   lastStatement (Inr g) = lastStatement g
-instance FindLastStatement SpecImpProgram where
+instance FindLastStatement t (SpecImpProgram t) where
   lastStatement (In p) = lastStatement p
-instance FindLastStatement (ImpSkip e) where
+instance FindLastStatement t (ImpSkip t e) where
   lastStatement ImpSkip = singleStatement impSkip
-instance FindLastStatement (ImpAsgn e) where
+instance FindLastStatement t (ImpAsgn t e) where
   lastStatement (ImpAsgn lhs rhs) = singleStatement (impAsgn lhs rhs)
-instance FindLastStatement (ImpSeq SpecImpProgram) where
+instance FindLastStatement t (ImpSeq t (SpecImpProgram t)) where
   lastStatement (ImpSeq stmts) = case stmts of
     []     -> singleStatement impSkip
     (s:[]) -> singleStatement s
@@ -176,11 +179,11 @@ instance FindLastStatement (ImpSeq SpecImpProgram) where
               in case mRest of
                    Nothing   -> LastStatement lastT (Just $ impSeq ss) (impSeq stmts)
                    Just rest -> LastStatement lastT (Just $ impSeq $ ss ++ [rest]) (impSeq stmts)
-instance FindLastStatement (ImpIf SpecImpProgram) where
-  lastStatement (ImpIf c t e) = singleStatement (impIf c t e)
-instance FindLastStatement (ImpWhile SpecImpProgram) where
-  lastStatement (ImpWhile c body meta) = singleStatement (impWhileWithMeta c body meta)
-instance FindLastStatement (SpecCall SpecImpProgram) where
+instance FindLastStatement t (ImpIf t (SpecImpProgram t)) where
+  lastStatement (ImpIf cond tbranch ebranch) = singleStatement (impIf cond tbranch ebranch)
+instance FindLastStatement t (ImpWhile t (SpecImpProgram t)) where
+  lastStatement (ImpWhile cond body meta) = singleStatement (impWhileWithMeta cond body meta)
+instance FindLastStatement t (SpecCall t (SpecImpProgram t)) where
   lastStatement (SpecCall cid params assignees) = singleStatement (specCall cid params assignees)
 
 splitTail :: [a] -> ([a], a)
@@ -200,17 +203,17 @@ class IsSkip e where
 instance (IsSkip (f e), IsSkip (g e)) => IsSkip ((f :+: g) e) where
   isSkip (Inl f) = isSkip f
   isSkip (Inr g) = isSkip g
-instance IsSkip SpecImpProgram where
+instance IsSkip (SpecImpProgram t) where
   isSkip (In p) = isSkip p
-instance IsSkip (ImpSkip e)  where isSkip _ = True
-instance IsSkip (ImpAsgn e)  where isSkip _ = False
-instance IsSkip (ImpSeq e)   where isSkip _ = False
-instance IsSkip (ImpIf e)    where isSkip _ = False
-instance IsSkip (ImpWhile e) where isSkip _ = False
-instance IsSkip (ImpCall e)  where isSkip _ = False
-instance IsSkip (SpecCall e) where isSkip _ = False
+instance IsSkip (ImpSkip t e)  where isSkip _ = True
+instance IsSkip (ImpAsgn t e)  where isSkip _ = False
+instance IsSkip (ImpSeq t e)   where isSkip _ = False
+instance IsSkip (ImpIf t e)    where isSkip _ = False
+instance IsSkip (ImpWhile t e) where isSkip _ = False
+instance IsSkip (ImpCall t e)  where isSkip _ = False
+instance IsSkip (SpecCall t e) where isSkip _ = False
 
-isLoop :: SpecImpProgram -> Bool
-isLoop p = case getLoop p of
+isLoop :: forall t. SpecImpProgram t -> Bool
+isLoop p = case getLoop @t p of
   Nothing -> False
   Just _  -> True
