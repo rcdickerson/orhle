@@ -2,6 +2,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Orhle.Verifier
   ( Failure(..)
@@ -28,7 +30,8 @@ import Prettyprinter
 data Failure  = Failure { failMessage :: String } deriving Show
 data Success  = Success { }
 
-rhleVerifier :: ( Num t
+rhleVerifier :: forall t.
+                ( Num t
                 , Ord t
                 , SMTString t
                 , SMTTypeString t
@@ -42,14 +45,16 @@ rhleVerifier funEnv (RhleTriple pre aprogs eprogs post) = do
   let names = Set.union (namesIn aprogs) (namesIn eprogs)
   let lits  = Set.union (litsIn  aprogs) (litsIn  eprogs)
   let env = mkEnv LogLevelInfo 2000 names
+  aprogsWithLoopIds <- mapM (populateLoopIds @(SpecImpProgram t) @t) aprogs
+  eprogsWithLoopIds <- mapM (populateLoopIds @(SpecImpProgram t) @t) eprogs
   wpResult <- runCeili env $ do
     log_i $ "Collecting loop head states for loop invariant inference..."
-    aLoopHeads <- mapM (headStates funEnv) aprogs
-    eLoopHeads <- mapM (headStates funEnv) eprogs
+    aLoopHeads <- mapM (headStates funEnv) aprogsWithLoopIds
+    eLoopHeads <- mapM (headStates funEnv) eprogsWithLoopIds
     let loopHeads = Map.unions $ aLoopHeads ++ eLoopHeads
     log_i $ "Running backward relational analysis..."
     let ptsContext = RelSpecImpPTSContext funEnv loopHeads names lits
-    relBackwardPT backwardWithFusion ptsContext aprogs eprogs post
+    relBackwardPT backwardWithFusion ptsContext aprogsWithLoopIds eprogsWithLoopIds post
   case wpResult of
     Left msg  -> return $ Left $ Failure msg
     Right wp -> do

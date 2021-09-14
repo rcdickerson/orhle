@@ -50,6 +50,8 @@ module Orhle.SpecImp
   , impSkip
   , impWhile
   , impWhileWithMeta
+  , populateLoopIds
+  , repopulateLoopIds
   , specCall
   ) where
 
@@ -178,6 +180,9 @@ instance MappableNames (SpecCall t e) where
   mapNames f (SpecCall cid args assignees) =
     SpecCall cid (map (mapNames f) args) (map f assignees)
 
+instance TransformMetadata m e t => TransformMetadata m (SpecCall t e) t where
+  transformMetadata call _ = return call
+
 instance Ord t => CollectableLiterals (SpecCall t e) t where
   litsIn (SpecCall _ args _) = litsIn args
 
@@ -201,6 +206,11 @@ instance MappableNames (SpecImpProgram t) where
 
 instance FreshableNames (SpecImpProgram t) where
   freshen (In f) = return . In =<< freshen f
+
+instance Monad m => TransformMetadata m (SpecImpProgram t) t where
+  transformMetadata (In prog) func = do
+    prog' <- transformMetadata prog func
+    return $ In prog'
 
 instance Ord t => CollectableLiterals (SpecImpProgram t) t where
   litsIn (In f) = litsIn f

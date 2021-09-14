@@ -53,6 +53,7 @@ scanPossibleSteps aprogs eprogs options =
 ---------------------
 -- Pretty Printing --
 ---------------------
+
 instance Pretty t => Pretty (Selection t) where
   pretty selection =
     case selection of
