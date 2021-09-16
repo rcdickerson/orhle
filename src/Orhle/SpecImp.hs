@@ -33,6 +33,7 @@ module Orhle.SpecImp
   , ImpWhile(..)
   , ImpWhileMetadata(..)
   , LoopHeadStates
+  , MapImpType(..)
   , Name(..)
   , SpecCall(..)
   , SpecImpEnv(..)
@@ -50,6 +51,8 @@ module Orhle.SpecImp
   , impSkip
   , impWhile
   , impWhileWithMeta
+  , mapSpecEnvType
+  , mapSpecImpEnvType
   , populateLoopIds
   , repopulateLoopIds
   , specCall
@@ -84,7 +87,7 @@ data Specification t = Specification
   , spec_choiceVars    :: [Name]
   , spec_preCondition  :: Assertion t
   , spec_postCondition :: Assertion t
-  } deriving Show
+  } deriving (Show, Functor)
 
 instance CollectableNames (Specification t) where
   namesIn (Specification ps rets cs pre post) = Set.unions allNames
@@ -126,6 +129,10 @@ instance Ord t => CollectableLiterals (FunSpecEnv t) t where
     Set.union (litsIn $ Map.elems aspecs)
               (litsIn $ Map.elems especs)
 
+mapSpecEnvType :: (t -> t') -> FunSpecEnv t -> FunSpecEnv t'
+mapSpecEnvType f (FunSpecEnv aspecs especs) = FunSpecEnv (Map.map (fmap f) aspecs)
+                                                         (Map.map (fmap f) especs)
+
 fse_qspecs :: FunSpecEnv t -> SpecImpQuant -> SpecMap t
 fse_qspecs env quant = case quant of
   SIQ_Universal   -> fse_aspecs env
@@ -146,6 +153,16 @@ instance CollectableNames e => CollectableNames (SpecImpEnv t e) where
 instance (Ord t, CollectableLiterals e t) => CollectableLiterals (SpecImpEnv t e) t where
   litsIn (SpecImpEnv impls specs) =
     Set.union (litsIn $ Map.elems impls) (litsIn specs)
+
+mapSpecImpEnvType :: MapImpType t t' implT implT'
+                  => (t -> t')
+                  -> SpecImpEnv t implT
+                  -> SpecImpEnv t' implT'
+mapSpecImpEnvType f (SpecImpEnv impls specs) =
+  let
+    impls' = Map.map (fmap $ mapImpType f) impls
+    specs' = mapSpecEnvType f specs
+  in SpecImpEnv impls' specs'
 
 sie_qspecs :: SpecImpEnv t e -> SpecImpQuant -> SpecMap t
 sie_qspecs = fse_qspecs . sie_specs
@@ -186,6 +203,9 @@ instance TransformMetadata m e t => TransformMetadata m (SpecCall t e) t where
 instance Ord t => CollectableLiterals (SpecCall t e) t where
   litsIn (SpecCall _ args _) = litsIn args
 
+instance MapImpType t t' (SpecCall t e) (SpecCall t' e') where
+  mapImpType f (SpecCall callId args assignees) = SpecCall callId (map (fmap f) args) assignees
+
 
 ---------------------
 -- SpecImp Language --
@@ -214,6 +234,9 @@ instance Monad m => TransformMetadata m (SpecImpProgram t) t where
 
 instance Ord t => CollectableLiterals (SpecImpProgram t) t where
   litsIn (In f) = litsIn f
+
+instance MapImpType t t' (SpecImpProgram t) (SpecImpProgram t') where
+  mapImpType f (In p) = In $ mapImpType f p
 
 specCall :: (SpecCall t :<: f) => CallId -> [AExp t] -> [Name] -> ImpExpr t f
 specCall cid args assignees = inject $ SpecCall cid args assignees
