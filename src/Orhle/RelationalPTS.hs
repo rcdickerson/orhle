@@ -7,6 +7,7 @@ module Orhle.RelationalPTS
 
 import Ceili.Assertion
 import Ceili.CeiliEnv
+import Ceili.Embedding
 import Ceili.Language.BExp ( bexpToAssertion )
 import Ceili.Language.Imp ( IterStateMap )
 import Ceili.Name
@@ -44,7 +45,7 @@ combineIterStateMaps :: Ord t => [IterStateMap t] -> IterStateMap t
 combineIterStateMaps = Map.unionsWith $ \left right ->
   Set.map (uncurry Map.union) $ Set.cartesianProduct left right
 
-relBackwardPT :: ( Num t
+relBackwardPT :: ( Embeddable Integer t
                  , Ord t
                  , AssertionParseable t
                  , SMTString t
@@ -62,7 +63,7 @@ relBackwardPT stepStrategy ctx aprogs eprogs post =
   relBackwardPT' stepStrategy ctx (ProgramRelation aprogs eprogs) post
 
 
-relBackwardPT' :: ( Num t
+relBackwardPT' :: ( Embeddable Integer t
                   , Ord t
                   , AssertionParseable t
                   , SMTString t
@@ -104,7 +105,7 @@ relBackwardPT' stepStrategy ctx (ProgramRelation aprogs eprogs) post = do
         []    -> inferInvariant stepStrategy ctx aloops eloops aprogs' eprogs' post
 
 
-useAnnotatedInvariant :: ( Num t
+useAnnotatedInvariant :: ( Embeddable Integer t
                          , Ord t
                          , AssertionParseable t
                          , SMTString t
@@ -139,7 +140,7 @@ useAnnotatedInvariant invariant stepStrategy ctx aloops eloops aprogs' eprogs' p
       log_e "[RelationalPTS] Annotated loop invariant is not invariant on loop body"
       return AFalse
 
-inferInvariant :: ( Num t
+inferInvariant :: ( Embeddable Integer t
                   , Ord t
                   , AssertionParseable t
                   , SMTString t

@@ -25,15 +25,12 @@ module Orhle
   ) where
 
 import Ceili.Assertion
-import Ceili.Evaluation
 import Ceili.Language.AExpParser ( AExpParseable )
 import Ceili.SMTString
-import Ceili.StatePredicate
 import Orhle.OrhleParser
 import Orhle.SpecImp
 import Orhle.Triple
 import Orhle.Verifier
-import Prettyprinter
 
 parseOrhle :: ( Num t
               , AExpParseable t
@@ -43,14 +40,7 @@ parseOrhle input = case Orhle.OrhleParser.parseOrhle input of
   Left err     -> Left  $ show err
   Right result -> Right $ result
 
-verify :: ( Num t
-          , Ord t
-          , SMTString t
-          , SMTTypeString t
-          , AssertionParseable t
-          , Pretty t
-          , Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (AExp t) t
-          , Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (BExp t) Bool
-          , StatePredicate (Assertion t) t
-          ) => SpecImpEnv t (SpecImpProgram t) -> RhleTriple t -> IO (Either Failure Success)
+verify :: SpecImpEnv Integer (SpecImpProgram Integer)
+       -> RhleTriple Integer
+       -> IO (Either Failure Success)
 verify = rhleVerifier

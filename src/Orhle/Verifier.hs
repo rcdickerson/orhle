@@ -13,20 +13,16 @@ module Orhle.Verifier
 
 import Ceili.Assertion
 import Ceili.CeiliEnv
-import Ceili.Evaluation
 import Ceili.Literal
 import Ceili.Name
 import qualified Ceili.SMT as SMT
-import Ceili.SMTString
-import Ceili.StatePredicate
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Orhle.CState
+import Orhle.CValue
 import Orhle.RelationalPTS
 import Orhle.SpecImp
 import Orhle.StepStrategy
 import Orhle.Triple
-import Prettyprinter
 
 data Failure  = Failure { failMessage :: String } deriving Show
 data Success  = Success { }
@@ -36,9 +32,11 @@ rhleVerifier :: SpecImpEnv Integer (SpecImpProgram Integer)
              -> IO (Either Failure Success)
 rhleVerifier iFunEnv triple = do
   let pre = (fmap Concrete) . rhlePre $ triple
-  let ppost = (fmap Concrete) . rhlePost $ triple
-  aprogs <- populateLoopIds . (mapImpType Concrete) $ rhleAProgs triple
-  eprogs <- populateLoopIds . (mapImpType Concrete) $ rhleEProgs triple
+  let post = (fmap Concrete) . rhlePost $ triple
+  let prepareProg = populateLoopIds @(SpecImpProgram CValue) @CValue
+                  . (mapImpType Concrete)
+  aprogs <- mapM prepareProg $ rhleAProgs triple
+  eprogs <- mapM prepareProg $ rhleEProgs triple
   let sFunEnv = mapSpecImpEnvType Concrete iFunEnv
   let names = Set.union (namesIn aprogs) (namesIn eprogs)
   let lits  = Set.union (litsIn  aprogs) (litsIn  eprogs)
@@ -66,7 +64,7 @@ headStates :: SpecImpEnv CValue (SpecImpProgram CValue)
 headStates env prog = do
   let ctx = SpecImpEvalContext (Fuel 100) env
   let names = Set.toList $ namesIn prog
-  let sts = [ Map.fromList $ map (\n -> (n, -1)) names
-            , Map.fromList $ map (\n -> (n, 0))  names
-            , Map.fromList $ map (\n -> (n, 1))  names ]
+  let sts = [ Map.fromList $ map (\n -> (n, Concrete 1)) names
+            , Map.fromList $ map (\n -> (n, Concrete 0))  names
+            , Map.fromList $ map (\n -> (n, Concrete $ -1))  names ]
   collectLoopHeadStates ctx sts prog

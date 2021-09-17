@@ -264,7 +264,7 @@ instance FunImplLookup (SpecImpEvalContext t e) e where
       Nothing   -> throwError $ "No implementation for " ++ name
       Just impl -> return impl
 
-instance ( Num t
+instance ( Embeddable Integer t
          , SMTString t
          , SMTTypeString t
          , AssertionParseable t
@@ -283,7 +283,7 @@ instance ( Num t
       (_, _, Just espec) -> evalSpec st espec call
       _ -> throwError $ "No implementation or specification for " ++ cid
 
-evalSpec :: ( Num t
+evalSpec :: ( Embeddable Integer t
             , SMTString t
             , SMTTypeString t
             , AssertionParseable t
@@ -318,14 +318,14 @@ evalSpec st
         return $ Just $ Map.union assigneeSt st
 
 -- TODO: This is janky.
-modelToState :: ( Num t
+modelToState :: ( Embeddable Integer t
                 , SMTString t
                 , SMTTypeString t
                 , AssertionParseable t
                 )
              => String
              -> ProgState t
-modelToState modelStr = case parseAssertion modelStr of
+modelToState modelStr = case parseAssertion @Integer modelStr of
   Left err -> error $ "Parse error: " ++ show err
   Right assertion -> extractState assertion
   where
@@ -337,17 +337,18 @@ modelToState modelStr = case parseAssertion modelStr of
       Var name -> name
       _ -> error $ "Unexpected arith in SAT model (expected name): " ++ show arith
     extractInt arith = case arith of
-      Num n -> n
-      Sub [Num n] -> -n
+      Num n -> embed n
+      Sub [Num n] -> embed (-n)
       _ -> error $ "Unexpected arith in SAT model (expected int): " ++ show arith
 
 
 -- TODO: Evaluating a function call should cost fuel to prevent infinite recursion.
 
-instance ( Num t
+instance ( Embeddable Integer t
          , SMTString t
          , SMTTypeString t
          , AssertionParseable t
+         , AExpAlgebra t
          , Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (AExp t) t
          , Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (BExp t) Bool
          ) => Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (SpecImpProgram t) (ImpStep t) where
@@ -361,13 +362,12 @@ instance ( Num t
 instance CollectLoopHeadStates (SpecImpEvalContext t e) (SpecCall t e) t where
   collectLoopHeadStates _ _ _ = return Map.empty
 
-instance ( Num t
+instance ( Embeddable Integer t
          , Ord t
+         , AExpAlgebra t
          , SMTString t
          , SMTTypeString t
          , AssertionParseable t
-         , Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (AExp t) t
-         , Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (BExp t) Bool
          ) => CollectLoopHeadStates (SpecImpEvalContext t (SpecImpProgram t)) (SpecImpProgram t) t where
   collectLoopHeadStates ctx sts (In f) = collectLoopHeadStates ctx sts f
 
@@ -435,7 +435,8 @@ class SpecImpQuantProvider a where
 instance SpecImpQuantProvider (SpecImpPTSContext t e) where
   getSpecImpQuant = fipc_quant
 
-instance ( Num t
+instance ( Embeddable Integer t
+         , Eq t
          , Ord t
          , SMTString t
          , SMTTypeString t
