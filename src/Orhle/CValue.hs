@@ -5,6 +5,8 @@
 
 module Orhle.CValue
   ( CValue(..)
+  , CValuePEval(..)
+  , pevalCArith
   ) where
 
 import Ceili.Assertion
@@ -35,8 +37,11 @@ data CValue = Concrete Integer
             deriving (Eq, Ord, Show)
 
 instance Pretty CValue where
-  pretty (Concrete i) = "c" <> pretty i
-  pretty (WithChoice _ constraints val) = "a" <> pretty val <> ", s.t. " <> (pretty $ Set.toList constraints)
+  pretty (Concrete i) = pretty i
+  pretty (WithChoice cvs constraints val) = pretty val <> " | "
+    <> if Set.null cvs
+       then pretty $ (Set.toList constraints)
+       else "E " <> pretty (Set.toList cvs) <> ". " <> pretty (Set.toList constraints)
 
 instance AssertionParseable CValue where
   parseLiteral = integer >>= return . Concrete
@@ -49,7 +54,7 @@ instance AssertionParseable CValue where
 data CValuePEval = CValuePEval { cvp_choiceVars  :: Set Name
                                , cvp_constraints :: Set (Assertion Integer)
                                , cvp_value       :: Arith Integer
-                               }
+                               } deriving (Eq, Show)
 
 pevalCArith :: Arith CValue -> CValuePEval
 pevalCArith carith = case carith of
@@ -79,26 +84,45 @@ pevalCArith carith = case carith of
 -- Specification Evaluation --
 ------------------------------
 
-instance Evaluable () CValue (Specification CValue, SpecCall CValue (SpecImpProgram CValue)) (ImpStep CValue) where
+instance Evaluable ctx
+                   CValue
+                   (Specification CValue, SpecCall CValue (SpecImpProgram CValue))
+                   (ImpStep CValue) where
   eval _ st (spec, call) = do
+    checkArglists spec call
     let (Specification params retVars choiceVars specPre specPost) = spec
     let (SpecCall _ args assignees) = call
-    checkArglists spec call
-    let callsitePre  = assertionAtState st
+    freshRetVars    <- envFreshen retVars
+    freshChoiceVars <- envFreshen choiceVars
+    let freshenVars = (substituteAll retVars freshRetVars)
+                    . (substituteAll choiceVars freshChoiceVars)
+    let callsitePre  = freshenVars
+                     $ assertionAtState st
                      $ instantiateParams params args specPre
-    let callsitePost = substituteAll retVars assignees
+    let callsitePost = freshenVars
                      $ assertionAtState st
                      $ instantiateParams params args specPost
-    meetsPre <- checkValidB $ assertionAtState st callsitePre
-    let (CAssertion ccvals cconstrs cassertion) = toCAssertion callsitePost
-    let choiceVars' = Set.union ccvals $ Set.fromList choiceVars
-    let constraints' = Set.union cconstrs $ Set.singleton cassertion
+    meetsPre <- checkValidB $ if null choiceVars
+                              then callsitePre
+                              else Exists choiceVars $ callsitePre
     case meetsPre of
       False -> return Nothing
-      True -> return . Just $ foldr updateSt st assignees
-              where updateSt var st' =
-                      let val = WithChoice choiceVars' constraints' (Var var)
-                      in Map.insert var val st'
+      True -> let
+        (CAssertion callsitePreCVars callsitePreConstraints callsitePreAssertion) = toCAssertion callsitePost
+        (CAssertion callsitePostCVars callsitePostConstraints callsitePostAssertion) = toCAssertion callsitePost
+        choiceVars' = Set.unions [ callsitePreCVars
+                                 , callsitePostCVars
+                                 , Set.fromList freshChoiceVars ]
+        constraints = Set.unions [ callsitePreConstraints
+                                 , callsitePostConstraints
+                                 , Set.fromList [callsitePreAssertion, callsitePostAssertion] ]
+        stUpdater = uncurry $ updateState choiceVars' constraints
+        in return . Just $ foldr stUpdater st (zip assignees freshRetVars)
+
+updateState :: Set Name -> Set (Assertion Integer) -> Name -> Name -> ProgState CValue -> ProgState CValue
+updateState choiceVars constraints assignee retVal st =
+  let val = WithChoice choiceVars constraints (Var retVal)
+  in Map.insert assignee val st
 
 checkArglists :: Specification t -> (SpecCall t e) -> Ceili ()
 checkArglists (Specification params retVars _ _ _) (SpecCall _ args assignees) =
@@ -108,8 +132,7 @@ checkArglists (Specification params retVars _ _ _) (SpecCall _ args assignees) =
 
 instantiateParams :: SubstitutableArith t a => [Name] -> [AExp t] -> a -> a
 instantiateParams params args a =
-  let
-    toAriths  = map aexpToArith args
+  let toAriths = map aexpToArith args
   in foldr (uncurry subArith) a (zip params toAriths)
 
 
@@ -145,7 +168,7 @@ toCAssertion cvAssertion = case cvAssertion of
   Lt  a1 a2 -> cmpCAssertion Lt  a1 a2
   Gt  a1 a2 -> cmpCAssertion Gt  a1 a2
   Lte a1 a2 -> cmpCAssertion Lte a1 a2
-  Gte a1 a2 -> cmpCAssertion Lte a1 a2
+  Gte a1 a2 -> cmpCAssertion Gte a1 a2
   Forall vars a -> let CAssertion cv constr a' = toCAssertion a
                    in CAssertion cv constr $ Forall vars a'
   Exists vars a -> let CAssertion cv constr a' = toCAssertion a
