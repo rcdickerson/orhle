@@ -8,7 +8,6 @@ import Ceili.Assertion
 import Ceili.CeiliEnv
 import Ceili.Evaluation
 import Ceili.Name
-import Ceili.ProgState
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Orhle.CValue
@@ -59,10 +58,15 @@ randSpecE = Specification @CValue [] [ret] [c0]
                    , Lt (Var c0) (Num $ Concrete 10)])
               (Eq (Var ret) (Var c0))
 
-specEnv = FunSpecEnv { fse_aspecs = Map.fromList [("rand", randSpecA)]
-                     , fse_especs = Map.fromList [("rand", randSpecE)] }
-specImpEnv = SpecImpEnv Map.empty specEnv
-evalCtx = SpecImpEvalContext (Fuel 100) specImpEnv
+specEnvA = FunSpecEnv { fse_aspecs = Map.fromList [("rand", randSpecA)]
+                      , fse_especs = Map.empty }
+specImpEnvA = SpecImpEnv Map.empty specEnvA
+evalCtxA = SpecImpEvalContext (Fuel 100) specImpEnvA
+
+specEnvE = FunSpecEnv { fse_aspecs = Map.empty
+                      , fse_especs = Map.fromList [("rand", randSpecE)] }
+specImpEnvE = SpecImpEnv Map.empty specEnvE
+evalCtxE = SpecImpEvalContext (Fuel 100) specImpEnvE
 
 stSum0 = Map.fromList [(rsum, Concrete 0)]
 
@@ -73,9 +77,9 @@ prog = impSeq [ specCall "rand" [] [r]
 test_oneAEval =
   let
     evalSI = eval @(SpecImpEvalContext CValue (SpecImpProgram CValue))
-    task = evalSI evalCtx stSum0 prog
+    task = evalSI evalCtxA stSum0 prog
     retConst = And [Gte (Num 0) (Var ret), Lt (Var ret) (Num 10)]
-    withChoice = WithChoice Set.empty (Set.singleton retConst)
+    withChoice = WithChoice Set.empty (Set.fromList [ATrue, retConst])
     expected = Just $ Map.fromList
         [ (r, withChoice $ Var ret)
         , (rsum, withChoice $ Add [Num 0, (Var ret)]) ]
@@ -89,16 +93,38 @@ test_twoAEvals =
   let
     evalSI = eval @(SpecImpEvalContext CValue (SpecImpProgram CValue))
     task = do
-      evalResult <- evalSI evalCtx stSum0 prog
+      evalResult <- evalSI evalCtxA stSum0 prog
       case evalResult of
         Nothing  -> return $ Nothing
-        Just st' -> evalSI evalCtx st' prog
+        Just st' -> evalSI evalCtxA st' prog
     retConst = And [Gte (Num 0) (Var ret), Lt (Var ret) (Num 10)]
     ret1Const = And [Gte (Num 0) (Var ret1), Lt (Var ret1) (Num 10)]
-    bothRetConstrs = Set.fromList [retConst, ret1Const]
     expected = Just $ Map.fromList
-        [ (r, WithChoice Set.empty (Set.singleton ret1Const) $ Var ret1)
-        , (rsum, WithChoice Set.empty bothRetConstrs $ Add[Add[Num 0, Var ret], Var ret1])]
+        [ (r,   WithChoice Set.empty
+                           (Set.fromList [ATrue, ret1Const])
+                           (Var ret1))
+        , (rsum, WithChoice Set.empty
+                            (Set.fromList [ATrue, retConst, ret1Const])
+                            (Add [Add [Num 0, Var ret], Var ret1])) ]
+  in do
+    result <- runCeili (defaultEnv $ namesIn prog) task
+    case result of
+      Left err -> assertFailure err
+      Right actual -> assertEqual expected actual
+
+test_oneEEval =
+  let
+    evalSI = eval @(SpecImpEvalContext CValue (SpecImpProgram CValue))
+    task = evalSI evalCtxE stSum0 prog
+    cConst = And [Gte (Num 0) (Var c0), Lt (Var c0) (Num 10)]
+    retConst = Eq (Var ret) (Var c0)
+    expected = Just $ Map.fromList
+        [ (r,    WithChoice (Set.singleton c0)
+                            (Set.fromList [cConst, retConst])
+                            (Var ret))
+        , (rsum, WithChoice (Set.singleton c0)
+                            (Set.fromList [cConst, retConst])
+                            (Add [Num 0, (Var ret)])) ]
   in do
     result <- runCeili (defaultEnv $ namesIn prog) task
     case result of

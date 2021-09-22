@@ -24,6 +24,7 @@ import Data.Set ( Set )
 import qualified Data.Set as Set
 import Prettyprinter
 
+import Debug.Trace
 
 ------------
 -- Values --
@@ -108,7 +109,7 @@ instance Evaluable ctx
     case meetsPre of
       False -> return Nothing
       True -> let
-        (CAssertion callsitePreCVars callsitePreConstraints callsitePreAssertion) = toCAssertion callsitePost
+        (CAssertion callsitePreCVars callsitePreConstraints callsitePreAssertion) = toCAssertion callsitePre
         (CAssertion callsitePostCVars callsitePostConstraints callsitePostAssertion) = toCAssertion callsitePost
         choiceVars' = Set.unions [ callsitePreCVars
                                  , callsitePostCVars
