@@ -9,13 +9,23 @@ module Orhle.CValue
 
 import Ceili.Assertion
 import Ceili.Assertion.AssertionParser ( integer )
+import Ceili.CeiliEnv
 import Ceili.Embedding
+import Ceili.Evaluation
 import Ceili.Language.AExp
-import Ceili.SMTString
+import Ceili.Name
+import Ceili.ProgState
 import Ceili.StatePredicate
+import Orhle.SpecImp
+import qualified Data.Map as Map
 import Data.Set ( Set )
 import qualified Data.Set as Set
 import Prettyprinter
+
+
+------------
+-- Values --
+------------
 
 data CValue = Concrete Integer
             | WithChoice { cv_choiceVars  :: Set Name
@@ -25,23 +35,149 @@ data CValue = Concrete Integer
             deriving (Eq, Ord, Show)
 
 instance Pretty CValue where
-  pretty (Concrete i) = pretty i
-  pretty (WithChoice _ constraints val) = pretty val <> ", s.t. " <> (pretty $ Set.toList constraints)
-
-instance SMTString CValue where
-  toSMT (Concrete i) = toSMT i
-  toSMT (WithChoice cvars constraints val) = toSMT val
-
-instance SMTTypeString CValue where
-  smtTypeString = smtTypeString @Integer
+  pretty (Concrete i) = "c" <> pretty i
+  pretty (WithChoice _ constraints val) = "a" <> pretty val <> ", s.t. " <> (pretty $ Set.toList constraints)
 
 instance AssertionParseable CValue where
   parseLiteral = integer >>= return . Concrete
 
 
+-----------------------------------
+-- Partial Arithmetic Evaluation --
+-----------------------------------
+
+data CValuePEval = CValuePEval { cvp_choiceVars  :: Set Name
+                               , cvp_constraints :: Set (Assertion Integer)
+                               , cvp_value       :: Arith Integer
+                               }
+
+pevalCArith :: Arith CValue -> CValuePEval
+pevalCArith carith = case carith of
+  Num i     -> case i of
+                 Concrete val -> CValuePEval Set.empty Set.empty $ Num val
+                 WithChoice cvs constr val -> CValuePEval cvs constr val
+  Var v     -> CValuePEval Set.empty Set.empty $ Var v
+  Add as    -> pevalList Add as
+  Sub as    -> pevalList Sub as
+  Mul as    -> pevalList Mul as
+  Div a1 a2 -> pevalBinop Div a1 a2
+  Mod a1 a2 -> pevalBinop Mod a1 a2
+  Pow a1 a2 -> pevalBinop Pow a1 a2
+  where
+    pevalList op as =
+      let as' = map pevalCArith as
+      in CValuePEval (Set.unions $ map cvp_choiceVars as')
+                     (Set.unions $ map cvp_constraints as')
+                     (op $ map cvp_value as')
+    pevalBinop op a1 a2 = let
+      CValuePEval cvs1 const1 val1 = pevalCArith a1
+      CValuePEval cvs2 const2 val2 = pevalCArith a2
+      in CValuePEval (Set.union cvs1 cvs2) (Set.union const1 const2) (op val1 val2)
+
+
+------------------------------
+-- Specification Evaluation --
+------------------------------
+
+instance Evaluable () CValue (Specification CValue, SpecCall CValue (SpecImpProgram CValue)) (ImpStep CValue) where
+  eval _ st (spec, call) = do
+    let (Specification params retVars choiceVars specPre specPost) = spec
+    let (SpecCall _ args assignees) = call
+    checkArglists spec call
+    let callsitePre  = assertionAtState st
+                     $ instantiateParams params args specPre
+    let callsitePost = substituteAll retVars assignees
+                     $ assertionAtState st
+                     $ instantiateParams params args specPost
+    meetsPre <- checkValidB $ assertionAtState st callsitePre
+    let (CAssertion ccvals cconstrs cassertion) = toCAssertion callsitePost
+    let choiceVars' = Set.union ccvals $ Set.fromList choiceVars
+    let constraints' = Set.union cconstrs $ Set.singleton cassertion
+    case meetsPre of
+      False -> return Nothing
+      True -> return . Just $ foldr updateSt st assignees
+              where updateSt var st' =
+                      let val = WithChoice choiceVars' constraints' (Var var)
+                      in Map.insert var val st'
+
+checkArglists :: Specification t -> (SpecCall t e) -> Ceili ()
+checkArglists (Specification params retVars _ _ _) (SpecCall _ args assignees) =
+  if      length args /= length params then throwError "Argument / parameter length mismatch"
+  else if length assignees /= length retVars then throwError "Assignees / returns length mismatch"
+  else return ()
+
+instantiateParams :: SubstitutableArith t a => [Name] -> [AExp t] -> a -> a
+instantiateParams params args a =
+  let
+    toAriths  = map aexpToArith args
+  in foldr (uncurry subArith) a (zip params toAriths)
+
+
 ----------------
--- Operations --
+-- Assertions --
 ----------------
+
+data CAssertion = CAssertion { ca_choiceVars  :: Set Name
+                             , ca_constraints :: Set (Assertion Integer)
+                             , ca_assertion   :: Assertion Integer
+                             }
+
+toCAssertion :: Assertion CValue -> CAssertion
+toCAssertion cvAssertion = case cvAssertion of
+  ATrue     -> CAssertion Set.empty Set.empty ATrue
+  AFalse    -> CAssertion Set.empty Set.empty AFalse
+  Atom v    -> CAssertion Set.empty Set.empty (Atom v)
+  Not a     -> let (CAssertion cv constr a') = toCAssertion a
+               in CAssertion cv constr $ Not a'
+  And as    -> let as' = map toCAssertion as
+               in CAssertion (Set.unions $ map ca_choiceVars as')
+                             (Set.unions $ map ca_constraints as')
+                             (And $ map ca_assertion as')
+  Or  as    -> let as' = map toCAssertion as
+               in CAssertion (Set.unions $ map ca_choiceVars as')
+                             (Set.unions $ map ca_constraints as')
+                             (Or $ map ca_assertion as')
+  Imp a1 a2 -> let
+                 CAssertion cv1 constr1 a1' = toCAssertion a1
+                 CAssertion cv2 constr2 a2' = toCAssertion a2
+               in CAssertion (Set.union cv1 cv2) (Set.union constr1 constr2) (Imp a1' a2')
+  Eq  a1 a2 -> cmpCAssertion Eq  a1 a2
+  Lt  a1 a2 -> cmpCAssertion Lt  a1 a2
+  Gt  a1 a2 -> cmpCAssertion Gt  a1 a2
+  Lte a1 a2 -> cmpCAssertion Lte a1 a2
+  Gte a1 a2 -> cmpCAssertion Lte a1 a2
+  Forall vars a -> let CAssertion cv constr a' = toCAssertion a
+                   in CAssertion cv constr $ Forall vars a'
+  Exists vars a -> let CAssertion cv constr a' = toCAssertion a
+                   in CAssertion cv constr $ Exists vars a'
+  where
+    cmpCAssertion op a1 a2 =
+      let
+        CValuePEval cvs1 constr1 val1 = pevalCArith a1
+        CValuePEval cvs2 constr2 val2 = pevalCArith a2
+      in CAssertion (Set.union cvs1 cvs2) (Set.union constr1 constr2) (op val1 val2)
+
+instance SMTQueryable CValue where
+  buildSMTQuery assertion =
+    let
+      CAssertion choiceVars constraints iassertion = toCAssertion assertion
+      allAssertions = And (iassertion:(Set.toList constraints))
+      query = if Set.null choiceVars
+              then allAssertions
+              else Exists (Set.toList choiceVars) $ allAssertions
+    in buildSMTQuery query
+
+verifyCAssertion :: Assertion CValue -> Ceili Bool
+verifyCAssertion assertion = do
+  let (CAssertion choiceVars constraints cassertion) = toCAssertion assertion
+  let check = And $ cassertion:(Set.toList constraints)
+  if Set.null choiceVars
+    then return $ eval @() @Integer () Map.empty check
+    else checkValidB $ Exists (Set.toList choiceVars) check
+
+---------------------------
+-- Arithmetic Operations --
+---------------------------
 
 instance Embeddable Integer CValue where embed = Concrete
 
@@ -97,5 +233,16 @@ instance ArithAlgebra CValue where
   arExp  = cvalExp
   arMod  = cvalMod
 
+
+---------------------
+-- State Predicate --
+---------------------
+
+evalCAssertion :: ProgState CValue -> Assertion CValue -> Ceili Bool
+evalCAssertion state assertion = verifyCAssertion $ assertionAtState state assertion
+
+instance Evaluable c CValue (Assertion CValue) (Ceili Bool) where
+  eval _ = evalCAssertion
+
 instance StatePredicate (Assertion CValue) CValue where
-  testState assertion state = eval () state assertion
+  testState = flip $ evalCAssertion

@@ -33,21 +33,21 @@ rhleVerifier :: SpecImpEnv Integer (SpecImpProgram Integer)
 rhleVerifier iFunEnv triple = do
   let pre = (fmap Concrete) . rhlePre $ triple
   let post = (fmap Concrete) . rhlePost $ triple
-  let prepareProg = populateLoopIds @(SpecImpProgram CValue) @CValue
+  let prepareProg = (populateLoopIds @(SpecImpProgram CValue) @CValue)
                   . (mapImpType Concrete)
-  aprogs <- mapM prepareProg $ rhleAProgs triple
-  eprogs <- mapM prepareProg $ rhleEProgs triple
-  let sFunEnv = mapSpecImpEnvType Concrete iFunEnv
+  aprogs  <- mapM prepareProg $ rhleAProgs triple
+  eprogs  <- mapM prepareProg $ rhleEProgs triple
+  let cFunEnv = mapSpecImpEnvType Concrete iFunEnv
   let names = Set.union (namesIn aprogs) (namesIn eprogs)
-  let lits  = Set.union (litsIn  aprogs) (litsIn  eprogs)
-  let env = mkEnv LogLevelInfo 2000 names
+  let lits  = Set.union (litsIn  aprogs) (litsIn eprogs)
+  let env = mkEnv LogLevelDebug 2000 names
   wpResult <- runCeili env $ do
     log_i $ "Collecting loop head states for loop invariant inference..."
-    aLoopHeads <- mapM (headStates sFunEnv) aprogs
-    eLoopHeads <- mapM (headStates sFunEnv) eprogs
+    aLoopHeads <- mapM (headStates cFunEnv) aprogs
+    eLoopHeads <- mapM (headStates cFunEnv) eprogs
     let loopHeads = Map.unions $ aLoopHeads ++ eLoopHeads
     log_i $ "Running backward relational analysis..."
-    let ptsContext = RelSpecImpPTSContext sFunEnv loopHeads names lits
+    let ptsContext = RelSpecImpPTSContext cFunEnv loopHeads names lits
     relBackwardPT backwardWithFusion ptsContext aprogs eprogs post
   case wpResult of
     Left msg  -> return $ Left $ Failure msg
