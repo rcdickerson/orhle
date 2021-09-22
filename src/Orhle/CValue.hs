@@ -24,7 +24,6 @@ import Data.Set ( Set )
 import qualified Data.Set as Set
 import Prettyprinter
 
-import Debug.Trace
 
 ------------
 -- Values --
@@ -100,20 +99,20 @@ instance Evaluable ctx
     let callsitePre  = freshenVars
                      $ assertionAtState st
                      $ instantiateParams params args specPre
+        (CAssertion callsitePreCVars callsitePreConstraints callsitePreAssertion) = toCAssertion callsitePre
     let callsitePost = freshenVars
                      $ assertionAtState st
                      $ instantiateParams params args specPost
-    meetsPre <- checkValidB $ if null choiceVars
+        (CAssertion callsitePostCVars callsitePostConstraints callsitePostAssertion) = toCAssertion callsitePost
+    let choiceVars' = Set.unions [ callsitePreCVars
+                                 , callsitePostCVars
+                                 , Set.fromList freshChoiceVars ]
+    meetsPre <- checkValidB $ if Set.null choiceVars'
                               then callsitePre
-                              else Exists choiceVars $ callsitePre
+                              else Exists (Set.toList choiceVars') $ callsitePre
     case meetsPre of
       False -> return Nothing
       True -> let
-        (CAssertion callsitePreCVars callsitePreConstraints callsitePreAssertion) = toCAssertion callsitePre
-        (CAssertion callsitePostCVars callsitePostConstraints callsitePostAssertion) = toCAssertion callsitePost
-        choiceVars' = Set.unions [ callsitePreCVars
-                                 , callsitePostCVars
-                                 , Set.fromList freshChoiceVars ]
         constraints = Set.unions [ callsitePreConstraints
                                  , callsitePostConstraints
                                  , Set.fromList [callsitePreAssertion, callsitePostAssertion] ]

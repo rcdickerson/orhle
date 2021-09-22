@@ -13,9 +13,9 @@ import qualified Data.Set as Set
 import Orhle.CValue
 import Orhle.SpecImp
 
-c0 = Name "c0" 0
-c1 = Name "c1" 0
-c2 = Name "c2" 0
+c0 = Name "c" 0
+c1 = Name "c" 1
+c2 = Name "c" 2
 x = Name "x" 0
 y = Name "y" 0
 
@@ -100,9 +100,9 @@ test_twoAEvals =
     retConst = And [Gte (Num 0) (Var ret), Lt (Var ret) (Num 10)]
     ret1Const = And [Gte (Num 0) (Var ret1), Lt (Var ret1) (Num 10)]
     expected = Just $ Map.fromList
-        [ (r,   WithChoice Set.empty
-                           (Set.fromList [ATrue, ret1Const])
-                           (Var ret1))
+        [ (r,    WithChoice Set.empty
+                            (Set.fromList [ATrue, ret1Const])
+                            (Var ret1))
         , (rsum, WithChoice Set.empty
                             (Set.fromList [ATrue, retConst, ret1Const])
                             (Add [Add [Num 0, Var ret], Var ret1])) ]
@@ -125,6 +125,31 @@ test_oneEEval =
         , (rsum, WithChoice (Set.singleton c0)
                             (Set.fromList [cConst, retConst])
                             (Add [Num 0, (Var ret)])) ]
+  in do
+    result <- runCeili (defaultEnv $ namesIn prog) task
+    case result of
+      Left err -> assertFailure err
+      Right actual -> assertEqual expected actual
+
+test_twoEEvals =
+  let
+    evalSI = eval @(SpecImpEvalContext CValue (SpecImpProgram CValue))
+    task = do
+      evalResult <- evalSI evalCtxE stSum0 prog
+      case evalResult of
+        Nothing  -> throwError "First evaluation yielded nothing."
+        Just st' -> evalSI evalCtxE st' prog
+    cConst = And [Gte (Num 0) (Var c0), Lt (Var c0) (Num 10)]
+    retConst = Eq (Var ret) (Var c0)
+    c1Const = And [Gte (Num 0) (Var c1), Lt (Var c1) (Num 10)]
+    ret1Const = Eq (Var ret1) (Var c1)
+    expected = Just $ Map.fromList
+        [ (r,    WithChoice (Set.singleton c1)
+                            (Set.fromList [c1Const, ret1Const])
+                            (Var ret1))
+        , (rsum, WithChoice (Set.fromList [c0, c1])
+                            (Set.fromList [cConst, c1Const, retConst, ret1Const])
+                            (Add [Add [Num 0, Var ret], Var ret1])) ]
   in do
     result <- runCeili (defaultEnv $ namesIn prog) task
     case result of
