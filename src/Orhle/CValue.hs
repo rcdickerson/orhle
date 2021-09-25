@@ -24,7 +24,6 @@ import Data.Set ( Set )
 import qualified Data.Set as Set
 import Prettyprinter
 
-
 ------------
 -- Values --
 ------------
@@ -38,10 +37,13 @@ data CValue = Concrete Integer
 
 instance Pretty CValue where
   pretty (Concrete i) = pretty i
-  pretty (WithChoice cvs constraints val) = pretty val <> " | "
-    <> if Set.null cvs
-       then pretty $ (Set.toList constraints)
-       else "E " <> pretty (Set.toList cvs) <> ". " <> pretty (Set.toList constraints)
+  pretty (WithChoice cvs constraints val) =
+    let
+      clist = list . (map pretty) $ Set.toList constraints
+    in case Set.null cvs of
+      True -> pretty val <+> "|" <+> clist
+      False -> "∃" <+> (list . (map pretty) $ Set.toList cvs) <> "."
+               <+> pretty val <+> "|" <+> clist
 
 instance AssertionParseable CValue where
   parseLiteral = integer >>= return . Concrete
