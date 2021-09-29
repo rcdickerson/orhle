@@ -8,6 +8,7 @@ import Ceili.Assertion
 import Ceili.CeiliEnv
 import Ceili.Evaluation
 import Ceili.Name
+import Ceili.StatePredicate
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Orhle.CValue
@@ -21,21 +22,25 @@ y = Name "y" 0
 
 test_pevalCArith =
   let
-    constraint1 = And [ Lt (Var c0) (Num 10)
+    aconstraint = Eq (Var $ Name "foo" 0) (Var $ Name "bar" 0)
+    econstraint1 = And [ Lt (Var c0) (Num 10)
                       , Gt (Var c1) (Num 0)
                       , Eq (Var x) (Add [Var c0, Var c1]) ]
-    constraint2 = Eq (Var y) (Var c2)
+    econstraint2 = Eq (Var y) (Var c2)
     arith = Add [ Num $ Concrete 0
-                , Num $ WithChoice (Set.fromList [c0, c1])
-                                   (Set.singleton constraint1)
-                                   (Add [Var x, Num 5])
-                , Num $ WithChoice (Set.fromList [c2])
-                                   (Set.singleton constraint2)
-                                   (Var y)]
-    expectedCVars = Set.fromList [c0, c1, c2]
-    expectedConstraints = Set.fromList [constraint1, constraint2]
+                , Num $ Constrained (Add [Var x, Num 5])
+                                    (Set.fromList [c0, c1])
+                                     Set.empty
+                                    (Set.singleton econstraint1)
+                , Num $ Constrained (Var y)
+                                    (Set.fromList [c2])
+                                    (Set.singleton aconstraint)
+                                    (Set.singleton econstraint2) ]
     expectedValue = Add [Num 0, Add [Var x, Num 5], Var y]
-    expected = CValuePEval expectedCVars expectedConstraints expectedValue
+    expectedCVars = Set.fromList [c0, c1, c2]
+    expectedAConstraints = Set.singleton aconstraint
+    expectedEConstraints = Set.fromList [econstraint1, econstraint2]
+    expected = CValuePEval expectedValue expectedCVars expectedAConstraints expectedEConstraints
     actual = pevalCArith arith
   in assertEqual expected actual
 
@@ -78,11 +83,10 @@ test_oneAEval =
   let
     evalSI = eval @(SpecImpEvalContext CValue (SpecImpProgram CValue))
     task = evalSI evalCtxA stSum0 prog
-    retConst = And [Gte (Num 0) (Var ret), Lt (Var ret) (Num 10)]
-    withChoice = WithChoice Set.empty (Set.fromList [ATrue, retConst])
+    retConstr = And [Gte (Num 0) (Var ret), Lt (Var ret) (Num 10)]
     expected = Just $ Map.fromList
-        [ (r, withChoice $ Var ret)
-        , (rsum, withChoice $ Add [Num 0, (Var ret)]) ]
+        [ (r, Constrained (Var ret) Set.empty (Set.singleton retConstr) Set.empty)
+        , (rsum, Constrained (Add [Num 0, (Var ret)]) Set.empty (Set.singleton retConstr) Set.empty) ]
   in do
     result <- runCeili (defaultEnv $ namesIn prog) task
     case result of
@@ -100,12 +104,11 @@ test_twoAEvals =
     retConst = And [Gte (Num 0) (Var ret), Lt (Var ret) (Num 10)]
     ret1Const = And [Gte (Num 0) (Var ret1), Lt (Var ret1) (Num 10)]
     expected = Just $ Map.fromList
-        [ (r,    WithChoice Set.empty
-                            (Set.fromList [ATrue, ret1Const])
-                            (Var ret1))
-        , (rsum, WithChoice Set.empty
-                            (Set.fromList [ATrue, retConst, ret1Const])
-                            (Add [Add [Num 0, Var ret], Var ret1])) ]
+        [ (r,    Constrained (Var ret1) Set.empty (Set.singleton ret1Const) Set.empty)
+        , (rsum, Constrained (Add [Add [Num 0, Var ret], Var ret1])
+                              Set.empty
+                             (Set.fromList [retConst, ret1Const])
+                              Set.empty) ]
   in do
     result <- runCeili (defaultEnv $ namesIn prog) task
     case result of
@@ -119,12 +122,14 @@ test_oneEEval =
     cConst = And [Gte (Num 0) (Var c0), Lt (Var c0) (Num 10)]
     retConst = Eq (Var ret) (Var c0)
     expected = Just $ Map.fromList
-        [ (r,    WithChoice (Set.singleton c0)
-                            (Set.fromList [cConst, retConst])
-                            (Var ret))
-        , (rsum, WithChoice (Set.singleton c0)
-                            (Set.fromList [cConst, retConst])
-                            (Add [Num 0, (Var ret)])) ]
+        [ (r,    Constrained (Var ret)
+                             (Set.fromList [c0, ret])
+                              Set.empty
+                             (Set.singleton $ aAnd [cConst, retConst]))
+        , (rsum, Constrained (Add [Num 0, (Var ret)])
+                             (Set.fromList [c0, ret])
+                              Set.empty
+                             (Set.singleton $ aAnd [cConst, retConst])) ]
   in do
     result <- runCeili (defaultEnv $ namesIn prog) task
     case result of
@@ -144,14 +149,70 @@ test_twoEEvals =
     c1Const = And [Gte (Num 0) (Var c1), Lt (Var c1) (Num 10)]
     ret1Const = Eq (Var ret1) (Var c1)
     expected = Just $ Map.fromList
-        [ (r,    WithChoice (Set.singleton c1)
-                            (Set.fromList [c1Const, ret1Const])
-                            (Var ret1))
-        , (rsum, WithChoice (Set.fromList [c0, c1])
-                            (Set.fromList [cConst, c1Const, retConst, ret1Const])
-                            (Add [Add [Num 0, Var ret], Var ret1])) ]
+        [ (r,    Constrained (Var ret1)
+                             (Set.fromList [c1, ret1])
+                              Set.empty
+                             (Set.singleton $ aAnd [c1Const, ret1Const]))
+        , (rsum, Constrained (Add [Add [Num 0, Var ret], Var ret1])
+                             (Set.fromList [c0, c1, ret, ret1])
+                              Set.empty
+                             (Set.fromList [ aAnd [cConst, retConst]
+                                           , aAnd [c1Const, ret1Const]
+                                           ])) ]
   in do
     result <- runCeili (defaultEnv $ namesIn prog) task
     case result of
       Left err -> assertFailure err
       Right actual -> assertEqual expected actual
+
+
+-----------------
+-- SMT Queries --
+-----------------
+
+test_separatingQuery = let
+  goodState = Map.fromList [ (Name "e!retVal" 0, Concrete 0)
+                           , (Name "e!r" 0, Constrained (Var $ Name "e!ret!" 1)
+                                                        (Set.fromList [Name "e!n" 1, Name "e!ret!" 1])
+                                                         Set.empty
+                                                        (Set.singleton $
+                                                         And [ Lte (Num 0) (Var $ Name "e!n" 1)
+                                                             , Lt (Var $ Name "e!n" 1) (Num 10)
+                                                             , Eq (Var $ Name "e!n" 1) (Var $ Name "e!ret!" 1)
+                                                             ]))
+                           , (Name "e!sum" 0, Constrained (Add [Num 0, Var $ Name "e!ret!" 1])
+                                                          (Set.fromList [Name "e!n" 1, Name "e!ret!" 1])
+                                                           Set.empty
+                                                          (Set.singleton $
+                                                            And [ Lte (Num 0) (Var $ Name "e!n" 1)
+                                                               , Lt (Var $ Name "e!n" 1) (Num 10)
+                                                               , Eq (Var $ Name "e!n" 1) (Var $ Name "e!ret!" 1)
+                                                               ]))
+
+                           , (Name "a!retVal" 0, Concrete 0)
+                           , (Name "a!r" 0, Constrained (Var $ Name "a!ret!" 1)
+                                                        Set.empty
+                                                        (Set.singleton $ And [ Lte (Num 0) (Var $ Name "a!ret!" 1)
+                                                                             , Lt (Var $ Name "a!ret!" 1) (Num 10)
+                                                                             ])
+                                                         Set.empty)
+                           , (Name "a!sum" 0, Constrained (Add [Num 0, Var $ Name "a!ret!" 1])
+                                                           Set.empty
+                                                          (Set.singleton $ And [ Lte (Num 0) (Var $ Name "a!ret!" 1)
+                                                                               , Lt (Var $ Name "a!ret!" 1) (Num 10)
+                                                                               , Eq (Mod (Var $ Name "a!ret!" 1) (Num 2)) (Num 1)
+                                                                               ])
+                                                           Set.empty)
+                           ]
+  badState = Map.fromList [ (Name "e!sum" 0, Concrete 12)
+                          , (Name "a!sum" 0, Concrete 11) ]
+  separator = Eq (Var $ Name "e!sum" 0) (Var $ Name "a!sum" 0)
+  task = do
+    acceptsGood <- testState @(Assertion CValue) @CValue separator goodState
+    acceptsBad  <- testState @(Assertion CValue) @CValue separator badState
+    return $ acceptsGood && (not acceptsBad)
+  in do
+    result <- runCeili (defaultEnv $ namesIn [goodState, badState]) task
+    case result of
+      Left err -> assertFailure err
+      Right actual -> assertEqual True actual

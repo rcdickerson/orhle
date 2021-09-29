@@ -265,90 +265,32 @@ instance FunImplLookup (SpecImpEvalContext t e) e where
       Just impl -> return impl
 
 instance ( Embeddable Integer t
-         , SMTQueryable t
          , AssertionParseable t
          , Evaluable (SpecImpEvalContext t e) t (AExp t) t
          , Evaluable (SpecImpEvalContext t e) t e (ImpStep t)
-         , Evaluable () t (Specification t, SpecCall t e) (ImpStep t)
+         , Evaluable () t (SpecImpQuant, Specification t, SpecCall t e) (ImpStep t)
          ) => Evaluable (SpecImpEvalContext t e) t (SpecCall t e) (ImpStep t) where
   eval ctx st call =
     let
       env = siec_env ctx
       cid = sc_callId call
+      evalSpec = eval @() @t @(SpecImpQuant, Specification t, SpecCall t e)
     in case (Map.lookup cid $ sie_impls env,
              Map.lookup cid $ sie_qspecs env SIQ_Universal,
              Map.lookup cid $ sie_qspecs env SIQ_Existential) of
       (Just _, _, _)     -> eval ctx st (toImpCall call)
-      (_, Just aspec, _) -> eval @() @t @(Specification t, SpecCall t e) () st (aspec, call)
-      (_, _, Just espec) -> eval @() @t @(Specification t, SpecCall t e) () st (espec, call)
+      (_, Just aspec, _) -> evalSpec () st (SIQ_Universal, aspec, call)
+      (_, _, Just espec) -> evalSpec () st (SIQ_Existential, espec, call)
       _ -> throwError $ "No implementation or specification for " ++ cid
-
--- evalSpec :: ( Embeddable Integer t
---             , SMTQueryable t
---             , AssertionParseable t
---             )
---          => ProgState t
---          -> Specification t
---          -> SpecCall t e
---          -> Ceili (Maybe (ProgState t))
--- evalSpec st
---          spec@(Specification params retVars choiceVars specPre specPost)
---          call@(SpecCall _ args assignees) =
---   do
---     checkArglists spec call
---     let callsitePre  = assertionAtState st
---                      $ instantiateParams params args specPre
---     let callsitePost = substituteAll retVars assignees
---                      $ assertionAtState st
---                      $ instantiateParams params args specPost
---     let query = case choiceVars of
---           [] -> And [callsitePre, callsitePost]
---           _  -> Exists choiceVars $ And [callsitePre, callsitePost]
---     sat <- checkSatWithLog LogLevelNone query
---     case sat of
---       SMT.SatUnknown -> do
---         log_e "[SpecImpEval] Spec call query sat unknown"
---         return Nothing
---       SMT.Unsat -> do
---         log_e "[SpecImpEval] Spec call unsat"
---         return Nothing
---       SMT.Sat model -> do
---         let assigneeSt = Map.filterWithKey (\k -> \_ -> k `elem` assignees) (modelToState model)
---         return $ Just $ Map.union assigneeSt st
-
--- -- TODO: This is janky.
--- modelToState :: ( Embeddable Integer t
---                 , SMTQueryable t
---                 , AssertionParseable t
---                 )
---              => String
---              -> ProgState t
--- modelToState modelStr = case parseAssertion @Integer modelStr of
---   Left err -> error $ "Parse error: " ++ show err
---   Right assertion -> extractState assertion
---   where
---     extractState assertion = case assertion of
---       Eq lhs rhs -> Map.fromList [(extractName lhs, extractInt rhs)]
---       And as     -> Map.unions $ map extractState as
---       _ -> error $ "Unexpected assertion in SAT model: " ++ show assertion
---     extractName arith = case arith of
---       Var name -> name
---       _ -> error $ "Unexpected arith in SAT model (expected name): " ++ show arith
---     extractInt arith = case arith of
---       Num n -> embed n
---       Sub [Num n] -> embed (-n)
---       _ -> error $ "Unexpected arith in SAT model (expected int): " ++ show arith
-
 
 -- TODO: Evaluating a function call should cost fuel to prevent infinite recursion.
 
 instance ( Embeddable Integer t
-         , SMTQueryable t
          , AssertionParseable t
          , AExpAlgebra t
          , Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (AExp t) t
          , Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (BExp t) Bool
-         , Evaluable () t (Specification t, SpecCall t (SpecImpProgram t)) (ImpStep t)
+         , Evaluable () t (SpecImpQuant, Specification t, SpecCall t (SpecImpProgram t)) (ImpStep t)
          ) => Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (SpecImpProgram t) (ImpStep t) where
   eval ctx st (In f) = eval ctx st f
 
@@ -363,9 +305,8 @@ instance CollectLoopHeadStates (SpecImpEvalContext t e) (SpecCall t e) t where
 instance ( Embeddable Integer t
          , Ord t
          , AExpAlgebra t
-         , SMTQueryable t
          , AssertionParseable t
-         , Evaluable () t (Specification t, SpecCall t (SpecImpProgram t)) (ImpStep t)
+         , Evaluable () t (SpecImpQuant, Specification t, SpecCall t (SpecImpProgram t)) (ImpStep t)
          ) => CollectLoopHeadStates (SpecImpEvalContext t (SpecImpProgram t)) (SpecImpProgram t) t where
   collectLoopHeadStates ctx sts (In f) = collectLoopHeadStates ctx sts f
 
@@ -434,7 +375,7 @@ instance SpecImpQuantProvider (SpecImpPTSContext t e) where
   getSpecImpQuant = fipc_quant
 
 instance ( Embeddable Integer t
-         , SMTQueryable t
+         , ValidCheckable t
          , Pretty t
          , Ord t
          , AssertionParseable t

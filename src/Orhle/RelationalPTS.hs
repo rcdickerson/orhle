@@ -47,7 +47,7 @@ combineIterStateMaps = Map.unionsWith $ \left right ->
 relBackwardPT :: ( Embeddable Integer t
                  , Ord t
                  , AssertionParseable t
-                 , SMTQueryable t
+                 , ValidCheckable t
                  , Pretty t
                  , StatePredicate (Assertion t) t
                  )
@@ -65,7 +65,7 @@ relBackwardPT' :: ( Embeddable Integer t
                   , Ord t
                   , Pretty t
                   , AssertionParseable t
-                  , SMTQueryable t
+                  , ValidCheckable t
                   , Pretty t
                   , StatePredicate (Assertion t) t
                   )
@@ -106,7 +106,7 @@ relBackwardPT' stepStrategy ctx (ProgramRelation aprogs eprogs) post = do
 useAnnotatedInvariant :: ( Embeddable Integer t
                          , Ord t
                          , AssertionParseable t
-                         , SMTQueryable t
+                         , ValidCheckable t
                          , Pretty t
                          , StatePredicate (Assertion t) t
                          )
@@ -140,7 +140,7 @@ useAnnotatedInvariant invariant stepStrategy ctx aloops eloops aprogs' eprogs' p
 inferInvariant :: ( Embeddable Integer t
                   , Ord t
                   , AssertionParseable t
-                  , SMTQueryable t
+                  , ValidCheckable t
                   , Pretty t
                   , StatePredicate (Assertion t) t
                   )

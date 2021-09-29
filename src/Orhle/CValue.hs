@@ -17,33 +17,42 @@ import Ceili.Evaluation
 import Ceili.Language.AExp
 import Ceili.Name
 import Ceili.ProgState
+import qualified Ceili.SMT as SMT
 import Ceili.StatePredicate
 import Orhle.SpecImp
-import qualified Data.Map as Map
 import Data.Set ( Set )
 import qualified Data.Set as Set
+import qualified Data.Map as Map
 import Prettyprinter
+import SimpleSMT ( logMessageAt )
+
 
 ------------
 -- Values --
 ------------
 
 data CValue = Concrete Integer
-            | WithChoice { cv_choiceVars  :: Set Name
-                         , cv_constraints :: Set (Assertion Integer)
-                         , cv_value       :: Arith Integer
-                         }
+            | Constrained { cv_value        :: Arith Integer
+                          , cv_choiceVars   :: Set Name
+                          , cv_aConstraints :: Set (Assertion Integer)
+                          , cv_eConstraints :: Set (Assertion Integer)
+                          }
             deriving (Eq, Ord, Show)
 
 instance Pretty CValue where
   pretty (Concrete i) = pretty i
-  pretty (WithChoice cvs constraints val) =
+  pretty (Constrained val cvs aconstrs econstrs) =
     let
-      clist = list . (map pretty) $ Set.toList constraints
-    in case Set.null cvs of
-      True -> pretty val <+> "|" <+> clist
-      False -> "∃" <+> (list . (map pretty) $ Set.toList cvs) <> "."
-               <+> pretty val <+> "|" <+> clist
+      prettyCvs = case Set.null cvs of
+                    True  -> emptyDoc
+                    False -> pretty @String "∃" <+> (list . (map pretty) . Set.toList $ cvs) <> "."
+      prettyAConstrs = list (map pretty $ Set.toList aconstrs)
+      prettyEConstrs = prettyCvs <+> list (map pretty $ Set.toList econstrs)
+    in case (Set.null aconstrs, Set.null econstrs) of
+      (True, True)   -> pretty val
+      (False, True)  -> pretty val <+> "a|" <+> prettyAConstrs
+      (True, False)  -> pretty val <+> "e|" <+> prettyEConstrs
+      (False, False) -> pretty val <+> "(a,e)|" <+> prettyAConstrs <+> "==>" <+> prettyEConstrs
 
 instance AssertionParseable CValue where
   parseLiteral = integer >>= return . Concrete
@@ -53,17 +62,18 @@ instance AssertionParseable CValue where
 -- Partial Arithmetic Evaluation --
 -----------------------------------
 
-data CValuePEval = CValuePEval { cvp_choiceVars  :: Set Name
-                               , cvp_constraints :: Set (Assertion Integer)
-                               , cvp_value       :: Arith Integer
+data CValuePEval = CValuePEval { cvp_value        :: Arith Integer
+                               , cvp_choiceVars   :: Set Name
+                               , cvp_aConstraints :: Set (Assertion Integer)
+                               , cvp_eConstraints :: Set (Assertion Integer)
                                } deriving (Eq, Show)
 
 pevalCArith :: Arith CValue -> CValuePEval
 pevalCArith carith = case carith of
   Num i     -> case i of
-                 Concrete val -> CValuePEval Set.empty Set.empty $ Num val
-                 WithChoice cvs constr val -> CValuePEval cvs constr val
-  Var v     -> CValuePEval Set.empty Set.empty $ Var v
+                 Concrete val -> CValuePEval (Num val) Set.empty Set.empty Set.empty
+                 Constrained val cvs aconstrs econstrs -> CValuePEval val cvs aconstrs econstrs
+  Var v     -> CValuePEval (Var v) Set.empty Set.empty Set.empty
   Add as    -> pevalList Add as
   Sub as    -> pevalList Sub as
   Mul as    -> pevalList Mul as
@@ -73,13 +83,17 @@ pevalCArith carith = case carith of
   where
     pevalList op as =
       let as' = map pevalCArith as
-      in CValuePEval (Set.unions $ map cvp_choiceVars as')
-                     (Set.unions $ map cvp_constraints as')
-                     (op $ map cvp_value as')
+      in CValuePEval (op $ map cvp_value as')
+                     (Set.unions $ map cvp_choiceVars as')
+                     (Set.unions $ map cvp_aConstraints as')
+                     (Set.unions $ map cvp_eConstraints as')
     pevalBinop op a1 a2 = let
-      CValuePEval cvs1 const1 val1 = pevalCArith a1
-      CValuePEval cvs2 const2 val2 = pevalCArith a2
-      in CValuePEval (Set.union cvs1 cvs2) (Set.union const1 const2) (op val1 val2)
+      CValuePEval val1 cvs1 aconstrs1 econstrs1 = pevalCArith a1
+      CValuePEval val2 cvs2 aconstrs2 econstrs2 = pevalCArith a2
+      in CValuePEval (op val1 val2)
+                     (Set.union cvs1 cvs2)
+                     (Set.union aconstrs1 aconstrs2)
+                     (Set.union econstrs1 econstrs2)
 
 
 ------------------------------
@@ -88,43 +102,42 @@ pevalCArith carith = case carith of
 
 instance Evaluable ctx
                    CValue
-                   (Specification CValue, SpecCall CValue (SpecImpProgram CValue))
+                   (SpecImpQuant, Specification CValue, SpecCall CValue (SpecImpProgram CValue))
                    (ImpStep CValue) where
-  eval _ st (spec, call) = do
+  eval _ st (quant, spec, call) = do
     checkArglists spec call
     let (Specification params retVars choiceVars specPre specPost) = spec
     let (SpecCall _ args assignees) = call
-    freshRetVars    <- envFreshen retVars
-    freshChoiceVars <- envFreshen choiceVars
-    let freshenVars = (substituteAll retVars freshRetVars)
-                    . (substituteAll choiceVars freshChoiceVars)
-    let callsitePre  = freshenVars
-                     $ assertionAtState st
-                     $ instantiateParams params args specPre
-        (CAssertion callsitePreCVars callsitePreConstraints callsitePreAssertion) = toCAssertion callsitePre
-    let callsitePost = freshenVars
-                     $ assertionAtState st
-                     $ instantiateParams params args specPost
-        (CAssertion callsitePostCVars callsitePostConstraints callsitePostAssertion) = toCAssertion callsitePost
-    let choiceVars' = Set.unions [ callsitePreCVars
-                                 , callsitePostCVars
-                                 , Set.fromList freshChoiceVars ]
-    meetsPre <- checkValidB $ if Set.null choiceVars'
-                              then callsitePre
-                              else Exists (Set.toList choiceVars') $ callsitePre
+    freshRetVars      <- envFreshen retVars
+    freshChoiceVars   <- envFreshen choiceVars
+    let freshenVars   = (substituteAll retVars freshRetVars)
+                      . (substituteAll choiceVars freshChoiceVars)
+    let vCallsitePre  = freshenVars
+                      $ assertionAtState st
+                      $ instantiateParams params args specPre
+    let vCallsitePost = freshenVars
+                      $ assertionAtState st
+                      $ instantiateParams params args specPost
+    meetsPre <- verifyCAssertion $ case null freshChoiceVars of
+                                     True  -> vCallsitePre
+                                     False -> Exists freshChoiceVars vCallsitePre
     case meetsPre of
       False -> return Nothing
       True -> let
-        constraints = Set.unions [ callsitePreConstraints
-                                 , callsitePostConstraints
-                                 , Set.fromList [callsitePreAssertion, callsitePostAssertion] ]
-        stUpdater = uncurry $ updateState choiceVars' constraints
+        cvs = Set.fromList freshChoiceVars
+        (CAssertion callsiteAssertion callsiteCvs callsiteAConstrs callsiteEConstrs)
+          = toCAssertion $ aAnd [vCallsitePre, vCallsitePost]
+        constrValue retVar = case quant of
+            SIQ_Universal   -> Constrained (Var retVar)
+                                           (Set.union cvs callsiteCvs)
+                                           (Set.insert callsiteAssertion callsiteAConstrs)
+                                           callsiteEConstrs
+            SIQ_Existential -> Constrained (Var retVar)
+                                           (Set.unions [cvs, callsiteCvs, Set.fromList freshRetVars])
+                                           callsiteAConstrs
+                                           (Set.insert callsiteAssertion callsiteEConstrs)
+        stUpdater (assignee, retVar) = Map.insert assignee (constrValue retVar)
         in return . Just $ foldr stUpdater st (zip assignees freshRetVars)
-
-updateState :: Set Name -> Set (Assertion Integer) -> Name -> Name -> ProgState CValue -> ProgState CValue
-updateState choiceVars constraints assignee retVal st =
-  let val = WithChoice choiceVars constraints (Var retVal)
-  in Map.insert assignee val st
 
 checkArglists :: Specification t -> (SpecCall t e) -> Ceili ()
 checkArglists (Specification params retVars _ _ _) (SpecCall _ args assignees) =
@@ -142,63 +155,71 @@ instantiateParams params args a =
 -- Assertions --
 ----------------
 
-data CAssertion = CAssertion { ca_choiceVars  :: Set Name
-                             , ca_constraints :: Set (Assertion Integer)
-                             , ca_assertion   :: Assertion Integer
+data CAssertion = CAssertion { ca_assertion    :: Assertion Integer
+                             , ca_choiceVars   :: Set Name
+                             , ca_aConstraints :: Set (Assertion Integer)
+                             , ca_eConstraints :: Set (Assertion Integer)
                              }
+
+unconstrainedCAssertion :: Assertion Integer -> CAssertion
+unconstrainedCAssertion a = CAssertion a Set.empty Set.empty Set.empty
 
 toCAssertion :: Assertion CValue -> CAssertion
 toCAssertion cvAssertion = case cvAssertion of
-  ATrue     -> CAssertion Set.empty Set.empty ATrue
-  AFalse    -> CAssertion Set.empty Set.empty AFalse
-  Atom v    -> CAssertion Set.empty Set.empty (Atom v)
-  Not a     -> let (CAssertion cv constr a') = toCAssertion a
-               in CAssertion cv constr $ Not a'
-  And as    -> let as' = map toCAssertion as
-               in CAssertion (Set.unions $ map ca_choiceVars as')
-                             (Set.unions $ map ca_constraints as')
-                             (And $ map ca_assertion as')
-  Or  as    -> let as' = map toCAssertion as
-               in CAssertion (Set.unions $ map ca_choiceVars as')
-                             (Set.unions $ map ca_constraints as')
-                             (Or $ map ca_assertion as')
+  ATrue     -> unconstrainedCAssertion ATrue
+  AFalse    -> unconstrainedCAssertion AFalse
+  Atom v    -> unconstrainedCAssertion (Atom v)
+  Not a     -> let (CAssertion assertion cvs aconstrs econstrs) = toCAssertion a
+               in CAssertion (Not assertion) cvs aconstrs econstrs
+  And as    -> let cas = map toCAssertion as
+               in CAssertion (And $ map ca_assertion cas)
+                             (Set.unions $ map ca_choiceVars cas)
+                             (Set.unions $ map ca_aConstraints cas)
+                             (Set.unions $ map ca_eConstraints cas)
+  Or  as    -> let cas = map toCAssertion as
+               in CAssertion (Or $ map ca_assertion cas)
+                             (Set.unions $ map ca_choiceVars cas)
+                             (Set.unions $ map ca_aConstraints cas)
+                             (Set.unions $ map ca_eConstraints cas)
   Imp a1 a2 -> let
-                 CAssertion cv1 constr1 a1' = toCAssertion a1
-                 CAssertion cv2 constr2 a2' = toCAssertion a2
-               in CAssertion (Set.union cv1 cv2) (Set.union constr1 constr2) (Imp a1' a2')
-  Eq  a1 a2 -> cmpCAssertion Eq  a1 a2
-  Lt  a1 a2 -> cmpCAssertion Lt  a1 a2
-  Gt  a1 a2 -> cmpCAssertion Gt  a1 a2
-  Lte a1 a2 -> cmpCAssertion Lte a1 a2
-  Gte a1 a2 -> cmpCAssertion Gte a1 a2
-  Forall vars a -> let CAssertion cv constr a' = toCAssertion a
-                   in CAssertion cv constr $ Forall vars a'
-  Exists vars a -> let CAssertion cv constr a' = toCAssertion a
-                   in CAssertion cv constr $ Exists vars a'
+                 (CAssertion ca1 cvs1 aconstrs1 econstrs1) = toCAssertion a1
+                 (CAssertion ca2 cvs2 aconstrs2 econstrs2) = toCAssertion a2
+               in CAssertion (Imp ca1 ca2)
+                             (Set.union cvs1 cvs2)
+                             (Set.union aconstrs1 aconstrs2)
+                             (Set.union econstrs1 econstrs2)
+  Eq  a1 a2 -> convertArith Eq  a1 a2
+  Lt  a1 a2 -> convertArith Lt  a1 a2
+  Gt  a1 a2 -> convertArith Gt  a1 a2
+  Lte a1 a2 -> convertArith Lte a1 a2
+  Gte a1 a2 -> convertArith Gte a1 a2
+  Forall vars a -> let (CAssertion ca cvs aconstrs econstrs) = toCAssertion a
+                   in CAssertion (Forall vars $ ca) cvs aconstrs econstrs
+  Exists vars a -> let (CAssertion ca cvs aconstrs econstrs) = toCAssertion a
+                   in CAssertion (Exists vars $ ca) cvs aconstrs econstrs
   where
-    cmpCAssertion op a1 a2 =
+    convertArith op arith1 arith2 =
       let
-        CValuePEval cvs1 constr1 val1 = pevalCArith a1
-        CValuePEval cvs2 constr2 val2 = pevalCArith a2
-      in CAssertion (Set.union cvs1 cvs2) (Set.union constr1 constr2) (op val1 val2)
-
-instance SMTQueryable CValue where
-  buildSMTQuery assertion =
-    let
-      CAssertion choiceVars constraints iassertion = toCAssertion assertion
-      allAssertions = And (iassertion:(Set.toList constraints))
-      query = if Set.null choiceVars
-              then allAssertions
-              else Exists (Set.toList choiceVars) $ allAssertions
-    in buildSMTQuery query
+        (CValuePEval val1 cvs1 aconstrs1 econstrs1) = pevalCArith arith1
+        (CValuePEval val2 cvs2 aconstrs2 econstrs2) = pevalCArith arith2
+        in CAssertion (op val1 val2)
+                      (Set.union cvs1 cvs2)
+                      (Set.union aconstrs1 aconstrs2)
+                      (Set.union econstrs1 econstrs2)
 
 verifyCAssertion :: Assertion CValue -> Ceili Bool
-verifyCAssertion assertion = do
-  let (CAssertion choiceVars constraints cassertion) = toCAssertion assertion
-  let check = And $ cassertion:(Set.toList constraints)
-  if Set.null choiceVars
-    then return $ eval @() @Integer () Map.empty check
-    else checkValidB $ Exists (Set.toList choiceVars) check
+verifyCAssertion assertion = checkValidB assertion
+
+instance ValidCheckable CValue where
+  checkValid logger cvAssertion = let
+    (CAssertion assertion cvs aconstrsSet econstrsSet) = toCAssertion cvAssertion
+    aconstrs = aAnd $ Set.toList aconstrsSet
+    econstrs = aAnd $ Set.toList econstrsSet
+    quantEConstrs = case Set.null cvs of
+                      True -> aAnd [econstrs, assertion]
+                      False -> Exists (Set.toList cvs) $ aAnd [econstrs, assertion]
+    in SMT.checkValid logger $ aImp aconstrs quantEConstrs
+
 
 ---------------------------
 -- Arithmetic Operations --
@@ -230,14 +251,15 @@ cvalBinop :: (Integer -> Integer -> Integer)
 cvalBinop fconc fabs lhs rhs = case (lhs, rhs) of
   (Concrete i, Concrete j) ->
     Concrete $ fconc i j
-  (Concrete i, WithChoice cvars constraints val) ->
-    WithChoice cvars constraints $ fabs (Num i) val
-  (WithChoice cvars constraints val, Concrete j) ->
-    WithChoice cvars constraints $ fabs val (Num j)
-  (WithChoice lcvars lconstraints lval, WithChoice rcvars rconstraints rval) ->
-    WithChoice (Set.union lcvars rcvars)
-               (Set.union lconstraints rconstraints)
-               (fabs lval rval)
+  (Concrete i, Constrained val cvars aconstrs econstrs) ->
+    Constrained (fabs (Num i) val) cvars aconstrs econstrs
+  (Constrained val cvars aconstrs econstrs, Concrete j) ->
+    Constrained (fabs val (Num j)) cvars aconstrs econstrs
+  (Constrained lval lcvars laconstrs leconstrs, Constrained rval rcvars raconstrs reconstrs) ->
+    Constrained (fabs lval rval)
+                (Set.union lcvars rcvars)
+                (Set.union laconstrs raconstrs)
+                (Set.union leconstrs reconstrs)
 
 instance AExpAlgebra CValue where
   aeZero = Concrete 0
@@ -270,4 +292,4 @@ instance Evaluable c CValue (Assertion CValue) (Ceili Bool) where
   eval _ = evalCAssertion
 
 instance StatePredicate (Assertion CValue) CValue where
-  testState = flip $ evalCAssertion
+  testState = flip evalCAssertion

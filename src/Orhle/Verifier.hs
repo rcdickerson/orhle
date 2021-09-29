@@ -41,7 +41,7 @@ rhleVerifier iFunEnv triple = do
   let names = Set.union (namesIn aprogs) (namesIn eprogs)
   let lits  = Set.union (litsIn  aprogs) (litsIn eprogs)
   let env = mkEnv LogLevelDebug 2000 names
-  wpResult <- runCeili env $ do
+  resultOrErr <- runCeili env $ do
     log_i $ "Collecting loop head states for loop invariant inference..."
     aLoopHeads <- mapM (headStates cFunEnv) aprogs
     eLoopHeads <- mapM (headStates cFunEnv) eprogs
@@ -49,11 +49,11 @@ rhleVerifier iFunEnv triple = do
     log_d $ "Loop heads: " ++ show loopHeads
     log_i $ "Running backward relational analysis..."
     let ptsContext = RelSpecImpPTSContext cFunEnv loopHeads names lits
-    relBackwardPT backwardWithFusion ptsContext aprogs eprogs post
-  case wpResult of
+    wp <- relBackwardPT backwardWithFusion ptsContext aprogs eprogs post
+    checkValid $ Imp pre wp
+  case resultOrErr of
     Left msg  -> return $ Left $ Failure msg
-    Right wp -> do
-      result <- SMT.checkValid $ Imp pre wp
+    Right result -> do
       return $ case result of
         SMT.Valid         -> Right $ Success
         SMT.Invalid model -> Left  $ Failure $ "Verification conditions are invalid. Model: " ++ model
