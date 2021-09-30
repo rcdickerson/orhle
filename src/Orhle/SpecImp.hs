@@ -64,6 +64,7 @@ import Ceili.Assertion
 import Ceili.CeiliEnv
 import Ceili.Evaluation
 import Ceili.Language.AExp
+import Ceili.Language.BExp
 import Ceili.Language.Compose
 import Ceili.Language.FunImp
 import Ceili.Literal
@@ -305,6 +306,7 @@ instance CollectLoopHeadStates (SpecImpEvalContext t e) (SpecCall t e) t where
 instance ( Embeddable Integer t
          , Ord t
          , AExpAlgebra t
+         , BExpAlgebra t
          , AssertionParseable t
          , Evaluable () t (SpecImpQuant, Specification t, SpecCall t (SpecImpProgram t)) (ImpStep t)
          ) => CollectLoopHeadStates (SpecImpEvalContext t (SpecImpProgram t)) (SpecImpProgram t) t where

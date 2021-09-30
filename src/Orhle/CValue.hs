@@ -15,6 +15,7 @@ import Ceili.CeiliEnv
 import Ceili.Embedding
 import Ceili.Evaluation
 import Ceili.Language.AExp
+import Ceili.Language.BExp
 import Ceili.Name
 import Ceili.ProgState
 import qualified Ceili.SMT as SMT
@@ -24,8 +25,8 @@ import Data.Set ( Set )
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Prettyprinter
-import SimpleSMT ( logMessageAt )
 
+import Debug.Trace
 
 ------------
 -- Values --
@@ -280,6 +281,17 @@ instance ArithAlgebra CValue where
   arExp  = cvalExp
   arMod  = cvalMod
 
+
+------------------------
+-- Boolean Operations --
+------------------------
+
+instance BExpAlgebra CValue where
+--  beEq
+--  beLt
+--  beGt
+--  beLte
+--  beGte
 
 ---------------------
 -- State Predicate --
