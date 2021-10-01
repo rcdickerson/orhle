@@ -38,6 +38,7 @@ library:
     - src
   exposed-modules:
     - Orhle
+    - Orhle.CValue
     - Orhle.OrhleParser
     - Orhle.RelationalPTS
     - Orhle.SpecImp

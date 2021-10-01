@@ -13,7 +13,6 @@ import Ceili.Language.Imp ( IterStateMap )
 import Ceili.Name
 import qualified Ceili.InvariantInference.Pie as Pie
 import Ceili.ProgState
-import Ceili.SMTString
 import Ceili.StatePredicate
 import Data.Maybe ( catMaybes )
 import qualified Data.Map as Map
@@ -48,8 +47,7 @@ combineIterStateMaps = Map.unionsWith $ \left right ->
 relBackwardPT :: ( Embeddable Integer t
                  , Ord t
                  , AssertionParseable t
-                 , SMTString t
-                 , SMTTypeString t
+                 , ValidCheckable t
                  , Pretty t
                  , StatePredicate (Assertion t) t
                  )
@@ -65,9 +63,9 @@ relBackwardPT stepStrategy ctx aprogs eprogs post =
 
 relBackwardPT' :: ( Embeddable Integer t
                   , Ord t
+                  , Pretty t
                   , AssertionParseable t
-                  , SMTString t
-                  , SMTTypeString t
+                  , ValidCheckable t
                   , Pretty t
                   , StatePredicate (Assertion t) t
                   )
@@ -108,8 +106,7 @@ relBackwardPT' stepStrategy ctx (ProgramRelation aprogs eprogs) post = do
 useAnnotatedInvariant :: ( Embeddable Integer t
                          , Ord t
                          , AssertionParseable t
-                         , SMTString t
-                         , SMTTypeString t
+                         , ValidCheckable t
                          , Pretty t
                          , StatePredicate (Assertion t) t
                          )
@@ -143,8 +140,7 @@ useAnnotatedInvariant invariant stepStrategy ctx aloops eloops aprogs' eprogs' p
 inferInvariant :: ( Embeddable Integer t
                   , Ord t
                   , AssertionParseable t
-                  , SMTString t
-                  , SMTTypeString t
+                  , ValidCheckable t
                   , Pretty t
                   , StatePredicate (Assertion t) t
                   )
@@ -169,7 +165,14 @@ inferInvariant stepStrategy ctx aloops eloops aprogs' eprogs' post =
     _  -> do
       let names = rsipc_programNames ctx
       let lits  = rsipc_programLits ctx
-      result <- Pie.loopInvGen names lits (relBackwardPT' stepStrategy) ctx conds bodies post headStates
+      result <- Pie.loopInvGen names
+                               lits
+                               (relBackwardPT' stepStrategy)
+                               ctx
+                               conds
+                               bodies
+                               post
+                               headStates
       case result of
         Just inv -> relBackwardPT stepStrategy ctx aprogs' eprogs' inv
         Nothing -> do

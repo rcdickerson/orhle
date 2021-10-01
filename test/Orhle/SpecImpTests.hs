@@ -1,7 +1,6 @@
 {-# OPTIONS_GHC -F -pgmF htfpp #-}
 
 module Orhle.SpecImpTests(htf_thisModulesTests) where
-
 import Test.Framework
 
 import Ceili.Assertion

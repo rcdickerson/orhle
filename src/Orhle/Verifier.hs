@@ -33,26 +33,27 @@ rhleVerifier :: SpecImpEnv Integer (SpecImpProgram Integer)
 rhleVerifier iFunEnv triple = do
   let pre = (fmap Concrete) . rhlePre $ triple
   let post = (fmap Concrete) . rhlePost $ triple
-  let prepareProg = populateLoopIds @(SpecImpProgram CValue) @CValue
+  let prepareProg = (populateLoopIds @(SpecImpProgram CValue) @CValue)
                   . (mapImpType Concrete)
-  aprogs <- mapM prepareProg $ rhleAProgs triple
-  eprogs <- mapM prepareProg $ rhleEProgs triple
-  let sFunEnv = mapSpecImpEnvType Concrete iFunEnv
+  aprogs  <- mapM prepareProg $ rhleAProgs triple
+  eprogs  <- mapM prepareProg $ rhleEProgs triple
+  let cFunEnv = mapSpecImpEnvType Concrete iFunEnv
   let names = Set.union (namesIn aprogs) (namesIn eprogs)
-  let lits  = Set.union (litsIn  aprogs) (litsIn  eprogs)
-  let env = mkEnv LogLevelInfo 2000 names
-  wpResult <- runCeili env $ do
+  let lits  = Set.union (litsIn  aprogs) (litsIn eprogs)
+  let env = mkEnv LogLevelDebug 2000 names
+  resultOrErr <- runCeili env $ do
     log_i $ "Collecting loop head states for loop invariant inference..."
-    aLoopHeads <- mapM (headStates sFunEnv) aprogs
-    eLoopHeads <- mapM (headStates sFunEnv) eprogs
+    aLoopHeads <- mapM (headStates cFunEnv) aprogs
+    eLoopHeads <- mapM (headStates cFunEnv) eprogs
     let loopHeads = Map.unions $ aLoopHeads ++ eLoopHeads
+    log_d $ "Loop heads: " ++ show loopHeads
     log_i $ "Running backward relational analysis..."
-    let ptsContext = RelSpecImpPTSContext sFunEnv loopHeads names lits
-    relBackwardPT backwardWithFusion ptsContext aprogs eprogs post
-  case wpResult of
+    let ptsContext = RelSpecImpPTSContext cFunEnv loopHeads names lits
+    wp <- relBackwardPT backwardWithFusion ptsContext aprogs eprogs post
+    checkValid $ Imp pre wp
+  case resultOrErr of
     Left msg  -> return $ Left $ Failure msg
-    Right wp -> do
-      result <- SMT.checkValid $ Imp pre wp
+    Right result -> do
       return $ case result of
         SMT.Valid         -> Right $ Success
         SMT.Invalid model -> Left  $ Failure $ "Verification conditions are invalid. Model: " ++ model
@@ -62,7 +63,7 @@ headStates :: SpecImpEnv CValue (SpecImpProgram CValue)
            -> SpecImpProgram CValue
            -> Ceili (LoopHeadStates CValue)
 headStates env prog = do
-  let ctx = SpecImpEvalContext (Fuel 100) env
+  let ctx = SpecImpEvalContext (Fuel 5) env
   let names = Set.toList $ namesIn prog
   let sts = [ Map.fromList $ map (\n -> (n, Concrete 1)) names
             , Map.fromList $ map (\n -> (n, Concrete 0))  names
