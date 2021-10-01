@@ -123,7 +123,7 @@ instance Evaluable ctx
                                      True  -> vCallsitePre
                                      False -> Exists freshChoiceVars vCallsitePre
     case meetsPre of
-      False -> return Nothing
+      False -> return []
       True -> let
         cvs = Set.fromList freshChoiceVars
         (CAssertion callsiteAssertion callsiteCvs callsiteAConstrs callsiteEConstrs)
@@ -138,7 +138,7 @@ instance Evaluable ctx
                                            callsiteAConstrs
                                            (Set.insert callsiteAssertion callsiteEConstrs)
         stUpdater (assignee, retVar) = Map.insert assignee (constrValue retVar)
-        in return . Just $ foldr stUpdater st (zip assignees freshRetVars)
+        in return [foldr stUpdater st (zip assignees freshRetVars)]
 
 checkArglists :: Specification t -> (SpecCall t e) -> Ceili ()
 checkArglists (Specification params retVars _ _ _) (SpecCall _ args assignees) =
@@ -150,6 +150,19 @@ instantiateParams :: SubstitutableArith t a => [Name] -> [AExp t] -> a -> a
 instantiateParams params args a =
   let toAriths = map aexpToArith args
   in foldr (uncurry subArith) a (zip params toAriths)
+
+
+-----------
+-- BExps --
+-----------
+
+instance SplitOnBExp CValue where
+  splitOnBExp bexp st = do
+    let assertion = assertionAtState st $ bexpToAssertion bexp
+    canBeTrue  <- checkValidB assertion
+    canBeFalse <- checkValidB $ Not assertion
+    return $ ( if canBeFalse then Just st else Nothing
+             , if canBeTrue  then Just st else Nothing )
 
 
 ----------------
@@ -281,17 +294,6 @@ instance ArithAlgebra CValue where
   arExp  = cvalExp
   arMod  = cvalMod
 
-
-------------------------
--- Boolean Operations --
-------------------------
-
-instance BExpAlgebra CValue where
---  beEq
---  beLt
---  beGt
---  beLte
---  beGte
 
 ---------------------
 -- State Predicate --

@@ -45,6 +45,7 @@ module Orhle.SpecImp
   , SpecImpQuantProvider(..)
   , Specification(..)
   , SpecMap
+  , SplitOnBExp(..)
   , impAsgn
   , impCall
   , impIf
@@ -267,6 +268,7 @@ instance FunImplLookup (SpecImpEvalContext t e) e where
 
 instance ( Embeddable Integer t
          , AssertionParseable t
+         , SplitOnBExp t
          , Evaluable (SpecImpEvalContext t e) t (AExp t) t
          , Evaluable (SpecImpEvalContext t e) t e (ImpStep t)
          , Evaluable () t (SpecImpQuant, Specification t, SpecCall t e) (ImpStep t)
@@ -289,8 +291,8 @@ instance ( Embeddable Integer t
 instance ( Embeddable Integer t
          , AssertionParseable t
          , AExpAlgebra t
+         , SplitOnBExp t
          , Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (AExp t) t
-         , Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (BExp t) Bool
          , Evaluable () t (SpecImpQuant, Specification t, SpecCall t (SpecImpProgram t)) (ImpStep t)
          ) => Evaluable (SpecImpEvalContext t (SpecImpProgram t)) t (SpecImpProgram t) (ImpStep t) where
   eval ctx st (In f) = eval ctx st f
@@ -306,7 +308,7 @@ instance CollectLoopHeadStates (SpecImpEvalContext t e) (SpecCall t e) t where
 instance ( Embeddable Integer t
          , Ord t
          , AExpAlgebra t
-         , BExpAlgebra t
+         , SplitOnBExp t
          , AssertionParseable t
          , Evaluable () t (SpecImpQuant, Specification t, SpecCall t (SpecImpProgram t)) (ImpStep t)
          ) => CollectLoopHeadStates (SpecImpEvalContext t (SpecImpProgram t)) (SpecImpProgram t) t where

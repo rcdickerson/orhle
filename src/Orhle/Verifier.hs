@@ -49,9 +49,8 @@ rhleVerifier iFunEnv triple = do
     log_d $ "Loop heads: " ++ show loopHeads
     log_i $ "Running backward relational analysis..."
     let ptsContext = RelSpecImpPTSContext cFunEnv loopHeads names lits
---    wp <- relBackwardPT backwardWithFusion ptsContext aprogs eprogs post
---    checkValid $ Imp pre wp
-    checkValid @Integer ATrue
+    wp <- relBackwardPT backwardWithFusion ptsContext aprogs eprogs post
+    checkValid $ Imp pre wp
   case resultOrErr of
     Left msg  -> return $ Left $ Failure msg
     Right result -> do
@@ -64,7 +63,7 @@ headStates :: SpecImpEnv CValue (SpecImpProgram CValue)
            -> SpecImpProgram CValue
            -> Ceili (LoopHeadStates CValue)
 headStates env prog = do
-  let ctx = SpecImpEvalContext (Fuel 100) env
+  let ctx = SpecImpEvalContext (Fuel 5) env
   let names = Set.toList $ namesIn prog
   let sts = [ Map.fromList $ map (\n -> (n, Concrete 1)) names
             , Map.fromList $ map (\n -> (n, Concrete 0))  names

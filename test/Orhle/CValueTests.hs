@@ -84,7 +84,7 @@ test_oneAEval =
     evalSI = eval @(SpecImpEvalContext CValue (SpecImpProgram CValue))
     task = evalSI evalCtxA stSum0 prog
     retConstr = And [Gte (Num 0) (Var ret), Lt (Var ret) (Num 10)]
-    expected = Just $ Map.fromList
+    expected = (:[]) $ Map.fromList
         [ (r, Constrained (Var ret) Set.empty (Set.singleton retConstr) Set.empty)
         , (rsum, Constrained (Add [Num 0, (Var ret)]) Set.empty (Set.singleton retConstr) Set.empty) ]
   in do
@@ -99,11 +99,11 @@ test_twoAEvals =
     task = do
       evalResult <- evalSI evalCtxA stSum0 prog
       case evalResult of
-        Nothing  -> return $ Nothing
-        Just st' -> evalSI evalCtxA st' prog
+        []   -> return $ []
+        sts' -> return . concat =<< mapM (\s -> evalSI evalCtxA s prog) sts'
     retConst = And [Gte (Num 0) (Var ret), Lt (Var ret) (Num 10)]
     ret1Const = And [Gte (Num 0) (Var ret1), Lt (Var ret1) (Num 10)]
-    expected = Just $ Map.fromList
+    expected = (:[]) $ Map.fromList
         [ (r,    Constrained (Var ret1) Set.empty (Set.singleton ret1Const) Set.empty)
         , (rsum, Constrained (Add [Add [Num 0, Var ret], Var ret1])
                               Set.empty
@@ -121,7 +121,7 @@ test_oneEEval =
     task = evalSI evalCtxE stSum0 prog
     cConst = And [Gte (Num 0) (Var c0), Lt (Var c0) (Num 10)]
     retConst = Eq (Var ret) (Var c0)
-    expected = Just $ Map.fromList
+    expected = (:[]) $ Map.fromList
         [ (r,    Constrained (Var ret)
                              (Set.fromList [c0, ret])
                               Set.empty
@@ -142,13 +142,13 @@ test_twoEEvals =
     task = do
       evalResult <- evalSI evalCtxE stSum0 prog
       case evalResult of
-        Nothing  -> throwError "First evaluation yielded nothing."
-        Just st' -> evalSI evalCtxE st' prog
+        []   -> throwError "First evaluation yielded nothing."
+        sts' -> return . concat =<< mapM (\s -> evalSI evalCtxE s prog) sts'
     cConst = And [Gte (Num 0) (Var c0), Lt (Var c0) (Num 10)]
     retConst = Eq (Var ret) (Var c0)
     c1Const = And [Gte (Num 0) (Var c1), Lt (Var c1) (Num 10)]
     ret1Const = Eq (Var ret1) (Var c1)
-    expected = Just $ Map.fromList
+    expected = (:[]) $ Map.fromList
         [ (r,    Constrained (Var ret1)
                              (Set.fromList [c1, ret1])
                               Set.empty
