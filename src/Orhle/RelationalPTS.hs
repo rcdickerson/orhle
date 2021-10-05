@@ -8,6 +8,7 @@ module Orhle.RelationalPTS
 import Ceili.Assertion
 import Ceili.CeiliEnv
 import Ceili.Embedding
+import Ceili.InvariantInference.Pie
 import Ceili.Language.BExp ( bexpToAssertion )
 import Ceili.Language.Imp ( IterStateMap )
 import Ceili.Name
@@ -23,15 +24,16 @@ import Orhle.SpecImp
 import Orhle.StepStrategy
 import Prettyprinter
 
-data RelSpecImpPTSContext t e = RelSpecImpPTSContext { rsipc_specEnv        :: SpecImpEnv t e
-                                                     , rsipc_loopHeadStates :: LoopHeadStates t
-                                                     , rsipc_programNames   :: Set Name
-                                                     , rsipc_programLits    :: Set t
+data RelSpecImpPTSContext t e = RelSpecImpPTSContext { rsipc_specEnv          :: SpecImpEnv t e
+                                                     , rsipc_loopHeadStates   :: LoopHeadStates t
+                                                     , rsipc_programNames     :: Set Name
+                                                     , rsipc_programLits      :: Set t
+                                                     , rsipc_candidateFilters :: [CandidateFilter t]
                                                      }
 
 toSinglePTSContext :: SpecImpQuant -> RelSpecImpPTSContext t e -> SpecImpPTSContext t e
-toSinglePTSContext quant (RelSpecImpPTSContext specEnv headStates names lits) =
-  SpecImpPTSContext quant specEnv headStates names lits
+toSinglePTSContext quant (RelSpecImpPTSContext specEnv headStates names lits filters) =
+  SpecImpPTSContext quant specEnv headStates names lits filters
 
 combineLoopHeadStates :: Ord t => RelSpecImpPTSContext t e -> [UUID] -> [ProgState t]
 combineLoopHeadStates ctx uuids =
@@ -156,20 +158,23 @@ inferInvariant stepStrategy ctx aloops eloops aprogs' eprogs' post =
   let
     allLoops = aloops ++ eloops
     bodies = ProgramRelation (map body aloops) (map body eloops)
-    conds = And $ map condA allLoops
+    conds = map condA allLoops
     -- TODO: Lockstep
     -- TODO: Variant
     headStates = combineLoopHeadStates ctx $ catMaybes $ map (iwm_id . impWhile_meta) allLoops
   in case headStates of
     [] -> throwError "Insufficient test head states for while loop, did you run populateTestStates?"
     _  -> do
-      let names = rsipc_programNames ctx
-      let lits  = rsipc_programLits ctx
+      let names   = rsipc_programNames ctx
+      let lits    = rsipc_programLits ctx
+      let filters = rsipc_candidateFilters ctx
       result <- Pie.loopInvGen names
                                lits
+                               filters
                                (relBackwardPT' stepStrategy)
                                ctx
-                               conds
+                               (map condA aloops)
+                               (map condA eloops)
                                bodies
                                post
                                headStates

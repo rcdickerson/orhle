@@ -170,6 +170,64 @@ test_twoEEvals =
 -- SMT Queries --
 -----------------
 
+test_pieFilterClause_concreteConsistent = let
+  loopCond  = Lte (Var $ Name "i" 0) (Num $ Concrete 10)
+  candidate = Gt (Var $ Name "i" 0) (Num $ Concrete 5)
+  task      = pieFilterClause [] [loopCond] ATrue candidate
+  in do
+    result <- runCeili (defaultEnv $ namesIn [loopCond, candidate]) task
+    case result of
+      Left err -> assertFailure err
+      Right actual -> assertEqual True actual
+
+test_pieFilterClause_concreteInconsistent = let
+  loopCond  = Lte (Var $ Name "i" 0) (Num $ Concrete 10)
+  candidate = Lt (Var $ Name "i" 0) (Num $ Concrete 5)
+  task      = pieFilterClause [] [loopCond] ATrue candidate
+  in do
+    result <- runCeili (defaultEnv $ namesIn [loopCond, candidate]) task
+    case result of
+      Left err -> assertFailure err
+      Right actual -> assertEqual False actual
+
+test_pieFilterClause_abstractConsistent = let
+  x_a  = Var $ Name "x_a" 0
+  x_e  = Var $ Name "x_e" 0
+  cvar = Name "cvar" 0
+  iterNum = Constrained (Add [x_a, x_e])
+                    (Set.fromList [cvar])
+                    (Set.fromList [ Eq (Num 10) x_a ])
+                    (Set.fromList [ Lte (Num 0) (Var $ cvar)
+                                  , Lt  (Var $ cvar) (Num 10)
+                                  , Eq  x_e (Var $ cvar)] )
+  loopCond  = Not $ Eq (Var $ Name "i" 0) (Num $ iterNum)
+  candidate = Eq (Var $ Name "i" 0) (Num $ Concrete 10)
+  task      = pieFilterClause [] [loopCond] ATrue candidate
+  in do
+    result <- runCeili (defaultEnv $ namesIn [loopCond, candidate]) task
+    case result of
+      Left err -> assertFailure err
+      Right actual -> assertEqual True actual
+
+test_pieFilterClause_abstractInconsistent = let
+  x_a  = Var $ Name "x_a" 0
+  x_e  = Var $ Name "x_e" 0
+  cvar = Name "cvar" 0
+  iterNum = Constrained (Add [x_a, x_e])
+                    (Set.fromList [cvar])
+                    (Set.fromList [ Eq (Num 10) x_a ])
+                    (Set.fromList [ Lte (Num 0) (Var $ cvar)
+                                  , Lt  (Var $ cvar) (Num 10)
+                                  , Eq  x_e (Var $ cvar)] )
+  loopCond  = Not $ Eq (Var $ Name "i" 0) (Num $ iterNum)
+  candidate = Eq (Var $ Name "i" 0) (Num $ Concrete 9)
+  task      = pieFilterClause [] [loopCond] ATrue candidate
+  in do
+    result <- runCeili (defaultEnv $ namesIn [loopCond, candidate]) task
+    case result of
+      Left err -> assertFailure err
+      Right actual -> assertEqual False actual
+
 test_separatingQuery = let
   goodState = Map.fromList [ (Name "e!retVal" 0, Concrete 0)
                            , (Name "e!r" 0, Constrained (Var $ Name "e!ret!" 1)

@@ -64,6 +64,7 @@ module Orhle.SpecImp
 import Ceili.Assertion
 import Ceili.CeiliEnv
 import Ceili.Evaluation
+import Ceili.InvariantInference.Pie
 import Ceili.Language.AExp
 import Ceili.Language.BExp
 import Ceili.Language.Compose
@@ -351,11 +352,12 @@ instance GetLoop t (ImpWhile t (SpecImpProgram t)) where getLoop = Just
 -- Backward Predicate Transform --
 ----------------------------------
 
-data SpecImpPTSContext t e = SpecImpPTSContext { fipc_quant          :: SpecImpQuant
-                                               , fipc_specEnv        :: SpecImpEnv t e
-                                               , fipc_loopHeadStates :: LoopHeadStates t
-                                               , fipc_programNames   :: Set Name
-                                               , fipc_programLits    :: Set t
+data SpecImpPTSContext t e = SpecImpPTSContext { fipc_quant            :: SpecImpQuant
+                                               , fipc_specEnv          :: SpecImpEnv t e
+                                               , fipc_loopHeadStates   :: LoopHeadStates t
+                                               , fipc_programNames     :: Set Name
+                                               , fipc_programLits      :: Set t
+                                               , fipc_candidateFilters :: [CandidateFilter t]
                                                }
 
 instance FunImplLookup (SpecImpPTSContext t (SpecImpProgram t)) (SpecImpProgram t) where
@@ -363,9 +365,10 @@ instance FunImplLookup (SpecImpPTSContext t (SpecImpProgram t)) (SpecImpProgram 
 
 instance ImpPieContextProvider (SpecImpPTSContext t (SpecImpProgram t)) t where
   impPieCtx ctx = ImpPieContext
-    { pc_loopHeadStates = fipc_loopHeadStates ctx
-    , pc_programNames   = fipc_programNames ctx
-    , pc_programLits    = fipc_programLits ctx
+    { pc_loopHeadStates   = fipc_loopHeadStates ctx
+    , pc_programNames     = fipc_programNames ctx
+    , pc_programLits      = fipc_programLits ctx
+    , pc_candidateFilters = fipc_candidateFilters ctx
     }
 
 class SpecImpEnvProvider a t e where

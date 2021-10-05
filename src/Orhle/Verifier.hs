@@ -16,6 +16,7 @@ import Ceili.CeiliEnv
 import Ceili.Literal
 import Ceili.Name
 import qualified Ceili.SMT as SMT
+import Data.List ( isSuffixOf )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Orhle.CValue
@@ -48,7 +49,9 @@ rhleVerifier iFunEnv triple = do
     let loopHeads = Map.unions $ aLoopHeads ++ eLoopHeads
     log_d $ "Loop heads: " ++ show loopHeads
     log_i $ "Running backward relational analysis..."
-    let ptsContext = RelSpecImpPTSContext cFunEnv loopHeads names lits
+    let filters = [ pieFilterClause ]
+    let namesNoRets = Set.filter (\(Name name _) -> not $ "!retVal" `isSuffixOf` name) names
+    let ptsContext = RelSpecImpPTSContext cFunEnv loopHeads namesNoRets lits filters
     wp <- relBackwardPT backwardWithFusion ptsContext aprogs eprogs post
     checkValid $ Imp pre wp
   case resultOrErr of

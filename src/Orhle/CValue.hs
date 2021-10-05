@@ -7,6 +7,7 @@ module Orhle.CValue
   ( CValue(..)
   , CValuePEval(..)
   , pevalCArith
+  , pieFilterClause
   ) where
 
 import Ceili.Assertion
@@ -20,13 +21,12 @@ import Ceili.Name
 import Ceili.ProgState
 import qualified Ceili.SMT as SMT
 import Ceili.StatePredicate
-import Orhle.SpecImp
 import Data.Set ( Set )
 import qualified Data.Set as Set
 import qualified Data.Map as Map
+import Orhle.SpecImp
 import Prettyprinter
 
-import Debug.Trace
 
 ------------
 -- Values --
@@ -165,6 +165,21 @@ instance SplitOnBExp CValue where
              , if canBeTrue  then Just st else Nothing )
 
 
+---------------------------
+-- PIE Predicate Filters --
+---------------------------
+
+pieFilterClause :: [ProgState CValue]
+                -> [Assertion CValue]
+                -> Assertion CValue
+                -> Assertion CValue
+                -> Ceili Bool
+pieFilterClause goodTests loopConds goal clause = do
+--  metByStates <- checkValidB . aAnd $ map (\s -> assertionAtState s clause) goodTests
+  consistent  <- checkSatB   . aAnd $ [aAnd $ map Not loopConds, clause, goal]
+  return consistent -- $ metByStates && consistent
+
+
 ----------------
 -- Assertions --
 ----------------
@@ -225,14 +240,24 @@ verifyCAssertion :: Assertion CValue -> Ceili Bool
 verifyCAssertion assertion = checkValidB assertion
 
 instance ValidCheckable CValue where
-  checkValid logger cvAssertion = let
-    (CAssertion assertion cvs aconstrsSet econstrsSet) = toCAssertion cvAssertion
-    aconstrs = aAnd $ Set.toList aconstrsSet
-    econstrs = aAnd $ Set.toList econstrsSet
-    quantEConstrs = case Set.null cvs of
-                      True -> aAnd [econstrs, assertion]
-                      False -> Exists (Set.toList cvs) $ aAnd [econstrs, assertion]
-    in SMT.checkValid logger $ aImp aconstrs quantEConstrs
+  checkValid logger assertion =
+    let (aconstrs, econstrs) = toSMTQuery assertion
+    in SMT.checkValid logger $ Imp aconstrs econstrs
+
+instance SatCheckable CValue where
+  checkSat logger assertion =
+    let (aconstrs, econstrs) = toSMTQuery assertion
+    in SMT.checkSat logger $ And [aconstrs, econstrs]
+
+toSMTQuery :: Assertion CValue -> (Assertion Integer, Assertion Integer)
+toSMTQuery cvAssertion = let
+  (CAssertion assertion cvs aconstrsSet econstrsSet) = toCAssertion cvAssertion
+  aconstrs = aAnd $ Set.toList aconstrsSet
+  econstrs = aAnd $ Set.toList econstrsSet
+  quantEConstrs = case Set.null cvs of
+                    True -> aAnd [econstrs, assertion]
+                    False -> Exists (Set.toList cvs) $ aAnd [econstrs, assertion]
+  in (aconstrs, quantEConstrs)
 
 
 ---------------------------
