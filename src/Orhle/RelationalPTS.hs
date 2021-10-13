@@ -173,8 +173,7 @@ inferInvariant stepStrategy ctx aloops eloops aprogs' eprogs' post =
                                filters
                                (relBackwardPT' stepStrategy)
                                ctx
-                               (map condA aloops)
-                               (map condA eloops)
+                               conds
                                bodies
                                post
                                headStates
