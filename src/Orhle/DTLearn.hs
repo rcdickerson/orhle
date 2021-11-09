@@ -1,3 +1,7 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+
 module Orhle.DTLearn
   ( learnSeparator
   ) where
@@ -6,26 +10,48 @@ import Ceili.Assertion
 import Ceili.CeiliEnv
 import Ceili.Evaluation
 import Ceili.ProgState
+import Ceili.StatePredicate
 import Control.Monad ( filterM )
+import Data.List ( sortOn )
+import Data.Maybe ( catMaybes )
 import Data.Set ( Set, (\\) )
 import qualified Data.Set as Set
-import Orhle.CValue
 
+-- Learning a DNF formula, a disjunction of clauses.
+-- Each clause is a conjunction of candidate features.
+-- Each clause must rule out *all* bad states.
+-- Each clause must allow at least one good state or it can be safely omitted.
+-- Every good state must be allowed by *at least one* clause.
 
-learnSeparator :: Set (ProgState CValue)
-               -> Set (ProgState CValue)
-               -> Set (Assertion Integer)
-               -> Ceili (Maybe (Assertion Integer))
-learnSeparator goodStates badStates features = do
-  candidates <- return . Set.fromList =<< filterM (satisfiesAll $ Set.toList goodStates) (Set.toList features)
-  learnSeparator' goodStates badStates candidates
+learnSeparator :: ( Ord t
+                  , StatePredicate (Assertion t) t
+                  )
+               => Int
+               -> (Int -> Set (Assertion t))
+               -> [ProgState t]
+               -> [ProgState t]
+               -> Ceili (Maybe (Assertion t))
+learnSeparator maxFeatureSize features badStates goodStates = do
+  let interestingFeature = eliminatesAtLeastOne badStates
+  let startingAtSize size = do
+        candidates <- return . Set.fromList =<< filterM interestingFeature (Set.toList $ features size)
+        mResult <- learnSeparator' candidates (Set.fromList badStates) (Set.fromList goodStates)
+        case mResult of
+          Nothing -> if (size >= maxFeatureSize)
+                     then return Nothing
+                     else startingAtSize (size + 1)
+          Just _  -> return mResult
+  startingAtSize 1
 
-learnSeparator' :: Set (ProgState CValue)
-                -> Set (ProgState CValue)
-                -> Set (Assertion Integer)
-                -> Ceili (Maybe (Assertion Integer))
-learnSeparator' goodStates badStates features = do
-  clauseResult <- learnClause goodStates badStates features Set.empty
+learnSeparator' :: ( Ord t
+                   , StatePredicate (Assertion t) t
+                   )
+                => Set (Assertion t)
+                -> Set (ProgState t)
+                -> Set (ProgState t)
+                -> Ceili (Maybe (Assertion t))
+learnSeparator' features badStates goodStates = do
+  clauseResult <- learnClause badStates goodStates features Set.empty
   case clauseResult of
     Nothing -> return Nothing
     Just (LearnedClause conjuncts allowedGoods) -> do
@@ -35,38 +61,42 @@ learnSeparator' goodStates badStates features = do
         then return . Just $ clause
         else do
           let features' = features \\ conjuncts
-          separator' <- learnSeparator remainingGoods badStates features'
+          separator' <- learnSeparator' features' badStates remainingGoods
           return $ case separator' of
             Nothing   -> Nothing
             Just rest -> Just $ aAnd [clause, rest]
 
-satisfiesAll :: [ProgState CValue]
-             -> Assertion Integer
-             -> Ceili Bool
-satisfiesAll states assertion = case states of
-  [] -> return True
+eliminatesAtLeastOne :: StatePredicate (Assertion t) t
+                     => [ProgState t]
+                     -> Assertion t
+                     -> Ceili Bool
+eliminatesAtLeastOne states assertion = case states of
+  [] -> return False
   state:rest -> do
-    steval <- eval () state (fmap Concrete assertion)
+    steval <- testState assertion state
     case steval of
-      False -> return False
-      True  -> satisfiesAll rest assertion
+      False -> return True
+      True  -> eliminatesAtLeastOne rest assertion
 
 
 ---------------------
 -- Clause Learning --
 ---------------------
 
-data LearnedClause =
-  LearnedClause { lc_conjuncts   :: Set (Assertion Integer)
-                , lc_allowedGood :: Set (ProgState CValue)
+data LearnedClause t =
+  LearnedClause { lc_conjuncts   :: Set (Assertion t)
+                , lc_allowedGood :: Set (ProgState t)
                 }
 
-learnClause :: Set (ProgState CValue)
-            -> Set (ProgState CValue)
-            -> Set (Assertion Integer)
-            -> Set (Assertion Integer)
-            -> Ceili (Maybe LearnedClause)
-learnClause goodStates badStates candidates selected =
+learnClause :: ( Ord t
+               , StatePredicate (Assertion t) t
+               )
+            => Set (ProgState t)
+            -> Set (ProgState t)
+            -> Set (Assertion t)
+            -> Set (Assertion t)
+            -> Ceili (Maybe (LearnedClause t))
+learnClause badStates goodStates candidates selected =
   if Set.null badStates
     then return . Just $ LearnedClause selected goodStates
     else do
@@ -77,12 +107,15 @@ learnClause goodStates badStates candidates selected =
         Just (features, allowedGoods) ->
           Just $ LearnedClause features allowedGoods
 
-scanEliminations :: [Elimination]
-                 -> Set (ProgState CValue)
-                 -> Set (Assertion Integer)
-                 -> Set (Assertion Integer)
-                 -> Ceili ( Maybe ( Set (Assertion Integer)
-                                  , Set (ProgState CValue)))
+scanEliminations :: ( Ord t
+                    , StatePredicate (Assertion t) t
+                    )
+                 => [Elimination t]
+                 -> Set (ProgState t)
+                 -> Set (Assertion t)
+                 -> Set (Assertion t)
+                 -> Ceili ( Maybe ( Set (Assertion t)
+                                  , Set (ProgState t)))
 scanEliminations elims goodStates candidates selected = case elims of
   [] -> return Nothing
   (Elimination feature remainingBad):rest -> do
@@ -98,32 +131,46 @@ scanEliminations elims goodStates candidates selected = case elims of
       -- We got rid of some bad states while keeping some good states.
       -- However, there are still some bad states left. Try adding more conjuncts.
       let features' = Set.delete feature candidates
-      result <- learnClause goodStates remainingBad features' selected'
+      result <- learnClause remainingBad goodStates features' selected'
       case result of
         Nothing -> scanEliminations rest goodStates candidates selected -- Didn't work, backtrack.
         Just (LearnedClause features allowedGoods) ->
           return . Just $ (Set.insert feature features, allowedGoods)
 
-statesMeeting :: Assertion Integer
-              -> Set (ProgState CValue)
-              -> Ceili (Set (ProgState CValue))
+statesMeeting :: forall t.
+                 ( Ord t
+                 , StatePredicate (Assertion t) t
+                 )
+              => Assertion t
+              -> Set (ProgState t)
+              -> Ceili (Set (ProgState t))
 statesMeeting assertion states = do
-  let cvAssertion = fmap Concrete assertion
-  let assertionsAtStates = Set.map (\s -> assertionAtState s cvAssertion) states
---  sequence $ map verifyCAssertion (Set.toList assertionsAtStates)
-  error "unimplemented"
+  let resultPairs state = do result <- testState assertion state; return (state, result)
+  evaluations <- sequence $ map resultPairs (Set.toList states)
+  let statesList = (map fst) . (filter snd) $ evaluations
+  return $ Set.fromList statesList
 
 
 ------------------
 -- Eliminations --
 ------------------
 
-data Elimination =
-  Elimination { elim_feature           :: Assertion Integer
-              , elim_remainingStates   :: Set (ProgState CValue)
+data Elimination t =
+  Elimination { elim_feature            :: Assertion t
+              , elim_remainingBadStates :: Set (ProgState t)
               }
 
-rankEliminations :: Set (ProgState CValue)
-                 -> Set (Assertion Integer)
-                 -> Ceili [Elimination]
-rankEliminations = error "unimplemented"
+rankEliminations :: ( Ord t
+                    , StatePredicate (Assertion t) t
+                    )
+                 => Set (ProgState t)
+                 -> Set (Assertion t)
+                 -> Ceili [Elimination t]
+rankEliminations badStates assertions = do
+  let evalElim assertion = do
+        remainingBadStates <- statesMeeting assertion badStates
+        if Set.size remainingBadStates == Set.size badStates
+          then return Nothing
+          else return . Just $ Elimination assertion remainingBadStates
+  eliminations <- sequence $ map evalElim (Set.toList assertions)
+  return $ sortOn (Set.size . elim_remainingBadStates) (catMaybes eliminations)

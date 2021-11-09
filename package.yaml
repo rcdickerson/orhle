@@ -39,6 +39,7 @@ library:
   exposed-modules:
     - Orhle
     - Orhle.CValue
+    - Orhle.DTLearn
     - Orhle.OrhleParser
     - Orhle.RelationalPTS
     - Orhle.SpecImp

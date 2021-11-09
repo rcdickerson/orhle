@@ -49,9 +49,8 @@ rhleVerifier iFunEnv triple = do
     let loopHeads = Map.unions $ aLoopHeads ++ eLoopHeads
     log_d $ "Loop heads: " ++ show loopHeads
     log_i $ "Running backward relational analysis..."
-    let filters = [ pieFilterClause ]
     let namesNoRets = Set.filter (\(Name name _) -> not $ "!retVal" `isSuffixOf` name) names
-    let ptsContext = RelSpecImpPTSContext cFunEnv loopHeads namesNoRets lits filters
+    let ptsContext = RelSpecImpPTSContext cFunEnv loopHeads namesNoRets lits
     wp <- relBackwardPT backwardWithFusion ptsContext aprogs eprogs post
     checkValid $ Imp pre wp
   case resultOrErr of

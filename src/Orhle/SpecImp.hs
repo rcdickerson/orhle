@@ -64,7 +64,6 @@ module Orhle.SpecImp
 import Ceili.Assertion
 import Ceili.CeiliEnv
 import Ceili.Evaluation
-import Ceili.InvariantInference.Pie
 import Ceili.Language.AExp
 import Ceili.Language.BExp
 import Ceili.Language.Compose
@@ -357,7 +356,6 @@ data SpecImpPTSContext t e = SpecImpPTSContext { fipc_quant            :: SpecIm
                                                , fipc_loopHeadStates   :: LoopHeadStates t
                                                , fipc_programNames     :: Set Name
                                                , fipc_programLits      :: Set t
-                                               , fipc_candidateFilters :: [CandidateFilter t]
                                                }
 
 instance FunImplLookup (SpecImpPTSContext t (SpecImpProgram t)) (SpecImpProgram t) where
@@ -368,7 +366,6 @@ instance ImpPieContextProvider (SpecImpPTSContext t (SpecImpProgram t)) t where
     { pc_loopHeadStates   = fipc_loopHeadStates ctx
     , pc_programNames     = fipc_programNames ctx
     , pc_programLits      = fipc_programLits ctx
-    , pc_candidateFilters = fipc_candidateFilters ctx
     }
 
 class SpecImpEnvProvider a t e where
