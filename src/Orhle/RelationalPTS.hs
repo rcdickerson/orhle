@@ -8,11 +8,11 @@ module Orhle.RelationalPTS
 import Ceili.Assertion
 import Ceili.CeiliEnv
 import Ceili.Embedding
-import Ceili.InvariantInference.Pie
+import qualified Ceili.FeatureLearning.LinearInequalities as LI
+import qualified Ceili.InvariantInference.LoopInvGen as Lig
 import Ceili.Language.BExp ( bexpToAssertion )
 import Ceili.Language.Imp ( IterStateMap )
 import Ceili.Name
-import qualified Ceili.InvariantInference.Pie as Pie
 import Ceili.ProgState
 import Ceili.StatePredicate
 import Data.Maybe ( catMaybes )
@@ -20,6 +20,7 @@ import qualified Data.Map as Map
 import Data.Set ( Set )
 import qualified Data.Set as Set
 import Data.UUID
+import qualified Orhle.DTLearn as DTL
 import Orhle.SpecImp
 import Orhle.StepStrategy
 import Prettyprinter
@@ -28,12 +29,11 @@ data RelSpecImpPTSContext t e = RelSpecImpPTSContext { rsipc_specEnv          ::
                                                      , rsipc_loopHeadStates   :: LoopHeadStates t
                                                      , rsipc_programNames     :: Set Name
                                                      , rsipc_programLits      :: Set t
-                                                     , rsipc_candidateFilters :: [CandidateFilter t]
                                                      }
 
 toSinglePTSContext :: SpecImpQuant -> RelSpecImpPTSContext t e -> SpecImpPTSContext t e
-toSinglePTSContext quant (RelSpecImpPTSContext specEnv headStates names lits filters) =
-  SpecImpPTSContext quant specEnv headStates names lits filters
+toSinglePTSContext quant (RelSpecImpPTSContext specEnv headStates names lits) =
+  SpecImpPTSContext quant specEnv headStates names lits
 
 combineLoopHeadStates :: Ord t => RelSpecImpPTSContext t e -> [UUID] -> [ProgState t]
 combineLoopHeadStates ctx uuids =
@@ -52,6 +52,7 @@ relBackwardPT :: ( Embeddable Integer t
                  , ValidCheckable t
                  , Pretty t
                  , StatePredicate (Assertion t) t
+                 , SatCheckable t
                  )
               => BackwardStepStrategy t
               -> RelSpecImpPTSContext t (SpecImpProgram t)
@@ -68,6 +69,7 @@ relBackwardPT' :: ( Embeddable Integer t
                   , Pretty t
                   , AssertionParseable t
                   , ValidCheckable t
+                  , SatCheckable t
                   , Pretty t
                   , StatePredicate (Assertion t) t
                   )
@@ -109,6 +111,7 @@ useAnnotatedInvariant :: ( Embeddable Integer t
                          , Ord t
                          , AssertionParseable t
                          , ValidCheckable t
+                         , SatCheckable t
                          , Pretty t
                          , StatePredicate (Assertion t) t
                          )
@@ -142,6 +145,7 @@ useAnnotatedInvariant invariant stepStrategy ctx aloops eloops aprogs' eprogs' p
 inferInvariant :: ( Embeddable Integer t
                   , Ord t
                   , AssertionParseable t
+                  , SatCheckable t
                   , ValidCheckable t
                   , Pretty t
                   , StatePredicate (Assertion t) t
@@ -165,18 +169,16 @@ inferInvariant stepStrategy ctx aloops eloops aprogs' eprogs' post =
   in case headStates of
     [] -> throwError "Insufficient test head states for while loop, did you run populateTestStates?"
     _  -> do
-      let names   = rsipc_programNames ctx
-      let lits    = rsipc_programLits ctx
-      let filters = rsipc_candidateFilters ctx
-      result <- Pie.loopInvGen names
-                               lits
-                               filters
+      let names = rsipc_programNames ctx
+      let lits  = rsipc_programLits ctx
+      let lis   = LI.linearInequalities names (Set.map embed lits)
+      result <- Lig.loopInvGen ctx
                                (relBackwardPT' stepStrategy)
-                               ctx
                                conds
                                bodies
                                post
                                headStates
+                               (DTL.learnSeparator 4 lis)
       case result of
         Just inv -> relBackwardPT stepStrategy ctx aprogs' eprogs' inv
         Nothing -> do
