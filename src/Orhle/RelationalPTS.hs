@@ -52,6 +52,7 @@ relBackwardPT :: ( Embeddable Integer t
                  , ValidCheckable t
                  , Pretty t
                  , StatePredicate (Assertion t) t
+                 , SatCheckable t
                  )
               => BackwardStepStrategy t
               -> RelSpecImpPTSContext t (SpecImpProgram t)
@@ -68,6 +69,7 @@ relBackwardPT' :: ( Embeddable Integer t
                   , Pretty t
                   , AssertionParseable t
                   , ValidCheckable t
+                  , SatCheckable t
                   , Pretty t
                   , StatePredicate (Assertion t) t
                   )
@@ -109,6 +111,7 @@ useAnnotatedInvariant :: ( Embeddable Integer t
                          , Ord t
                          , AssertionParseable t
                          , ValidCheckable t
+                         , SatCheckable t
                          , Pretty t
                          , StatePredicate (Assertion t) t
                          )
@@ -142,6 +145,7 @@ useAnnotatedInvariant invariant stepStrategy ctx aloops eloops aprogs' eprogs' p
 inferInvariant :: ( Embeddable Integer t
                   , Ord t
                   , AssertionParseable t
+                  , SatCheckable t
                   , ValidCheckable t
                   , Pretty t
                   , StatePredicate (Assertion t) t
