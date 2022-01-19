@@ -1,6 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 module Orhle.DTLearn
   ( learnSeparator
@@ -8,6 +10,8 @@ module Orhle.DTLearn
 
 import Ceili.Assertion
 import Ceili.CeiliEnv
+import Ceili.Embedding
+import Ceili.Name
 import Ceili.ProgState
 import Ceili.StatePredicate
 import Data.Maybe ( catMaybes )
@@ -23,7 +27,8 @@ import Prettyprinter
 -- Each clause must allow at least one good state or it can be safely omitted.
 -- Every good state must be allowed by *at least one* clause.
 
-learnSeparator :: ( Ord t
+learnSeparator :: ( Embeddable Integer t
+                  , Ord t
                   , StatePredicate (Assertion t) t
                   , SatCheckable t
                   , Pretty t
@@ -34,20 +39,55 @@ learnSeparator :: ( Ord t
                -> [ProgState t]
                -> Ceili (Maybe (Assertion t))
 learnSeparator maxFeatureSize features badStates goodStates = do
-  let startingAtSize size = do
-        log_d $ "[DTLearn] Examining features of size " ++ show size
-        eliminations <- rankEliminations (Set.fromList badStates) (features size)
-        log_d $ "[DTLearn] " ++ show (countEliminations eliminations) ++ " features which eliminate at least one bad state."
-        mResult <- learnSeparator' eliminations (Set.fromList badStates) (Set.fromList goodStates)
-        case mResult of
-          Nothing -> if (size >= maxFeatureSize)
-                     then do (log_d $ "[DTLearn] Unable to find any separator within features of size " ++ show maxFeatureSize)
-                               >> return Nothing
-                     else startingAtSize (size + 1)
-          Just result -> do
-            log_d $ "[DTLearn] Learned separator: " ++ show result
-            return mResult
-  startingAtSize maxFeatureSize --startingAtSize 1
+  if null badStates
+    then pure $ Just ATrue
+    else do
+      --startAtSize 1 maxFeatureSize features badStates goodStates
+      startAtSize maxFeatureSize maxFeatureSize features badStates goodStates
+
+
+startAtSize :: ( Embeddable Integer t
+               , Ord t
+               , StatePredicate (Assertion t) t
+               , SatCheckable t
+               , Pretty t
+               )
+               => Int
+               -> Int
+               -> (Int -> Set (Assertion t))
+               -> [ProgState t]
+               -> [ProgState t]
+               -> Ceili (Maybe (Assertion t))
+startAtSize currentSize maxSize featureGen rawBadStates rawGoodStates = do
+  log_d $ "[DTLearn] Examining features of size " ++ show currentSize
+  let features = featureGen currentSize
+  -- Add missing names to states. TODO: This might not be the best place for this.
+  let allNames = Set.unions $ (Set.toList $ Set.map namesIn features)
+                            ++ map namesIn rawBadStates
+                            ++ map namesIn rawGoodStates
+  let prepareStates = Set.fromList . (map $ addMissingNames (Set.toList allNames))
+  let badStates = prepareStates rawBadStates
+  let goodStates = prepareStates rawGoodStates
+  -------
+  eliminations <- rankEliminations badStates (featureGen currentSize)
+  -- log_d . show $ pretty "***** Eliminations: " <+> pretty eliminations
+  log_d $ "[DTLearn] " ++ show (countEliminations eliminations) ++ " features which eliminate at least one bad state."
+  mResult <- learnSeparator' eliminations badStates goodStates
+  case mResult of
+    Nothing -> if (currentSize >= maxSize)
+               then do (log_d $ "[DTLearn] Unable to find any separator within features of size " ++ show maxSize)
+                         >> pure Nothing
+               else startAtSize (currentSize + 1) maxSize featureGen rawBadStates rawGoodStates
+    Just result -> do
+      log_d $ "[DTLearn] Learned separator: " ++ show result
+      pure mResult
+
+addMissingNames :: forall t. (Ord t, Embeddable Integer t) => [Name] -> ProgState t -> ProgState t
+addMissingNames names progState = foldr
+                                  (\name st -> if Map.member name st
+                                    then st
+                                    else Map.insert name (embed 0) st)
+                                  progState names
 
 learnSeparator' :: ( Ord t
                    , StatePredicate (Assertion t) t
@@ -60,18 +100,19 @@ learnSeparator' :: ( Ord t
                 -> Ceili (Maybe (Assertion t))
 learnSeparator' eliminations badStates goodStates = do
   log_d $ "[DTLearn] Learning clause..."
-  clauseResult <- learnClause eliminations badStates goodStates (Set.empty)
+  clauseResult <- learnClause eliminations badStates goodStates Set.empty
   case clauseResult of
-    Nothing -> return Nothing
+    Nothing -> pure Nothing
     Just lc@(LearnedClause lcElims allowedGoods) -> do
       let clause = aAnd $ Set.toList (lc_conjuncts lc)
+      log_d $ "[DTLearn] Found clause: " ++ show clause
       let remainingGoods = goodStates \\ allowedGoods
       if Set.null remainingGoods
-        then return . Just $ clause
+        then pure . Just $ clause
         else do
           let eliminations' = removeEliminations lcElims eliminations -- No more bad states will be removed by these conjuncts.
           separator' <- learnSeparator' eliminations' badStates remainingGoods
-          return $ case separator' of
+          pure $ case separator' of
             Nothing   -> Nothing
             Just rest -> Just $ aOr [clause, rest]
 
@@ -99,16 +140,22 @@ learnClause :: ( Ord t
             -> Set (Elimination t)
             -> Ceili (Maybe (LearnedClause t))
 learnClause eliminations badStates goodStates selected = do
-  -- log_d . show $ pretty "[DTLearn]   bad states: "  <+> (align . prettyProgStates . Set.toList) badStates
-  -- log_d . show $ pretty "[DTLearn]   good states: " <+> (align . prettyProgStates . Set.toList) goodStates
-  let currentConj = elimSetToClause selected
-  allowedGood <- statesMeeting currentConj goodStates
-  if Set.null allowedGood then
-    return Nothing
-  else if Set.null badStates then
-    return . Just $ LearnedClause selected allowedGood
-  else
-    scanEliminations eliminations badStates allowedGood selected
+  --log_d . show $ pretty "[DTLearn]   bad states: "  <+> (align . prettyProgStates . Set.toList) badStates
+  --log_d . show $ pretty "[DTLearn]   good states: " <+> (align . prettyProgStates . Set.toList) goodStates
+  if Set.null selected
+    then scanEliminations eliminations badStates goodStates selected
+    else do
+      let currentConj = elimSetToClause selected
+      log_d $ "[DTLearn]   selected clauses: " ++ show currentConj
+      allowedGood <- statesMeeting currentConj goodStates
+      log_d $ "[DTLearn]   allowed good count: " ++ show (Set.size allowedGood)
+      -- log_d . show $ pretty "[DTLearn]   allowed good: "  <+> (align . prettyProgStates . Set.toList) allowedGood
+      if Set.null allowedGood then
+        pure Nothing
+      else if Set.null badStates then
+        pure . Just $ LearnedClause selected allowedGood
+      else
+        scanEliminations eliminations badStates allowedGood selected
 
 scanEliminations :: ( Ord t
                     , StatePredicate (Assertion t) t
@@ -122,26 +169,32 @@ scanEliminations :: ( Ord t
                  -> Ceili (Maybe (LearnedClause t))
 scanEliminations elims badStates goodStates selected =
   if Map.null elims
-  then return Nothing
+  then pure Nothing
   else do
     let (selectedElim, elims') = popElimination elims
+    -- log_d . show $ pretty "***** Bad states: " <+> (align . prettyProgStates . Set.toList) badStates
+    -- log_d . show $ pretty "***** Remaining bad states: " <+> (align . prettyProgStates . Set.toList) (elim_remainingBadStates selectedElim)
     let remainingBad = Set.intersection badStates (elim_remainingBadStates selectedElim)
     let selected' = Set.insert selectedElim selected
+    -- log_d $ "*****Selected: " ++ show (elimSetToClause selected')
     allowedGood <- statesMeeting (elimSetToClause selected') goodStates
-    if Set.null allowedGood then
+    if Set.null allowedGood then do
       -- This choice eliminates all the good states. Keep moving down the list.
+      -- log_d $ "****Eliminates all good"
+      -- log_d $ "****Good states: " ++ (show . align . prettyProgStates . Set.toList) goodStates
       scanEliminations elims' badStates goodStates selected
     else if Set.null remainingBad then do
       -- We got rid of all the bad states while allowing some good states. Hooray!
       log_d $ "[DTLearn] Learned clause: " ++ show (elimSetToClause selected')
-      return . Just $ LearnedClause selected' allowedGood
+      pure . Just $ LearnedClause selected' allowedGood
     else do
       -- We got rid of some bad states while keeping some good states.
       -- However, there are still some bad states left. Try adding more conjuncts.
+      -- log_d $ "****Some bad left"
       result <- learnClause elims' remainingBad allowedGood selected'
       case result of
         Nothing -> scanEliminations elims' badStates goodStates selected -- Didn't work, backtrack.
-        Just _  -> return result -- We found a solution.
+        Just _  -> pure result -- We found a solution.
 
 statesMeeting :: forall t.
                  ( Ord t
@@ -151,10 +204,10 @@ statesMeeting :: forall t.
               -> Set (ProgState t)
               -> Ceili (Set (ProgState t))
 statesMeeting assertion states = do
-  let resultPairs state = do result <- testState assertion state; return (state, result)
+  let resultPairs state = do result <- testState assertion state; pure (state, result)
   evaluations <- sequence $ map resultPairs (Set.toList states)
   let statesList = (map fst) . (filter snd) $ evaluations
-  return $ Set.fromList statesList
+  pure $ Set.fromList statesList
 
 
 ------------------
@@ -164,7 +217,17 @@ statesMeeting assertion states = do
 data Elimination t =
   Elimination { elim_feature            :: Assertion t
               , elim_remainingBadStates :: Set (ProgState t)
-              } deriving (Eq, Ord)
+              } deriving (Show, Eq, Ord)
+
+instance Pretty t => Pretty (Elimination t) where
+  pretty (Elimination feature remainingBad) =
+        pretty "Elimination: "
+    <+> pretty feature
+    <>  pretty ", remaining bad: "
+    <+> (align . prettyProgStates . Set.toList) remainingBad
+
+instance CollectableNames (Elimination t) where
+  namesIn (Elimination feature remBad) = Set.union (namesIn feature) (namesIn $ Set.toList remBad)
 
 elimSetToClause :: Set (Elimination t) -> Assertion t
 elimSetToClause elimSet =
@@ -174,6 +237,9 @@ elimSetToClause elimSet =
 
 -- The lower the rank, the better.
 type RankedEliminations t = Map Int (Set (Elimination t))
+
+instance Pretty t => Pretty (RankedEliminations t) where
+  pretty elims = align . pretty . (map Set.toList) $ Map.elems elims
 
 rankEliminations :: ( Ord t
                     , StatePredicate (Assertion t) t
@@ -186,14 +252,14 @@ rankEliminations badStates assertions = do
         remainingBadStates <- statesMeeting assertion badStates
         let remainingBadCount = Set.size remainingBadStates
         if remainingBadCount == Set.size badStates
-          then return Nothing
-          else return . Just $ (remainingBadCount, Elimination assertion remainingBadStates)
+          then pure Nothing
+          else pure . Just $ (remainingBadCount, Elimination assertion remainingBadStates)
   eliminations <- sequence $ map evalElim (Set.toList assertions)
   let insertElim (rank, elim) elimMap = let
         rset = Map.findWithDefault Set.empty rank elimMap
         rset' = Set.insert elim rset
         in Map.insert rank rset' elimMap
-  return $ foldr insertElim Map.empty (catMaybes eliminations)
+  pure $ foldr insertElim Map.empty (catMaybes eliminations)
 
 popElimination :: RankedEliminations t -> (Elimination t, RankedEliminations t)
 popElimination elims =

@@ -15,6 +15,7 @@ import Ceili.Assertion
 import Ceili.CeiliEnv
 import Ceili.Literal
 import Ceili.Name
+import Ceili.ProgState
 import qualified Ceili.SMT as SMT
 import Data.List ( isSuffixOf )
 import qualified Data.Map as Map
@@ -54,7 +55,7 @@ rhleVerifier iFunEnv triple = do
     wp <- relBackwardPT backwardWithFusion ptsContext aprogs eprogs post
     checkValid $ Imp pre wp
   case resultOrErr of
-    Left msg  -> return $ Left $ Failure msg
+    Left msg  -> pure . Left . Failure $ msg
     Right result -> do
       return $ case result of
         SMT.Valid         -> Right $ Success

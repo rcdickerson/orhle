@@ -351,32 +351,32 @@ instance GetLoop t (ImpWhile t (SpecImpProgram t)) where getLoop = Just
 -- Backward Predicate Transform --
 ----------------------------------
 
-data SpecImpPTSContext t e = SpecImpPTSContext { fipc_quant            :: SpecImpQuant
-                                               , fipc_specEnv          :: SpecImpEnv t e
-                                               , fipc_loopHeadStates   :: LoopHeadStates t
-                                               , fipc_programNames     :: Set Name
-                                               , fipc_programLits      :: Set t
+data SpecImpPTSContext t e = SpecImpPTSContext { sipc_quant            :: SpecImpQuant
+                                               , sipc_specEnv          :: SpecImpEnv t e
+                                               , sipc_loopHeadStates   :: LoopHeadStates t
+                                               , sipc_programNames     :: Set Name
+                                               , sipc_programLits      :: Set t
                                                }
 
 instance FunImplLookup (SpecImpPTSContext t (SpecImpProgram t)) (SpecImpProgram t) where
-  lookupFunImpl ctx = lookupFunImpl (sie_impls . fipc_specEnv $ ctx)
+  lookupFunImpl ctx = lookupFunImpl (sie_impls . sipc_specEnv $ ctx)
 
 instance ImpPieContextProvider (SpecImpPTSContext t (SpecImpProgram t)) t where
   impPieCtx ctx = ImpPieContext
-    { pc_loopHeadStates   = fipc_loopHeadStates ctx
-    , pc_programNames     = fipc_programNames ctx
-    , pc_programLits      = fipc_programLits ctx
+    { pc_loopHeadStates = sipc_loopHeadStates ctx
+    , pc_programNames   = sipc_programNames ctx
+    , pc_programLits    = sipc_programLits ctx
     }
 
 class SpecImpEnvProvider a t e where
   getSpecImpEnv :: a -> SpecImpEnv t e
 instance SpecImpEnvProvider (SpecImpPTSContext t e) t e where
-  getSpecImpEnv = fipc_specEnv
+  getSpecImpEnv = sipc_specEnv
 
 class SpecImpQuantProvider a where
   getSpecImpQuant :: a -> SpecImpQuant
 instance SpecImpQuantProvider (SpecImpPTSContext t e) where
-  getSpecImpQuant = fipc_quant
+  getSpecImpQuant = sipc_quant
 
 instance ( Embeddable Integer t
          , ValidCheckable t
