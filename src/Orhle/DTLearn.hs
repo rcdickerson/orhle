@@ -34,16 +34,14 @@ learnSeparator :: ( Embeddable Integer t
                   , Pretty t
                   )
                => Int
-               -> (Int -> Set (Assertion t))
+               -> (Set Name -> Int -> Set (Assertion t))
                -> [ProgState t]
                -> [ProgState t]
                -> Ceili (Maybe (Assertion t))
 learnSeparator maxFeatureSize features badStates goodStates = do
   if null badStates
     then pure $ Just ATrue
-    else do
-      --startAtSize 1 maxFeatureSize features badStates goodStates
-      startAtSize maxFeatureSize maxFeatureSize features badStates goodStates
+    else startAtSize 1 maxFeatureSize features badStates goodStates
 
 
 startAtSize :: ( Embeddable Integer t
@@ -54,24 +52,23 @@ startAtSize :: ( Embeddable Integer t
                )
                => Int
                -> Int
-               -> (Int -> Set (Assertion t))
+               -> (Set Name -> Int -> Set (Assertion t))
                -> [ProgState t]
                -> [ProgState t]
                -> Ceili (Maybe (Assertion t))
 startAtSize currentSize maxSize featureGen rawBadStates rawGoodStates = do
   log_d $ "[DTLearn] Examining features of size " ++ show currentSize
-  let features = featureGen currentSize
   -- Add missing names to states. TODO: This might not be the best place for this.
-  let allNames = Set.unions $ (Set.toList $ Set.map namesIn features)
-                            ++ map namesIn rawBadStates
-                            ++ map namesIn rawGoodStates
+  let allNames = Set.unions $ map namesIn rawBadStates
+                           ++ map namesIn rawGoodStates
   let prepareStates = Set.fromList . (map $ addMissingNames (Set.toList allNames))
   let badStates = prepareStates rawBadStates
   let goodStates = prepareStates rawGoodStates
   -------
-  eliminations <- rankEliminations badStates (featureGen currentSize)
+  log_d $ "[DTLearn] Ranking eliminations"
+  eliminations <- rankEliminations badStates (featureGen allNames currentSize)
   -- log_d . show $ pretty "***** Eliminations: " <+> pretty eliminations
-  log_d $ "[DTLearn] " ++ show (countEliminations eliminations) ++ " features which eliminate at least one bad state."
+  log_d $ "[DTLearn] " ++ show (countEliminations eliminations) ++ " features which eliminate at least one bad state"
   mResult <- learnSeparator' eliminations badStates goodStates
   case mResult of
     Nothing -> if (currentSize >= maxSize)
@@ -193,7 +190,7 @@ scanEliminations elims badStates goodStates selected =
       -- log_d $ "****Some bad left"
       result <- learnClause elims' remainingBad allowedGood selected'
       case result of
-        Nothing -> scanEliminations elims' badStates goodStates selected -- Didn't work, backtrack.
+        Nothing -> pure Nothing -- scanEliminations elims' badStates goodStates selected -- Didn't work, backtrack.
         Just _  -> pure result -- We found a solution.
 
 statesMeeting :: forall t.

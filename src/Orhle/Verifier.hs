@@ -15,7 +15,6 @@ import Ceili.Assertion
 import Ceili.CeiliEnv
 import Ceili.Literal
 import Ceili.Name
-import Ceili.ProgState
 import qualified Ceili.SMT as SMT
 import Data.List ( isSuffixOf )
 import qualified Data.Map as Map

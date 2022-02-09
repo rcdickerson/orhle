@@ -21,7 +21,7 @@ import qualified Data.Map as Map
 import Data.Set ( Set )
 import qualified Data.Set as Set
 import Data.UUID
-import qualified Orhle.DTLearn as DTL
+import qualified Orhle.DTLearn2 as DTL
 import Orhle.SpecImp
 import Orhle.StepStrategy
 import Prettyprinter
@@ -172,23 +172,23 @@ inferInvariant stepStrategy ctx aloops eloops aprogs' eprogs' post =
     _  -> do
       let names = rsipc_programNames ctx
       let lits  = rsipc_programLits ctx
-      -- let lis   = LI.linearInequalities names (Set.map embed lits) 2
-      let lis = Set.fromList [ Lte (Var $ Name "test!1!counter" 0) (Num $ embed @Integer 5)
-                             , Lte (Var $ Name "test!2!counter" 0) (Num $ embed @Integer 5)
-                             , Gte (Var $ Name "test!1!lastTime" 0) (Num $ embed @Integer 0)
-                             , Gte (Var $ Name "test!2!lastTime" 0) (Num $ embed @Integer 0)
-                             , Eq (Sub [Var $ Name "test!1!currentTime" 0, Var $ Name "test!1!lastTime" 0]) (Num $ embed @Integer 100)
-                             , Eq (Sub [Var $ Name "test!2!currentTime" 0, Var $ Name "test!2!lastTime" 0]) (Num $ embed @Integer 101)
-                             , Eq (Var $ Name "test!1!currentTotal" 0) (Mul [Num $ embed @Integer 100, (Var $ Name "test!1!counter" 0)])
-                             , Eq (Var $ Name "test!2!currentTotal" 0) (Mul [Num $ embed @Integer 101, (Var $ Name "test!2!counter" 0)])
-                             ]
+      let lis   = LI.linearInequalities (Set.map embed lits)
+      -- let lis = Set.fromList [ Lte (Var $ Name "test!1!counter" 0) (Num $ embed @Integer 5)
+      --                        , Lte (Var $ Name "test!2!counter" 0) (Num $ embed @Integer 5)
+      --                        , Gte (Var $ Name "test!1!lastTime" 0) (Num $ embed @Integer 0)
+      --                        , Gte (Var $ Name "test!2!lastTime" 0) (Num $ embed @Integer 0)
+      --                        , Eq (Sub [Var $ Name "test!1!currentTime" 0, Var $ Name "test!1!lastTime" 0]) (Num $ embed @Integer 100)
+      --                        , Eq (Sub [Var $ Name "test!2!currentTime" 0, Var $ Name "test!2!lastTime" 0]) (Num $ embed @Integer 101)
+      --                        , Eq (Var $ Name "test!1!currentTotal" 0) (Mul [Num $ embed @Integer 100, (Var $ Name "test!1!counter" 0)])
+      --                        , Eq (Var $ Name "test!2!currentTotal" 0) (Mul [Num $ embed @Integer 101, (Var $ Name "test!2!counter" 0)])
+      --                        ]
       result <- Lig.loopInvGen ctx
                                (relBackwardPT' stepStrategy)
                                conds
                                bodies
                                post
                                headStates
-                               (DTL.learnSeparator 4 (\_ -> lis))
+                               (DTL.learnSeparator 12 2 lis)
       case result of
         Just inv -> relBackwardPT stepStrategy ctx aprogs' eprogs' inv
         Nothing -> do

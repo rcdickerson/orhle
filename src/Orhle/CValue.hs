@@ -242,12 +242,55 @@ verifyCAssertion assertion = checkValidB assertion
 instance ValidCheckable CValue where
   checkValid logger assertion =
     let (aconstrs, econstrs) = toSMTQuery assertion
-    in SMT.checkValid logger $ Imp aconstrs econstrs
+        query = Imp aconstrs econstrs
+    in
+      if isConcrete query
+      then pure $ if eval () (Map.empty :: ProgState Integer) query
+                     then SMT.Valid
+                     else SMT.Invalid "()"
+      else SMT.checkValid logger query
 
 instance SatCheckable CValue where
   checkSat logger assertion =
     let (aconstrs, econstrs) = toSMTQuery assertion
-    in SMT.checkSat logger $ And [aconstrs, econstrs]
+        query = And [aconstrs, econstrs]
+    in
+      if isConcrete query
+      then pure $ if eval () (Map.empty :: ProgState Integer) query
+                     then SMT.Sat "()"
+                     else SMT.Unsat
+      else SMT.checkSat logger query
+
+class IsConcrete t where
+  isConcrete :: t -> Bool
+
+instance IsConcrete (Assertion Integer) where
+  isConcrete assertion = case assertion of
+    ATrue      -> True
+    AFalse     -> True
+    Atom _     -> False
+    Not a      -> isConcrete a
+    And as     -> and $ map isConcrete as
+    Or as      -> and $ map isConcrete as
+    Imp a1 a2  -> isConcrete a1 && isConcrete a2
+    Eq a1 a2   -> isConcrete a1 && isConcrete a2
+    Lt a1 a2   -> isConcrete a1 && isConcrete a2
+    Gt a1 a2   -> isConcrete a1 && isConcrete a2
+    Lte a1 a2  -> isConcrete a1 && isConcrete a2
+    Gte a1 a2  -> isConcrete a1 && isConcrete a2
+    Forall _ _ -> False
+    Exists _ _ -> False
+
+instance IsConcrete (Arith Integer) where
+  isConcrete arith = case arith of
+    Num _     -> True
+    Var _     -> False
+    Add as    -> and $ map isConcrete as
+    Sub as    -> and $ map isConcrete as
+    Mul as    -> and $ map isConcrete as
+    Div a1 a2 -> isConcrete a1 && isConcrete a2
+    Mod a1 a2 -> isConcrete a1 && isConcrete a2
+    Pow a1 a2 -> isConcrete a1 && isConcrete a2
 
 toSMTQuery :: Assertion CValue -> (Assertion Integer, Assertion Integer)
 toSMTQuery cvAssertion = let
