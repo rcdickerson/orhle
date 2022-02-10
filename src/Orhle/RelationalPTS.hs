@@ -172,7 +172,8 @@ inferInvariant stepStrategy ctx aloops eloops aprogs' eprogs' post =
     _  -> do
       let names = rsipc_programNames ctx
       let lits  = rsipc_programLits ctx
-      let lis   = LI.linearInequalities (Set.map embed lits)
+      let lis   = \_ -> LI.linearInequalities (Set.map embed lits) names
+      let separatorLearner =  Lig.SeparatorLearner (DTL.LearnerContext $ Map.empty) (DTL.learnSeparator 12 2 lis)
       -- let lis = Set.fromList [ Lte (Var $ Name "test!1!counter" 0) (Num $ embed @Integer 5)
       --                        , Lte (Var $ Name "test!2!counter" 0) (Num $ embed @Integer 5)
       --                        , Gte (Var $ Name "test!1!lastTime" 0) (Num $ embed @Integer 0)
@@ -188,7 +189,7 @@ inferInvariant stepStrategy ctx aloops eloops aprogs' eprogs' post =
                                bodies
                                post
                                headStates
-                               (DTL.learnSeparator 12 2 lis)
+                               separatorLearner
       case result of
         Just inv -> relBackwardPT stepStrategy ctx aprogs' eprogs' inv
         Nothing -> do
