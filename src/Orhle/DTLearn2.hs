@@ -7,6 +7,7 @@
 
 module Orhle.DTLearn2
   ( LearnerContext(..)
+  , emptyLearnerContext
   , learnSeparator
   ) where
 
@@ -26,113 +27,135 @@ import Data.Map ( Map )
 import qualified Data.Map as Map
 import Prettyprinter
 
+-- Context that we get to keep across invocations of learnSeparator.
+data LearnerContext t = LearnerContext { lctx_unusedFeatures :: Maybe [Assertion t]
+                                       , lctx_usedFeatures   :: Maybe [Feature t]
+                                       , lctx_queue          :: Maybe (DTLQueue t)
+                                       , lctx_lastSeenBads   :: Set (ProgState t)
+                                       }
+
+emptyLearnerContext :: LearnerContext t
+emptyLearnerContext = LearnerContext Nothing Nothing Nothing Set.empty
+
+-- The cost function for queue entries.
+entryScore :: DTLQueueEntry t -> Int
+entryScore (DTLQueueEntry clauses features unrejectedBads unacceptedGoods) =
+  if Set.null unacceptedGoods && Set.null unrejectedBads
+  then fromIntegral (maxBound :: Int)
+  else let
+    unrejectedBadsScore  = -1 * Set.size unrejectedBads
+    unacceptedGoodsScore = -100 * Set.size unacceptedGoods
+    clauseSizeScore      = -10 * length clauses
+    featuresSizeScore    = -1 * length features
+  in unrejectedBadsScore + unacceptedGoodsScore + clauseSizeScore + featuresSizeScore
+
+--------------
+-- Features --
+--------------
 data Feature t = Feature { f_assertion     :: Assertion t
                          , f_rejectedBads  :: Set (ProgState t)
                          , f_acceptedGoods :: Set (ProgState t)
                          } deriving (Ord)
+
 instance Eq t => Eq (Feature t)
   where f1 == f2 = (f_assertion f1) == (f_assertion f2)
 
+
+-------------
+-- Clauses --
+-------------
 data Clause t = Clause { c_features      :: [Feature t]
                        , c_rejectedBads  :: Set (ProgState t)
                        , c_acceptedGoods :: Set (ProgState t)
                        } deriving (Eq, Ord)
 
-singletonClause :: Feature t -> Clause t
-singletonClause feature = Clause [feature] (f_rejectedBads feature) (f_acceptedGoods feature)
+------------
+-- Queues --
+------------
 
-c_size :: Clause t -> Int
-c_size = length . c_features
+type DTLQueue t = Map Int (Set (DTLQueueEntry t))
+data DTLQueueEntry t = DTLQueueEntry { qe_clauses         :: [Clause t]
+                                     , qe_candidate       :: [Feature t]
+                                     , qe_unrejectedBads  :: Set (ProgState t)
+                                     , qe_unacceptedGoods :: Set (ProgState t)
+                                     } deriving (Eq, Ord)
 
--- Context that we get to keep across invocations of learnSeparator.
-data LearnerContext t = LearnerContext { lctx_features     :: Maybe [Feature t]
-                                       , lctx_queue        :: Maybe (FeatureQueue t)
-                                       , lctx_lastSeenBads :: Set (ProgState t)
-                                       }
-
-data SepCtx t = SepCtx { ctx_queue          :: FeatureQueue t
-                       , ctx_features       :: [Feature t]
-                       , ctx_badStates      :: Set (ProgState t)
-                       , ctx_goodStates     :: Set (ProgState t)
-                       , ctx_maxClauseSize  :: Int
-                       }
-
-type FeatureQueue t = Map Int (Set (Clause t))
-
-peekQueue :: FeatureQueue t -> Maybe (Clause t)
-peekQueue queue
+qPeek :: DTLQueue t -> Maybe (DTLQueueEntry t)
+qPeek queue
   | Map.null queue = Nothing
   | otherwise =
       let (_, maxElt) = Map.findMax queue
       in if Set.null maxElt then Nothing else Just $ Set.findMax maxElt
 
-popQueue :: FeatureQueue t -> (Maybe (Clause t), FeatureQueue t)
-popQueue queue = do
+qPop :: DTLQueue t -> (Maybe (DTLQueueEntry t), DTLQueue t)
+qPop queue = do
   let mMaxView = Map.maxViewWithKey queue
   case mMaxView of
     Nothing -> (Nothing, queue)
-    Just ((key, maxSet), queue') -> do
+    Just ((key, maxSet), queue') ->
       let mMaxElt = Set.maxView maxSet
-      case mMaxElt of
+      in case mMaxElt of
         Nothing -> (Nothing, queue')
-        Just (elt, maxSet') -> (Just elt, Map.insert key maxSet' queue')
+        Just (elt, maxSet') ->
+          if Set.null maxSet'
+          then (Just elt, queue')
+          else (Just elt, Map.insert key maxSet' queue')
 
-enqueue :: Ord t => Clause t -> FeatureQueue t -> FeatureQueue t
-enqueue clause queue =
-  let score = scoreClause clause
+qInsert :: Ord t => DTLQueueEntry t -> DTLQueue t -> DTLQueue t
+qInsert entry queue =
+  let score = entryScore entry
   in case Map.lookup score queue of
-    Nothing  -> Map.insert score (Set.singleton clause) queue
-    Just set -> Map.insert score (Set.insert clause set) queue
+    Nothing  -> Map.insert score (Set.singleton entry) queue
+    Just set -> Map.insert score (Set.insert entry set) queue
 
-scoreClause :: Clause t -> Int
-scoreClause clause = (Set.size $ c_rejectedBads clause)
-             + (1000 * (Set.size $ c_acceptedGoods clause))
+qSize :: DTLQueue t -> Int
+qSize = Map.foldr (\set count -> count + Set.size set) 0
 
-queueSize :: FeatureQueue t -> Int
-queueSize = Map.foldr (\set count -> count + Set.size set) 0
+
+-----------------------------
+-- Separator Learner Monad --
+-----------------------------
+
+data SepCtx t = SepCtx { ctx_queue         :: DTLQueue t
+                       , ctx_features      :: [Feature t]
+                       , ctx_maxClauseSize :: Int
+                       }
 
 type SepM t = StateT (SepCtx t) Ceili
 
-getQueue :: SepM t (FeatureQueue t)
+getQueue :: SepM t (DTLQueue t)
 getQueue = get >>= pure . ctx_queue
+
+getQueueSize :: SepM t Int
+getQueueSize = getQueue >>= pure . qSize
 
 getFeatures :: SepM t [Feature t]
 getFeatures = get >>= pure . ctx_features
 
-getBadStates :: SepM t (Set (ProgState t))
-getBadStates = get >>= pure . ctx_badStates
-
-getGoodStates :: SepM t (Set (ProgState t))
-getGoodStates = get >>= pure . ctx_goodStates
-
 getMaxClauseSize :: SepM t Int
 getMaxClauseSize = get >>= pure . ctx_maxClauseSize
 
-putQueue :: (FeatureQueue t) -> SepM t ()
+putQueue :: (DTLQueue t) -> SepM t ()
 putQueue queue = do
-  SepCtx _ features badStates goodStates maxClauseSize <- get
-  put $ SepCtx queue features badStates goodStates maxClauseSize
+  SepCtx _ features maxClauseSize <- get
+  put $ SepCtx queue features maxClauseSize
 
-sPopQueue :: SepM t (Maybe (Clause t))
-sPopQueue = do
+dequeue :: SepM t (Maybe (DTLQueueEntry t))
+dequeue = do
   queue <- getQueue
-  let (elt, queue') = popQueue queue
+  let (elt, queue') = qPop queue
   putQueue queue'
   pure elt
 
-mergeQueue :: Ord t => Pretty t => (FeatureQueue t) -> SepM t ()
-mergeQueue batch = do
+enqueue :: Ord t => DTLQueueEntry t -> SepM t ()
+enqueue entry = do
   queue <- getQueue
-  let newQueue = Map.unionWith Set.union queue batch
-  let newQueueHead = case peekQueue newQueue of
-                       Nothing -> "<empty>"
-                       Just clause -> show . clauseToAssertion $ clause
-  let batchHead = case peekQueue batch of
-                       Nothing -> "<empty>"
-                       Just clause -> show . clauseToAssertion $ clause
-  lift . log_d $ "Appending " ++ (show $ queueSize batch) ++ " to queue, new size " ++ (show $ queueSize newQueue) ++
-    ". Head of queue: " ++ newQueueHead ++ ", head of batch: " ++ batchHead
-  putQueue newQueue
+  putQueue $ qInsert entry queue
+
+
+-------------
+-- Learner --
+-------------
 
 learnSeparator :: ( Embeddable Integer t
                   , Ord t
@@ -149,32 +172,103 @@ learnSeparator :: ( Embeddable Integer t
                -> Ceili (LearnerContext t, Maybe (Assertion t))
 learnSeparator maxClauseSize maxFeatureSize featureGen lctx rawBadStates rawGoodStates
   | null rawBadStates = pure (lctx, Just ATrue)
+  | Set.size (Set.fromList rawBadStates) < length rawBadStates = throwError "Duplicate bad states" -- TODO: Remove
   | otherwise = do
       -- Add missing names to states. TODO: This might not be the best place for this.
       let names = Set.toList . Set.unions $ map namesIn rawBadStates
                                          ++ map namesIn rawGoodStates
-      let prepareStates = map $ addMissingNames names
-      let badStatesList = prepareStates rawBadStates
-      let badStates = Set.fromList badStatesList
+      let prepareStates  = map $ addMissingNames names
+      let badStatesList  = prepareStates rawBadStates
       let goodStatesList = prepareStates rawGoodStates
-      let goodStates = Set.fromList goodStatesList
+      let badStates      = Set.fromList badStatesList
+      let goodStates     = Set.fromList goodStatesList
+      let oldBadStates   = lctx_lastSeenBads lctx
       -------
-      features <- case lctx_features lctx of
-        Just cache -> updateFeatures (lctx_lastSeenBads lctx) badStates cache
-        Nothing -> do
+
+      (unusedFeatures, usedFeatures, newlyUsedFeatures) <- case (lctx_unusedFeatures lctx, lctx_usedFeatures lctx) of
+        (Nothing, Nothing) -> do
           let rawFeatures = Set.toList $ featureGen (Set.fromList names) maxFeatureSize
-          prepareFeatures badStatesList goodStatesList rawFeatures
+          log_d $ "[DTLearn] " ++ (show $ length rawFeatures) ++ " initial features."
+          (unused, used) <- prepareFeatures badStatesList goodStatesList rawFeatures
+          pure (unused, used, used)
+        (Nothing, Just used) -> do
+          updated <- updateFeatures (lctx_lastSeenBads lctx) badStates used
+          pure ([], updated, [])
+        (Just unused, Nothing) -> do
+          (unused', used) <- prepareFeatures badStatesList goodStatesList unused
+          pure (unused', used, used)
+        (Just unused, Just used) -> do
+          updated <- updateFeatures (lctx_lastSeenBads lctx) badStates used
+          (unused', newlyUsed) <- prepareFeatures badStatesList goodStatesList unused
+          pure (unused', updated ++ newlyUsed, newlyUsed)
 
-      queue <- case lctx_queue lctx of
-        Just cache -> updateQueue (lctx_lastSeenBads lctx) badStates cache
-        Nothing -> pure $ foldr enqueue Map.empty $ map singletonClause features
+      initialQueue <- case lctx_queue lctx of
+        Just q  -> updateQueue oldBadStates badStates q
+        Nothing -> pure Map.empty
+      let queue = foldr qInsert initialQueue $ map (featureToEntry badStates goodStates) newlyUsedFeatures
 
-      (queue', mSeparator) <- separatorSearch maxClauseSize features queue badStates goodStates
+      log_d $ "[DTLearn] Beginning separator search. " ++
+        (show $ Set.size badStates) ++ " bad states, " ++
+        (show $ Set.size goodStates) ++ " good states, " ++
+        (show $ length usedFeatures) ++ " used features, " ++
+        (show $ qSize queue) ++ " paths in queue."
 
-      let lctx' = LearnerContext (Just features) (Just queue') badStates
+      case qPeek queue of
+        Nothing -> log_d $ "***** queue is empty"
+        Just qh -> log_d $ "***** Head of queue: " ++ (show . length . qe_clauses $ qh) ++ " clauses plus: " ++ (show . aAnd . (map f_assertion) . qe_candidate $ qh)
+
+      let context = SepCtx queue usedFeatures maxClauseSize
+      (mSeparator, context') <- runStateT (findSeparator badStates goodStates) context
+
+      let lctx' = LearnerContext (Just unusedFeatures) (Just usedFeatures) (Just $ ctx_queue context') badStates
       case mSeparator of
         Nothing -> pure (lctx', Nothing)
         Just separator -> pure (lctx', Just . aOr $ map clauseToAssertion separator)
+
+addMissingNames :: forall t. (Ord t, Embeddable Integer t) => [Name] -> ProgState t -> ProgState t
+addMissingNames names progState = foldr
+                                  (\name st -> if Map.member name st
+                                    then st
+                                    else Map.insert name (embed 0) st)
+                                  progState names
+
+featureToEntry :: Ord t => Set (ProgState t) -> Set (ProgState t) -> Feature t -> DTLQueueEntry t
+featureToEntry badStates goodStates feat@(Feature _ rejectedBads acceptedGoods) =
+  DTLQueueEntry [] [feat] (Set.difference badStates rejectedBads) (Set.difference goodStates acceptedGoods)
+
+splitStates :: forall t.
+                 ( Ord t
+                 , StatePredicate (Assertion t) t
+                 )
+              => Assertion t
+              -> [ProgState t]
+              -> Ceili ([ProgState t], [ProgState t])
+splitStates assertion states = do
+  let resultPairs state = do result <- testState assertion state; pure (state, result)
+  evaluations <- sequence $ map resultPairs states
+  let (accepted, rejected) = List.partition snd evaluations
+  pure (map fst accepted, map fst rejected)
+
+prepareFeatures :: ( Ord t
+                   , StatePredicate (Assertion t) t
+                   , Pretty t )
+                => [ProgState t]
+                -> [ProgState t]
+                -> [Assertion t]
+                -> Ceili ([Assertion t], [Feature t])
+prepareFeatures _ _ [] = pure ([], [])
+prepareFeatures badStates goodStates (a:as) = do
+  (_, rejectedBads) <- splitStates a badStates
+  (restUnused, restUsed) <- prepareFeatures badStates goodStates as
+  if null rejectedBads
+    then pure (a:restUnused, restUsed)
+    else do
+      (acceptedGoods, _) <- splitStates a goodStates
+      if null acceptedGoods
+        then pure (a:restUnused, restUsed)
+        else
+         let feature = Feature a (Set.fromList rejectedBads) (Set.fromList acceptedGoods)
+         in pure (restUnused, feature:restUsed)
 
 updateFeatures :: ( Ord t
                   , StatePredicate (Assertion t) t
@@ -199,189 +293,156 @@ updateQueue :: ( Ord t
                )
             => Set (ProgState t)
             -> Set (ProgState t)
-            -> FeatureQueue t
-            -> Ceili (FeatureQueue t)
+            -> DTLQueue t
+            -> Ceili (DTLQueue t)
 updateQueue oldBadStates newBadStates queue = do
-  -- TODO: Cleanup duplication
+  -- TODO: Cleanup duplication wrt updateFeatures
   let badsToAdd = Set.toList $ Set.difference newBadStates oldBadStates
   let rejects assertion state = do
         result <- testState assertion state
         pure $ if result then Nothing else Just state
-  let updateFeature (Feature assertion bads goods) = do
-        mBads <- sequence $ map (rejects assertion) badsToAdd
-        let newBads = Set.union bads (Set.fromList $ catMaybes mBads)
-        pure $ Feature assertion newBads goods
-  let updateClause (Clause features _ goods) = do
+  let updateFeature (Feature assertion oldRejectedBads oldAcceptedGoods) = do
+        rejectionsToAdd <- sequence $ map (rejects assertion) badsToAdd
+        let newRejectedBads = Set.union oldRejectedBads (Set.fromList $ catMaybes rejectionsToAdd)
+        pure $ Feature assertion newRejectedBads oldAcceptedGoods
+  let updateClause (Clause features oldRejectedBads oldAcceptedGoods) = do
         features' <- sequence $ map updateFeature features
-        let bads' = Set.unions $ map f_rejectedBads features'
-        pure $ Clause features' bads' goods
-  let queueList = foldr (++) [] $ map Set.toList $ Map.elems queue
-  queueList' <- sequence $ map updateClause queueList
-  pure $ foldr enqueue Map.empty queueList'
+        let newRejectedBads = Set.unions $ map f_rejectedBads features'
+        if and $ map (flip Set.member $ newRejectedBads) badsToAdd
+               then pure . Just $ Clause features' newRejectedBads oldAcceptedGoods
+               else pure Nothing
+  let updateEntry (DTLQueueEntry clauses candidate unrejectedBads unacceptedGoods) = do
+        mClauses' <- sequence $ map updateClause clauses
+        let clauses' = catMaybes mClauses'
+        if length clauses' < length mClauses'
+          then pure Nothing
+          else do
+            candidate' <- sequence $ map updateFeature candidate
+            let rejectedBads' = Set.unions $ map f_rejectedBads candidate'
+            pure . Just $ DTLQueueEntry clauses' candidate' (Set.difference newBadStates rejectedBads') unacceptedGoods
 
-prepareFeatures :: ( Ord t
-                   , StatePredicate (Assertion t) t
-                   , Pretty t )
-                => [ProgState t]
-                -> [ProgState t]
-                -> [Assertion t]
-                -> Ceili [Feature t]
-prepareFeatures _ _ [] = pure []
-prepareFeatures badStates goodStates (a:as) = do
-  (_, rejectedBads) <- splitStates a badStates
-  rest <- prepareFeatures badStates goodStates as
-  if null rejectedBads
-    then pure rest
-    else do
-      acceptedGoods <- lookupAcceptedGoods a goodStates
-      if null acceptedGoods
-        then pure rest
-        else
-          let feature = Feature a (Set.fromList rejectedBads) acceptedGoods
-          in pure (feature:rest)
+  let queueList = concat $ map Set.toList $ Map.elems queue
+  mQueueList' <- sequence $ map updateEntry queueList
+  let queue' = foldr qInsert Map.empty (catMaybes mQueueList')
+  log_d $ "[DTLearn] Queue updated, removed " ++ (show $ qSize queue - qSize queue') ++ " item(s)."
+  pure queue'
 
-lookupAcceptedGoods :: ( Ord t
-                       , StatePredicate (Assertion t) t
-                       , Pretty t )
-                    => Assertion t
-                    -> [ProgState t]
-                    -> Ceili (Set (ProgState t))
-lookupAcceptedGoods assertion goodStates = do
-  (acceptedGoodsList, _) <- splitStates assertion goodStates
-  let acceptedGoods = Set.fromList acceptedGoodsList
-  pure acceptedGoods
-
-separatorSearch :: ( Ord t
-                   , StatePredicate (Assertion t) t
-                   , Pretty t
-                   )
-                => Int
-                -> [Feature t]
-                -> FeatureQueue t
-                -> Set (ProgState t)
-                -> Set (ProgState t)
-                -> Ceili (FeatureQueue t, Maybe [Clause t])
-separatorSearch maxClauseSize features queue badStates goodStates = do
-  let context = SepCtx queue features badStates goodStates maxClauseSize
-  log_d $ "[DTLearn] Beginning clause search. " ++ (show $ Set.size badStates) ++ " bad states, " ++
-    (show $ Set.size goodStates) ++ " good states, " ++ (show $ length features) ++ " features."
-  (mClause, newContext) <- runStateT clauseSearch context
-  let queue' = ctx_queue newContext
-  case mClause of
-    Nothing -> pure (queue', Nothing)
-    Just clause -> do
-      log_d $ "**** Found clause: " ++ show (clauseToAssertion clause)
-      let remainingGoods = Set.difference goodStates $ c_acceptedGoods clause
-      if Set.null remainingGoods
-        then pure (queue', Just [clause])
-        else do
-          log_d $ "**** " ++ show (Set.size remainingGoods) ++ " remaining good states left"
-          let filterGoods (Feature assertion rejectedBads acceptedGoods) =
-                let goods' = Set.intersection acceptedGoods remainingGoods
-                in if Set.null goods' then Nothing else Just $ Feature assertion rejectedBads goods'
-          let features' = catMaybes $ map filterGoods features
-          (lctx'', mNextSep) <- separatorSearch maxClauseSize features' queue' badStates remainingGoods
-          case mNextSep of
-            Nothing -> pure (lctx'', Nothing)
-            Just rest -> pure (lctx'', Just $ clause:rest)
-
-addMissingNames :: forall t. (Ord t, Embeddable Integer t) => [Name] -> ProgState t -> ProgState t
-addMissingNames names progState = foldr
-                                  (\name st -> if Map.member name st
-                                    then st
-                                    else Map.insert name (embed 0) st)
-                                  progState names
-
-splitStates :: forall t.
-                 ( Ord t
+findSeparator :: ( Ord t
                  , StatePredicate (Assertion t) t
+                 , Pretty t
                  )
-              => Assertion t
-              -> [ProgState t]
-              -> Ceili ([ProgState t], [ProgState t])
-splitStates assertion states = do
-  let resultPairs state = do result <- testState assertion state; pure (state, result)
-  evaluations <- sequence $ map resultPairs states
-  let (accepted, rejected) = List.partition snd evaluations
-  pure (map fst accepted, map fst rejected)
+              => Set (ProgState t)
+              -> Set (ProgState t)
+              -> SepM t (Maybe [Clause t])
+findSeparator badStates goodStates = do
+  mEntry <- dequeue
+  case mEntry of
+    Nothing    -> do
+      -- Queue is empty, fail.
+      lift . log_d $ "[DTLearn] Search queue is empty, giving up."
+      pure Nothing
+    Just entry -> case (qe_candidate entry) of
+      [] -> do
+        lift . log_d $ "******* Found empty candidate, reseeding."
+        allFeatures <- getFeatures
+        let toEntry feat@(Feature _ rejectedBads acceptedGoods) =
+                DTLQueueEntry (qe_clauses entry) [feat] (Set.difference badStates rejectedBads) (Set.difference goodStates acceptedGoods)
+        mapM_ enqueue $ map toEntry allFeatures
+        findSeparator badStates goodStates
+      _  -> if Set.null (qe_unacceptedGoods entry) && Set.null (qe_unrejectedBads entry)
+            then do
+                -- No more remaining good states to cover, succeed.
+                clauses <- entryToClauses badStates goodStates entry
+                lift . log_d $ "[DTLearn] Found separator: " ++ (show $ clausesToAssertion clauses)
+                enqueue entry -- Re-enqueue in case we need to revisit after further counterexamples.
+                pure $ Just clauses
+            else enqueueNext badStates goodStates entry >> findSeparator badStates goodStates
 
-clauseSearch :: ( Ord t
-                , StatePredicate (Assertion t) t
-                , Pretty t
-                ) => SepM t (Maybe (Clause t))
-clauseSearch = do
-  mCandidate <- sPopQueue
-  case mCandidate of
-    Nothing -> pure Nothing -- Queue is empty, we're done.
-    Just candidate -> do
-      mResult <- appendNextFeatures candidate
-      case mResult of
-        Nothing -> clauseSearch
-        Just clause -> pure $ Just clause
+entryToClauses :: ( Ord t
+                  , StatePredicate (Assertion t) t)
+               => Set (ProgState t)
+               -> Set (ProgState t)
+               -> DTLQueueEntry t
+               -> SepM t [Clause t]
+entryToClauses badStates goodStates (DTLQueueEntry clauses candidate _ _) = case candidate of
+  [] -> pure clauses
+  _  ->  do
+    let candidateAssertion = aAnd $ map f_assertion candidate
+    (_, rejectedBads)  <- lift $ splitStates candidateAssertion (Set.toList badStates)
+    (acceptedGoods, _) <- lift $ splitStates candidateAssertion (Set.toList goodStates)
+    let clause' = Clause candidate (Set.fromList rejectedBads) (Set.fromList acceptedGoods)
+    pure $ clause':clauses
 
-appendNextFeatures :: ( Ord t
-                      , StatePredicate (Assertion t) t
-                      , Pretty t
-                      )
-                   => Clause t
-                   -> SepM t (Maybe (Clause t))
-appendNextFeatures candidate = do
+clausesToAssertion :: [Clause t] -> Assertion t
+clausesToAssertion = aOr . concat . map (map f_assertion . c_features)
+
+enqueueNext :: ( Ord t
+               , StatePredicate (Assertion t) t
+               , Pretty t
+               )
+            => Set (ProgState t)
+            -> Set (ProgState t)
+            -> DTLQueueEntry t
+            -> SepM t ()
+enqueueNext badStates goodStates entry@(DTLQueueEntry _ entryFeatures unrejectedBads unacceptedGoods) = do
   maxClauseSize <- getMaxClauseSize
-  if c_size candidate >= maxClauseSize
-    then pure Nothing
+  if length entryFeatures >= maxClauseSize
+    then pure ()
     else do
-      features <- getFeatures
-      resultOrBatch <- nextQueueBatch features candidate Map.empty
-      case resultOrBatch of
-        Right result -> pure $ Just result
-        Left batch -> mergeQueue batch >> pure Nothing
+      allFeatures <- getFeatures
+      let useful feature = (not $ Set.disjoint (f_acceptedGoods feature) unacceptedGoods)
+                        && (not $ Set.disjoint (f_rejectedBads  feature) unrejectedBads)
+      let usefulFeatures = filter useful allFeatures
+--      lift . log_d $ "[DTLearn] Considering " ++ (show $ length usefulFeatures) ++ " useful features."
+      nextLevel <- nextEntries badStates goodStates entry usefulFeatures
+      if length nextLevel > 0
+        then lift . log_d $ "[DTLearn] Enqueueing " ++ (show $ length nextLevel) ++ " new search paths."
+        else pure ()
+--      lift . log_d $ "**** (head): " ++ (if null nextLevel then "<empty>" else show . aAnd . (map f_assertion) . qe_candidate . head $ nextLevel)
+      mapM_ enqueue nextLevel
 
-nextQueueBatch :: ( Ord t
-                  , StatePredicate (Assertion t) t
-                  , Pretty t
-                  )
-               => [Feature t]
-               -> Clause t
-               -> FeatureQueue t
-               -> SepM t (Either (FeatureQueue t) (Clause t))
-nextQueueBatch [] _ batch = pure $ Left batch
-nextQueueBatch (feature:rest) candidate batch = do
-  finished <- clauseRejectsAllBads candidate
-  if finished
-    then pure $ Right candidate
+
+nextEntries :: ( Ord t
+               , StatePredicate (Assertion t) t
+               , Pretty t
+               )
+            => Set (ProgState t)
+            -> Set (ProgState t)
+            -> DTLQueueEntry t
+            -> [Feature t]
+            -> SepM t [DTLQueueEntry t]
+nextEntries _ _ _ [] = pure []
+nextEntries badStates goodStates entry@(DTLQueueEntry oldClauses oldCandidate oldUnrejectedBads oldUnacceptedGoods) (newFeature:rest) = do
+  let newCandidate = newFeature:oldCandidate
+  let newAssertion = aAnd $ map f_assertion newCandidate
+  (newAcceptedGoodsList, _) <- lift $ splitStates newAssertion $ Set.toList goodStates
+  let newAcceptedGoods = Set.fromList newAcceptedGoodsList
+  let clauseAcceptedGoods = foldr Set.union Set.empty $ map c_acceptedGoods oldClauses
+  if Set.isSubsetOf newAcceptedGoods clauseAcceptedGoods
+    then nextEntries badStates goodStates entry rest -- The proposed clause isn't buying us anything.
     else do
-      mCandidate' <- addFeature candidate feature
-      case mCandidate' of
-        Nothing -> nextQueueBatch rest candidate batch
-        Just candidate' -> nextQueueBatch rest candidate (enqueue candidate' batch)
-
-clauseRejectsAllBads :: Eq t => Clause t -> SepM t Bool
-clauseRejectsAllBads clause = do
-  badStates <- getBadStates
-  pure $ (c_rejectedBads clause) == badStates
-
-addFeature :: ( Ord t
-              , StatePredicate (Assertion t) t
-              , Pretty t
-              )
-           => Clause t
-           -> Feature t
-           -> SepM t (Maybe (Clause t))
-addFeature clause feature = do
-  goodStates <- getGoodStates
-  let oldRejectedBads = c_rejectedBads clause
-  if Set.isSubsetOf (f_rejectedBads feature) oldRejectedBads
-    then pure Nothing
-    else do
-      if Set.null $ Set.intersection (f_acceptedGoods feature) goodStates
-        then pure Nothing
+      let newRejectedBads = Set.unions (map f_rejectedBads newCandidate)
+      let newUnrejectedBads = Set.difference badStates newRejectedBads
+      let newUnacceptedGoods = Set.difference goodStates $ Set.union newAcceptedGoods clauseAcceptedGoods
+      if Set.null newUnrejectedBads
+        then do
+          newClauses <- entryToClauses badStates goodStates entry
+          newEntries <- seedNewClause badStates goodStates newClauses
+          pure . (newEntries ++) =<< nextEntries badStates goodStates entry rest
         else do
-          let newAssertion = aAnd [f_assertion feature, clauseToAssertion clause]
-          let newRejectedBads = Set.union (f_rejectedBads feature) oldRejectedBads
-          newAcceptedGoods <- lift $ lookupAcceptedGoods newAssertion $ Set.toList goodStates
-          if Set.null newAcceptedGoods
-            then pure Nothing
-            else pure . Just $ Clause (feature:c_features clause) newRejectedBads newAcceptedGoods
+          let newEntry = DTLQueueEntry oldClauses newCandidate newUnrejectedBads newUnacceptedGoods
+          pure . (newEntry:) =<< nextEntries badStates goodStates entry rest
+
+seedNewClause :: Ord t => Set (ProgState t) -> Set (ProgState t) -> [Clause t] -> SepM t [DTLQueueEntry t]
+seedNewClause badStates goodStates clauses = do
+  allFeatures <- getFeatures
+  let createEntry feature@(Feature _ rejectedBads acceptedGoods) =
+        let
+          unrejectedBads  = Set.difference badStates rejectedBads
+          unacceptedGoods = Set.difference goodStates acceptedGoods
+        in DTLQueueEntry clauses [feature] unrejectedBads unacceptedGoods
+  pure $ map createEntry allFeatures
+
 
 clauseToAssertion :: Clause t -> Assertion t
 clauseToAssertion = aAnd . (map f_assertion) . c_features
