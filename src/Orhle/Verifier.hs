@@ -15,7 +15,9 @@ import Ceili.Assertion
 import Ceili.CeiliEnv
 import Ceili.Literal
 import Ceili.Name
+import Ceili.ProgState
 import qualified Ceili.SMT as SMT
+import Control.Monad.Trans ( lift )
 import Data.List ( isSuffixOf )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -24,6 +26,7 @@ import Orhle.RelationalPTS
 import Orhle.SpecImp
 import Orhle.StepStrategy
 import Orhle.Triple
+import System.Random
 
 data Failure  = Failure { failMessage :: String } deriving Show
 data Success  = Success { }
@@ -44,8 +47,8 @@ rhleVerifier iFunEnv triple = do
   let env = mkEnv LogLevelDebug 2000 names
   resultOrErr <- runCeili env $ do
     log_i $ "Collecting loop head states for loop invariant inference..."
-    aLoopHeads <- mapM (headStates cFunEnv) aprogs
-    eLoopHeads <- mapM (headStates cFunEnv) eprogs
+    aLoopHeads <- mapM (headStates 5 cFunEnv) aprogs
+    eLoopHeads <- mapM (headStates 5 cFunEnv) eprogs
     let loopHeads = Map.unions $ aLoopHeads ++ eLoopHeads
     log_d $ "Loop heads: " ++ show loopHeads
     log_i $ "Running backward relational analysis..."
@@ -61,13 +64,22 @@ rhleVerifier iFunEnv triple = do
         SMT.Invalid model -> Left  $ Failure $ "Verification conditions are invalid. Model: " ++ model
         SMT.ValidUnknown  -> Left  $ Failure "Solver returned unknown."
 
-headStates :: SpecImpEnv CValue (SpecImpProgram CValue)
+headStates :: Int
+           -> SpecImpEnv CValue (SpecImpProgram CValue)
            -> SpecImpProgram CValue
            -> Ceili (LoopHeadStates CValue)
-headStates env prog = do
-  let ctx = SpecImpEvalContext (Fuel 5) env
+headStates numRandomStates env prog = do
+  let ctx = SpecImpEvalContext (Fuel 10) env
   let names = Set.toList $ namesIn prog
+  randomStates <- sequence . take numRandomStates . repeat $ randomState names
   let sts = [ Map.fromList $ map (\n -> (n, Concrete 1)) names
             , Map.fromList $ map (\n -> (n, Concrete 0))  names
             , Map.fromList $ map (\n -> (n, Concrete $ -1))  names ]
+            ++ randomStates
   collectLoopHeadStates ctx sts prog
+
+randomState :: [Name] -> Ceili (ProgState CValue)
+randomState names = do
+  g <- lift . lift $ newStdGen
+  let values = map Concrete $ take (length names) (randomRs (-1000, 1000) g :: [Integer])
+  pure $ Map.fromList $ zip names values
