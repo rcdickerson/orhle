@@ -10,7 +10,7 @@ import Ceili.Assertion
 import Ceili.CeiliEnv
 import Ceili.Embedding
 import qualified Ceili.FeatureLearning.LinearInequalities as LI
-import qualified Ceili.InvariantInference.LoopInvGen as Lig
+--import qualified Ceili.InvariantInference.LoopInvGen as Lig
 import Ceili.Language.BExp ( bexpToAssertion )
 import Ceili.Language.Imp ( IterStateMap )
 import Ceili.Name
@@ -21,7 +21,8 @@ import qualified Data.Map as Map
 import Data.Set ( Set )
 import qualified Data.Set as Set
 import Data.UUID
-import qualified Orhle.DTLearn2 as DTL
+import qualified Orhle.DTInvGen as DTI
+--import qualified Orhle.DTLearn2 as DTL
 import Orhle.SpecImp
 import Orhle.StepStrategy
 import Prettyprinter
@@ -80,16 +81,16 @@ relBackwardPT' :: ( Embeddable Integer t
                -> Assertion t
                -> Ceili (Assertion t)
 relBackwardPT' stepStrategy ctx (ProgramRelation aprogs eprogs) post = do
-  log_d   "[RelationalPTS] --------------------------------"
-  log_d   "[RelationalPTS] Taking step on:"
-  log_d $ "[RelationalPTS] Post: " ++ (show $ pretty post)
-  log_d $ "[RelationalPTS] Universal programs:"
-  log_d $ show $ indent 16 $ vsep (map (\p -> pretty "--------" <> hardline <> pretty p) aprogs) <> hardline
-  log_d $ "[RelationalPTS] Existential programs:"
-  log_d $ show $ indent 16 $ vsep (map (\p -> pretty "--------" <> hardline <> pretty p) eprogs) <> hardline
+  -- log_d   "[RelationalPTS] --------------------------------"
+  -- log_d   "[RelationalPTS] Taking step on:"
+  -- log_d $ "[RelationalPTS] Post: " ++ (show $ pretty post)
+  -- log_d $ "[RelationalPTS] Universal programs:"
+  -- log_d $ show $ indent 16 $ vsep (map (\p -> pretty "--------" <> hardline <> pretty p) aprogs) <> hardline
+  -- log_d $ "[RelationalPTS] Existential programs:"
+  -- log_d $ show $ indent 16 $ vsep (map (\p -> pretty "--------" <> hardline <> pretty p) eprogs) <> hardline
   Step selection aprogs' eprogs' <- stepStrategy aprogs eprogs
-  log_d $ "[RelationalPTS] Step: " ++ (show $ pretty selection)
-  log_d   "[RelationalPTS] --------------------------------"
+  -- log_d $ "[RelationalPTS] Step: " ++ (show $ pretty selection)
+  -- log_d   "[RelationalPTS] --------------------------------"
   case selection of
     NoSelectionFound ->
       case (aprogs', eprogs') of
@@ -172,8 +173,8 @@ inferInvariant stepStrategy ctx aloops eloops aprogs' eprogs' post =
     _  -> do
       let names = rsipc_programNames ctx
       let lits  = rsipc_programLits ctx
-      let lis   = \_ -> LI.linearInequalities (Set.map embed lits) names
-      let separatorLearner =  Lig.SeparatorLearner DTL.emptyLearnerContext (DTL.learnSeparator 12 2 lis) DTL.resetQueue
+      let lis   = LI.linearInequalities (Set.map embed lits) names
+      --let separatorLearner =  Lig.SeparatorLearner DTL.emptyLearnerContext (DTL.learnSeparator 12 2 lis) DTL.resetQueue
       -- let lis = Set.fromList [ Lte (Var $ Name "test!1!counter" 0) (Num $ embed @Integer 5)
       --                        , Lte (Var $ Name "test!2!counter" 0) (Num $ embed @Integer 5)
       --                        , Gte (Var $ Name "test!1!lastTime" 0) (Num $ embed @Integer 0)
@@ -183,13 +184,14 @@ inferInvariant stepStrategy ctx aloops eloops aprogs' eprogs' post =
       --                        , Eq (Var $ Name "test!1!currentTotal" 0) (Mul [Num $ embed @Integer 100, (Var $ Name "test!1!counter" 0)])
       --                        , Eq (Var $ Name "test!2!currentTotal" 0) (Mul [Num $ embed @Integer 101, (Var $ Name "test!2!counter" 0)])
       --                        ]
-      result <- Lig.loopInvGen ctx
-                               (relBackwardPT' stepStrategy)
-                               conds
-                               bodies
-                               post
-                               headStates
-                               separatorLearner
+      -- result <- Lig.loopInvGen ctx
+      --                          (relBackwardPT' stepStrategy)
+      --                          conds
+      --                          bodies
+      --                          post
+      --                          headStates
+      --                          separatorLearner
+      result <- DTI.dtInvGen ctx 2 12 (relBackwardPT' stepStrategy) conds bodies post headStates lis
       case result of
         Just inv -> relBackwardPT stepStrategy ctx aprogs' eprogs' inv
         Nothing -> do
