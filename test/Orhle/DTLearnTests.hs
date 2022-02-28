@@ -37,14 +37,14 @@ runAndAssertEquivalent expected actual = do
         Nothing        -> assertFailure "Expected assertion, got Nothing."
         Just assertion -> assertEquivalent expected assertion
 
-test_simpleSeparator = let
-  x          = Name "x" 0
-  names      = Set.singleton x
-  lits       = Set.empty
-  badStates  = [ Map.fromList [(Name "x" 0,  0)]
-               , Map.fromList [(Name "x" 0, -1)]
-               , Map.fromList [(Name "x" 0, -5)] ]
-  goodStates = [ Map.fromList [(Name "x" 0, 1)]
-               , Map.fromList [(Name "x" 0, 5)] ]
-  expected   = Lt @Integer (Num 0) (Var x)
-  in runAndAssertEquivalent expected $ learnSeparator 2 (linearInequalities names lits) badStates goodStates
+-- test_simpleSeparator = let
+--   x          = Name "x" 0
+--   names      = Set.singleton x
+--   lits       = Set.empty
+--   badStates  = [ Map.fromList [(Name "x" 0,  0)]
+--                , Map.fromList [(Name "x" 0, -1)]
+--                , Map.fromList [(Name "x" 0, -5)] ]
+--   goodStates = [ Map.fromList [(Name "x" 0, 1)]
+--                , Map.fromList [(Name "x" 0, 5)] ]
+--   expected   = Lt @Integer (Num 0) (Var x)
+--   in runAndAssertEquivalent expected $ learnSeparator 2 (linearInequalities names lits) badStates goodStates

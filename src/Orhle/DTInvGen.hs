@@ -8,6 +8,17 @@
 
 module Orhle.DTInvGen
   ( dtInvGen
+
+  -- Exposed for testing.
+  , Clause(..)
+  , DtiEnv(..)
+  , DtiM
+  , DTLQueue
+  , DTLQueueEntry(..)
+  , Feature(..)
+  , addBadState
+  , qInsert
+  , updateQueue
   ) where
 
 import Ceili.Assertion
@@ -27,6 +38,7 @@ import Data.Maybe ( catMaybes )
 import Data.Set ( Set )
 import qualified Data.Set as Set
 import Prettyprinter
+import System.Random ( randomRIO )
 
 
 --------------
@@ -35,7 +47,7 @@ import Prettyprinter
 data Feature t = Feature { f_assertion     :: Assertion t
                          , f_rejectedBads  :: Set (ProgState t)
                          , f_acceptedGoods :: Set (ProgState t)
-                         } deriving (Ord)
+                         } deriving (Ord, Show)
 
 instance Eq t => Eq (Feature t)
   where f1 == f2 = (f_assertion f1) == (f_assertion f2)
@@ -47,7 +59,7 @@ instance Eq t => Eq (Feature t)
 data Clause t = Clause { c_features      :: [Feature t]
                        , c_rejectedBads  :: Set (ProgState t)
                        , c_acceptedGoods :: Set (ProgState t)
-                       } deriving (Eq, Ord)
+                       } deriving (Eq, Ord, Show)
 
 ------------
 -- Queues --
@@ -58,7 +70,7 @@ data DTLQueueEntry t = DTLQueueEntry { qe_clauses         :: [Clause t]
                                      , qe_candidate       :: [Feature t]
                                      , qe_unrejectedBads  :: Set (ProgState t)
                                      , qe_unacceptedGoods :: Set (ProgState t)
-                                     } deriving (Eq, Ord)
+                                     } deriving (Eq, Ord, Show)
 
 qPeek :: DTLQueue t -> Maybe (DTLQueueEntry t)
 qPeek queue
@@ -217,18 +229,34 @@ dtInvGen :: ( Embeddable Integer t
          -> [ProgState t]
          -> (Int -> Set (Assertion t))
          -> Ceili (Maybe (Assertion t))
-dtInvGen ctx maxFeatureSize maxClauseSize backwardPT loopConds body post goodStatesList featureGen = do
+dtInvGen ctx maxFeatureSize maxClauseSize backwardPT loopConds body post fullGoodStatesList featureGen = do
   log_i $ "[DTInvGen] Beginning invariant inference"
+  goodStatesList <- lift . lift $ randomSample 50 fullGoodStatesList
   -- Add missing names to good states. TODO: This might not be the best place for this.
   let names = Set.toList . Set.unions $ map namesIn goodStatesList
   let goodStates = Set.fromList $ map (addMissingNames names) goodStatesList
   -------
   let rawFeatures = Set.toList $ featureGen maxFeatureSize
   log_d $ "[DTInvGen] " ++ (show $ length rawFeatures) ++ " initial features."
-  let nconds = aAnd $ map Not loopConds
-  let goal = aImp nconds post
+  let nLoopConds = map Not loopConds
+  let goalQuery assertion = do
+        wp <- computeWP assertion
+        pure $ aAnd [ Imp (aAnd $ assertion:nLoopConds) post
+                    , Not $ Imp (aAnd $ assertion:nLoopConds) AFalse
+                    , Imp (aAnd $ assertion:loopConds) wp
+                    ]
   let wpTransform = backwardPT ctx body
-  evalStateT (vPreGen goal) $ DtiEnv goodStates Set.empty loopConds Map.empty Set.empty rawFeatures maxClauseSize names wpTransform
+  evalStateT (vPreGen goalQuery) $ DtiEnv goodStates Set.empty loopConds Map.empty Set.empty rawFeatures maxClauseSize names wpTransform
+
+-- Adapted from https://www.programming-idioms.org/idiom/158/random-sublist/2123/haskell
+randomSample :: Int -> [a] -> IO [a]
+randomSample k x | k >= length x = pure x
+randomSample 0 x = pure []
+randomSample k x = do
+   i <- randomRIO (0, length x - 1)
+   let (a, e:b) = splitAt i x
+   l <- randomSample (k-1) (a ++ b)
+   pure (e : l)
 
 addMissingNames :: (Ord t, Embeddable Integer t) => [Name] -> ProgState t -> ProgState t
 addMissingNames names progState = foldr
@@ -254,8 +282,9 @@ vPreGen :: ( Embeddable Integer t
            , StatePredicate (Assertion t) t
            , AssertionParseable t
            , SatCheckable t)
-        => Assertion t -> DtiM t (Maybe (Assertion t))
-vPreGen goal = do
+        => (Assertion t -> DtiM t (Assertion t))
+        -> DtiM t (Maybe (Assertion t))
+vPreGen goalQuery = do
   goodStates <- getGoodStates
   badStates <- getBadStates
   plog_d $ "[DTInvGen] Starting vPreGen pass"
@@ -269,7 +298,8 @@ vPreGen goal = do
       return Nothing
     Just candidate -> do
       plog_d $ "[DTInvGen] vPreGen candidate precondition: " ++ (show . pretty) candidate
-      mCounter <- lift . findCounterexample $ Imp candidate goal
+      query <- goalQuery candidate
+      mCounter <- lift $ findCounterexample query
       case mCounter of
         Nothing -> do
           plog_d $ "[DTInvGen] vPreGen found satisfactory precondition: " ++ show candidate
@@ -277,7 +307,7 @@ vPreGen goal = do
         Just counter -> do
           plog_d $ "[DTInvGen] vPreGen found counterexample: " ++ show counter
           cexState <- envAddMissingNames $ extractState counter
-          addBadState cexState >> vPreGen goal
+          addBadState cexState >> vPreGen goalQuery
 
 -- TODO: This is fragile.
 extractState :: Pretty t => (Assertion t) -> (ProgState t)
@@ -396,10 +426,10 @@ nextEntries badStates goodStates entry@(DTLQueueEntry oldClauses oldCandidate _ 
   let newUnrejectedBads = Set.difference badStates newRejectedBads
   if Set.null newUnrejectedBads
     then do
-      isInductive <- checkInductive . aAnd . (map f_assertion) $ newCandidate
-      if not isInductive then
-        nextEntries badStates goodStates entry rest
-      else do
+      --isInductive <- checkInductive . aAnd . (map f_assertion) $ newCandidate
+--      if not isInductive then
+--        nextEntries badStates goodStates entry rest
+--      else do
         let newAcceptedGoods = Set.unions $ map f_acceptedGoods newCandidate
         let newClause = Clause newCandidate newRejectedBads newAcceptedGoods
         let newClauses = newClause : oldClauses
@@ -410,22 +440,22 @@ nextEntries badStates goodStates entry@(DTLQueueEntry oldClauses oldCandidate _ 
       let newEntry = DTLQueueEntry oldClauses newCandidate newUnrejectedBads oldUnacceptedGoods
       pure . (newEntry:) =<< nextEntries badStates goodStates entry rest
 
-checkInductive :: ( ValidCheckable t
-                  , Pretty t
-                  ) => Assertion t -> DtiM t Bool
-checkInductive assertion = do
-  conds <- getLoopConds
-  wp <- computeWP assertion
-  let query = Imp (And $ assertion:conds) wp
-  response <- lift . checkValid $ query
-  case response of
-    SMT.Valid        -> return True
-    SMT.Invalid _    -> return False
-    SMT.ValidUnknown -> do
-      plog_e $ "[DTInvGen] SMT solver returned unknown when checking inductivity. "
-               ++ "Treating candidate as non-inductive. Inductivity SMT query: "
-               ++ show query
-      return False
+-- checkInductive :: ( ValidCheckable t
+--                   , Pretty t
+--                   ) => Assertion t -> DtiM t Bool
+-- checkInductive assertion = do
+--   conds <- getLoopConds
+--   wp <- computeWP assertion
+--   let query = Imp (And $ assertion:conds) wp
+--   response <- lift . checkValid $ query
+--   case response of
+--     SMT.Valid        -> return True
+--     SMT.Invalid _    -> return False
+--     SMT.ValidUnknown -> do
+--       plog_e $ "[DTInvGen] SMT solver returned unknown when checking inductivity. "
+--                ++ "Treating candidate as non-inductive. Inductivity SMT query: "
+--                ++ show query
+--       return False
 
 clauseToAssertion :: Clause t -> Assertion t
 clauseToAssertion = aAnd . (map f_assertion) . c_features
@@ -448,12 +478,15 @@ addBadState newBadState = do
   oldBadStates     <- getBadStates
   goodStates       <- getGoodStates
   candidates       <- getFeatureCandidates
-  updatedFeatures  <- updateFeatures (Set.singleton newBadState) =<< getFeatures
+  -- Update bad states set.
   let newBadStates = Set.insert newBadState oldBadStates
   putBadStates newBadStates
+  -- Update features cache / feature candidates.
+  updatedFeatures <- updateFeatures (Set.singleton newBadState) =<< getFeatures
   (candidates', newlyUsedFeatures) <- prepareFeatures (Set.toList newBadStates) (Set.toList goodStates) candidates
   putFeatures $ Set.union updatedFeatures $ Set.fromList newlyUsedFeatures
   putFeatureCandidates candidates'
+  -- Update queue.
   newEntries <- sequence $ map (featureToEntry newBadStates goodStates) newlyUsedFeatures
   updatedQueue <- updateQueue (Set.singleton newBadState) =<< getQueue
   putQueue $ foldr qInsert updatedQueue newEntries
@@ -469,11 +502,11 @@ featureToEntry :: ( Ord t
 featureToEntry badStates goodStates feat@(Feature assertion rejectedBads acceptedGoods) = do
   let unrejectedBads = Set.difference badStates rejectedBads
   if Set.null unrejectedBads
-    then do
-      isInductive <- checkInductive assertion
-      if isInductive
-        then pure $ DTLQueueEntry [Clause [feat] rejectedBads acceptedGoods] [] badStates (Set.difference goodStates acceptedGoods)
-        else pure $ DTLQueueEntry [] [feat] unrejectedBads goodStates
+    then pure $ DTLQueueEntry [Clause [feat] rejectedBads acceptedGoods] [] badStates (Set.difference goodStates acceptedGoods)
+--      isInductive <- checkInductive assertion
+--      if isInductive
+--        then pure $ DTLQueueEntry [Clause [feat] rejectedBads acceptedGoods] [] badStates (Set.difference goodStates acceptedGoods)
+--        else pure $ DTLQueueEntry [] [feat] unrejectedBads goodStates
     else pure $ DTLQueueEntry [] [feat] unrejectedBads goodStates
 
 splitStates :: forall t.

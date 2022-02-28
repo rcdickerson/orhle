@@ -25,6 +25,7 @@ dependencies:
 - mtl
 - parsec
 - prettyprinter
+- random
 - simple-smt
 - smtLib
 - split
@@ -39,6 +40,7 @@ library:
   exposed-modules:
     - Orhle
     - Orhle.CValue
+    - Orhle.DTInvGen
     - Orhle.DTLearn
     - Orhle.OrhleParser
     - Orhle.RelationalPTS
