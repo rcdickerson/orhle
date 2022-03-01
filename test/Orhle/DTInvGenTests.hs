@@ -23,9 +23,9 @@ runDti task env =
       Left msg -> assertFailure msg
       Right result -> pure result
 
-dummyDtiEnv =
+testDtiEnv badStates goodStates queue features candidates names =
   let wpTransform _ = pure $ ATrue
-  in DtiEnv Set.empty Set.empty [] Map.empty Set.empty [] 12 [] wpTransform
+  in DtiEnv badStates goodStates [] queue features candidates 12 names wpTransform
 
 assertionFromStr :: AssertionParseable t => String -> IO (Assertion t)
 assertionFromStr str =
@@ -37,24 +37,45 @@ assertionFromStr str =
 
 test_updateQueue_emptyQueue = do
   let queue = Map.empty :: DTLQueue Integer
-  queue' <- runDti (updateQueue Set.empty queue) dummyDtiEnv
+  let env = testDtiEnv Set.empty Set.empty Map.empty Set.empty [] []
+  queue' <- runDti (updateQueue Set.empty Set.empty queue) env
   assertEqual queue queue'
 
 test_updateQueue_updatesBadsAndRemovesEntryWithBadClause = do
-  assertion1 <- assertionFromStr "x < 0" :: IO (Assertion Integer)
-  assertion2 <- assertionFromStr "x = 0" :: IO (Assertion Integer)
+  assertion1 <- assertionFromStr "(< x 0)" :: IO (Assertion Integer)
+  assertion2 <- assertionFromStr "(< x 1)" :: IO (Assertion Integer)
   let
-    clause1 = Clause [Feature assertion1 Set.empty Set.empty] Set.empty Set.empty
-    clause2 = Clause [Feature assertion2 Set.empty Set.empty] Set.empty Set.empty
-    entry1  = DTLQueueEntry [clause1] [] Set.empty Set.empty
-    entry2  = DTLQueueEntry [clause2] [] Set.empty Set.empty
-    queue   = qInsert entry1 $ qInsert entry2 $ Map.empty
-    -- clause2 no longer rejects all bads.
-    newBadStates = Set.singleton $ Map.fromList [(Name "x" 0, 0)]
-    newClause1   = Clause [Feature assertion1 newBadStates Set.empty] newBadStates Set.empty
-    newEntry1    = DTLQueueEntry [newClause1] [] newBadStates Set.empty
-    expected     = qInsert newEntry1 Map.empty
-  queue' <- runDti (updateQueue newBadStates queue) dummyDtiEnv
+    -- To start, a single bad state and two clauses that reject it.
+    goodState1 = Map.fromList [(Name "x" 0, 20)]
+    goodState2 = Map.fromList [(Name "x" 0, -20)]
+    badState   = Map.fromList [(Name "x" 0, -10)]
+    feature1   = Feature assertion1 (Set.singleton badState) (Set.singleton goodState2)
+    feature2   = Feature assertion2 (Set.singleton badState) (Set.singleton goodState2)
+    clause1    = Clause [feature1]
+                        (Set.singleton badState)
+                        (Set.singleton goodState1)
+    clause2    = Clause [feature2]
+                        (Set.singleton badState)
+                        (Set.singleton goodState1)
+    entry1     = DTLQueueEntry [clause1] [] (Set.singleton badState) Set.empty
+    entry2     = DTLQueueEntry [clause2] [] (Set.singleton badState) Set.empty
+    queue      = qInsert entry1 $ qInsert entry2 $ Map.empty
+    -- Add a new bad state such that clause2 no longer rejects all bads.
+    addedBadState = Map.fromList [(Name "x" 0, 0)]
+    newBadStates  = Set.fromList [badState, addedBadState]
+    newClause1    = Clause [Feature assertion1 newBadStates (Set.singleton goodState2)]
+                    newBadStates
+                    (Set.singleton goodState1)
+    newEntry1     = DTLQueueEntry [newClause1] [] newBadStates Set.empty
+    -- The second clause should be evicted from the queue.
+    expected      = qInsert newEntry1 Map.empty
+  let env = testDtiEnv newBadStates
+                       (Set.fromList [goodState1, goodState2])
+                       queue
+                       (Set.fromList [feature1, feature2])
+                       []
+                       [Name "x" 0]
+  queue' <- runDti (updateQueue (Set.singleton badState) (Set.singleton addedBadState) queue) env
   assertEqual expected queue'
 
 test_addBadState = do
@@ -89,7 +110,7 @@ test_addBadState = do
                         (Set.singleton goodState2)
     entry1     = DTLQueueEntry []
                                [feature1]
-                               (Set.fromList [badState2])
+                               (Set.fromList [badState1])
                                (Set.fromList [goodState2, goodState3])
     entry2     = DTLQueueEntry [clause2]
                                []
@@ -108,22 +129,25 @@ test_addBadState = do
   -- After update.
   let
     newBadState = Map.fromList [(Name "x" 0, 10), (Name "y" 0, 30)]
+    -- Feature 1 rejects the new bad state.
     feature1' = Feature assertion1
                         (Set.fromList [newBadState, badState2])
                         (Set.singleton goodState1)
+    entry1'  = DTLQueueEntry []
+                             [feature1']
+                             (Set.fromList [badState1])
+                             (Set.fromList [goodState2, goodState3])
+
+    -- Entry2 no longer rejects all bads, removed from queue.
+
     -- A newly useful assertion has entered the game.
     feature3 = Feature assertion3
                        (Set.singleton newBadState)
-                       (Set.fromList [goodState1, goodState2])
-    entry1'  = DTLQueueEntry []
-                             [feature1']
-                             (Set.fromList [newBadState, badState2])
-                             (Set.fromList [goodState2, goodState3])
-    -- Entry2 no longer rejects all bads.
+                       (Set.fromList [goodState1])
     entry3'  = DTLQueueEntry []
                              [feature3]
-                             (Set.fromList [newBadState])
-                             (Set.fromList [goodState3])
+                             (Set.fromList [badState1, badState2])
+                             (Set.fromList [goodState2, goodState3])
     expectedGoodStates = goodStates
     expectedBadStates  = Set.insert newBadState badStates
     expectedQueue      = qInsert entry1' $ qInsert entry3' $ Map.empty

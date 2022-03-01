@@ -488,7 +488,7 @@ addBadState newBadState = do
   putFeatureCandidates candidates'
   -- Update queue.
   newEntries <- sequence $ map (featureToEntry newBadStates goodStates) newlyUsedFeatures
-  updatedQueue <- updateQueue (Set.singleton newBadState) =<< getQueue
+  updatedQueue <- updateQueue oldBadStates (Set.singleton newBadState) =<< getQueue
   putQueue $ foldr qInsert updatedQueue newEntries
 
 featureToEntry :: ( Ord t
@@ -499,15 +499,16 @@ featureToEntry :: ( Ord t
                -> Set (ProgState t)
                -> Feature t
                -> DtiM t (DTLQueueEntry t)
-featureToEntry badStates goodStates feat@(Feature assertion rejectedBads acceptedGoods) = do
-  let unrejectedBads = Set.difference badStates rejectedBads
+featureToEntry badStates goodStates feat@(Feature _ rejectedBads acceptedGoods) = do
+  let unrejectedBads  = Set.difference badStates  rejectedBads
+  let unacceptedGoods = Set.difference goodStates acceptedGoods
   if Set.null unrejectedBads
-    then pure $ DTLQueueEntry [Clause [feat] rejectedBads acceptedGoods] [] badStates (Set.difference goodStates acceptedGoods)
+    then pure $ DTLQueueEntry [Clause [feat] rejectedBads acceptedGoods] [] badStates unacceptedGoods
 --      isInductive <- checkInductive assertion
 --      if isInductive
 --        then pure $ DTLQueueEntry [Clause [feat] rejectedBads acceptedGoods] [] badStates (Set.difference goodStates acceptedGoods)
 --        else pure $ DTLQueueEntry [] [feat] unrejectedBads goodStates
-    else pure $ DTLQueueEntry [] [feat] unrejectedBads goodStates
+    else pure $ DTLQueueEntry [] [feat] unrejectedBads unacceptedGoods
 
 splitStates :: forall t.
                  ( Ord t
@@ -562,22 +563,23 @@ updateQueue :: ( Ord t
                , StatePredicate (Assertion t) t
                )
             => Set (ProgState t)
+            -> Set (ProgState t)
             -> DTLQueue t
             -> DtiM t (DTLQueue t)
-updateQueue newBadStates queue = do
+updateQueue oldBadStates addedBadStates queue = do
   -- TODO: Cleanup duplication wrt updateFeatures
-  let newBadStatesList = Set.toList newBadStates
+  let addedBadStatesList = Set.toList addedBadStates
   let rejects assertion state = do
         result <- testState assertion state
         pure $ if result then Nothing else Just state
   let updateFeature (Feature assertion oldRejectedBads oldAcceptedGoods) = do
-        rejectionsToAdd <- sequence $ map (rejects assertion) newBadStatesList
+        rejectionsToAdd <- sequence $ map (rejects assertion) addedBadStatesList
         let newRejectedBads = Set.union oldRejectedBads (Set.fromList $ catMaybes rejectionsToAdd)
         pure $ Feature assertion newRejectedBads oldAcceptedGoods
   let updateClause (Clause features _ oldAcceptedGoods) = do
         features' <- sequence $ map updateFeature features
         let newRejectedBads = Set.unions $ map f_rejectedBads features'
-        if and $ map (flip Set.member $ newRejectedBads) newBadStatesList
+        if and $ map (flip Set.member $ newRejectedBads) addedBadStatesList
                then pure . Just $ Clause features' newRejectedBads oldAcceptedGoods
                else pure Nothing
   let updateEntry (DTLQueueEntry clauses candidate _ oldUnacceptedGoods) = do
@@ -587,8 +589,9 @@ updateQueue newBadStates queue = do
           then pure Nothing
           else do
             candidate' <- sequence $ map updateFeature candidate
-            let rejectedBads' = Set.unions $ map f_rejectedBads candidate'
-            pure . Just $ DTLQueueEntry clauses' candidate' (Set.difference newBadStates rejectedBads') oldUnacceptedGoods
+            let rejected'       = Set.unions $ map f_rejectedBads candidate'
+            let unrejectedBads' = Set.difference (Set.union oldBadStates addedBadStates) rejected'
+            pure . Just $ DTLQueueEntry clauses' candidate' unrejectedBads' oldUnacceptedGoods
 
   let queueList = concat $ map Set.toList $ Map.elems queue
   mQueueList' <- lift . sequence . (map updateEntry) $ queueList
