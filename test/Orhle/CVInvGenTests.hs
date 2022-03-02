@@ -86,3 +86,7 @@ test_learnSeparator_returnsTrueWhenNoBadsOrGoods =
   in do
     sep <- evalCvi learnSeparator env
     assertEqual (Just ATrue) sep
+
+test_qInsert = assertFailure "unimplemented"
+
+test_qPop = assertFailure "unimplemented"

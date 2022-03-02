@@ -11,9 +11,13 @@ module Orhle.CVInvGen
   -- Exposed for testing.
   , CviEnv(..)
   , CviM
+  , Entry(..)
+  , Queue
   , closeNames
   , learnSeparator
   , mkCviEnv
+  , qInsert
+  , qPop
   ) where
 
 import Ceili.Assertion
@@ -89,6 +93,37 @@ data Entry t = Entry { qe_clauses         :: [Clause t]
                      } deriving (Eq, Ord, Show)
 type Queue t = Map Int (Set (Entry t))
 
+qSize :: Queue t -> Int
+qSize = Map.foldr (\set count -> count + Set.size set) 0
+
+qInsert :: Ord t => Entry t -> Queue t -> Queue t
+qInsert entry queue =
+  let score = entryScore entry
+  in case Map.lookup score queue of
+    Nothing  -> Map.insert score (Set.singleton entry) queue
+    Just set -> Map.insert score (Set.insert entry set) queue
+
+qPop :: Queue t -> (Maybe (Entry t), Queue t)
+qPop queue = do
+  let mMaxView = Map.maxViewWithKey queue
+  case mMaxView of
+    Nothing -> (Nothing, queue)
+    Just ((key, maxSet), queue') ->
+      let mMaxElt = Set.maxView maxSet
+      in case mMaxElt of
+        Nothing -> (Nothing, queue')
+        Just (elt, maxSet') ->
+          if Set.null maxSet'
+          then (Just elt, queue')
+          else (Just elt, Map.insert key maxSet' queue')
+
+-------------------
+-- Cost Function --
+-------------------
+
+entryScore :: Entry t -> Int
+entryScore (Entry clauses candidate) = error "unimplemented"
+
 
 -----------------
 -- Computation --
@@ -128,6 +163,23 @@ getBadStates = get >>= pure . envBadStates
 
 getGoodStates :: CviM t (Set (ProgState t))
 getGoodStates = get >>= pure . envGoodStates
+
+putQueue :: (Queue t) -> CviM t ()
+putQueue queue = do
+  CviEnv _ bads goods features fCandidates goalQ names <- get
+  put $ CviEnv queue bads goods features fCandidates goalQ names
+
+enqueue :: Ord t => Entry t -> CviM t ()
+enqueue entry = do
+  queue <- getQueue
+  putQueue $ qInsert entry queue
+
+dequeue :: CviM t (Maybe (Entry t))
+dequeue = do
+  queue <- getQueue
+  let (elt, queue') = qPop queue
+  putQueue queue'
+  pure elt
 
 checkGoal :: CviConstraints t => Assertion t -> CviM t (Either (ProgState t) (Assertion t))
 checkGoal candidate = do
@@ -204,15 +256,27 @@ cvInvGen' = do
 
 learnSeparator :: CviConstraints t => CviM t (Maybe (Assertion t))
 learnSeparator = do
+  queue      <- getQueue
   goodStates <- getGoodStates
   badStates  <- getBadStates
+  clog_d $ "[CVInvGen] Beginning separator search."
+  clog_d $ "  bad states:  " ++ (show $ Set.size badStates)
+  clog_d $ "  good states: " ++ (show $ Set.size goodStates)
+  clog_d $ "  queue size:  " ++ (show $ qSize queue)
   -- Short circuit on trivial separation cases.
   if Set.null badStates
-    then pure $ Just ATrue
+    then do clog_d "[CVInvGen] No bad states, returning true."; pure $ Just ATrue
   else if Set.null goodStates
-    then pure $ Just AFalse
-  else do
-   error "unimplemented"
+    then do clog_d "[CVInvGen] No good states, returning false."; pure $ Just AFalse
+  else learnSeparator'
+
+learnSeparator' :: CviConstraints t => CviM t (Maybe (Assertion t))
+learnSeparator' = do
+  mEntry <- dequeue
+  case mEntry of
+    Nothing -> do clog_d $ "[CVInvGen] Search queue is empty, failing."; pure Nothing
+    Just entry -> do
+      error "unimplemented"
 
 
 ---------------------------
