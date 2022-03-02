@@ -14,8 +14,28 @@ import qualified Data.Map as Map
 import Data.Set ( Set )
 import qualified Data.Set as Set
 
+-- Utilities -------------------------------
+
 state :: [(String, Integer)] -> ProgState Integer
 state = Map.fromList . map (\(n, i) -> (Name n 0, i))
+
+states :: [[(String, Integer)]] -> Set (ProgState Integer)
+states = Set.fromList . (map state)
+
+assertionFromStr :: AssertionParseable t => String -> IO (Assertion t)
+assertionFromStr str =
+  let assertion = parseAssertion str
+  in case assertion of
+    Left err -> assertFailure (show err)
+    Right a  -> pure a
+
+feature :: String
+        -> Set (ProgState Integer)
+        -> Set (ProgState Integer)
+        -> IO (Feature Integer)
+feature assertionStr rejected accepted = do
+  assertion <- assertionFromStr assertionStr
+  pure $ Feature assertion rejected accepted
 
 dummyWp :: WeakestPre () (ImpProgram t) Integer
 dummyWp = WeakestPre (\ _ _ _ -> pure ATrue) ()
@@ -26,6 +46,9 @@ evalCvi task env = do
   case mResult of
     Left err     -> assertFailure $ show err
     Right result -> pure result
+
+---------------------------------------------
+
 
 test_closeNames =
   let
@@ -87,6 +110,38 @@ test_learnSeparator_returnsTrueWhenNoBadsOrGoods =
     sep <- evalCvi learnSeparator env
     assertEqual (Just ATrue) sep
 
-test_qInsert = assertFailure "unimplemented"
+test_qInsert = do
+  feature1 <- feature "x < 0" (states [[("x", 4)]]) (states [[("x", -1)]])
+  feature2 <- feature "x < 1" (states [[("x", 4)], [("x", 0)]]) (states [[("x", -1)]])
+  let
+    entry1      = Entry [] [feature1]
+    entry2      = Entry [[feature2]] []
+    entry1Score = entryScore entry1
+    entry2Score = entryScore entry2
+    expected    = Map.insert entry1Score (Set.fromList [entry1])
+                $ Map.insert entry2Score (Set.fromList [entry2])
+                $ (Map.empty :: Queue Integer)
+    actual      = qInsert entry1 $ qInsert entry2 $ qInsert entry2 $ (Map.empty :: Queue Integer)
+  assertEqual expected actual
 
-test_qPop = assertFailure "unimplemented"
+test_qPop = do
+  feature1 <- feature "x < 0" (states [[("x", 4)]]) (states [[("x", -1)]])
+  feature2 <- feature "x < 1" (states [[("x", 4)], [("x", 0)]]) (states [[("x", -1)]])
+  let
+    entry1      = Entry [] [feature1]
+    entry2      = Entry [[feature2]] []
+    entry1Score = entryScore entry1
+    entry2Score = entryScore entry2
+    queue       = qInsert entry1 $ qInsert entry2 $ qInsert entry2 $ (Map.empty :: Queue Integer)
+    expected    = if entry1Score >= entry2Score
+                  then (Just entry1, qInsert entry2 Map.empty)
+                  else (Just entry2, qInsert entry1 Map.empty)
+    actual      = qPop queue
+  assertEqual expected actual
+
+test_qPop_empty =
+  let
+    queue       = Map.empty :: Queue Integer
+    expected    = (Nothing, queue)
+    actual      = qPop queue
+  in assertEqual expected actual

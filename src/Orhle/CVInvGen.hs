@@ -9,11 +9,14 @@ module Orhle.CVInvGen
   , cvInvGen
 
   -- Exposed for testing.
+  , Clause
   , CviEnv(..)
   , CviM
   , Entry(..)
+  , Feature(..)
   , Queue
   , closeNames
+  , entryScore
   , learnSeparator
   , mkCviEnv
   , qInsert
@@ -96,7 +99,7 @@ type Queue t = Map Int (Set (Entry t))
 qSize :: Queue t -> Int
 qSize = Map.foldr (\set count -> count + Set.size set) 0
 
-qInsert :: Ord t => Entry t -> Queue t -> Queue t
+qInsert :: CviConstraints t => Entry t -> Queue t -> Queue t
 qInsert entry queue =
   let score = entryScore entry
   in case Map.lookup score queue of
@@ -117,12 +120,19 @@ qPop queue = do
           then (Just elt, queue')
           else (Just elt, Map.insert key maxSet' queue')
 
+
 -------------------
 -- Cost Function --
 -------------------
 
-entryScore :: Entry t -> Int
-entryScore (Entry clauses candidate) = error "unimplemented"
+entryScore :: CviConstraints t => Entry t -> Int
+entryScore entry@(Entry clauses candidate) =
+  let
+    acceptedGoods = Set.size $ entryAcceptedGoods entry
+    rejectedBads  = Set.size $ entryRejectedBads entry
+    numClauses    = length clauses
+    candidateSize = length candidate
+  in (100 * acceptedGoods) + rejectedBads - numClauses - candidateSize
 
 
 -----------------
@@ -169,7 +179,7 @@ putQueue queue = do
   CviEnv _ bads goods features fCandidates goalQ names <- get
   put $ CviEnv queue bads goods features fCandidates goalQ names
 
-enqueue :: Ord t => Entry t -> CviM t ()
+enqueue :: CviConstraints t => Entry t -> CviM t ()
 enqueue entry = do
   queue <- getQueue
   putQueue $ qInsert entry queue
@@ -290,6 +300,26 @@ addBadState badState = error "unimplemented"
 -------------
 -- Utility --
 -------------
+
+clauseAcceptedGoods :: CviConstraints t => Clause t -> Set (ProgState t)
+clauseAcceptedGoods = Set.unions . (map featAcceptedGoods)
+
+clauseRejectedBads :: CviConstraints t => Clause t -> Set (ProgState t)
+clauseRejectedBads = Set.unions . (map featRejectedBads)
+
+entryAcceptedGoods :: CviConstraints t => Entry t -> Set (ProgState t)
+entryAcceptedGoods (Entry clauses candidate) =
+  let
+    clauseAccepted = Set.unions $ map clauseAcceptedGoods clauses
+    candidateAccepted = Set.unions $ map featAcceptedGoods candidate
+  in Set.union clauseAccepted candidateAccepted
+
+entryRejectedBads :: CviConstraints t => Entry t -> Set (ProgState t)
+entryRejectedBads (Entry clauses candidate) =
+  let
+    clauseRejected = Set.unions $ map clauseRejectedBads clauses
+    candidateRejected = Set.unions $ map featRejectedBads candidate
+  in Set.union clauseRejected candidateRejected
 
 closeNames :: CviConstraints t => [Name] -> ProgState t -> ProgState t
 closeNames names state =
