@@ -83,9 +83,6 @@ instance Eq t => Eq (Feature t)
 
 type Clause t = [Feature t]
 
-emptyClause :: Clause t
-emptyClause = []
-
 
 ------------
 -- Queues --
