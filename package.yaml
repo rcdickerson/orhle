@@ -40,6 +40,7 @@ library:
   exposed-modules:
     - Orhle
     - Orhle.CValue
+    - Orhle.CVInvGen
     - Orhle.DTInvGen
     - Orhle.DTLearn
     - Orhle.OrhleParser

@@ -11,12 +11,14 @@ module Orhle.DTInvGen
 
   -- Exposed for testing.
   , Clause(..)
+  , ClauseCandidate(..)
   , DtiEnv(..)
   , DtiM
   , DTLQueue
   , DTLQueueEntry(..)
   , Feature(..)
   , addBadState
+  , emptyCandidate
   , qInsert
   , updateQueue
   ) where
@@ -61,14 +63,33 @@ data Clause t = Clause { c_features      :: [Feature t]
                        , c_acceptedGoods :: Set (ProgState t)
                        } deriving (Eq, Ord, Show)
 
+data ClauseCandidate t = ClauseCandidate { cand_features        :: [Feature t]
+                                         , cand_rejectedBads    :: Set (ProgState t)
+                                         , cand_acceptedGoods   :: Set (ProgState t)
+                                         } deriving (Eq, Ord, Show)
+
+emptyCandidate :: ClauseCandidate t
+emptyCandidate = ClauseCandidate [] Set.empty Set.empty
+
+cand_unrejectedBads :: Ord t => ClauseCandidate t -> DtiM t (Set (ProgState t))
+cand_unrejectedBads candidate = do
+  allBads <- getBadStates
+  let rejectedBads = cand_rejectedBads candidate
+  pure $ Set.difference allBads rejectedBads
+
+cand_unacceptedGoods :: Ord t => ClauseCandidate t -> DtiM t (Set (ProgState t))
+cand_unacceptedGoods candidate = do
+  allGoods <- getGoodStates
+  let acceptedGoods = cand_acceptedGoods candidate
+  pure $ Set.difference allGoods acceptedGoods
+
 ------------
 -- Queues --
 ------------
 
 type DTLQueue t = Map Int (Set (DTLQueueEntry t))
 data DTLQueueEntry t = DTLQueueEntry { qe_clauses         :: [Clause t]
-                                     , qe_candidate       :: [Feature t]
-                                     , qe_unrejectedBads  :: Set (ProgState t)
+                                     , qe_candidate       :: ClauseCandidate t
                                      , qe_unacceptedGoods :: Set (ProgState t)
                                      } deriving (Eq, Ord, Show)
 
@@ -105,14 +126,14 @@ qSize = Map.foldr (\set count -> count + Set.size set) 0
 
 -- The cost function for queue entries.
 entryScore :: DTLQueueEntry t -> Int
-entryScore (DTLQueueEntry clauses features unrejectedBads unacceptedGoods) =
-  if Set.null unrejectedBads && Set.null unacceptedGoods
+entryScore (DTLQueueEntry clauses candidate unacceptedGoods) =
+  if Set.null unacceptedGoods
   then fromIntegral (maxBound :: Int)
   else let
-    unrejectedBadsScore  = -1 * Set.size unrejectedBads
+    unrejectedBadsScore  = Set.size . cand_rejectedBads $ candidate
     unacceptedGoodsScore = -100 * Set.size unacceptedGoods
     clauseSizeScore      = -10 * length clauses
-    featuresSizeScore    = -1 * length features
+    featuresSizeScore    = -1 * length (cand_features candidate)
   in unrejectedBadsScore + unacceptedGoodsScore + clauseSizeScore + featuresSizeScore
 
 
@@ -231,7 +252,7 @@ dtInvGen :: ( Embeddable Integer t
          -> Ceili (Maybe (Assertion t))
 dtInvGen ctx maxFeatureSize maxClauseSize backwardPT loopConds body post fullGoodStatesList featureGen = do
   log_i $ "[DTInvGen] Beginning invariant inference"
-  goodStatesList <- lift . lift $ randomSample 50 fullGoodStatesList
+  goodStatesList <- lift . lift $ randomSample 3 fullGoodStatesList
   -- Add missing names to good states. TODO: This might not be the best place for this.
   let names = Set.toList . Set.unions $ map namesIn goodStatesList
   let goodStates = Set.fromList $ map (addMissingNames names) goodStatesList
@@ -250,8 +271,8 @@ dtInvGen ctx maxFeatureSize maxClauseSize backwardPT loopConds body post fullGoo
 
 -- Adapted from https://www.programming-idioms.org/idiom/158/random-sublist/2123/haskell
 randomSample :: Int -> [a] -> IO [a]
+randomSample 0 _ = pure []
 randomSample k x | k >= length x = pure x
-randomSample 0 x = pure []
 randomSample k x = do
    i <- randomRIO (0, length x - 1)
    let (a, e:b) = splitAt i x
@@ -339,7 +360,6 @@ learnSeparator :: ( Embeddable Integer t
 learnSeparator = do
   goodStates <- getGoodStates
   badStates <- getBadStates
-
   if Set.null goodStates || Set.null badStates
     then pure . Just $ ATrue
     else do
@@ -348,12 +368,6 @@ learnSeparator = do
       (show $ Set.size badStates) ++ " bad states, " ++
       (show $ Set.size goodStates) ++ " good states, " ++
       (show $ qSize queue) ++ " paths in queue."
-    case qPeek queue of
-      Nothing -> plog_d $ "***** queue is empty"
-      Just qh -> plog_d $ "***** Head of queue: " ++ (show . length . qe_clauses $ qh) ++
-        " clauses plus: " ++ (show . aAnd . (map f_assertion) . qe_candidate $ qh) ++
-        ", " ++ (show . Set.size . qe_unrejectedBads $ qh) ++ " unrejected features."
-
     mSeparator <- findSeparator badStates goodStates
     case mSeparator of
       Nothing -> pure Nothing
@@ -391,14 +405,15 @@ enqueueNext :: ( Ord t
             -> Set (ProgState t)
             -> DTLQueueEntry t
             -> DtiM t ()
-enqueueNext badStates goodStates entry@(DTLQueueEntry _ entryFeatures unrejectedBads unacceptedGoods) = do
+enqueueNext badStates goodStates entry@(DTLQueueEntry _ candidate unacceptedGoods) = do
   maxClauseSize <- envMaxClauseSize
-  if length entryFeatures >= maxClauseSize
+  if length (cand_features candidate) >= maxClauseSize
     then pure ()
     else do
-      allFeatures <- getFeatures
+      allFeatures     <- getFeatures
+      unrejectedBads  <- cand_unrejectedBads candidate
       let useful feature = (not $ Set.disjoint (f_rejectedBads feature)  unrejectedBads)
-                        && (not $ Set.disjoint (f_acceptedGoods feature) unacceptedGoods)
+                        && (not $ Set.disjoint (f_acceptedGoods feature) (cand_acceptedGoods candidate))
       let usefulFeatures = Set.filter useful allFeatures
 --      lift . log_d $ "[DTInvGen] Considering " ++ (show $ length usefulFeatures) ++ " useful features."
       nextLevel <- nextEntries badStates goodStates entry $ Set.toList usefulFeatures
@@ -420,25 +435,26 @@ nextEntries :: ( Ord t
             -> [Feature t]
             -> DtiM t [DTLQueueEntry t]
 nextEntries _ _ _ [] = pure []
-nextEntries badStates goodStates entry@(DTLQueueEntry oldClauses oldCandidate _ oldUnacceptedGoods) (newFeature:rest) = do
-  let newCandidate = newFeature:oldCandidate
-  let newRejectedBads = Set.unions (map f_rejectedBads newCandidate)
-  let newUnrejectedBads = Set.difference badStates newRejectedBads
-  if Set.null newUnrejectedBads
-    then do
-      --isInductive <- checkInductive . aAnd . (map f_assertion) $ newCandidate
---      if not isInductive then
---        nextEntries badStates goodStates entry rest
---      else do
-        let newAcceptedGoods = Set.unions $ map f_acceptedGoods newCandidate
-        let newClause = Clause newCandidate newRejectedBads newAcceptedGoods
-        let newClauses = newClause : oldClauses
-        let newUnacceptedGoods = Set.difference goodStates newAcceptedGoods
-        let newEntry = DTLQueueEntry newClauses [] badStates newUnacceptedGoods
+nextEntries badStates goodStates entry@(DTLQueueEntry oldClauses oldCandidate oldUnacceptedGoods) (newFeature:rest) = do
+  let newCandidateFeatures = newFeature:(cand_features oldCandidate)
+  let newAcceptedGoods  = Set.unions $ map f_acceptedGoods newCandidateFeatures
+  if Set.null newAcceptedGoods
+    then nextEntries badStates goodStates entry rest
+  else do
+    let newRejectedBads   = Set.unions $ map f_rejectedBads newCandidateFeatures
+    let newUnrejectedBads = Set.difference badStates newRejectedBads
+    if Set.null newUnrejectedBads
+      then do
+        let newClause = Clause newCandidateFeatures newRejectedBads newAcceptedGoods
+        let newClauses = newClause:oldClauses
+        let newClausesAcceptedGoods = Set.unions $ map c_acceptedGoods newClauses
+        allGoods <- getGoodStates
+        let newEntry = DTLQueueEntry newClauses emptyCandidate $ Set.difference allGoods newClausesAcceptedGoods
         pure . (newEntry:) =<< nextEntries badStates goodStates entry rest
-    else do
-      let newEntry = DTLQueueEntry oldClauses newCandidate newUnrejectedBads oldUnacceptedGoods
-      pure . (newEntry:) =<< nextEntries badStates goodStates entry rest
+      else do
+        let newCandidate = ClauseCandidate newCandidateFeatures newRejectedBads newAcceptedGoods
+        let newEntry = DTLQueueEntry oldClauses newCandidate oldUnacceptedGoods
+        pure . (newEntry:) =<< nextEntries badStates goodStates entry rest
 
 -- checkInductive :: ( ValidCheckable t
 --                   , Pretty t
@@ -500,15 +516,10 @@ featureToEntry :: ( Ord t
                -> Feature t
                -> DtiM t (DTLQueueEntry t)
 featureToEntry badStates goodStates feat@(Feature _ rejectedBads acceptedGoods) = do
-  let unrejectedBads  = Set.difference badStates  rejectedBads
   let unacceptedGoods = Set.difference goodStates acceptedGoods
-  if Set.null unrejectedBads
-    then pure $ DTLQueueEntry [Clause [feat] rejectedBads acceptedGoods] [] badStates unacceptedGoods
---      isInductive <- checkInductive assertion
---      if isInductive
---        then pure $ DTLQueueEntry [Clause [feat] rejectedBads acceptedGoods] [] badStates (Set.difference goodStates acceptedGoods)
---        else pure $ DTLQueueEntry [] [feat] unrejectedBads goodStates
-    else pure $ DTLQueueEntry [] [feat] unrejectedBads unacceptedGoods
+  if Set.null $ Set.difference badStates rejectedBads
+    then pure $ DTLQueueEntry [Clause [feat] rejectedBads acceptedGoods] emptyCandidate unacceptedGoods
+    else pure $ DTLQueueEntry [] (ClauseCandidate [feat] rejectedBads acceptedGoods) unacceptedGoods
 
 splitStates :: forall t.
                  ( Ord t
@@ -547,13 +558,13 @@ updateFeatures :: ( Ord t
                => Set (ProgState t)
                -> Set (Feature t)
                -> DtiM t (Set (Feature t))
-updateFeatures newBadStates features = do
-  let newBadStatesList = Set.toList newBadStates
+updateFeatures addedBadStates features = do
+  let addedBadStatesList = Set.toList addedBadStates
   let rejects assertion state = do
         result <- testState assertion state
         pure $ if result then Nothing else Just state
   let updateFeature (Feature assertion rejectedBads acceptedGoods) = do
-        mBads <- sequence $ map (rejects assertion) newBadStatesList
+        mBads <- sequence $ map (rejects assertion) addedBadStatesList
         let newBads = Set.union rejectedBads (Set.fromList $ catMaybes mBads)
         pure $ Feature assertion newBads acceptedGoods
   features' <- lift . sequence . (map updateFeature) $ Set.toList features
@@ -566,35 +577,38 @@ updateQueue :: ( Ord t
             -> Set (ProgState t)
             -> DTLQueue t
             -> DtiM t (DTLQueue t)
-updateQueue oldBadStates addedBadStates queue = do
-  -- TODO: Cleanup duplication wrt updateFeatures
-  let addedBadStatesList = Set.toList addedBadStates
-  let rejects assertion state = do
-        result <- testState assertion state
-        pure $ if result then Nothing else Just state
-  let updateFeature (Feature assertion oldRejectedBads oldAcceptedGoods) = do
-        rejectionsToAdd <- sequence $ map (rejects assertion) addedBadStatesList
-        let newRejectedBads = Set.union oldRejectedBads (Set.fromList $ catMaybes rejectionsToAdd)
-        pure $ Feature assertion newRejectedBads oldAcceptedGoods
-  let updateClause (Clause features _ oldAcceptedGoods) = do
-        features' <- sequence $ map updateFeature features
-        let newRejectedBads = Set.unions $ map f_rejectedBads features'
-        if and $ map (flip Set.member $ newRejectedBads) addedBadStatesList
-               then pure . Just $ Clause features' newRejectedBads oldAcceptedGoods
-               else pure Nothing
-  let updateEntry (DTLQueueEntry clauses candidate _ oldUnacceptedGoods) = do
-        mClauses' <- sequence $ map updateClause clauses
-        let clauses' = catMaybes mClauses'
-        if length clauses' < length mClauses'
-          then pure Nothing
-          else do
-            candidate' <- sequence $ map updateFeature candidate
-            let rejected'       = Set.unions $ map f_rejectedBads candidate'
-            let unrejectedBads' = Set.difference (Set.union oldBadStates addedBadStates) rejected'
-            pure . Just $ DTLQueueEntry clauses' candidate' unrejectedBads' oldUnacceptedGoods
-
-  let queueList = concat $ map Set.toList $ Map.elems queue
-  mQueueList' <- lift . sequence . (map updateEntry) $ queueList
-  let queue' = foldr qInsert Map.empty (catMaybes mQueueList')
-  plog_d $ "[DTInvGen] Queue updated, removed " ++ (show $ qSize queue - qSize queue') ++ " item(s)."
-  pure queue'
+updateQueue oldBadStates addedBadStates queue =
+  let
+    -- TODO: Cleanup duplication wrt updateFeatures
+    addedBadStatesList = Set.toList addedBadStates
+    rejects assertion state = do
+      result <- testState assertion state
+      pure $ if result then Nothing else Just state
+    updateFeature (Feature assertion oldRejectedBads oldAcceptedGoods) = do
+      rejectionsToAdd <- sequence $ map (rejects assertion) addedBadStatesList
+      let newRejectedBads = Set.union oldRejectedBads (Set.fromList $ catMaybes rejectionsToAdd)
+      pure $ Feature assertion newRejectedBads oldAcceptedGoods
+    updateClause (Clause features _ oldAcceptedGoods) = do
+      features' <- sequence $ map updateFeature features
+      let newRejectedBads = Set.unions $ map f_rejectedBads features'
+      if and $ map (flip Set.member $ newRejectedBads) addedBadStatesList
+             then pure . Just $ Clause features' newRejectedBads oldAcceptedGoods
+             else pure Nothing
+    updateClauseCandidate (ClauseCandidate features _ oldAcceptedGoods) = do
+      features' <- sequence $ map updateFeature features
+      let newRejectedBads = Set.unions $ map f_rejectedBads features'
+      pure $ ClauseCandidate features' newRejectedBads oldAcceptedGoods
+    updateEntry (DTLQueueEntry clauses candidate oldUnacceptedGoods) = do
+      mClauses' <- sequence $ map updateClause clauses
+      let clauses' = catMaybes mClauses'
+      if length clauses' < length mClauses'
+        then pure Nothing
+        else do
+          candidate' <- updateClauseCandidate candidate
+          pure . Just $ DTLQueueEntry clauses' candidate' oldUnacceptedGoods
+  in do
+    let queueList = concat $ map Set.toList $ Map.elems queue
+    mQueueList' <- lift . sequence . (map updateEntry) $ queueList
+    let queue' = foldr qInsert Map.empty (catMaybes mQueueList')
+    plog_d $ "[DTInvGen] Queue updated, removed " ++ (show $ qSize queue - qSize queue') ++ " item(s)."
+    pure queue'

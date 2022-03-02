@@ -103,13 +103,20 @@ relBackwardPT' stepStrategy ctx (ProgramRelation aprogs eprogs) post = do
       post' <- impBackwardPT (toSinglePTSContext SIQ_Existential ctx) stmt post
       relBackwardPT stepStrategy ctx aprogs' eprogs' post'
     LoopFusion aloops eloops -> do
+      let continueWithInv inv = useInvariant inv stepStrategy ctx aloops eloops aprogs' eprogs' post
       let annotatedInvars = Set.toList . Set.fromList . catMaybes $ (map invar aloops) ++ (map invar eloops)
       case annotatedInvars of
-        (_:_) -> useAnnotatedInvariant (And annotatedInvars) stepStrategy ctx aloops eloops aprogs' eprogs' post
-        []    -> inferInvariant stepStrategy ctx aloops eloops aprogs' eprogs' post
+        (_:_) -> continueWithInv (And annotatedInvars)
+        []    -> do
+          mInvariant <- inferInvariant stepStrategy ctx aloops eloops post
+          case mInvariant of
+            Just inv -> continueWithInv inv
+            Nothing -> do
+              log_e "[RelationalPTS] Unable to infer loop invariant, proceeding with False"
+              continueWithInv AFalse -- TODO: Fall back to single stepping over loops.
 
 
-useAnnotatedInvariant :: ( Embeddable Integer t
+useInvariant :: ( Embeddable Integer t
                          , Ord t
                          , AssertionParseable t
                          , ValidCheckable t
@@ -126,23 +133,28 @@ useAnnotatedInvariant :: ( Embeddable Integer t
                       -> [SpecImpProgram t]
                       -> Assertion t
                       -> Ceili (Assertion t)
-useAnnotatedInvariant invariant stepStrategy ctx aloops eloops aprogs' eprogs' post = do
+useInvariant invariant stepStrategy ctx aloops eloops aprogs' eprogs' post = do
   wpInvar <- relBackwardPT stepStrategy ctx (map body aloops) (map body eloops) invariant
   let conds = map condA (aloops ++ eloops)
   isSufficient <- checkValidB $ Imp (And $ invariant:(map Not conds)) post
   isInvariant  <- checkValidB $ Imp (And $ invariant:conds) wpInvar
+  isConsistent <- checkValidB $ Not $ Imp invariant AFalse
   -- TODO: Lockstep
   -- TODO: Variant
-  case (isSufficient, isInvariant) of
-    (True, True) -> do
-      log_d "[RelationalPTS] Annotated loop invariant is sufficient and invariant"
+  case (isSufficient, isInvariant, isConsistent) of
+    (True, True, True) -> do
+      log_d "[RelationalPTS] Annotated loop invariant is sufficient, invariant, and consistent"
       relBackwardPT stepStrategy ctx aprogs' eprogs' invariant
-    (False, _)   -> do
+    (False, _, _)   -> do
       log_e "[RelationalPTS] Annotated loop invariant insufficient to establish post"
       return AFalse
-    (_, False)   -> do
+    (_, False, _)   -> do
       log_e "[RelationalPTS] Annotated loop invariant is not invariant on loop body"
       return AFalse
+    (_, _, False)   -> do
+      log_e "[RelationalPTS] Annotated loop invariant is not consistent (it implies false)"
+      return AFalse
+
 
 inferInvariant :: ( Embeddable Integer t
                   , Ord t
@@ -156,11 +168,9 @@ inferInvariant :: ( Embeddable Integer t
                -> RelSpecImpPTSContext t (SpecImpProgram t)
                -> [ImpWhile t (SpecImpProgram t)]
                -> [ImpWhile t (SpecImpProgram t)]
-               -> [SpecImpProgram t]
-               -> [SpecImpProgram t]
                -> Assertion t
-               -> Ceili (Assertion t)
-inferInvariant stepStrategy ctx aloops eloops aprogs' eprogs' post =
+               -> Ceili (Maybe (Assertion t))
+inferInvariant stepStrategy ctx aloops eloops post =
   let
     allLoops = aloops ++ eloops
     bodies = ProgramRelation (map body aloops) (map body eloops)
@@ -191,12 +201,7 @@ inferInvariant stepStrategy ctx aloops eloops aprogs' eprogs' post =
       --                          post
       --                          headStates
       --                          separatorLearner
-      result <- DTI.dtInvGen ctx 2 12 (relBackwardPT' stepStrategy) conds bodies post headStates lis
-      case result of
-        Just inv -> relBackwardPT stepStrategy ctx aprogs' eprogs' inv
-        Nothing -> do
-          log_e "[RelationalPTS] Unable to infer loop invariant, proceeding with False"
-          return AFalse -- TODO: Fall back to single stepping over loops.
+      DTI.dtInvGen ctx 2 12 (relBackwardPT' stepStrategy) conds bodies post headStates lis
 
 body :: ImpWhile t e -> e
 body (ImpWhile _ b _) = b
