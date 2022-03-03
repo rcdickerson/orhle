@@ -347,15 +347,20 @@ usefulFeatures entry = do
       pure $ filter useful features
     candidate -> do
       -- A useful addition to an existing candidate rejects something new
-      -- while still accepting some of the states the candidate accepts.
+      -- while not bringing the accepted states for the new candidate
+      -- down to 1) the empty set or 2) a subset of the good states the
+      -- clauses already accept. (Note the former condition is not a subcase
+      -- of the latter since the clause list may be empty.)
       badStates <- getBadStates
-      let acceptedGoods  = clauseAcceptedGoods candidate
-      let rejectedBads   = clauseRejectedBads  candidate
-      let remainingBads  = Set.difference badStates rejectedBads
-      let useful feature = (not $ Set.disjoint (featRejectedBads feature)  remainingBads)
-                        && (not $ Set.disjoint (featAcceptedGoods feature) acceptedGoods)
+      let candAcceptedGoods = clauseAcceptedGoods candidate
+      let candRejectedBads  = clauseRejectedBads  candidate
+      let candRemainingBads = Set.difference badStates candRejectedBads
+      let claAcceptedGoods  = Set.unions $ map clauseAcceptedGoods (entryClauses entry)
+      let useful feature =
+               (not $ Set.disjoint   (featRejectedBads feature)  candRemainingBads)
+            && (not $ Set.disjoint   (featAcceptedGoods feature) candAcceptedGoods)
+            && (not $ Set.isSubsetOf (clauseAcceptedGoods (feature:candidate)) claAcceptedGoods)
       pure $ filter useful features
-      -- TODO: No need to check candidate whose new acceptedGoods is a subset of clause accepted goods.
 
 nextLevel :: CviConstraints t => Entry t -> [Feature t] -> CviM t [Entry t]
 nextLevel _ [] = pure []

@@ -370,6 +370,45 @@ test_usefulFeatures_emptyCandidateWithFeatureAcceptingNewGoods = do
   useful <- evalCvi task env
   assertSameElements [feature1, feature3] useful
 
+test_usefulFeatures_candidatesAcceptingSubsetOfClauseFeaturesNotUseful = do
+  let
+    goodState1 = state [("feat1", 1), ("feat2", 1), ("feat3", 0), ("feat4", 0)]
+    goodState2 = state [("feat1", 1), ("feat2", 1), ("feat3", 1), ("feat4", 1)]
+    goodState3 = state [("feat1", 0), ("feat2", 0), ("feat3", 1), ("feat4", 0)]
+    goodStates = Set.fromList [goodState1, goodState2, goodState3]
+  let
+    badState1  = state [("feat1", 0), ("feat2", 1), ("feat3", 0), ("feat4", 0)]
+    badState2  = state [("feat1", 1), ("feat2", 0), ("feat3", 1), ("feat4", 1)]
+    badStates  = Set.fromList [badState1, badState2]
+  feature1 <- feature "(= feat1 1)"
+                      (Set.fromList [badState1])
+                      (Set.fromList [goodState1, goodState2])
+  feature2 <- feature "(= feat2 1)"
+                      (Set.fromList [badState2])
+                      (Set.fromList [goodState1, goodState2])
+  feature3 <- feature "(= feat3 1)"
+                      (Set.fromList [badState1])
+                      (Set.fromList [goodState2, goodState3])
+  feature4 <- feature "(= feat4 1)"
+                      (Set.fromList [badState2])
+                      (Set.fromList [goodState2])
+  let features = [feature1, feature2, feature3, feature4]
+  -- feature1 /\ feature2 accept goodState1 and goodState2.
+  -- feature3 kicks off a promising clause accepting goodState2 and goodState3
+  -- (even though goodState2 is already accepted by feature1 /\ feature2,
+  -- goodState3 is not.)
+  -- feature4 would normally be a good addition to feature3 as it rejects a new
+  -- bad state while accepting a subset of the good states. However, in this
+  -- case, the new candidate's (feature3 /\ feature4) set of good states
+  -- becomes a subset of the clauses', so there's no need to continue down
+  -- this path. (The eventual clause would not add any new good states to
+  -- the overall entry.)
+  let entry = Entry [[feature1, feature2]] [feature3] False
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  let task = mapM_ addFeature features >> usefulFeatures entry
+  useful <- evalCvi task env
+  assertEqual [] useful
+
 test_learnSeparator_returnsTrueWhenNoBads =
   let
     badStates = Set.empty
