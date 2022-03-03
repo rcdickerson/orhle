@@ -11,12 +11,11 @@ import Ceili.Assertion
 import Ceili.CeiliEnv
 import Ceili.Language.Imp
 import Control.Monad.Trans.State ( evalStateT )
-import Data.Map ( Map )
 import qualified Data.Map as Map
 import Data.Set ( Set )
 import qualified Data.Set as Set
 
--- Utilities -------------------------------
+-- Test Utilities ---------------------------
 
 state :: [(String, Integer)] -> ProgState Integer
 state = Map.fromList . map (\(n, i) -> (Name n 0, i))
@@ -53,6 +52,7 @@ evalCvi task env = do
 
 
 -- Close Names
+
 test_closeNames =
   let
     names    = [Name "a" 0, Name "b" 0, Name "c" 0, Name "d" 0]
@@ -88,6 +88,7 @@ test_mkCviEnv_closesStateNames =
 
 
 -- Queue
+
 test_qInsert = do
   feature1 <- feature "(< x 0)" (states [[("x", 4)]]) (states [[("x", -1)]])
   feature2 <- feature "(< x 1)" (states [[("x", 4)], [("x", 0)]]) (states [[("x", -1)]])
@@ -125,73 +126,21 @@ test_qPop_empty =
   in assertEqual expected actual
 
 
--- Separator Learning
-test_learnSeparator_returnsTrueWhenNoBads =
-  let
-    badStates = Set.empty
-    goodStates = Set.fromList [ state[("a", 12), ("b", 4)] ]
-    env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
-  in do
-    sep <- evalCvi learnSeparator env
-    assertEqual (Just ATrue) sep
+-- Conversions
 
-test_learnSeparator_returnsFalseWhenNoGoods =
-  let
-    badStates = Set.fromList [ state[("a", 12), ("b", 4)] ]
-    goodStates = Set.empty
-    env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
-  in do
-    sep <- evalCvi learnSeparator env
-    assertEqual (Just AFalse) sep
-
-test_learnSeparator_returnsTrueWhenNoBadsOrGoods =
-  let
-    badStates = Set.empty
-    goodStates = Set.empty
-    env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
-  in do
-    sep <- evalCvi learnSeparator env
-    assertEqual (Just ATrue) sep
-
-test_learnSeparator = do
-  -- Target separator: (x < 10 || y = 5) && (z < 0)
-  expected <- assertionFromStr "(and (or (< x 10) (= y 5)) (< z 0))" :: IO (Assertion Integer)
-  -- All the needed feature candidates plus some extras:
-  assertions <- sequence $ [ assertionFromStr "(< x 10)"
-                           , assertionFromStr "(= y 5)"
-                           , assertionFromStr "(< z 0)"
-                           , assertionFromStr "(< x 0)"
-                           , assertionFromStr "(= y 2)"
-                           , assertionFromStr "(= z -1)"
-                           , assertionFromStr "(> x 10)"
-                           ] :: IO [Assertion Integer]
-  let
-    goodState1 = state [("x", 0),  ("y", 5),  ("z", -10)]
-    goodState2 = state [("x", 0),  ("y", 2),  ("z", -7)]
-    goodState3 = state [("x", 20), ("y", 5),  ("z", -1)]
-    goodStates = Set.fromList [goodState1, goodState2, goodState3]
-  let
-    badState1  = state [("x", 20), ("y", 2),  ("z", -8)]
-    badState2  = state [("x", 0),  ("y", 0),  ("z",  0)]
-    badState3  = state [("x", 12), ("y", 5),  ("z",  9)]
-    badState4  = state [("x", -4), ("y", -2), ("z",  8)]
-    badStates  = Set.fromList [badState1, badState2, badState3, badState4]
-  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp assertions
-  mActual <- evalCvi learnSeparator env :: IO (Maybe (Assertion Integer))
-  case mActual of
-    Nothing     -> assertFailure "Separator learner was unable to find a separator."
-    Just actual -> assertEquivalent expected actual
-
-
--- Utility
-
-test_entryToAssertion = do
-  feature1 <- feature "(< x 0)" Set.empty Set.empty
-  feature2 <- feature "(= y 3)" Set.empty Set.empty
-  feature3 <- feature "(> z 2)" Set.empty Set.empty
-  let entry = Entry [ [feature1, feature2], [feature3] ] [] True
-  expected <- assertionFromStr "(or (and (< x 0) (= y 3)) (> z 2))"
-  let actual = entryToAssertion entry
+test_assertionToFeature = do
+  assertion <- assertionFromStr "(> x 1)"
+  let badStates = states  [ [("x", 0)]
+                          , [("x", 1)]
+                          , [("x", 2)]
+                          ]
+  let goodStates = states [ [("x", -10)]
+                          , [("x",  10)]
+                          ]
+  let expected = Feature assertion (states [[("x", 0)], [("x", 1)]])
+                                   (states [[("x", 10)]])
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  actual <- evalCvi (assertionToFeature assertion) env
   assertEqual expected actual
 
 test_featureToEntry_rejectsAllBads_acceptsNoGoods = do
@@ -269,6 +218,34 @@ test_featureToEntry_rejectsSomeBads_acceptsAllGoods = do
   entry <- evalCvi (featureToEntry feature1) env
   assertEqual expected entry
 
+test_entryToAssertion = do
+  feature1 <- feature "(< x 0)" Set.empty Set.empty
+  feature2 <- feature "(= y 3)" Set.empty Set.empty
+  feature3 <- feature "(> z 2)" Set.empty Set.empty
+  let entry = Entry [ [feature1, feature2], [feature3] ] [] True
+  expected <- assertionFromStr "(or (and (< x 0) (= y 3)) (> z 2))"
+  let actual = entryToAssertion entry
+  assertEqual expected actual
+
+test_assertionToEntry = do
+  assertion <- assertionFromStr "(> x 1)"
+  let badStates = states  [ [("x", 0)]
+                          , [("x", 1)]
+                          , [("x", 2)]
+                          ]
+  let goodStates = states [ [("x", -10)]
+                          , [("x",  10)]
+                          ]
+  let feature = Feature assertion (states [[("x", 0)], [("x", 1)]])
+                                  (states [[("x", 10)]])
+  let expected = Entry [] [feature] False
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  entry <- evalCvi (assertionToEntry assertion) env
+  assertEqual expected entry
+
+
+-- Utility
+
 test_acceptsAllGoods_true = do
   assertion1 <- assertionFromStr "(= x 10)"
   assertion2 <- assertionFromStr "(< x 25)"
@@ -308,3 +285,148 @@ test_acceptsAllGoods_false = do
   let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
   result <- evalCvi (acceptsAllGoods clauses) env
   assertEqual False result
+
+
+-- Separator Learning
+
+test_usefulFeatures_rejectsNewAcceptsSame = do
+  let
+    goodState1 = state [("feat1", 1), ("feat2", 1), ("feat3", 1)]
+    goodState2 = state [("feat1", 0), ("feat2", 0), ("feat3", 0)]
+    goodState3 = state [("feat1", 1), ("feat2", 0), ("feat3", 0)]
+    goodStates = Set.fromList [goodState1, goodState2, goodState3]
+  let
+    badState1  = state [("feat1", 0), ("feat2", 0), ("feat3", 1)]
+    badState2  = state [("feat1", 1), ("feat2", 1), ("feat3", 0)]
+    badStates  = Set.fromList [badState1, badState2]
+  feature1 <- feature "(= feat1 1)"
+                      (Set.fromList [badState1])
+                      (Set.fromList [goodState1, goodState3])
+  feature2 <- feature "(= feat2 1)"
+                      (Set.fromList [badState1])
+                      (Set.fromList [goodState1])
+  feature3 <- feature "(= feat3 1)"
+                      (Set.fromList [badState2])
+                      (Set.fromList [goodState1])
+  let features = [feature1, feature2, feature3]
+  let entry = Entry [] [feature1, feature2] False
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  let task = mapM_ addFeature features >> usefulFeatures entry
+  useful <- evalCvi task env
+  assertEqual [feature3] useful
+
+test_usefulFeatures_rejectsNewButAcceptsIsDisjoint = do
+  let
+    goodState1 = state [("feat1", 1), ("feat2", 1), ("feat3", 0)]
+    goodState2 = state [("feat1", 0), ("feat2", 0), ("feat3", 1)]
+    goodState3 = state [("feat1", 1), ("feat2", 0), ("feat3", 0)]
+    goodStates = Set.fromList [goodState1, goodState2, goodState3]
+  let
+    badState1  = state [("feat1", 0), ("feat2", 0), ("feat3", 1)]
+    badState2  = state [("feat1", 1), ("feat2", 1), ("feat3", 0)]
+    badStates  = Set.fromList [badState1, badState2]
+  feature1 <- feature "(= feat1 1)"
+                      (Set.fromList [badState1])
+                      (Set.fromList [goodState1, goodState3])
+  feature2 <- feature "(= feat2 1)"
+                      (Set.fromList [badState1])
+                      (Set.fromList [goodState1])
+  feature3 <- feature "(= feat3 1)"
+                      (Set.fromList [badState2])
+                      (Set.fromList [goodState2])
+  let features = [feature1, feature2, feature3]
+  let entry = Entry [] [feature1, feature2] False
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  let task = mapM_ addFeature features >> usefulFeatures entry
+  useful <- evalCvi task env
+  assertEqual [] useful
+
+test_usefulFeatures_emptyCandidateWithFeatureAcceptingNewGoods = do
+  let
+    goodState1 = state [("feat1", 1), ("feat2", 1), ("feat3", 0)]
+    goodState2 = state [("feat1", 0), ("feat2", 0), ("feat3", 1)]
+    goodState3 = state [("feat1", 1), ("feat2", 0), ("feat3", 0)]
+    goodStates = Set.fromList [goodState1, goodState2, goodState3]
+  let
+    badState1  = state [("feat1", 0), ("feat2", 1), ("feat3", 1)]
+    badState2  = state [("feat1", 1), ("feat2", 0), ("feat3", 0)]
+    badStates  = Set.fromList [badState1, badState2]
+  feature1 <- feature "(= feat1 1)"
+                      (Set.fromList [badState1])
+                      (Set.fromList [goodState1, goodState3])
+  feature2 <- feature "(= feat2 1)"
+                      (Set.fromList [badState2])
+                      (Set.fromList [goodState1])
+  feature3 <- feature "(= feat3 1)"
+                      (Set.fromList [badState2])
+                      (Set.fromList [goodState2])
+  let features = [feature1, feature2, feature3]
+  -- feature1 /\ feature2 accept goodState1 while ruling out all bads;
+  -- feature1 would kick off a new candidate that accepts goodState3, while
+  -- feature3 would kick off a new candidate that accepts goodState2.
+  let entry = Entry [[feature1, feature2]] [] False
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  let task = mapM_ addFeature features >> usefulFeatures entry
+  useful <- evalCvi task env
+  assertSameElements [feature1, feature3] useful
+
+test_learnSeparator_returnsTrueWhenNoBads =
+  let
+    badStates = Set.empty
+    goodStates = Set.fromList [ state[("a", 12), ("b", 4)] ]
+    env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  in do
+    sep <- evalCvi learnSeparator env
+    assertEqual (Just ATrue) sep
+
+test_learnSeparator_returnsFalseWhenNoGoods =
+  let
+    badStates = Set.fromList [ state[("a", 12), ("b", 4)] ]
+    goodStates = Set.empty
+    env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  in do
+    sep <- evalCvi learnSeparator env
+    assertEqual (Just AFalse) sep
+
+test_learnSeparator_returnsTrueWhenNoBadsOrGoods =
+  let
+    badStates = Set.empty
+    goodStates = Set.empty
+    env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  in do
+    sep <- evalCvi learnSeparator env
+    assertEqual (Just ATrue) sep
+
+test_learnSeparator = do
+  -- Target separator: (x < 10 || y = 5) && (z < 0)
+  expected <- assertionFromStr "(and (or (< x 10) (= y 5)) (< z 0))" :: IO (Assertion Integer)
+  -- All the needed feature candidates plus some extras:
+  assertions <- sequence $ [ assertionFromStr "(< x 10)"
+                           , assertionFromStr "(= y 5)"
+                           , assertionFromStr "(< z 0)"
+                           , assertionFromStr "(<= x 0)"
+                           , assertionFromStr "(= y 2)"
+                           , assertionFromStr "(= z -1)"
+                           , assertionFromStr "(> x 10)"
+                           ] :: IO [Assertion Integer]
+  let
+    goodState1 = state [("x", 0),  ("y", 5),  ("z", -10)]
+    goodState2 = state [("x", 0),  ("y", 2),  ("z", -7)]
+    goodState3 = state [("x", 20), ("y", 5),  ("z", -1)]
+    goodStates = Set.fromList [goodState1, goodState2, goodState3]
+  let
+    badState1  = state [("x", 20), ("y", 2),  ("z", -8)]
+    badState2  = state [("x", 0),  ("y", 0),  ("z",  0)]
+    badState3  = state [("x", 12), ("y", 5),  ("z",  9)]
+    badState4  = state [("x", -4), ("y", -2), ("z",  8)]
+    badStates  = Set.fromList [badState1, badState2, badState3, badState4]
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp assertions
+  let task = do
+        features <- mapM assertionToFeature assertions
+        mapM_ addFeature features
+        mapM_ enqueue =<< mapM featureToEntry features
+        learnSeparator
+  mActual <- evalCvi task env :: IO (Maybe (Assertion Integer))
+  case mActual of
+    Nothing     -> assertFailure "Separator learner was unable to find a separator."
+    Just actual -> assertEquivalent expected actual

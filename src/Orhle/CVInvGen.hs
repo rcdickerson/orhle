@@ -16,7 +16,11 @@ module Orhle.CVInvGen
   , Feature(..)
   , Queue
   , acceptsAllGoods
+  , addFeature
+  , assertionToEntry
+  , assertionToFeature
   , closeNames
+  , enqueue
   , entryScore
   , entryToAssertion
   , featureToEntry
@@ -25,6 +29,7 @@ module Orhle.CVInvGen
   , nextLevel
   , qInsert
   , qPop
+  , usefulFeatures
   ) where
 
 import Ceili.Assertion
@@ -35,6 +40,7 @@ import Ceili.ProgState
 import Ceili.PTS ( BackwardPT )
 import qualified Ceili.SMT as SMT
 import Ceili.StatePredicate
+import Data.List ( partition )
 import Data.Map ( Map )
 import qualified Data.Map as Map
 import Data.Set ( Set )
@@ -82,6 +88,13 @@ data Feature t = Feature { featAssertion     :: Assertion t
 instance Eq t => Eq (Feature t)
   where f1 == f2 = (featAssertion f1) == (featAssertion f2)
 
+instance Pretty t => Pretty (Feature t) where
+  pretty (Feature assertion bads goods) =
+    align $ encloseSep lbracket rbracket space
+    [ pretty "Assertion:" <+> pretty assertion
+    , pretty "Rejected bads:" <+> align (prettyProgStates (Set.toList bads))
+    , pretty "AcceptedGoods:" <+> align (prettyProgStates (Set.toList goods))
+    ]
 
 -------------
 -- Clauses --
@@ -98,6 +111,14 @@ data Entry t = Entry { entryClauses         :: [Clause t]
                      , entryCandidate       :: Clause t
                      , entryAcceptsAllGoods :: Bool
                      } deriving (Eq, Ord, Show)
+
+instance Pretty t => Pretty (Entry t) where
+  pretty (Entry clauses candidate acceptsAllGoods) =
+    align $ encloseSep lbracket rbracket space
+    [ pretty "Clauses:" <+> pretty clauses
+    , pretty "Candidate:" <+> pretty candidate
+    ]
+
 type Queue t = Map Int (Set (Entry t))
 
 qSize :: Queue t -> Int
@@ -184,6 +205,11 @@ getFeatures = get >>= pure . envFeatures
 
 getFeatureCandidates :: CviM t [Assertion t]
 getFeatureCandidates = get >>= pure . envFeatureCandidates
+
+addFeature :: Ord t => Feature t -> CviM t ()
+addFeature feature = do
+  CviEnv queue bads goods features fCandidates goalQ names <- get
+  put $ CviEnv queue bads goods (Set.insert feature features) fCandidates goalQ names
 
 putQueue :: (Queue t) -> CviM t ()
 putQueue queue = do
@@ -295,23 +321,41 @@ learnSeparator' :: CviConstraints t => CviM t (Maybe (Assertion t))
 learnSeparator' = do
   mEntry <- dequeue
   case mEntry of
-    Nothing -> do clog_d $ "[CVInvGen] Search queue is empty, failing."; pure Nothing
+    Nothing -> do
+      clog_d $ "[CVInvGen] Search queue is empty, failing."
+      pure Nothing
     Just entry -> do
+      -- traceM . show $ pretty "Entry: " <+> pretty entry
       if entryAcceptsAllGoods entry
         then pure . Just $ entryToAssertion entry
         else do
-          badStates <- getBadStates
-          features  <- getFeatures
-          let candAcceptedGoods = clauseAcceptedGoods $ entryCandidate entry
-          let candRejectedBads  = clauseRejectedBads  $ entryCandidate entry
-          let candRemainingBads = Set.difference badStates candRejectedBads
-          -- A useful addition to the candidate rejects something the candidate does not
-          -- while still accepting some of the states the candidate accepts.
-          let useful feature    = (not $ Set.disjoint (featRejectedBads feature)  candRemainingBads)
-                               && (not $ Set.disjoint (featAcceptedGoods feature) candAcceptedGoods)
-          let usefulFeatures    = filter useful $ Set.toList features
-          mapM_ enqueue =<< nextLevel entry usefulFeatures
+          nextFeatures <- usefulFeatures entry
+          mapM_ enqueue =<< nextLevel entry nextFeatures
           learnSeparator'
+
+usefulFeatures :: CviConstraints t => Entry t -> CviM t [Feature t]
+usefulFeatures entry = do
+  features <- pure . Set.toList =<< getFeatures
+  case entryCandidate entry of
+    [] -> do
+      -- The candidate is empty. A useful kickoff to a new clause candidate
+      -- is any feature accepting currently unaccepted good states.
+      goodStates <- getGoodStates
+      let acceptedGoods  = Set.unions $ map clauseAcceptedGoods (entryClauses entry)
+      let remainingGoods = Set.difference goodStates acceptedGoods
+      let useful feature = not $ Set.disjoint (featAcceptedGoods feature) remainingGoods
+      pure $ filter useful features
+    candidate -> do
+      -- A useful addition to an existing candidate rejects something new
+      -- while still accepting some of the states the candidate accepts.
+      badStates <- getBadStates
+      let acceptedGoods  = clauseAcceptedGoods candidate
+      let rejectedBads   = clauseRejectedBads  candidate
+      let remainingBads  = Set.difference badStates rejectedBads
+      let useful feature = (not $ Set.disjoint (featRejectedBads feature)  remainingBads)
+                        && (not $ Set.disjoint (featAcceptedGoods feature) acceptedGoods)
+      pure $ filter useful features
+      -- TODO: No need to check candidate whose new acceptedGoods is a subset of clause accepted goods.
 
 nextLevel :: CviConstraints t => Entry t -> [Feature t] -> CviM t [Entry t]
 nextLevel _ [] = pure []
@@ -338,6 +382,32 @@ nextLevel entry (newFeature:rest) = do
 
 addBadState :: CviConstraints t => ProgState t -> CviM t ()
 addBadState badState = error "unimplemented"
+
+
+-----------------------
+-- Entry Conversions --
+-----------------------
+
+assertionToFeature :: CviConstraints t => Assertion t -> CviM t (Feature t)
+assertionToFeature assertion = do
+  badStates  <- getBadStates
+  goodStates <- getGoodStates
+  (_, rejectedBads)  <- lift $ splitStates assertion $ Set.toList badStates
+  (acceptedGoods, _) <- lift $ splitStates assertion $ Set.toList goodStates
+  pure $ Feature assertion (Set.fromList rejectedBads) (Set.fromList acceptedGoods)
+
+featureToEntry :: CviConstraints t => Feature t -> CviM t (Entry t)
+featureToEntry feature = do
+  badStates <- getBadStates
+  if Set.null $ Set.difference badStates (featRejectedBads feature)
+    then pure . Entry [[feature]] [] =<< acceptsAllGoods [[feature]]
+    else pure $ Entry [] [feature] False
+
+assertionToEntry :: CviConstraints t => Assertion t -> CviM t (Entry t)
+assertionToEntry assertion = assertionToFeature assertion >>= featureToEntry
+
+entryToAssertion :: Entry t -> Assertion t
+entryToAssertion = aOr . map (aAnd . map featAssertion) . entryClauses
 
 
 -------------
@@ -369,16 +439,6 @@ entryRejectedBads (Entry clauses candidate _) =
     candidateRejected = Set.unions $ map featRejectedBads candidate
   in Set.union clauseRejected candidateRejected
 
-entryToAssertion :: Entry t -> Assertion t
-entryToAssertion = aOr . map (aAnd . map featAssertion) . entryClauses
-
-featureToEntry :: CviConstraints t => Feature t -> CviM t (Entry t)
-featureToEntry feature = do
-  badStates <- getBadStates
-  if Set.null $ Set.difference badStates (featRejectedBads feature)
-    then pure . Entry [[feature]] [] =<< acceptsAllGoods [[feature]]
-    else pure $ Entry [] [feature] False
-
 acceptsAllGoods :: CviConstraints t => [Clause t] -> CviM t Bool
 acceptsAllGoods clauses = do
   goodStates <- getGoodStates
@@ -393,6 +453,13 @@ closeNames names state =
                        then st
                        else Map.insert name (embed (0 :: Integer)) st
   in foldr ensureIn state names
+
+splitStates :: CviConstraints t => Assertion t -> [ProgState t] -> Ceili ([ProgState t], [ProgState t])
+splitStates assertion states = do
+  let resultPairs state = do result <- testState assertion state; pure (state, result)
+  evaluations <- sequence $ map resultPairs states
+  let (accepted, rejected) = partition snd evaluations
+  pure (map fst accepted, map fst rejected)
 
 -- TODO: This is fragile.
 extractState :: Pretty t => (Assertion t) -> (ProgState t)
