@@ -89,11 +89,11 @@ test_mkCviEnv_closesStateNames =
 
 -- Queue
 test_qInsert = do
-  feature1 <- feature "x < 0" (states [[("x", 4)]]) (states [[("x", -1)]])
-  feature2 <- feature "x < 1" (states [[("x", 4)], [("x", 0)]]) (states [[("x", -1)]])
+  feature1 <- feature "(< x 0)" (states [[("x", 4)]]) (states [[("x", -1)]])
+  feature2 <- feature "(< x 1)" (states [[("x", 4)], [("x", 0)]]) (states [[("x", -1)]])
   let
-    entry1      = Entry [] [feature1]
-    entry2      = Entry [[feature2]] []
+    entry1      = Entry [] [feature1] False
+    entry2      = Entry [[feature2]] [] False
     entry1Score = entryScore entry1
     entry2Score = entryScore entry2
     expected    = Map.insert entry1Score (Set.fromList [entry1])
@@ -103,11 +103,11 @@ test_qInsert = do
   assertEqual expected actual
 
 test_qPop = do
-  feature1 <- feature "x < 0" (states [[("x", 4)]]) (states [[("x", -1)]])
-  feature2 <- feature "x < 1" (states [[("x", 4)], [("x", 0)]]) (states [[("x", -1)]])
+  feature1 <- feature "(< x 0)" (states [[("x", 4)]]) (states [[("x", -1)]])
+  feature2 <- feature "(< x 1)" (states [[("x", 4)], [("x", 0)]]) (states [[("x", -1)]])
   let
-    entry1      = Entry [] [feature1]
-    entry2      = Entry [[feature2]] []
+    entry1      = Entry [] [feature1] False
+    entry2      = Entry [[feature2]] [] False
     entry1Score = entryScore entry1
     entry2Score = entryScore entry2
     queue       = qInsert entry1 $ qInsert entry2 $ qInsert entry2 $ (Map.empty :: Queue Integer)
@@ -125,7 +125,7 @@ test_qPop_empty =
   in assertEqual expected actual
 
 
--- Learn Separator
+-- Separator Learning
 test_learnSeparator_returnsTrueWhenNoBads =
   let
     badStates = Set.empty
@@ -181,3 +181,130 @@ test_learnSeparator = do
   case mActual of
     Nothing     -> assertFailure "Separator learner was unable to find a separator."
     Just actual -> assertEquivalent expected actual
+
+
+-- Utility
+
+test_entryToAssertion = do
+  feature1 <- feature "(< x 0)" Set.empty Set.empty
+  feature2 <- feature "(= y 3)" Set.empty Set.empty
+  feature3 <- feature "(> z 2)" Set.empty Set.empty
+  let entry = Entry [ [feature1, feature2], [feature3] ] [] True
+  expected <- assertionFromStr "(or (and (< x 0) (= y 3)) (> z 2))"
+  let actual = entryToAssertion entry
+  assertEqual expected actual
+
+test_featureToEntry_rejectsAllBads_acceptsNoGoods = do
+  assertion <- assertionFromStr "(> x 5)"
+  let badStates = states  [ [("x", 0)]
+                          , [("x", 1)]
+                          , [("x", 2)]
+                          ]
+  let goodStates = states [ [("x", -20)]
+                          , [("x", -10)]
+                          ]
+  let feature1 = Feature assertion badStates Set.empty
+  let expected = Entry [[feature1]] [] False
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  entry <- evalCvi (featureToEntry feature1) env
+  assertEqual expected entry
+
+test_featureToEntry_rejectsAllBads_acceptsSomeGoods = do
+  assertion <- assertionFromStr "(> x 5)"
+  let badStates = states  [ [("x", 0)]
+                          , [("x", 1)]
+                          , [("x", 2)]
+                          ]
+  let goodStates = states [ [("x",  10)]
+                          , [("x", -10)]
+                          ]
+  let feature1 = Feature assertion badStates $ Set.singleton (state [("x", 10)])
+  let expected = Entry [[feature1]] [] False
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  entry <- evalCvi (featureToEntry feature1) env
+  assertEqual expected entry
+
+test_featureToEntry_rejectsAllBads_acceptsAllGoods = do
+  assertion <- assertionFromStr "(> x 5)"
+  let badStates = states  [ [("x", 0)]
+                          , [("x", 1)]
+                          , [("x", 2)]
+                          ]
+  let goodStates = states [ [("x", 10)]
+                          , [("x", 20)]
+                          ]
+  let feature1 = Feature assertion badStates goodStates
+  let expected = Entry [[feature1]] [] True
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  entry <- evalCvi (featureToEntry feature1) env
+  assertEqual expected entry
+
+test_featureToEntry_rejectsSomeBads_acceptsSomeGoods = do
+  assertion <- assertionFromStr "(> x 1)"
+  let badStates = states  [ [("x", 0)]
+                          , [("x", 1)]
+                          , [("x", 2)]
+                          ]
+  let goodStates = states [ [("x", -10)]
+                          , [("x",  10)]
+                          ]
+  let feature1 = Feature assertion (states [[("x", 0)], [("x", 1)]]) (states [[("x", 10)]])
+  let expected = Entry [] [feature1] False
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  entry <- evalCvi (featureToEntry feature1) env
+  assertEqual expected entry
+
+test_featureToEntry_rejectsSomeBads_acceptsAllGoods = do
+  assertion <- assertionFromStr "(> x 1)"
+  let badStates = states  [ [("x", 0)]
+                          , [("x", 1)]
+                          , [("x", 2)]
+                          ]
+  let goodStates = states [ [("x", 10)]
+                          , [("x", 20)]
+                          ]
+  let feature1 = Feature assertion (states [[("x", 0)], [("x", 1)]]) goodStates
+  let expected = Entry [] [feature1] False
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  entry <- evalCvi (featureToEntry feature1) env
+  assertEqual expected entry
+
+test_acceptsAllGoods_true = do
+  assertion1 <- assertionFromStr "(= x 10)"
+  assertion2 <- assertionFromStr "(< x 25)"
+  assertion3 <- assertionFromStr "(> x 15)"
+  assertion4 <- assertionFromStr "(= x 30)"
+  let badStates = states  [ [("x", 0)]
+                          , [("x", 1)]
+                          ]
+  let goodStates = states [ [("x", 10)]
+                          , [("x", 20)]
+                          , [("x", 30)]
+                          ]
+  let feature1 = Feature assertion1 badStates (states [[("x", 10)]])
+      feature2 = Feature assertion2 Set.empty (states [[("x", 10)], [("x", 20)]])
+      feature3 = Feature assertion3 badStates (states [[("x", 20)], [("x", 30)]])
+      feature4 = Feature assertion4 badStates (states [[("x", 30)]])
+  let clauses = [[feature1], [feature2, feature3], [feature3, feature4]]
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  result <- evalCvi (acceptsAllGoods clauses) env
+  assertEqual True result
+
+test_acceptsAllGoods_false = do
+  assertion1 <- assertionFromStr "(= x 10)"
+  assertion2 <- assertionFromStr "(< x 25)"
+  assertion3 <- assertionFromStr "(> x 15)"
+  let badStates = states  [ [("x", 0)]
+                          , [("x", 1)]
+                          ]
+  let goodStates = states [ [("x", 10)]
+                          , [("x", 20)]
+                          , [("x", 30)]
+                          ]
+  let feature1 = Feature assertion1 badStates (states [[("x", 10)]])
+      feature2 = Feature assertion2 Set.empty (states [[("x", 10)], [("x", 20)]])
+      feature3 = Feature assertion3 badStates (states [[("x", 20)], [("x", 30)]])
+  let clauses = [[feature1], [feature2, feature3]]
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  result <- evalCvi (acceptsAllGoods clauses) env
+  assertEqual False result
