@@ -399,7 +399,7 @@ test_learnSeparator_returnsTrueWhenNoBadsOrGoods =
 
 test_learnSeparator = do
   -- Target separator: (x < 10 || y = 5) && (z < 0)
-  expected <- assertionFromStr "(and (or (< x 10) (= y 5)) (< z 0))" :: IO (Assertion Integer)
+  expected <- assertionFromStr "(or (and (< x 10) (= y 5)) (< z 0))" :: IO (Assertion Integer)
   -- All the needed feature candidates plus some extras:
   assertions <- sequence $ [ assertionFromStr "(< x 10)"
                            , assertionFromStr "(= y 5)"
@@ -410,15 +410,16 @@ test_learnSeparator = do
                            , assertionFromStr "(> x 10)"
                            ] :: IO [Assertion Integer]
   let
-    goodState1 = state [("x", 0),  ("y", 5),  ("z", -10)]
-    goodState2 = state [("x", 0),  ("y", 2),  ("z", -7)]
-    goodState3 = state [("x", 20), ("y", 5),  ("z", -1)]
-    goodStates = Set.fromList [goodState1, goodState2, goodState3]
+    goodState1 = state [("x", 0),  ("y", 5),  ("z",  10)]
+    goodState2 = state [("x", 8),  ("y", 5),  ("z",  10)]
+    goodState3 = state [("x", 0),  ("y", 2),  ("z", -7)]
+    goodState4 = state [("x", 20), ("y", 5),  ("z", -1)]
+    goodStates = Set.fromList [goodState1, goodState2, goodState3, goodState4]
   let
-    badState1  = state [("x", 20), ("y", 2),  ("z", -8)]
-    badState2  = state [("x", 0),  ("y", 0),  ("z",  0)]
-    badState3  = state [("x", 12), ("y", 5),  ("z",  9)]
-    badState4  = state [("x", -4), ("y", -2), ("z",  8)]
+    badState1  = state [("x", 20), ("y",  2),  ("z", 8)]
+    badState2  = state [("x", 0),  ("y",  0),  ("z", 0)]
+    badState3  = state [("x", 12), ("y",  5),  ("z", 9)]
+    badState4  = state [("x", -4), ("y", -2),  ("z", 8)]
     badStates  = Set.fromList [badState1, badState2, badState3, badState4]
   let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp assertions
   let task = do
