@@ -26,6 +26,7 @@ module Orhle.CVInvGen
   , entryScore
   , entryToAssertion
   , featureToEntry
+  , getFeatures
   , getFeatureCandidates
   , getQueue
   , learnSeparator
@@ -57,8 +58,6 @@ import qualified Data.Set as Set
 import Control.Monad.Trans ( lift )
 import Control.Monad.Trans.State ( StateT, evalStateT, get, put )
 import Prettyprinter
-
-import Debug.Trace
 
 
 ----------------------------
@@ -195,9 +194,8 @@ mkCviEnv (Job badStates goodStates loopCond loopBody postCond) wp fCandidates =
     negLoopCond         = Not loopCond
     goalQuery candidate = do
       weakestPre <- (wpSemantics wp) (wpContext wp) loopBody candidate
-      pure $ aAnd [ Imp (aAnd [candidate, negLoopCond]) postCond     -- Establishes Post
-                  , Not $ Imp (aAnd [candidate, negLoopCond]) AFalse -- Non-trivial
-                  , Imp (aAnd [candidate, loopCond]) weakestPre      -- Inductive
+      pure $ aAnd [ Imp (aAnd [candidate, negLoopCond]) postCond -- Establishes Post
+                  , Imp (aAnd [candidate, loopCond]) weakestPre  -- Inductive
                   ]
   in CviEnv Map.empty closedBads closedGoods Set.empty fCandidates goalQuery names
 
@@ -225,6 +223,11 @@ putQueue :: Queue t -> CviM t ()
 putQueue queue = do
   CviEnv _ bads goods features fCandidates goalQ names <- get
   put $ CviEnv queue bads goods features fCandidates goalQ names
+
+putBadStates :: Set (ProgState t) -> CviM t ()
+putBadStates badStates = do
+  CviEnv queue _ goods features fCandidates goalQ names <- get
+  put $ CviEnv queue badStates goods features fCandidates goalQ names
 
 putFeatures :: Set (Feature t) -> CviM t ()
 putFeatures features = do
@@ -345,7 +348,6 @@ learnSeparator' = do
       clog_d $ "[CVInvGen] Search queue is empty, failing."
       pure Nothing
     Just entry -> do
-      -- traceM . show $ pretty "Entry: " <+> pretty entry
       if entryAcceptsAllGoods entry
         then pure . Just $ entryToAssertion entry
         else do
@@ -407,8 +409,9 @@ nextLevel entry (newFeature:rest) = do
 
 addBadState :: CviConstraints t => ProgState t -> CviM t ()
 addBadState badState = do
-  getQueue    >>= lift . (updateQueue    badState) >>= putQueue
-  getFeatures >>= lift . (updateFeatures badState) >>= putFeatures
+  getQueue     >>= lift . (updateQueue    badState) >>= putQueue
+  getFeatures  >>= lift . (updateFeatures badState) >>= putFeatures
+  getBadStates >>= pure . (Set.insert     badState) >>= putBadStates
   addNewlyUsefulCandidates badState
 
 updateFeatures :: CviConstraints t => ProgState t -> Set (Feature t) -> Ceili (Set (Feature t))
@@ -423,11 +426,13 @@ addNewlyUsefulCandidates newBadState = do
         result <- lift $ testState assertion newBadState
         pure $ if result then Left assertion else Right assertion
   (candidates', newlyUseful) <- pure . partitionEithers =<< mapM rejectsNewBad featureCandidates
-  newFeatures <- mapM assertionToFeature newlyUseful
-  let filteredFeatures = filter (not . Set.null . featAcceptedGoods) newFeatures
-  newEntries <- mapM featureToEntry filteredFeatures
-  mapM_ enqueue newEntries
+  maybeUseful <- mapM assertionToFeature newlyUseful
+  let newFeatures = filter (not . Set.null . featAcceptedGoods) maybeUseful
+  newEntries <- mapM featureToEntry newFeatures
+
   putFeatureCandidates candidates'
+  mapM_ addFeature newFeatures
+  mapM_ enqueue newEntries
 
 -- Update mechanics.
 

@@ -43,7 +43,8 @@ dummyWp = WeakestPre (\ _ _ _ -> pure ATrue) ()
 
 evalCeili :: Ceili a -> IO a
 evalCeili task = do
-  mResult <- runCeili (defaultEnv Set.empty) task
+  let env = mkEnv LogLevelInfo 2000 Set.empty
+  mResult <- runCeili env task
   case mResult of
     Left err     -> assertFailure $ show err
     Right result -> pure result
@@ -606,12 +607,47 @@ test_addNewlyUsefulCandidates = do
   let expectedQueue = qInsert (Entry [[expectedFeature2]] [] True)
                     $ Map.empty
   let expectedCandidates' = [assertion3, assertion4]
+  let expectedFeatures' = Set.fromList [expectedFeature2]
   let env = mkCviEnv (Job newBadStates goodStates ATrue impSkip ATrue) dummyWp candidates
   let task = do
         addNewlyUsefulCandidates newBadState
         queue <- getQueue
         fCandidates <- getFeatureCandidates
-        pure (queue, fCandidates)
-  (actualQueue, actualCandidates') <- evalCvi task env
+        features <- getFeatures
+        pure (queue, fCandidates, features)
+  (actualQueue, actualCandidates', actualFeatures') <- evalCvi task env
   assertEqual expectedQueue       actualQueue
   assertEqual expectedCandidates' actualCandidates'
+  assertEqual expectedFeatures'   actualFeatures'
+
+
+-- CVInvGen (end-to-end test of invariant inference).
+
+test_cvInvGen = do
+  -- Target invariant: x <= y /\ y <= x
+  let x = Name "x" 0
+  let y = Name "y" 0
+  features <- sequence $ [ assertionFromStr "(<= x 0)"
+                         , assertionFromStr "(<= y 0)"
+                         , assertionFromStr "(<= x 10)"
+                         , assertionFromStr "(<= y 10)"
+                         , assertionFromStr "(<= x y)"
+                         , assertionFromStr "(<= y x)"
+                         ] :: IO [Assertion Integer]
+  loopCond <- assertionFromStr "(and (< x 10) (< y 10))"
+  let loopBody = impSeq [ impAsgn x (AAdd (AVar x) (ALit 1))
+                        , impAsgn y (AAdd (AVar y) (ALit 1))
+                        ] :: ImpProgram Integer
+  let goodStates = states [ [("x", 0), ("y", 0)]
+                          , [("x", 1), ("y", 1)]
+                          , [("x", 2), ("y", 2)]
+                          ]
+  postCond <- assertionFromStr "(= x y)"
+  let featureGen = FeatureGen 2 12 (\_ -> Set.fromList features)
+  let pts = WeakestPre impBackwardPT $ ImpPieContext Map.empty (Set.fromList [x, y]) (Set.singleton (10 :: Integer))
+  let job = Job Set.empty goodStates loopCond loopBody postCond
+  expected <- assertionFromStr "(and (<= x y) (<= y x))"
+  mActual  <- evalCeili $ cvInvGen featureGen pts job
+  case mActual of
+    Nothing     -> assertFailure "Unable to find separator."
+    Just actual -> assertEquivalent expected actual
