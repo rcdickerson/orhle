@@ -564,3 +564,23 @@ test_updateEntry_acceptingClauseClearsDoneFlag = do
   let expected = (Entry [] [] False, [[feature1]])
   actual <- evalCeili $ updateEntry newBadState entry
   assertEqual expected actual
+
+test_updateQueue = do
+  feature1 <- feature "(< x 1)" (states [[("x", 5)]]) (states [[("x", -1)]])
+  feature2 <- feature "(< x 2)" (states [[("x", 5)]]) (states [[("x", -1)]])
+  feature3 <- feature "(< x 3)" (states [[("x", 5)]]) (states [[("x", -1)]])
+  feature4 <- feature "(< x 4)" (states [[("x", 5)]]) (states [[("x", -1)]])
+  let queue = qInsert (Entry [[feature1], [feature2], [feature3]] [feature4] False)
+            $ qInsert (Entry [[feature1, feature3], [feature2]] [feature4] False)
+            $ qInsert (Entry [] [feature1] False)
+            $ qInsert (Entry [[feature3]] [] False) -- Should be removed completely.
+            $ Map.empty
+  let newBadState = state [("x", 2)]
+  feature1' <- feature "(< x 1)" (states [[("x", 5)], [("x", 2)]]) (states [[("x", -1)]])
+  feature2' <- feature "(< x 2)" (states [[("x", 5)], [("x", 2)]]) (states [[("x", -1)]])
+  let expected = qInsert (Entry [[feature1'], [feature2']] [] False)
+               $ qInsert (Entry [[feature1', feature3], [feature2']] [feature4] False)
+               $ qInsert (Entry [] [feature1'] False)
+               $ Map.empty
+  actual <- evalCeili $ updateQueue newBadState queue
+  assertEqual expected actual

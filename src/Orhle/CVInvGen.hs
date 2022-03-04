@@ -33,6 +33,7 @@ module Orhle.CVInvGen
   , updateClause
   , updateFeature
   , updateEntry
+  , updateQueue
   , usefulFeatures
   ) where
 
@@ -112,6 +113,10 @@ data Entry t = Entry { entryClauses         :: [Clause t]
                      , entryCandidate       :: Clause t
                      , entryAcceptsAllGoods :: Bool
                      } deriving (Eq, Ord, Show)
+
+nullEntry :: Entry t -> Bool
+nullEntry (Entry [] [] _) = True
+nullEntry _ = False
 
 instance Pretty t => Pretty (Entry t) where
   pretty (Entry clauses candidate _) =
@@ -212,9 +217,14 @@ addFeature feature = do
   CviEnv queue bads goods features fCandidates goalQ names <- get
   put $ CviEnv queue bads goods (Set.insert feature features) fCandidates goalQ names
 
-putQueue :: (Queue t) -> CviM t ()
+putQueue :: Queue t -> CviM t ()
 putQueue queue = do
   CviEnv _ bads goods features fCandidates goalQ names <- get
+  put $ CviEnv queue bads goods features fCandidates goalQ names
+
+putFeatures :: Set (Feature t) -> CviM t ()
+putFeatures features = do
+  CviEnv queue bads goods _ fCandidates goalQ names <- get
   put $ CviEnv queue bads goods features fCandidates goalQ names
 
 enqueue :: CviConstraints t => Entry t -> CviM t ()
@@ -388,7 +398,20 @@ nextLevel entry (newFeature:rest) = do
 
 addBadState :: CviConstraints t => ProgState t -> CviM t ()
 addBadState badState = do
+  getQueue    >>= lift . (updateQueue badState)    >>= putQueue
+  getFeatures >>= lift . (updateFeatures badState) >>= putFeatures
+  addNewlyUsefulCandidates badState
+
+updateFeatures :: CviConstraints t => ProgState t -> Set (Feature t) -> Ceili (Set (Feature t))
+updateFeatures newBadState features = do
+  features' <- mapM (updateFeature newBadState) $ Set.toList features
+  pure . Set.fromList . (map fst) $ features'
+
+addNewlyUsefulCandidates :: CviConstraints t => ProgState t -> CviM t ()
+addNewlyUsefulCandidates newBadState = do
   error "unimplemented"
+
+-- Update mechanics.
 
 data UpdateFlag = Accepts
                 | Rejects
@@ -421,6 +444,19 @@ updateEntry newBadState (Entry clauses candidate finished) = do
   (candidate', _) <- updateClause newBadState candidate
   let finished' = if null acceptClauses then finished else False
   pure (Entry (map fst rejectClauses) candidate' finished', map fst acceptClauses)
+
+updateQueue :: CviConstraints t => ProgState t -> Queue t -> Ceili (Queue t)
+updateQueue newBadState queue = do
+  let entries = Set.toList . Set.unions . Map.elems $ queue
+  updatedEntries <- mapM (updateEntry newBadState) entries
+  let newEntry (entry, removedClauses) =
+        case removedClauses of
+          [] -> entry
+          _  -> Entry (entryClauses entry) [] False
+  let process update newQueue =
+        let entry' = newEntry update
+        in if nullEntry entry' then newQueue else qInsert entry' newQueue
+  pure $ foldr process Map.empty updatedEntries
 
 
 -----------------------
