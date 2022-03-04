@@ -29,7 +29,9 @@ module Orhle.CVInvGen
   , nextLevel
   , qInsert
   , qPop
+  , updateClause
   , updateFeature
+  , updateEntry
   , usefulFeatures
   ) where
 
@@ -390,13 +392,25 @@ addBadState :: CviConstraints t => ProgState t -> CviM t ()
 addBadState badState = do
   error "unimplemented"
 
-updateFeature :: CviConstraints t => ProgState t -> Feature t -> CviM t (Feature t)
+updateFeature :: CviConstraints t => ProgState t -> Feature t -> CviM t (Feature t, Bool)
 updateFeature newBadState (Feature assertion rejectedBads acceptedGoods) = do
   acceptsNewBad <- lift $ testState assertion newBadState
-  let rejectedBads' = if acceptsNewBad
-                      then rejectedBads
-                      else Set.insert newBadState rejectedBads
-  pure $ Feature assertion rejectedBads' acceptedGoods
+  let (rejectedBads', updated) = if acceptsNewBad
+                                 then (rejectedBads, False)
+                                 else (Set.insert newBadState rejectedBads, True)
+  pure $ (Feature assertion rejectedBads' acceptedGoods, updated)
+
+updateClause :: CviConstraints t => ProgState t -> Clause t -> CviM t (Clause t, Bool)
+updateClause newBadState features = do
+  updatedFeatures <- mapM (updateFeature newBadState) features
+  let (features', updates) = unzip updatedFeatures
+  pure $ (features', or updates)
+
+updateEntry :: CviConstraints t => ProgState t -> Entry t -> CviM t (Entry t, [Clause t])
+updateEntry newBadState (Entry clauses candidate acceptsAllGoods) = do
+  clauses' <- mapM (updateClause newBadState) clauses
+  error "unimplemented"
+
 
 -----------------------
 -- Entry Conversions --
