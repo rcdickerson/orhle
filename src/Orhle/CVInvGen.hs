@@ -29,6 +29,7 @@ module Orhle.CVInvGen
   , nextLevel
   , qInsert
   , qPop
+  , updateFeature
   , usefulFeatures
   ) where
 
@@ -161,9 +162,9 @@ entryScore entry@(Entry clauses candidate _) =
   in (100 * acceptedGoods) + rejectedBads - numClauses - candidateSize
 
 
------------------
--- Computation --
------------------
+-----------------------
+-- Computation Monad --
+-----------------------
 
 data CviEnv t = CviEnv { envQueue             :: Queue t
                        , envBadStates         :: Set (ProgState t)
@@ -386,8 +387,16 @@ nextLevel entry (newFeature:rest) = do
 ---------------------------
 
 addBadState :: CviConstraints t => ProgState t -> CviM t ()
-addBadState badState = error "unimplemented"
+addBadState badState = do
+  error "unimplemented"
 
+updateFeature :: CviConstraints t => ProgState t -> Feature t -> CviM t (Feature t)
+updateFeature newBadState (Feature assertion rejectedBads acceptedGoods) = do
+  acceptsNewBad <- lift $ testState assertion newBadState
+  let rejectedBads' = if acceptsNewBad
+                      then rejectedBads
+                      else Set.insert newBadState rejectedBads
+  pure $ Feature assertion rejectedBads' acceptedGoods
 
 -----------------------
 -- Entry Conversions --
