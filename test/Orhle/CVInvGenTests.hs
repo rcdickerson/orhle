@@ -477,7 +477,7 @@ test_learnSeparator = do
 test_updateFeature_accepts = do
   feature1 <- feature "(< x 0)" (states [[("x", 1)]]) (states [[("x", -1)]])
   let newBadState = state [("x", -2)]
-  let expected = feature1
+  let expected = (feature1, False)
   let env = mkCviEnv (Job (states [[("x", 1)]]) (states[[("x", -1)]]) ATrue impSkip ATrue) dummyWp []
   actual <- evalCvi (updateFeature newBadState feature1) env
   assertEqual expected actual
@@ -485,7 +485,8 @@ test_updateFeature_accepts = do
 test_updateFeature_rejects = do
   feature1 <- feature "(< x 0)" (states [[("x", 1)]]) (states [[("x", -1)]])
   let newBadState = state [("x", 2)]
-  expected <- feature "(< x 0)" (states [[("x", 1)], [("x", 2)]]) (states [[("x", -1)]])
+  expectedFeature <- feature "(< x 0)" (states [[("x", 1)], [("x", 2)]]) (states [[("x", -1)]])
+  let expected = (expectedFeature, True)
   let env = mkCviEnv (Job (states [[("x", 1)]]) (states[[("x", -1)]]) ATrue impSkip ATrue) dummyWp []
   actual <- evalCvi (updateFeature newBadState feature1) env
   assertEqual expected actual
