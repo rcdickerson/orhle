@@ -514,3 +514,45 @@ test_updateClause_someReject = do
   let expected = ([feature1', feature2', feature3], Rejects)
   actual <- evalCeili $ updateClause newBadState clause
   assertEqual expected actual
+
+test_updateEntry_allClausesReject = do
+  feature1 <- feature "(< x 0)" (states [[("x", 5)]]) (states [[("x", -1)]])
+  feature2 <- feature "(< x 1)" (states [[("x", 5)]]) (states [[("x", -1)]])
+  feature3 <- feature "(< x 2)" (states [[("x", 5)]]) (states [[("x", -1)]])
+  feature4 <- feature "(< x 3)" (states [[("x", 5)]]) (states [[("x", -1)]])
+  let entry = Entry [[feature1, feature2], [feature3]] [feature4] False
+  let newBadState = state [("x", 10)]
+  feature1' <- feature "(< x 0)" (states [[("x", 5)], [("x", 10)]]) (states [[("x", -1)]])
+  feature2' <- feature "(< x 1)" (states [[("x", 5)], [("x", 10)]]) (states [[("x", -1)]])
+  feature3' <- feature "(< x 2)" (states [[("x", 5)], [("x", 10)]]) (states [[("x", -1)]])
+  feature4' <- feature "(< x 3)" (states [[("x", 5)], [("x", 10)]]) (states [[("x", -1)]])
+  let expected = (Entry [[feature1', feature2'], [feature3']] [feature4'] False, [])
+  actual <- evalCeili $ updateEntry newBadState entry
+  assertEqual expected actual
+
+test_updateEntry_someFeatureAcceptsButAllClausesStillReject = do
+  feature1 <- feature "(< x 0)" (states [[("x", 5)]]) (states [[("x", -1)]])
+  feature2 <- feature "(< x 3)" (states [[("x", 5)]]) (states [[("x", -1)]])
+  feature3 <- feature "(< x 1)" (states [[("x", 5)]]) (states [[("x", -1)]])
+  feature4 <- feature "(< x 2)" (states [[("x", 5)]]) (states [[("x", -1)]])
+  let entry = Entry [[feature1, feature2], [feature3]] [feature4] False
+  let newBadState = state [("x", 2)] -- feature2 accepts, all other features reject.
+  feature1' <- feature "(< x 0)" (states [[("x", 5)], [("x", 2)]]) (states [[("x", -1)]])
+  feature3' <- feature "(< x 1)" (states [[("x", 5)], [("x", 2)]]) (states [[("x", -1)]])
+  feature4' <- feature "(< x 2)" (states [[("x", 5)], [("x", 2)]]) (states [[("x", -1)]])
+  let expected = (Entry [[feature1', feature2], [feature3']] [feature4'] False, [])
+  actual <- evalCeili $ updateEntry newBadState entry
+  assertEqual expected actual
+
+test_updateEntry_someClauseAccepts = do
+  feature1 <- feature "(< x 2)" (states [[("x", 5)]]) (states [[("x", -1)]])
+  feature2 <- feature "(< x 3)" (states [[("x", 5)]]) (states [[("x", -1)]])
+  feature3 <- feature "(< x 0)" (states [[("x", 5)]]) (states [[("x", -1)]])
+  feature4 <- feature "(< x 1)" (states [[("x", 5)]]) (states [[("x", -1)]])
+  let entry = Entry [[feature1, feature2], [feature3]] [feature4] False
+  let newBadState = state [("x", 1)] -- Features 1 and 2 (the first clause) accepts.
+  feature3' <- feature "(< x 0)" (states [[("x", 5)], [("x", 1)]]) (states [[("x", -1)]])
+  feature4' <- feature "(< x 1)" (states [[("x", 5)], [("x", 1)]]) (states [[("x", -1)]])
+  let expected = (Entry [[feature3']] [feature4'] False, [[feature1, feature2]])
+  actual <- evalCeili $ updateEntry newBadState entry
+  assertEqual expected actual

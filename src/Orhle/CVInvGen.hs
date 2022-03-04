@@ -114,7 +114,7 @@ data Entry t = Entry { entryClauses         :: [Clause t]
                      } deriving (Eq, Ord, Show)
 
 instance Pretty t => Pretty (Entry t) where
-  pretty (Entry clauses candidate acceptsAllGoods) =
+  pretty (Entry clauses candidate _) =
     align $ encloseSep lbracket rbracket space
     [ pretty "Clauses:" <+> pretty clauses
     , pretty "Candidate:" <+> pretty candidate
