@@ -573,6 +573,7 @@ test_updateQueue = do
   let queue = qInsert (Entry [[feature1], [feature2], [feature3]] [feature4] False)
             $ qInsert (Entry [[feature1, feature3], [feature2]] [feature4] False)
             $ qInsert (Entry [] [feature1] False)
+            $ qInsert (Entry [[feature3]] [feature2] False)
             $ qInsert (Entry [[feature3]] [] False) -- Should be removed completely.
             $ Map.empty
   let newBadState = state [("x", 2)]
@@ -580,6 +581,7 @@ test_updateQueue = do
   feature2' <- feature "(< x 2)" (states [[("x", 5)], [("x", 2)]]) (states [[("x", -1)]])
   let expected = qInsert (Entry [[feature1'], [feature2']] [] False)
                $ qInsert (Entry [[feature1', feature3], [feature2']] [feature4] False)
+               $ qInsert (Entry [] [feature2'] False)
                $ qInsert (Entry [] [feature1'] False)
                $ Map.empty
   actual <- evalCeili $ updateQueue newBadState queue

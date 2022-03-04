@@ -452,7 +452,9 @@ updateQueue newBadState queue = do
   let newEntry (entry, removedClauses) =
         case removedClauses of
           [] -> entry
-          _  -> Entry (entryClauses entry) [] False
+          _  -> if null (entryClauses entry)
+                then entry -- If there are no remaining clauses, keep the candidate.
+                else Entry (entryClauses entry) [] False
   let process update newQueue =
         let entry' = newEntry update
         in if nullEntry entry' then newQueue else qInsert entry' newQueue
