@@ -556,3 +556,11 @@ test_updateEntry_someClauseAccepts = do
   let expected = (Entry [[feature3']] [feature4'] False, [[feature1, feature2]])
   actual <- evalCeili $ updateEntry newBadState entry
   assertEqual expected actual
+
+test_updateEntry_acceptingClauseClearsDoneFlag = do
+  feature1 <- feature "(< x 0)" (states [[("x", 5)]]) (states [[("x", -1)]])
+  let entry = Entry [[feature1]] [] True
+  let newBadState = state [("x", -2)]
+  let expected = (Entry [] [] False, [[feature1]])
+  actual <- evalCeili $ updateEntry newBadState entry
+  assertEqual expected actual
