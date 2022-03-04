@@ -18,6 +18,7 @@ module Orhle.CVInvGen
   , UpdateFlag(..)
   , acceptsAllGoods
   , addFeature
+  , addNewlyUsefulCandidates
   , assertionToEntry
   , assertionToFeature
   , closeNames
@@ -25,6 +26,8 @@ module Orhle.CVInvGen
   , entryScore
   , entryToAssertion
   , featureToEntry
+  , getFeatureCandidates
+  , getQueue
   , learnSeparator
   , mkCviEnv
   , nextLevel
@@ -45,6 +48,7 @@ import Ceili.ProgState
 import Ceili.PTS ( BackwardPT )
 import qualified Ceili.SMT as SMT
 import Ceili.StatePredicate
+import Data.Either ( partitionEithers )
 import Data.List ( partition )
 import Data.Map ( Map )
 import qualified Data.Map as Map
@@ -227,6 +231,11 @@ putFeatures features = do
   CviEnv queue bads goods _ fCandidates goalQ names <- get
   put $ CviEnv queue bads goods features fCandidates goalQ names
 
+putFeatureCandidates :: [Assertion t] -> CviM t ()
+putFeatureCandidates fCandidates = do
+  CviEnv queue bads goods features _ goalQ names <- get
+  put $ CviEnv queue bads goods features fCandidates goalQ names
+
 enqueue :: CviConstraints t => Entry t -> CviM t ()
 enqueue entry = do
   queue <- getQueue
@@ -398,7 +407,7 @@ nextLevel entry (newFeature:rest) = do
 
 addBadState :: CviConstraints t => ProgState t -> CviM t ()
 addBadState badState = do
-  getQueue    >>= lift . (updateQueue badState)    >>= putQueue
+  getQueue    >>= lift . (updateQueue    badState) >>= putQueue
   getFeatures >>= lift . (updateFeatures badState) >>= putFeatures
   addNewlyUsefulCandidates badState
 
@@ -409,7 +418,16 @@ updateFeatures newBadState features = do
 
 addNewlyUsefulCandidates :: CviConstraints t => ProgState t -> CviM t ()
 addNewlyUsefulCandidates newBadState = do
-  error "unimplemented"
+  featureCandidates <- getFeatureCandidates
+  let rejectsNewBad assertion = do
+        result <- lift $ testState assertion newBadState
+        pure $ if result then Left assertion else Right assertion
+  (candidates', newlyUseful) <- pure . partitionEithers =<< mapM rejectsNewBad featureCandidates
+  newFeatures <- mapM assertionToFeature newlyUseful
+  let filteredFeatures = filter (not . Set.null . featAcceptedGoods) newFeatures
+  newEntries <- mapM featureToEntry filteredFeatures
+  mapM_ enqueue newEntries
+  putFeatureCandidates candidates'
 
 -- Update mechanics.
 

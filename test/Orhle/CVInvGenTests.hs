@@ -590,3 +590,28 @@ test_updateQueue = do
                $ Map.empty
   actual <- evalCeili $ updateQueue newBadState queue
   assertEqual expected actual
+
+test_addNewlyUsefulCandidates = do
+  assertion1 <- assertionFromStr "(< x 1)" -- Rejects all goods, eliminated when we look
+                                           -- at it for rejecting some bad state (but not
+                                           -- sooner).
+  assertion2 <- assertionFromStr "(< x 2)" -- Rejects new bad while accepting goods.
+  assertion3 <- assertionFromStr "(< x 3)" -- Does not reject new bad.
+  assertion4 <- assertionFromStr "(< x 4)" -- Does not reject new bad.
+  let candidates = [assertion1, assertion2, assertion3, assertion4]
+  let goodStates = states [[("x", 1)]]
+  let newBadState = state [("x", 2)]
+  let newBadStates = Set.singleton newBadState
+  expectedFeature2 <- feature "(< x 2)" (states [[("x", 2)]]) (states [[("x", 1)]])
+  let expectedQueue = qInsert (Entry [[expectedFeature2]] [] True)
+                    $ Map.empty
+  let expectedCandidates' = [assertion3, assertion4]
+  let env = mkCviEnv (Job newBadStates goodStates ATrue impSkip ATrue) dummyWp candidates
+  let task = do
+        addNewlyUsefulCandidates newBadState
+        queue <- getQueue
+        fCandidates <- getFeatureCandidates
+        pure (queue, fCandidates)
+  (actualQueue, actualCandidates') <- evalCvi task env
+  assertEqual expectedQueue       actualQueue
+  assertEqual expectedCandidates' actualCandidates'
