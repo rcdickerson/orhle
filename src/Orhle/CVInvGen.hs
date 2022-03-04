@@ -449,15 +449,17 @@ updateQueue :: CviConstraints t => ProgState t -> Queue t -> Ceili (Queue t)
 updateQueue newBadState queue = do
   let entries = Set.toList . Set.unions . Map.elems $ queue
   updatedEntries <- mapM (updateEntry newBadState) entries
-  let newEntry (entry, removedClauses) =
-        case removedClauses of
-          [] -> entry
-          _  -> if null (entryClauses entry)
-                then entry -- If there are no remaining clauses, keep the candidate.
-                else Entry (entryClauses entry) [] False
-  let process update newQueue =
-        let entry' = newEntry update
-        in if nullEntry entry' then newQueue else qInsert entry' newQueue
+  let enqueueUpdate (entry, removed) newQueue =
+        case removed of
+          [] -> qInsert entry newQueue
+          _  -> let entry' = Entry (entryClauses entry) [] False
+                in if nullEntry entry' then newQueue else qInsert entry' newQueue
+  let enqueueRemoved removed newQueue =
+        let rEntries = map (\r -> Entry [] r False) removed
+        in foldr qInsert newQueue rEntries
+  let process (entry, removedClauses) newQueue = enqueueUpdate (entry, removedClauses)
+                                               $ enqueueRemoved removedClauses
+                                               $ newQueue
   pure $ foldr process Map.empty updatedEntries
 
 
