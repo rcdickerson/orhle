@@ -509,6 +509,8 @@ test_updateClause_someReject = do
   feature3 <- feature "(< x 2)" (states [[("x", 5)]]) (states [[("x", -1)]])
   let clause = [feature1, feature2, feature3]
   let newBadState = state [("x", 1)]
-  let expected = (clause, Rejects)
+  feature1' <- feature "(< x 0)" (states [[("x", 5)], [("x", 1)]]) (states [[("x", -1)]])
+  feature2' <- feature "(< x 1)" (states [[("x", 5)], [("x", 1)]]) (states [[("x", -1)]])
+  let expected = ([feature1', feature2', feature3], Rejects)
   actual <- evalCeili $ updateClause newBadState clause
   assertEqual expected actual

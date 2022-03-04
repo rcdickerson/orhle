@@ -87,10 +87,7 @@ generateFeatures (FeatureGen maxSize _ gen) = gen maxSize
 data Feature t = Feature { featAssertion     :: Assertion t
                          , featRejectedBads  :: Set (ProgState t)
                          , featAcceptedGoods :: Set (ProgState t)
-                         } deriving (Ord, Show)
-
-instance Eq t => Eq (Feature t)
-  where f1 == f2 = (featAssertion f1) == (featAssertion f2)
+                         } deriving (Eq, Ord, Show)
 
 instance Pretty t => Pretty (Feature t) where
   pretty (Feature assertion bads goods) =
@@ -399,8 +396,8 @@ data UpdateFlag = Accepts
 
 anyRejects :: [UpdateFlag] -> UpdateFlag
 anyRejects flags = case flags of
-  [] -> Accepts
-  Rejects:_ -> Rejects
+  []           -> Accepts
+  Rejects:_    -> Rejects
   Accepts:rest -> anyRejects rest
 
 updateFeature :: CviConstraints t => ProgState t -> Feature t -> Ceili (Feature t, UpdateFlag)
@@ -409,18 +406,21 @@ updateFeature newBadState (Feature assertion rejectedBads acceptedGoods) = do
   let (rejectedBads', flag) = if acceptsNewBad
                               then (rejectedBads, Accepts)
                               else (Set.insert newBadState rejectedBads, Rejects)
-  pure $ (Feature assertion rejectedBads' acceptedGoods, flag)
+  pure (Feature assertion rejectedBads' acceptedGoods, flag)
 
 updateClause :: CviConstraints t => ProgState t -> Clause t -> Ceili (Clause t, UpdateFlag)
 updateClause newBadState features = do
   updatedFeatures <- mapM (updateFeature newBadState) features
   let (features', flags) = unzip updatedFeatures
-  pure $ (features', anyRejects flags)
+  pure (features', anyRejects flags)
 
 updateEntry :: CviConstraints t => ProgState t -> Entry t -> Ceili (Entry t, [Clause t])
-updateEntry newBadState (Entry clauses candidate acceptsAllGoods) = do
-  clauses' <- mapM (updateClause newBadState) clauses
-  error "unimplemented"
+updateEntry newBadState (Entry clauses candidate finished) = do
+  updatedClauses <- mapM (updateClause newBadState) clauses
+  let (rejectClauses, acceptClauses) = partition ((== Rejects) . snd) updatedClauses
+  (candidate', _) <- updateClause newBadState candidate
+  let finished' = if null acceptClauses then finished else False
+  pure (Entry (map fst rejectClauses) candidate' finished', map fst acceptClauses)
 
 
 -----------------------
