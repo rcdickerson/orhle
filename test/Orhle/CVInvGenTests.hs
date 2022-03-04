@@ -41,12 +41,16 @@ feature assertionStr rejected accepted = do
 dummyWp :: WeakestPre () (ImpProgram t) Integer
 dummyWp = WeakestPre (\ _ _ _ -> pure ATrue) ()
 
-evalCvi :: CviM t a -> CviEnv t -> IO a
-evalCvi task env = do
-  mResult <- runCeili (defaultEnv Set.empty) $ evalStateT task env
+evalCeili :: Ceili a -> IO a
+evalCeili task = do
+  mResult <- runCeili (defaultEnv Set.empty) task
   case mResult of
     Left err     -> assertFailure $ show err
     Right result -> pure result
+
+evalCvi :: CviM t a -> CviEnv t -> IO a
+evalCvi task env = evalCeili $ evalStateT task env
+
 
 ---------------------------------------------
 
@@ -477,16 +481,34 @@ test_learnSeparator = do
 test_updateFeature_accepts = do
   feature1 <- feature "(< x 0)" (states [[("x", 1)]]) (states [[("x", -1)]])
   let newBadState = state [("x", -2)]
-  let expected = (feature1, False)
-  let env = mkCviEnv (Job (states [[("x", 1)]]) (states[[("x", -1)]]) ATrue impSkip ATrue) dummyWp []
-  actual <- evalCvi (updateFeature newBadState feature1) env
+  let expected = (feature1, Accepts)
+  actual <- evalCeili $ updateFeature newBadState feature1
   assertEqual expected actual
 
 test_updateFeature_rejects = do
   feature1 <- feature "(< x 0)" (states [[("x", 1)]]) (states [[("x", -1)]])
   let newBadState = state [("x", 2)]
   expectedFeature <- feature "(< x 0)" (states [[("x", 1)], [("x", 2)]]) (states [[("x", -1)]])
-  let expected = (expectedFeature, True)
-  let env = mkCviEnv (Job (states [[("x", 1)]]) (states[[("x", -1)]]) ATrue impSkip ATrue) dummyWp []
-  actual <- evalCvi (updateFeature newBadState feature1) env
+  let expected = (expectedFeature, Rejects)
+  actual <- evalCeili $ updateFeature newBadState feature1
+  assertEqual expected actual
+
+test_updateClause_allAccept = do
+  feature1 <- feature "(< x 0)" (states [[("x", 5)]]) (states [[("x", -1)]])
+  feature2 <- feature "(< x 1)" (states [[("x", 5)]]) (states [[("x", -1)]])
+  feature3 <- feature "(< x 2)" (states [[("x", 5)]]) (states [[("x", -1)]])
+  let clause = [feature1, feature2, feature3]
+  let newBadState = state [("x", -2)]
+  let expected = (clause, Accepts)
+  actual <- evalCeili $ updateClause newBadState clause
+  assertEqual expected actual
+
+test_updateClause_someReject = do
+  feature1 <- feature "(< x 0)" (states [[("x", 5)]]) (states [[("x", -1)]])
+  feature2 <- feature "(< x 1)" (states [[("x", 5)]]) (states [[("x", -1)]])
+  feature3 <- feature "(< x 2)" (states [[("x", 5)]]) (states [[("x", -1)]])
+  let clause = [feature1, feature2, feature3]
+  let newBadState = state [("x", 1)]
+  let expected = (clause, Rejects)
+  actual <- evalCeili $ updateClause newBadState clause
   assertEqual expected actual

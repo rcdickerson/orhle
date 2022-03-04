@@ -15,6 +15,7 @@ module Orhle.CVInvGen
   , Entry(..)
   , Feature(..)
   , Queue
+  , UpdateFlag(..)
   , acceptsAllGoods
   , addFeature
   , assertionToEntry
@@ -392,21 +393,31 @@ addBadState :: CviConstraints t => ProgState t -> CviM t ()
 addBadState badState = do
   error "unimplemented"
 
-updateFeature :: CviConstraints t => ProgState t -> Feature t -> CviM t (Feature t, Bool)
-updateFeature newBadState (Feature assertion rejectedBads acceptedGoods) = do
-  acceptsNewBad <- lift $ testState assertion newBadState
-  let (rejectedBads', updated) = if acceptsNewBad
-                                 then (rejectedBads, False)
-                                 else (Set.insert newBadState rejectedBads, True)
-  pure $ (Feature assertion rejectedBads' acceptedGoods, updated)
+data UpdateFlag = Accepts
+                | Rejects
+                deriving (Ord, Eq, Show)
 
-updateClause :: CviConstraints t => ProgState t -> Clause t -> CviM t (Clause t, Bool)
+anyRejects :: [UpdateFlag] -> UpdateFlag
+anyRejects flags = case flags of
+  [] -> Accepts
+  Rejects:_ -> Rejects
+  Accepts:rest -> anyRejects rest
+
+updateFeature :: CviConstraints t => ProgState t -> Feature t -> Ceili (Feature t, UpdateFlag)
+updateFeature newBadState (Feature assertion rejectedBads acceptedGoods) = do
+  acceptsNewBad <- testState assertion newBadState
+  let (rejectedBads', flag) = if acceptsNewBad
+                              then (rejectedBads, Accepts)
+                              else (Set.insert newBadState rejectedBads, Rejects)
+  pure $ (Feature assertion rejectedBads' acceptedGoods, flag)
+
+updateClause :: CviConstraints t => ProgState t -> Clause t -> Ceili (Clause t, UpdateFlag)
 updateClause newBadState features = do
   updatedFeatures <- mapM (updateFeature newBadState) features
-  let (features', updates) = unzip updatedFeatures
-  pure $ (features', or updates)
+  let (features', flags) = unzip updatedFeatures
+  pure $ (features', anyRejects flags)
 
-updateEntry :: CviConstraints t => ProgState t -> Entry t -> CviM t (Entry t, [Clause t])
+updateEntry :: CviConstraints t => ProgState t -> Entry t -> Ceili (Entry t, [Clause t])
 updateEntry newBadState (Entry clauses candidate acceptsAllGoods) = do
   clauses' <- mapM (updateClause newBadState) clauses
   error "unimplemented"
