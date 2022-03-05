@@ -16,16 +16,18 @@ import Ceili.Language.Imp ( IterStateMap )
 import Ceili.Name
 import Ceili.ProgState
 import Ceili.StatePredicate
+import Control.Monad.Trans ( lift )
 import Data.Maybe ( catMaybes )
 import qualified Data.Map as Map
 import Data.Set ( Set )
 import qualified Data.Set as Set
 import Data.UUID
-import qualified Orhle.DTInvGen as DTI
+import qualified Orhle.CVInvGen as CVI
 --import qualified Orhle.DTLearn2 as DTL
 import Orhle.SpecImp
 import Orhle.StepStrategy
 import Prettyprinter
+import System.Random ( randomRIO )
 
 data RelSpecImpPTSContext t e = RelSpecImpPTSContext { rsipc_specEnv          :: SpecImpEnv t e
                                                      , rsipc_loopHeadStates   :: LoopHeadStates t
@@ -117,42 +119,37 @@ relBackwardPT' stepStrategy ctx (ProgramRelation aprogs eprogs) post = do
 
 
 useInvariant :: ( Embeddable Integer t
-                         , Ord t
-                         , AssertionParseable t
-                         , ValidCheckable t
-                         , SatCheckable t
-                         , Pretty t
-                         , StatePredicate (Assertion t) t
-                         )
-                      => Assertion t
-                      -> BackwardStepStrategy t
-                      -> RelSpecImpPTSContext t (SpecImpProgram t)
-                      -> [ImpWhile t (SpecImpProgram t)]
-                      -> [ImpWhile t (SpecImpProgram t)]
-                      -> [SpecImpProgram t]
-                      -> [SpecImpProgram t]
-                      -> Assertion t
-                      -> Ceili (Assertion t)
+                , Ord t
+                , AssertionParseable t
+                , ValidCheckable t
+                , SatCheckable t
+                , Pretty t
+                , StatePredicate (Assertion t) t
+                )
+             => Assertion t
+             -> BackwardStepStrategy t
+             -> RelSpecImpPTSContext t (SpecImpProgram t)
+             -> [ImpWhile t (SpecImpProgram t)]
+             -> [ImpWhile t (SpecImpProgram t)]
+             -> [SpecImpProgram t]
+             -> [SpecImpProgram t]
+             -> Assertion t
+             -> Ceili (Assertion t)
 useInvariant invariant stepStrategy ctx aloops eloops aprogs' eprogs' post = do
   wpInvar <- relBackwardPT stepStrategy ctx (map body aloops) (map body eloops) invariant
   let conds = map condA (aloops ++ eloops)
   isSufficient <- checkValidB $ Imp (And $ invariant:(map Not conds)) post
   isInvariant  <- checkValidB $ Imp (And $ invariant:conds) wpInvar
-  isConsistent <- checkValidB $ Not $ Imp invariant AFalse
   -- TODO: Lockstep
   -- TODO: Variant
-  case (isSufficient, isInvariant, isConsistent) of
-    (True, True, True) -> do
-      log_d "[RelationalPTS] Annotated loop invariant is sufficient, invariant, and consistent"
+  case (isSufficient, isInvariant) of
+    (True, True) -> do
       relBackwardPT stepStrategy ctx aprogs' eprogs' invariant
-    (False, _, _)   -> do
-      log_e "[RelationalPTS] Annotated loop invariant insufficient to establish post"
+    (False, _)   -> do
+      log_e "[RelationalPTS] Invariant is insufficient to establish post"
       return AFalse
-    (_, False, _)   -> do
-      log_e "[RelationalPTS] Annotated loop invariant is not invariant on loop body"
-      return AFalse
-    (_, _, False)   -> do
-      log_e "[RelationalPTS] Annotated loop invariant is not consistent (it implies false)"
+    (_, False)   -> do
+      log_e "[RelationalPTS] Invariant is not invariant on loop body"
       return AFalse
 
 
@@ -201,7 +198,12 @@ inferInvariant stepStrategy ctx aloops eloops post =
       --                          post
       --                          headStates
       --                          separatorLearner
-      DTI.dtInvGen ctx 2 12 (relBackwardPT' stepStrategy) conds bodies post headStates lis
+      --DTI.dtInvGen ctx 2 12 (relBackwardPT' stepStrategy) conds bodies post headStates lis
+      someHeadStates <- lift . lift $ randomSample 3 headStates
+      let cviJob        = CVI.Job Set.empty (Set.fromList $ someHeadStates) (aAnd conds) bodies post
+      let cviFeatureGen = CVI.FeatureGen 12 2 lis
+      let cviWps        = CVI.WeakestPre (relBackwardPT' stepStrategy) ctx
+      CVI.cvInvGen cviFeatureGen cviWps cviJob
 
 body :: ImpWhile t e -> e
 body (ImpWhile _ b _) = b
@@ -212,6 +214,15 @@ condA (ImpWhile c _ _) = bexpToAssertion c
 invar :: ImpWhile t e -> Maybe (Assertion t)
 invar (ImpWhile _ _ meta) = iwm_invariant meta
 
+-- Adapted from https://www.programming-idioms.org/idiom/158/random-sublist/2123/haskell
+randomSample :: Int -> [a] -> IO [a]
+randomSample 0 _ = pure []
+randomSample k x | k >= length x = pure x
+randomSample k x = do
+   i <- randomRIO (0, length x - 1)
+   let (a, e:b) = splitAt i x
+   l <- randomSample (k-1) (a ++ b)
+   pure (e : l)
 
 ---------------------------
 -- Relational "Programs" --

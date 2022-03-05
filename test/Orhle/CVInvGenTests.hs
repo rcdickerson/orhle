@@ -38,12 +38,15 @@ feature assertionStr rejected accepted = do
   assertion <- assertionFromStr assertionStr
   pure $ Feature assertion rejected accepted
 
+singletonClause :: Feature t -> Clause t
+singletonClause feature = Clause [feature] (featAcceptedGoods feature)
+
 dummyWp :: WeakestPre () (ImpProgram t) Integer
 dummyWp = WeakestPre (\ _ _ _ -> pure ATrue) ()
 
 evalCeili :: Ceili a -> IO a
 evalCeili task = do
-  let env = mkEnv LogLevelInfo 2000 Set.empty
+  let env = mkEnv LogLevelDebug 2000 Set.empty
   mResult <- runCeili env task
   case mResult of
     Left err     -> assertFailure $ show err
@@ -98,8 +101,8 @@ test_qInsert = do
   feature1 <- feature "(< x 0)" (states [[("x", 4)]]) (states [[("x", -1)]])
   feature2 <- feature "(< x 1)" (states [[("x", 4)], [("x", 0)]]) (states [[("x", -1)]])
   let
-    entry1      = Entry [] [feature1] False
-    entry2      = Entry [[feature2]] [] False
+    entry1      = Entry [] (singletonClause feature1) False
+    entry2      = Entry [singletonClause feature2] emptyClause False
     entry1Score = entryScore entry1
     entry2Score = entryScore entry2
     expected    = Map.insert entry1Score (Set.fromList [entry1])
@@ -112,8 +115,8 @@ test_qPop = do
   feature1 <- feature "(< x 0)" (states [[("x", 4)]]) (states [[("x", -1)]])
   feature2 <- feature "(< x 1)" (states [[("x", 4)], [("x", 0)]]) (states [[("x", -1)]])
   let
-    entry1      = Entry [] [feature1] False
-    entry2      = Entry [[feature2]] [] False
+    entry1      = Entry [] (singletonClause feature1) False
+    entry2      = Entry [(singletonClause feature2)] emptyClause False
     entry1Score = entryScore entry1
     entry2Score = entryScore entry2
     queue       = qInsert entry1 $ qInsert entry2 $ qInsert entry2 $ (Map.empty :: Queue Integer)
@@ -158,7 +161,7 @@ test_featureToEntry_rejectsAllBads_acceptsNoGoods = do
                           , [("x", -10)]
                           ]
   let feature1 = Feature assertion badStates Set.empty
-  let expected = Entry [[feature1]] [] False
+  let expected = Entry [(singletonClause feature1)] emptyClause False
   let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
   entry <- evalCvi (featureToEntry feature1) env
   assertEqual expected entry
@@ -173,7 +176,7 @@ test_featureToEntry_rejectsAllBads_acceptsSomeGoods = do
                           , [("x", -10)]
                           ]
   let feature1 = Feature assertion badStates $ Set.singleton (state [("x", 10)])
-  let expected = Entry [[feature1]] [] False
+  let expected = Entry [(singletonClause feature1)] emptyClause False
   let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
   entry <- evalCvi (featureToEntry feature1) env
   assertEqual expected entry
@@ -188,7 +191,7 @@ test_featureToEntry_rejectsAllBads_acceptsAllGoods = do
                           , [("x", 20)]
                           ]
   let feature1 = Feature assertion badStates goodStates
-  let expected = Entry [[feature1]] [] True
+  let expected = Entry [(singletonClause feature1)] emptyClause True
   let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
   entry <- evalCvi (featureToEntry feature1) env
   assertEqual expected entry
@@ -203,7 +206,7 @@ test_featureToEntry_rejectsSomeBads_acceptsSomeGoods = do
                           , [("x",  10)]
                           ]
   let feature1 = Feature assertion (states [[("x", 0)], [("x", 1)]]) (states [[("x", 10)]])
-  let expected = Entry [] [feature1] False
+  let expected = Entry [] (singletonClause feature1) False
   let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
   entry <- evalCvi (featureToEntry feature1) env
   assertEqual expected entry
@@ -218,7 +221,7 @@ test_featureToEntry_rejectsSomeBads_acceptsAllGoods = do
                           , [("x", 20)]
                           ]
   let feature1 = Feature assertion (states [[("x", 0)], [("x", 1)]]) goodStates
-  let expected = Entry [] [feature1] False
+  let expected = Entry [] (singletonClause feature1) False
   let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
   entry <- evalCvi (featureToEntry feature1) env
   assertEqual expected entry
@@ -227,7 +230,9 @@ test_entryToAssertion = do
   feature1 <- feature "(< x 0)" Set.empty Set.empty
   feature2 <- feature "(= y 3)" Set.empty Set.empty
   feature3 <- feature "(> z 2)" Set.empty Set.empty
-  let entry = Entry [ [feature1, feature2], [feature3] ] [] True
+  let clause1 = Clause [feature1, feature2] Set.empty
+  let clause2 = singletonClause feature3
+  let entry = Entry [clause1, clause2] emptyClause True
   expected <- assertionFromStr "(or (and (< x 0) (= y 3)) (> z 2))"
   let actual = entryToAssertion entry
   assertEqual expected actual
@@ -243,7 +248,7 @@ test_assertionToEntry = do
                           ]
   let feature = Feature assertion (states [[("x", 0)], [("x", 1)]])
                                   (states [[("x", 10)]])
-  let expected = Entry [] [feature] False
+  let expected = Entry [] (singletonClause feature) False
   let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
   entry <- evalCvi (assertionToEntry assertion) env
   assertEqual expected entry
@@ -267,7 +272,10 @@ test_acceptsAllGoods_true = do
       feature2 = Feature assertion2 Set.empty (states [[("x", 10)], [("x", 20)]])
       feature3 = Feature assertion3 badStates (states [[("x", 20)], [("x", 30)]])
       feature4 = Feature assertion4 badStates (states [[("x", 30)]])
-  let clauses = [[feature1], [feature2, feature3], [feature3, feature4]]
+  let clause1 = singletonClause feature1
+      clause2 = Clause [feature2, feature3] (states [[("x", 20)]])
+      clause3 = Clause [feature3, feature4] (states [[("x", 30)]])
+      clauses = [clause1, clause2, clause3]
   let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
   result <- evalCvi (acceptsAllGoods clauses) env
   assertEqual True result
@@ -286,7 +294,9 @@ test_acceptsAllGoods_false = do
   let feature1 = Feature assertion1 badStates (states [[("x", 10)]])
       feature2 = Feature assertion2 Set.empty (states [[("x", 10)], [("x", 20)]])
       feature3 = Feature assertion3 badStates (states [[("x", 20)], [("x", 30)]])
-  let clauses = [[feature1], [feature2, feature3]]
+  let clause1 = singletonClause feature1
+      clause2 = Clause [feature2, feature3] (states [[("x", 20)]])
+      clauses = [clause1, clause2]
   let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
   result <- evalCvi (acceptsAllGoods clauses) env
   assertEqual False result
@@ -314,7 +324,8 @@ test_usefulFeatures_rejectsNewAcceptsSame = do
                       (Set.fromList [badState2])
                       (Set.fromList [goodState1])
   let features = [feature1, feature2, feature3]
-  let entry = Entry [] [feature1, feature2] False
+  let candidate = Clause [feature1, feature2] (Set.fromList [goodState1])
+  let entry = Entry [] candidate False
   let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
   let task = mapM_ addFeature features >> usefulFeatures entry
   useful <- evalCvi task env
@@ -340,7 +351,8 @@ test_usefulFeatures_rejectsNewButAcceptsIsDisjoint = do
                       (Set.fromList [badState2])
                       (Set.fromList [goodState2])
   let features = [feature1, feature2, feature3]
-  let entry = Entry [] [feature1, feature2] False
+  let candidate = Clause [feature1, feature2] (Set.fromList [goodState1])
+  let entry = Entry [] candidate False
   let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
   let task = mapM_ addFeature features >> usefulFeatures entry
   useful <- evalCvi task env
@@ -369,7 +381,8 @@ test_usefulFeatures_emptyCandidateWithFeatureAcceptingNewGoods = do
   -- feature1 /\ feature2 accept goodState1 while ruling out all bads;
   -- feature1 would kick off a new candidate that accepts goodState3, while
   -- feature3 would kick off a new candidate that accepts goodState2.
-  let entry = Entry [[feature1, feature2]] [] False
+  let clause = Clause [feature1, feature2] (Set.fromList [goodState1])
+  let entry = Entry [clause] emptyClause False
   let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
   let task = mapM_ addFeature features >> usefulFeatures entry
   useful <- evalCvi task env
@@ -408,7 +421,8 @@ test_usefulFeatures_candidatesAcceptingSubsetOfClauseFeaturesNotUseful = do
   -- becomes a subset of the clauses', so there's no need to continue down
   -- this path. (The eventual clause would not add any new good states to
   -- the overall entry.)
-  let entry = Entry [[feature1, feature2]] [feature3] False
+  let clause = Clause [feature1, feature2] (Set.fromList [goodState1, goodState2])
+  let entry = Entry [clause] (singletonClause feature3) False
   let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
   let task = mapM_ addFeature features >> usefulFeatures entry
   useful <- evalCvi task env
@@ -498,7 +512,7 @@ test_updateClause_allAccept = do
   feature1 <- feature "(< x 0)" (states [[("x", 5)]]) (states [[("x", -1)]])
   feature2 <- feature "(< x 1)" (states [[("x", 5)]]) (states [[("x", -1)]])
   feature3 <- feature "(< x 2)" (states [[("x", 5)]]) (states [[("x", -1)]])
-  let clause = [feature1, feature2, feature3]
+  let clause = Clause [feature1, feature2, feature3] (states [[("x", -1)]])
   let newBadState = state [("x", -2)]
   let expected = (clause, Accepts)
   actual <- evalCeili $ updateClause newBadState clause
@@ -508,11 +522,11 @@ test_updateClause_someReject = do
   feature1 <- feature "(< x 0)" (states [[("x", 5)]]) (states [[("x", -1)]])
   feature2 <- feature "(< x 1)" (states [[("x", 5)]]) (states [[("x", -1)]])
   feature3 <- feature "(< x 2)" (states [[("x", 5)]]) (states [[("x", -1)]])
-  let clause = [feature1, feature2, feature3]
+  let clause = Clause [feature1, feature2, feature3] (states [[("x", -1)]])
   let newBadState = state [("x", 1)]
   feature1' <- feature "(< x 0)" (states [[("x", 5)], [("x", 1)]]) (states [[("x", -1)]])
   feature2' <- feature "(< x 1)" (states [[("x", 5)], [("x", 1)]]) (states [[("x", -1)]])
-  let expected = ([feature1', feature2', feature3], Rejects)
+  let expected = (Clause [feature1', feature2', feature3] (states [[("x", -1)]]), Rejects)
   actual <- evalCeili $ updateClause newBadState clause
   assertEqual expected actual
 
@@ -521,13 +535,17 @@ test_updateEntry_allClausesReject = do
   feature2 <- feature "(< x 1)" (states [[("x", 5)]]) (states [[("x", -1)]])
   feature3 <- feature "(< x 2)" (states [[("x", 5)]]) (states [[("x", -1)]])
   feature4 <- feature "(< x 3)" (states [[("x", 5)]]) (states [[("x", -1)]])
-  let entry = Entry [[feature1, feature2], [feature3]] [feature4] False
+  let clause1 = Clause [feature1, feature2] (states [[("x", -1)]])
+  let clause2 = singletonClause feature3
+  let entry = Entry [clause1, clause2] (singletonClause feature4) False
   let newBadState = state [("x", 10)]
   feature1' <- feature "(< x 0)" (states [[("x", 5)], [("x", 10)]]) (states [[("x", -1)]])
   feature2' <- feature "(< x 1)" (states [[("x", 5)], [("x", 10)]]) (states [[("x", -1)]])
   feature3' <- feature "(< x 2)" (states [[("x", 5)], [("x", 10)]]) (states [[("x", -1)]])
   feature4' <- feature "(< x 3)" (states [[("x", 5)], [("x", 10)]]) (states [[("x", -1)]])
-  let expected = (Entry [[feature1', feature2'], [feature3']] [feature4'] False, [])
+  let clause1' = Clause [feature1', feature2'] (states [[("x", -1)]])
+  let clause2' = singletonClause feature3'
+  let expected = (Entry [clause1', clause2'] (singletonClause feature4') False, [])
   actual <- evalCeili $ updateEntry newBadState entry
   assertEqual expected actual
 
@@ -536,12 +554,16 @@ test_updateEntry_someFeatureAcceptsButAllClausesStillReject = do
   feature2 <- feature "(< x 3)" (states [[("x", 5)]]) (states [[("x", -1)]])
   feature3 <- feature "(< x 1)" (states [[("x", 5)]]) (states [[("x", -1)]])
   feature4 <- feature "(< x 2)" (states [[("x", 5)]]) (states [[("x", -1)]])
-  let entry = Entry [[feature1, feature2], [feature3]] [feature4] False
+  let clause1 = Clause [feature1, feature2] (states [[("x", -1)]])
+  let clause2 = singletonClause feature3
+  let entry = Entry [clause1, clause2] (singletonClause feature4) False
   let newBadState = state [("x", 2)] -- feature2 accepts, all other features reject.
   feature1' <- feature "(< x 0)" (states [[("x", 5)], [("x", 2)]]) (states [[("x", -1)]])
   feature3' <- feature "(< x 1)" (states [[("x", 5)], [("x", 2)]]) (states [[("x", -1)]])
   feature4' <- feature "(< x 2)" (states [[("x", 5)], [("x", 2)]]) (states [[("x", -1)]])
-  let expected = (Entry [[feature1', feature2], [feature3']] [feature4'] False, [])
+  let clause1' = Clause [feature1', feature2] (states [[("x", -1)]])
+  let clause2' = singletonClause feature3'
+  let expected = (Entry [clause1', clause2'] (singletonClause feature4') False, [])
   actual <- evalCeili $ updateEntry newBadState entry
   assertEqual expected actual
 
@@ -550,19 +572,22 @@ test_updateEntry_someClauseAccepts = do
   feature2 <- feature "(< x 3)" (states [[("x", 5)]]) (states [[("x", -1)]])
   feature3 <- feature "(< x 0)" (states [[("x", 5)]]) (states [[("x", -1)]])
   feature4 <- feature "(< x 1)" (states [[("x", 5)]]) (states [[("x", -1)]])
-  let entry = Entry [[feature1, feature2], [feature3]] [feature4] False
+  let clause1 = Clause [feature1, feature2] (states [[("x", -1)]])
+  let clause2 = singletonClause feature3
+  let entry = Entry [clause1, clause2] (singletonClause feature4) False
   let newBadState = state [("x", 1)] -- Features 1 and 2 (the first clause) accepts.
   feature3' <- feature "(< x 0)" (states [[("x", 5)], [("x", 1)]]) (states [[("x", -1)]])
   feature4' <- feature "(< x 1)" (states [[("x", 5)], [("x", 1)]]) (states [[("x", -1)]])
-  let expected = (Entry [[feature3']] [feature4'] False, [[feature1, feature2]])
+  let acceptingClause = Clause [feature1, feature2] (states [[("x", -1)]])
+  let expected = (Entry [(singletonClause feature3')] (singletonClause feature4') False, [acceptingClause])
   actual <- evalCeili $ updateEntry newBadState entry
   assertEqual expected actual
 
 test_updateEntry_acceptingClauseClearsDoneFlag = do
   feature1 <- feature "(< x 0)" (states [[("x", 5)]]) (states [[("x", -1)]])
-  let entry = Entry [[feature1]] [] True
+  let entry = Entry [(singletonClause feature1)] emptyClause True
   let newBadState = state [("x", -2)]
-  let expected = (Entry [] [] False, [[feature1]])
+  let expected = (Entry [] emptyClause False, [(singletonClause feature1)])
   actual <- evalCeili $ updateEntry newBadState entry
   assertEqual expected actual
 
@@ -573,21 +598,28 @@ test_updateQueue = do
   feature4 <- feature "(< x 4)" (states [[("x", 10)]]) (states [[("x", -1)]])
   feature5 <- feature "(< x 5)" (states [[("x", 10)]]) (states [[("x", -1)]])
   feature6 <- feature "(< x 6)" (states [[("x", 10)]]) (states [[("x", -1)]])
-  let queue = qInsert (Entry [[feature1], [feature2], [feature3]] [feature4] False)
-            $ qInsert (Entry [[feature1, feature3], [feature2]] [feature4] False)
-            $ qInsert (Entry [] [feature1] False)
-            $ qInsert (Entry [[feature5]] [feature2] False)
-            $ qInsert (Entry [[feature6]] [] False)
+  let clause1  = singletonClause feature1
+  let clause2  = singletonClause feature2
+  let clause3  = singletonClause feature3
+  let clause13 = Clause [feature1, feature3] (states [[("x", -1)]])
+  let queue = qInsert (Entry [clause1, clause2, clause3] (singletonClause feature4) False)
+            $ qInsert (Entry [clause13, clause2] (singletonClause feature4) False)
+            $ qInsert (Entry [] (singletonClause feature1) False)
+            $ qInsert (Entry [(singletonClause feature5)] (singletonClause feature2) False)
+            $ qInsert (Entry [(singletonClause feature6)] emptyClause False)
             $ Map.empty
   let newBadState = state [("x", 2)]
   feature1' <- feature "(< x 1)" (states [[("x", 10)], [("x", 2)]]) (states [[("x", -1)]])
   feature2' <- feature "(< x 2)" (states [[("x", 10)], [("x", 2)]]) (states [[("x", -1)]])
-  let expected = qInsert (Entry [[feature1'], [feature2']] [] False)
-               $ qInsert (Entry [] [feature3] False)
-               $ qInsert (Entry [[feature1', feature3], [feature2']] [feature4] False)
-               $ qInsert (Entry [] [feature1'] False)
-               $ qInsert (Entry [] [feature5] False)
-               $ qInsert (Entry [] [feature6] False)
+  let clause1' = singletonClause feature1'
+  let clause2' = singletonClause feature2'
+  let clause1'3 = Clause [feature1', feature3] (states [[("x", -1)]])
+  let expected = qInsert (Entry [clause1', clause2'] emptyClause False)
+               $ qInsert (Entry [] (singletonClause feature3) False)
+               $ qInsert (Entry [clause1'3, clause2'] (singletonClause feature4) False)
+               $ qInsert (Entry [] (singletonClause feature1') False)
+               $ qInsert (Entry [] (singletonClause feature5) False)
+               $ qInsert (Entry [] (singletonClause feature6) False)
                $ Map.empty
   actual <- evalCeili $ updateQueue newBadState queue
   assertEqual expected actual
@@ -604,7 +636,7 @@ test_addNewlyUsefulCandidates = do
   let newBadState = state [("x", 2)]
   let newBadStates = Set.singleton newBadState
   expectedFeature2 <- feature "(< x 2)" (states [[("x", 2)]]) (states [[("x", 1)]])
-  let expectedQueue = qInsert (Entry [[expectedFeature2]] [] True)
+  let expectedQueue = qInsert (Entry [(singletonClause expectedFeature2)] emptyClause True)
                     $ Map.empty
   let expectedCandidates' = [assertion3, assertion4]
   let expectedFeatures' = Set.fromList [expectedFeature2]
