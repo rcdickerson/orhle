@@ -50,7 +50,7 @@ rhleVerifier iFunEnv triple = do
     aLoopHeads <- mapM (headStates 5 cFunEnv) aprogs
     eLoopHeads <- mapM (headStates 5 cFunEnv) eprogs
     let loopHeads = Map.unions $ aLoopHeads ++ eLoopHeads
-    log_d $ "Loop heads: " ++ show loopHeads
+    -- log_d $ "Loop heads: " ++ show loopHeads
     log_i $ "Running backward relational analysis..."
     let namesNoRets = Set.filter (\(Name name _) -> not $ "!retVal" `isSuffixOf` name) names
     let ptsContext = RelSpecImpPTSContext cFunEnv loopHeads namesNoRets lits

@@ -77,7 +77,7 @@ test_mkCviEnv_closesStateNames =
                               , state[("c", 4)]
                               , state[("d", 8)]
                               ]
-    env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+    env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp [] 10
     expectedBad = Set.fromList [ state[ ("a", 0), ("b", 0), ("c", 0), ("d", 0)
                                       , ("x", 2), ("y", 0), ("z", 0)]
                                , state[ ("a", 0), ("b", 0), ("c", 0), ("d", 0)
@@ -147,7 +147,7 @@ test_assertionToFeature = do
                           ]
   let expected = Feature assertion (states [[("x", 0)], [("x", 1)]])
                                    (states [[("x", 10)]])
-  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp [] 10
   actual <- evalCvi (assertionToFeature assertion) env
   assertEqual expected actual
 
@@ -162,7 +162,7 @@ test_featureToEntry_rejectsAllBads_acceptsNoGoods = do
                           ]
   let feature1 = Feature assertion badStates Set.empty
   let expected = Entry [(singletonClause feature1)] emptyClause False
-  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp [] 10
   entry <- evalCvi (featureToEntry feature1) env
   assertEqual expected entry
 
@@ -177,7 +177,7 @@ test_featureToEntry_rejectsAllBads_acceptsSomeGoods = do
                           ]
   let feature1 = Feature assertion badStates $ Set.singleton (state [("x", 10)])
   let expected = Entry [(singletonClause feature1)] emptyClause False
-  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp [] 10
   entry <- evalCvi (featureToEntry feature1) env
   assertEqual expected entry
 
@@ -192,7 +192,7 @@ test_featureToEntry_rejectsAllBads_acceptsAllGoods = do
                           ]
   let feature1 = Feature assertion badStates goodStates
   let expected = Entry [(singletonClause feature1)] emptyClause True
-  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp [] 10
   entry <- evalCvi (featureToEntry feature1) env
   assertEqual expected entry
 
@@ -207,7 +207,7 @@ test_featureToEntry_rejectsSomeBads_acceptsSomeGoods = do
                           ]
   let feature1 = Feature assertion (states [[("x", 0)], [("x", 1)]]) (states [[("x", 10)]])
   let expected = Entry [] (singletonClause feature1) False
-  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp [] 10
   entry <- evalCvi (featureToEntry feature1) env
   assertEqual expected entry
 
@@ -222,7 +222,7 @@ test_featureToEntry_rejectsSomeBads_acceptsAllGoods = do
                           ]
   let feature1 = Feature assertion (states [[("x", 0)], [("x", 1)]]) goodStates
   let expected = Entry [] (singletonClause feature1) False
-  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp [] 10
   entry <- evalCvi (featureToEntry feature1) env
   assertEqual expected entry
 
@@ -249,7 +249,7 @@ test_assertionToEntry = do
   let feature = Feature assertion (states [[("x", 0)], [("x", 1)]])
                                   (states [[("x", 10)]])
   let expected = Entry [] (singletonClause feature) False
-  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp [] 10
   entry <- evalCvi (assertionToEntry assertion) env
   assertEqual expected entry
 
@@ -276,7 +276,7 @@ test_acceptsAllGoods_true = do
       clause2 = Clause [feature2, feature3] (states [[("x", 20)]])
       clause3 = Clause [feature3, feature4] (states [[("x", 30)]])
       clauses = [clause1, clause2, clause3]
-  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp [] 10
   result <- evalCvi (acceptsAllGoods clauses) env
   assertEqual True result
 
@@ -297,7 +297,7 @@ test_acceptsAllGoods_false = do
   let clause1 = singletonClause feature1
       clause2 = Clause [feature2, feature3] (states [[("x", 20)]])
       clauses = [clause1, clause2]
-  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp [] 10
   result <- evalCvi (acceptsAllGoods clauses) env
   assertEqual False result
 
@@ -326,7 +326,7 @@ test_usefulFeatures_rejectsNewAcceptsSame = do
   let features = [feature1, feature2, feature3]
   let candidate = Clause [feature1, feature2] (Set.fromList [goodState1])
   let entry = Entry [] candidate False
-  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp [] 10
   let task = mapM_ addFeature features >> usefulFeatures entry
   useful <- evalCvi task env
   assertEqual [feature3] useful
@@ -353,7 +353,7 @@ test_usefulFeatures_rejectsNewButAcceptsIsDisjoint = do
   let features = [feature1, feature2, feature3]
   let candidate = Clause [feature1, feature2] (Set.fromList [goodState1])
   let entry = Entry [] candidate False
-  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp [] 10
   let task = mapM_ addFeature features >> usefulFeatures entry
   useful <- evalCvi task env
   assertEqual [] useful
@@ -383,7 +383,7 @@ test_usefulFeatures_emptyCandidateWithFeatureAcceptingNewGoods = do
   -- feature3 would kick off a new candidate that accepts goodState2.
   let clause = Clause [feature1, feature2] (Set.fromList [goodState1])
   let entry = Entry [clause] emptyClause False
-  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp [] 10
   let task = mapM_ addFeature features >> usefulFeatures entry
   useful <- evalCvi task env
   assertSameElements [feature1, feature3] useful
@@ -423,7 +423,7 @@ test_usefulFeatures_candidatesAcceptingSubsetOfClauseFeaturesNotUseful = do
   -- the overall entry.)
   let clause = Clause [feature1, feature2] (Set.fromList [goodState1, goodState2])
   let entry = Entry [clause] (singletonClause feature3) False
-  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp [] 10
   let task = mapM_ addFeature features >> usefulFeatures entry
   useful <- evalCvi task env
   assertEqual [] useful
@@ -432,7 +432,7 @@ test_learnSeparator_returnsTrueWhenNoBads =
   let
     badStates = Set.empty
     goodStates = Set.fromList [ state[("a", 12), ("b", 4)] ]
-    env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+    env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp [] 10
   in do
     sep <- evalCvi learnSeparator env
     assertEqual (Just ATrue) sep
@@ -441,7 +441,7 @@ test_learnSeparator_returnsFalseWhenNoGoods =
   let
     badStates = Set.fromList [ state[("a", 12), ("b", 4)] ]
     goodStates = Set.empty
-    env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+    env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp [] 10
   in do
     sep <- evalCvi learnSeparator env
     assertEqual (Just AFalse) sep
@@ -450,7 +450,7 @@ test_learnSeparator_returnsTrueWhenNoBadsOrGoods =
   let
     badStates = Set.empty
     goodStates = Set.empty
-    env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp []
+    env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp [] 10
   in do
     sep <- evalCvi learnSeparator env
     assertEqual (Just ATrue) sep
@@ -479,7 +479,7 @@ test_learnSeparator = do
     badState3  = state [("x", 12), ("y",  5),  ("z", 9)]
     badState4  = state [("x", -4), ("y", -2),  ("z", 8)]
     badStates  = Set.fromList [badState1, badState2, badState3, badState4]
-  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp assertions
+  let env = mkCviEnv (Job badStates goodStates ATrue impSkip ATrue) dummyWp assertions 10
   let task = do
         features <- mapM assertionToFeature assertions
         mapM_ addFeature features
@@ -640,7 +640,7 @@ test_addNewlyUsefulCandidates = do
                     $ Map.empty
   let expectedCandidates' = [assertion3, assertion4]
   let expectedFeatures' = Set.fromList [expectedFeature2]
-  let env = mkCviEnv (Job newBadStates goodStates ATrue impSkip ATrue) dummyWp candidates
+  let env = mkCviEnv (Job newBadStates goodStates ATrue impSkip ATrue) dummyWp candidates 10
   let task = do
         addNewlyUsefulCandidates newBadState
         queue <- getQueue

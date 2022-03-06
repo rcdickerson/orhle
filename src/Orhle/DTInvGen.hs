@@ -322,10 +322,10 @@ vPreGen goalQuery = do
       query <- goalQuery candidate
       mCounter <- lift $ findCounterexample query
       case mCounter of
-        Nothing -> do
+        FormulaValid -> do
           plog_d $ "[DTInvGen] vPreGen found satisfactory precondition: " ++ show candidate
           return $ Just candidate
-        Just counter -> do
+        Counterexample counter -> do
           plog_d $ "[DTInvGen] vPreGen found counterexample: " ++ show counter
           cexState <- envAddMissingNames $ extractState counter
           addBadState cexState >> vPreGen goalQuery

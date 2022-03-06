@@ -199,9 +199,9 @@ inferInvariant stepStrategy ctx aloops eloops post =
       --                          headStates
       --                          separatorLearner
       --DTI.dtInvGen ctx 2 12 (relBackwardPT' stepStrategy) conds bodies post headStates lis
-      someHeadStates <- lift . lift $ randomSample 3 headStates
+      someHeadStates <- lift . lift $ randomSample 20 headStates
       let cviJob        = CVI.Job Set.empty (Set.fromList $ someHeadStates) (aAnd conds) bodies post
-      let cviFeatureGen = CVI.FeatureGen 12 2 lis
+      let cviFeatureGen = CVI.FeatureGen 2 2 lis
       let cviWps        = CVI.WeakestPre (relBackwardPT' stepStrategy) ctx
       CVI.cvInvGen cviFeatureGen cviWps cviJob
 

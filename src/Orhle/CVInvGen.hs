@@ -123,6 +123,9 @@ emptyClause = Clause [] Set.empty
 nullClause :: Clause t -> Bool
 nullClause (Clause features _) = null features
 
+clauseSize :: Clause t -> Int
+clauseSize (Clause features _) = length features
+
 
 ------------
 -- Queues --
@@ -197,11 +200,12 @@ data CviEnv t = CviEnv { envQueue             :: Queue t
                        , envFeatureCandidates :: [Assertion t]
                        , envGoalQuery         :: Assertion t -> Ceili (Assertion t)
                        , envStateNames        :: [Name]
+                       , envMaxClauseSize     :: Int
                        }
 type CviM t = StateT (CviEnv t) Ceili
 
-mkCviEnv :: CviConstraints t => Job p t -> WeakestPre c p t -> [Assertion t] -> CviEnv t
-mkCviEnv (Job badStates goodStates loopCond loopBody postCond) wp fCandidates =
+mkCviEnv :: CviConstraints t => Job p t -> WeakestPre c p t -> [Assertion t] -> Int -> CviEnv t
+mkCviEnv (Job badStates goodStates loopCond loopBody postCond) wp fCandidates maxClauseSize =
   let
     nameList            = Set.unions . (map namesIn) . Set.toList
     names               = Set.toList $ Set.union (nameList badStates) (nameList goodStates)
@@ -213,7 +217,7 @@ mkCviEnv (Job badStates goodStates loopCond loopBody postCond) wp fCandidates =
       pure $ aAnd [ Imp (aAnd [candidate, negLoopCond]) postCond -- Establishes Post
                   , Imp (aAnd [candidate, loopCond]) weakestPre  -- Inductive
                   ]
-  in CviEnv Map.empty closedBads closedGoods Set.empty fCandidates goalQuery names
+  in CviEnv Map.empty closedBads closedGoods Set.empty fCandidates goalQuery names maxClauseSize
 
 getQueue :: CviM t (Queue t)
 getQueue = get >>= pure . envQueue
@@ -230,30 +234,33 @@ getFeatures = get >>= pure . envFeatures
 getFeatureCandidates :: CviM t [Assertion t]
 getFeatureCandidates = get >>= pure . envFeatureCandidates
 
+getMaxClauseSize :: CviM t Int
+getMaxClauseSize = get >>= pure . envMaxClauseSize
+
 addFeature :: Ord t => Feature t -> CviM t ()
 addFeature feature = do
-  CviEnv queue bads goods features fCandidates goalQ names <- get
-  put $ CviEnv queue bads goods (Set.insert feature features) fCandidates goalQ names
+  CviEnv queue bads goods features fCandidates goalQ names mcs <- get
+  put $ CviEnv queue bads goods (Set.insert feature features) fCandidates goalQ names mcs
 
 putQueue :: Queue t -> CviM t ()
 putQueue queue = do
-  CviEnv _ bads goods features fCandidates goalQ names <- get
-  put $ CviEnv queue bads goods features fCandidates goalQ names
+  CviEnv _ bads goods features fCandidates goalQ names mcs <- get
+  put $ CviEnv queue bads goods features fCandidates goalQ names mcs
 
 putBadStates :: Set (ProgState t) -> CviM t ()
 putBadStates badStates = do
-  CviEnv queue _ goods features fCandidates goalQ names <- get
-  put $ CviEnv queue badStates goods features fCandidates goalQ names
+  CviEnv queue _ goods features fCandidates goalQ names mcs <- get
+  put $ CviEnv queue badStates goods features fCandidates goalQ names mcs
 
 putFeatures :: Set (Feature t) -> CviM t ()
 putFeatures features = do
-  CviEnv queue bads goods _ fCandidates goalQ names <- get
-  put $ CviEnv queue bads goods features fCandidates goalQ names
+  CviEnv queue bads goods _ fCandidates goalQ names mcs <- get
+  put $ CviEnv queue bads goods features fCandidates goalQ names mcs
 
 putFeatureCandidates :: [Assertion t] -> CviM t ()
 putFeatureCandidates fCandidates = do
-  CviEnv queue bads goods features _ goalQ names <- get
-  put $ CviEnv queue bads goods features fCandidates goalQ names
+  CviEnv queue bads goods features _ goalQ names mcs <- get
+  put $ CviEnv queue bads goods features fCandidates goalQ names mcs
 
 enqueue :: CviConstraints t => Entry t -> CviM t ()
 enqueue entry = do
@@ -267,18 +274,27 @@ dequeue = do
   putQueue queue'
   pure elt
 
-checkGoal :: CviConstraints t => Assertion t -> CviM t (Either (ProgState t) (Assertion t))
+data GoalStatus t = GoalMet
+                  | GoalCex (ProgState t)
+                  | SMTError String
+
+checkGoal :: CviConstraints t => Assertion t -> CviM t (GoalStatus t)
 checkGoal candidate = do
   goalQuery <- get >>= pure . envGoalQuery
   mCex <- lift $ goalQuery candidate >>= findCounterexample
   case mCex of
-    Nothing  -> pure $ Right candidate
-    Just cex -> do
+    FormulaValid -> pure GoalMet
+    Counterexample cex -> do
       let cexState = extractState cex
-      pure $ Left cexState
+      pure $ GoalCex cexState
+    SMTTimeout -> pure $ SMTError "SMT timeout"
+    SMTUnknown -> pure $ SMTError "SMT returned unknown"
 
 clog_d :: String -> CviM t ()
 clog_d = lift . log_d
+
+clog_e :: String -> CviM t ()
+clog_e = lift . log_e
 
 
 ----------------------
@@ -308,7 +324,7 @@ cvInvGen featureGen wpts job = do
   log_i $ "[CVInvGen] Beginning invariant inference"
   let featureCandidates = Set.toList $ generateFeatures featureGen
   log_d $ "[CVInvGen] " ++ (show $ length featureCandidates) ++ " initial feature candidates."
-  let env = mkCviEnv job wpts featureCandidates
+  let env = mkCviEnv job wpts featureCandidates (fgMaxClauseSize featureGen)
   evalStateT cvInvGen' env
 
 cvInvGen' :: CviConstraints t => CviM t (Maybe (Assertion t))
@@ -316,24 +332,28 @@ cvInvGen' = do
   badStates  <- getBadStates
   goodStates <- getGoodStates
   clog_d $ "[CVInvGen] Starting vPreGen pass"
-  clog_d . show $ pretty "[CVInvGen]   good states: " <+> pretty (Set.size goodStates)
-  clog_d . show $ pretty "[CVInvGen]   bad states: "  <+> pretty (Set.size badStates)
+  clog_d . show $ pretty "[CVInvGen]   good states:" <+> pretty (Set.size goodStates)
+  clog_d . show $ pretty "[CVInvGen]   bad states: " <+> pretty (Set.size badStates)
   -- Try to learn a separator. If we find one, check to see if it meets the goal criteria.
   -- If it does, return it. Otherwise, add the new counterexample and recurse.
   mSeparator <- learnSeparator
   case mSeparator of
     Nothing -> clog_d "[CVInvGen] Unable to find separator." >> pure Nothing
     Just separator -> do
-      clog_d . show $ pretty "[CVInvGen] Candidate precondition: " <+> (align . pretty) separator
-      checkResult <- checkGoal separator
-      case checkResult of
-        Right invariant -> do
-          clog_d . show $ pretty "[CVInvGen] Found invariant: " <+> (align . pretty) invariant
-          pure $ Just invariant
-        Left cex -> do
-          clog_d . show $ pretty "[CVInvGen] Found counterexample: " <+> (align . pretty) cex
+      clog_d . show $ pretty "[CVInvGen] Candidate precondition:" <+> (align . pretty) separator
+      goalStatus <- checkGoal separator
+      case goalStatus of
+        GoalCex cex -> do
+          clog_d . show $ pretty "[CVInvGen] Found counterexample:" <+> (align . pretty) cex
           addBadState cex
           cvInvGen'
+        GoalMet -> do
+          clog_d . show $ pretty "[CVInvGen] Found invariant:" <+> (align . pretty) separator
+          pure $ Just separator
+        SMTError msg -> do
+          clog_e . show $ pretty "[CVInvGen]" <+> pretty msg
+                      <+> pretty "on candidate" <+> (align . pretty) separator
+          cvInvGen' -- Continue now that the problematic assertion is out of the queue.
 
 
 -----------------------
@@ -361,9 +381,12 @@ learnSeparator' = do
       clog_d $ "[CVInvGen] Search queue is empty, failing."
       pure Nothing
     Just entry -> do
+      maxClauseSize <- getMaxClauseSize
       if entryAcceptsAllGoods entry
         then pure . Just $ entryToAssertion entry
-        else do
+      else if clauseSize (entryCandidate entry) >= maxClauseSize
+        then learnSeparator'
+      else do
           nextFeatures <- usefulFeatures entry
           mapM_ enqueue =<< nextLevel entry nextFeatures
           learnSeparator'
@@ -450,12 +473,21 @@ addBadState badState = do
   getQueue     >>= lift . (updateQueue    badState) >>= putQueue
   getFeatures  >>= lift . (updateFeatures badState) >>= putFeatures
   getBadStates >>= pure . (Set.insert     badState) >>= putBadStates
+  addNewlyUsefulFeatures   badState
   addNewlyUsefulCandidates badState
 
 updateFeatures :: CviConstraints t => ProgState t -> Set (Feature t) -> Ceili (Set (Feature t))
 updateFeatures newBadState features = do
   features' <- mapM (updateFeature newBadState) $ Set.toList features
   pure . Set.fromList . (map fst) $ features'
+
+addNewlyUsefulFeatures :: CviConstraints t => ProgState t -> CviM t ()
+addNewlyUsefulFeatures newBadState = do
+  features <- getFeatures
+  let featuresList = Set.toList features
+  let newlyUseful = filter (\f -> Set.member newBadState $ featRejectedBads f) featuresList
+  newEntries <- mapM featureToEntry newlyUseful
+  mapM_ enqueue newEntries
 
 addNewlyUsefulCandidates :: CviConstraints t => ProgState t -> CviM t ()
 addNewlyUsefulCandidates newBadState = do
