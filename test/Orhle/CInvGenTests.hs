@@ -104,7 +104,7 @@ test_mkCIEnv_closesStateNames =
     assertEqual expectedBad  (envBadStates env)
     assertEqual expectedGood (envGoodStates env)
 
-test_remainingGoods = do
+test_getRemainingGoods = do
   let state1 = state [("x", 1)]
       state2 = state [("x", 2)]
       state3 = state [("x", 3)]
@@ -116,7 +116,7 @@ test_remainingGoods = do
   let clause2 = Root (clause [feature3]) []
   let expected = Set.fromList [state3]
   let env = CIEnv Map.empty Set.empty states [clause1, clause2] Set.empty [] (\ _ -> pure ATrue) [] 8
-  actual <- evalCI remainingGoods env
+  actual <- evalCI getRemainingGoods env
   assertEqual expected actual
 
 test_buildCurrentResult = do
@@ -171,6 +171,68 @@ test_qPop_empty =
 
 
 -- Separator Learner
+
+test_usefulFeatures = do
+  let goodState1 = state [("x", 1)]
+      goodState2 = state [("x", 2)]
+      goodState3 = state [("x", 3)]
+      goodState4 = state [("x", 4)]
+      goodStates = Set.fromList [goodState1, goodState2, goodState3, goodState4]
+  let badState1 = state [("y", 1)]
+      badState2 = state [("y", 2)]
+      badState3 = state [("y", 3)]
+      badState4 = state [("y", 4)]
+      badStates = Set.fromList [badState1, badState2, badState3, badState4]
+  feature1 <- feature "(and (= x 1) (< y 0))" badStates (Set.fromList [goodState1])
+  feature2 <- feature "(and (= x 2) (< y 0))" badStates (Set.fromList [goodState2])
+  -- To start, our root clauses cover good states 1 and 2...
+  let clause1 = Clause [feature1] (Set.fromList [goodState1])
+  let clause2 = Clause [feature2] (Set.fromList [goodState2])
+  let root1 = Root clause1 []
+  let root2 = Root clause2 []
+  -- ... and we have an entry that accepts good states 2, 3, and 4, but only rejects bad state 1.
+  entryFeature <- feature "(and (> x 1) (not (= y 1)))"
+                          (Set.fromList [badState1])
+                          (Set.fromList [goodState2, goodState3, goodState4])
+  let entry1 = Entry [entryFeature]
+                     (Set.fromList [badState1])
+                     (Set.fromList [goodState3, goodState4])
+  -- A useful feature must keep the entry's accepted good states as a non-subset of the
+  -- already accepted [feature1, feature2] while rejecting some new bad states.
+  usefulFeature1 <- feature "(and (= x 3) (not (= y 2)))"
+                          (Set.fromList [badState2])
+                          (Set.fromList [goodState3])
+  usefulFeature2 <- feature "(and (< x 5) (< y 3)))"
+                          (Set.fromList [badState3, badState4])
+                          goodStates
+  -- This feature is not useful because it does not reject any new bad states:
+  nonUsefulFeature1 <- feature "(and (< x 5) (not (= y 1)))"
+                               (Set.fromList [badState1])
+                               goodStates
+  -- This feature is not useful because it does not overlap any of the entry's accepted
+  -- good states:
+  nonUsefulFeature2 <- feature "(and (= x 1) (> y 5))"
+                                badStates
+                                (Set.fromList [goodState1])
+  -- This feature is not useful because, while it does overlap the entry's accepted
+  -- good states, it takes the set of accepted good states to a subset of states
+  -- already accepted by the root clauses.
+  nonUsefulFeature3 <- feature "(and (= x 2) (> y 5))"
+                                badStates
+                                (Set.fromList [goodState2])
+  let features = Set.fromList [ feature1
+                              , feature2
+                              , entryFeature
+                              , usefulFeature1
+                              , usefulFeature2
+                              , nonUsefulFeature1
+                              , nonUsefulFeature2
+                              , nonUsefulFeature3
+                              ]
+  let expected = [usefulFeature1, usefulFeature2]
+  let env = CIEnv Map.empty badStates goodStates [root1, root2] features [] (\_ -> pure ATrue) [] 8
+  actual <- evalCI (usefulFeatures entry1) env
+  assertEqual (Set.fromList expected) (Set.fromList actual)
 
 test_learnSeparator_returnsTrueWhenNoBads =
   let

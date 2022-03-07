@@ -17,12 +17,15 @@ module Orhle.CInvGen
   , buildCurrentResult
   , closeNames
   , entryScore
+  , getRemainingGoods
   , learnSeparator
   , mkCIEnv
   , qInsert
   , qPop
-  , remainingGoods
+  , usefulFeatures
   ) where
+
+import Debug.Trace
 
 import Ceili.Assertion
 import Ceili.CeiliEnv
@@ -264,11 +267,6 @@ getFeatureCandidates = get >>= pure . envFeatureCandidates
 getMaxClauseSize :: CiM t Int
 getMaxClauseSize = get >>= pure . envMaxClauseSize
 
-addFeature :: Ord t => Feature t -> CiM t ()
-addFeature feature = do
-  CIEnv queue bads goods roots features fCandidates goalQ names mcs <- get
-  put $ CIEnv queue bads goods roots (Set.insert feature features) fCandidates goalQ names mcs
-
 putQueue :: Queue t -> CiM t ()
 putQueue queue = do
   CIEnv _ bads goods roots features fCandidates goalQ names mcs <- get
@@ -288,6 +286,11 @@ putFeatureCandidates :: [Assertion t] -> CiM t ()
 putFeatureCandidates fCandidates = do
   CIEnv queue bads goods roots features _ goalQ names mcs <- get
   put $ CIEnv queue bads goods roots features fCandidates goalQ names mcs
+
+addFeature :: Ord t => Feature t -> CiM t ()
+addFeature feature = do
+  CIEnv queue bads goods roots features fCandidates goalQ names mcs <- get
+  put $ CIEnv queue bads goods roots (Set.insert feature features) fCandidates goalQ names mcs
 
 enqueue :: CIConstraints t => Entry t -> CiM t ()
 enqueue entry = do
@@ -386,7 +389,7 @@ learnSeparator = do
 
 learnSeparator' :: CIConstraints t => CiM t (Maybe (Assertion t))
 learnSeparator' = do
-  remaining <- remainingGoods
+  remaining <- getRemainingGoods
   if Set.null remaining
     then pure . Just =<< buildCurrentResult
     else do
@@ -399,13 +402,35 @@ learnSeparator' = do
           maxClauseSize <- getMaxClauseSize
           if length (entryCandidate entry) >= maxClauseSize
             then learnSeparator'
-          else do
-            nextFeatures <- usefulFeatures entry
-            mapM_ enqueue =<< nextLevel entry nextFeatures
-            learnSeparator'
+            else do
+              nextFeatures <- usefulFeatures entry
+              mapM_ enqueue =<< nextLevel entry nextFeatures
+              learnSeparator'
 
 usefulFeatures :: CIConstraints t => Entry t -> CiM t [Feature t]
-usefulFeatures entry = error "unimplemented"
+usefulFeatures (Entry candidate enRejectedBads enAcceptedGoods) = do
+  remainingGoods <- getRemainingGoods
+  useful <- case candidate of
+    [] ->
+      -- The candidate is empty. A useful kickoff to a new clause candidate
+      -- is any feature accepting currently unaccepted good states.
+      pure $ \feature -> not $ Set.disjoint (featAcceptedGoods feature) remainingGoods
+    _  -> do
+      -- A useful addition to an existing candidate rejects something new
+      -- while not bringing the accepted states for the new candidate
+      -- down to either 1) the empty set or 2) a subset of of the good
+      -- states already accepted by the entry's clauses. (Note the former
+      -- condition is not a subcase of the latter since there may not
+      -- be any non-trivial root clauses yet, and empty set is a subset
+      -- of itself.)
+      badStates <- getBadStates
+      let enRemainingBads = Set.difference badStates enRejectedBads
+      pure $ \feature ->
+               let optimisticAccepts = Set.intersection (featAcceptedGoods feature) enAcceptedGoods
+               in (not $ Set.disjoint (featRejectedBads feature) enRemainingBads)
+               && (not $ Set.null optimisticAccepts)
+               && (not $ Set.disjoint optimisticAccepts remainingGoods)
+  getFeatures >>= pure . filter useful . Set.toList
 
 nextLevel :: CIConstraints t => Entry t -> [Feature t] -> CiM t [Entry t]
 nextLevel _ [] = pure []
@@ -431,8 +456,8 @@ closeNames names state =
                        else Map.insert name (embed (0 :: Integer)) st
   in foldr ensureIn state names
 
-remainingGoods :: CIConstraints t => CiM t (Set (ProgState t))
-remainingGoods = do
+getRemainingGoods :: CIConstraints t => CiM t (Set (ProgState t))
+getRemainingGoods = do
   goodStates  <- getGoodStates
   rootClauses <- getRootClauses
   let rootAccepted = Set.unions $ map rootClauseAcceptedGoods rootClauses
