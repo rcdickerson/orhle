@@ -39,6 +39,7 @@ library:
     - src
   exposed-modules:
     - Orhle
+    - Orhle.CInvGen
     - Orhle.CValue
     - Orhle.CVInvGen
     - Orhle.DTInvGen
