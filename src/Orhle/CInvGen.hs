@@ -418,6 +418,10 @@ learnSeparator' = do
 usefulFeatures :: CIConstraints t => Entry t -> CiM t [Feature t]
 usefulFeatures (Entry candidate enRejectedBads enAcceptedGoods) = do
   rootsAccepted <- getRootsAccepted
+
+  -- Short circuit if there are no possible useful features.
+  if Set.isSubsetOf enRejectedBads rootsAccepted then pure [] else do
+
   useful <- case candidate of
     [] ->
       -- The candidate is empty. A useful kickoff to a new clause candidate
