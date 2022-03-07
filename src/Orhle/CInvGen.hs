@@ -18,10 +18,12 @@ module Orhle.CInvGen
   , closeNames
   , entryScore
   , getRemainingGoods
+  , getRootClauses
   , learnSeparator
   , mkCIEnv
   , qInsert
   , qPop
+  , addRootClause
   , usefulFeatures
   ) where
 
@@ -134,6 +136,7 @@ clauseSize (Clause features _) = length features
 
 data RootClause t = Root (Clause t) [RootClause t]
                   | EmptyRoot
+                  deriving (Eq, Ord, Show)
 
 rootClauseAcceptedGoods :: RootClause t -> Set (ProgState t)
 rootClauseAcceptedGoods root =
@@ -277,6 +280,11 @@ putBadStates badStates = do
   CIEnv queue _ goods roots features fCandidates goalQ names mcs <- get
   put $ CIEnv queue badStates goods roots features fCandidates goalQ names mcs
 
+putRootClauses :: [RootClause t] -> CiM t ()
+putRootClauses roots = do
+  CIEnv queue bads goods _ features fCandidates goalQ names mcs <- get
+  put $ CIEnv queue bads goods roots features fCandidates goalQ names mcs
+
 putFeatures :: Set (Feature t) -> CiM t ()
 putFeatures features = do
   CIEnv queue bads goods roots _ fCandidates goalQ names mcs <- get
@@ -404,17 +412,17 @@ learnSeparator' = do
             then learnSeparator'
             else do
               nextFeatures <- usefulFeatures entry
-              mapM_ enqueue =<< nextLevel entry nextFeatures
+              enqueueNextLevel entry nextFeatures
               learnSeparator'
 
 usefulFeatures :: CIConstraints t => Entry t -> CiM t [Feature t]
 usefulFeatures (Entry candidate enRejectedBads enAcceptedGoods) = do
-  remainingGoods <- getRemainingGoods
+  rootsAccepted <- getRootsAccepted
   useful <- case candidate of
     [] ->
       -- The candidate is empty. A useful kickoff to a new clause candidate
       -- is any feature accepting currently unaccepted good states.
-      pure $ \feature -> not $ Set.disjoint (featAcceptedGoods feature) remainingGoods
+      pure $ \feature -> not $ Set.isSubsetOf (featAcceptedGoods feature) rootsAccepted
     _  -> do
       -- A useful addition to an existing candidate rejects something new
       -- while not bringing the accepted states for the new candidate
@@ -429,12 +437,60 @@ usefulFeatures (Entry candidate enRejectedBads enAcceptedGoods) = do
                let optimisticAccepts = Set.intersection (featAcceptedGoods feature) enAcceptedGoods
                in (not $ Set.disjoint (featRejectedBads feature) enRemainingBads)
                && (not $ Set.null optimisticAccepts)
-               && (not $ Set.disjoint optimisticAccepts remainingGoods)
+               && (not $ Set.isSubsetOf optimisticAccepts rootsAccepted)
   getFeatures >>= pure . filter useful . Set.toList
 
-nextLevel :: CIConstraints t => Entry t -> [Feature t] -> CiM t [Entry t]
-nextLevel _ [] = pure []
-nextLevel entry (newFeature:rest) = error "unimplemented"
+enqueueNextLevel :: CIConstraints t => Entry t -> [Feature t] -> CiM t ()
+enqueueNextLevel _ [] = pure ()
+enqueueNextLevel entry@(Entry candidate enRejectedBads _) (newFeature:rest) = do
+  let newCandidate = newFeature:candidate
+  -- A useful feature *optimistically* accepted an interesting set of good
+  -- states, but now we will do the SMT work to make sure.
+  goodStates    <- getGoodStates
+  rootsAccepted <- getRootsAccepted
+  let newCandidateAssertion = aAnd $ map featAssertion newCandidate
+  (newAcceptedGoodsList, _) <- lift $ splitStates newCandidateAssertion $ Set.toList goodStates
+  let newAcceptedGoods = Set.fromList newAcceptedGoodsList
+  if Set.isSubsetOf newAcceptedGoods rootsAccepted
+    then
+      -- It turns out the accepted good states are not intersting.
+      enqueueNextLevel entry rest
+    else do
+      badStates <- getBadStates
+      let newRejectedBads = Set.union enRejectedBads (featRejectedBads newFeature)
+      if newRejectedBads == badStates
+        then do
+          -- We found a new root clause.
+          addRootClause $ Clause newCandidate newAcceptedGoods
+          remainingGoods <- getRemainingGoods
+          if Set.null remainingGoods
+            then pure ()
+            else enqueueNextLevel entry rest
+        else do
+          enqueue $ Entry newCandidate newAcceptedGoods newRejectedBads
+          enqueueNextLevel entry rest
+
+
+------------------------
+-- Root Clause Update --
+------------------------
+
+addRootClause :: CIConstraints t => Clause t -> CiM t ()
+addRootClause clause = do
+  currentAccepted <- getRootsAccepted
+  let cAccepted = clauseAcceptedGoods clause
+  if Set.isSubsetOf cAccepted currentAccepted
+    then pure ()
+    else do
+      currentRoots <- getRootClauses
+      let (covered, uncovered) = partition (isCoveredBy cAccepted) currentRoots
+      putRootClauses $ (Root clause covered):uncovered
+
+isCoveredBy :: Ord t => Set (ProgState t) -> RootClause t -> Bool
+isCoveredBy set root = case root of
+  EmptyRoot      -> True
+  Root rClause _ -> Set.isSubsetOf (clauseAcceptedGoods rClause) set
+
 
 ---------------------------
 -- Counterexample Update --
@@ -456,12 +512,15 @@ closeNames names state =
                        else Map.insert name (embed (0 :: Integer)) st
   in foldr ensureIn state names
 
+getRootsAccepted :: CIConstraints t => CiM t (Set (ProgState t))
+getRootsAccepted = do
+  rootClauses <- getRootClauses
+  pure $ Set.unions $ map rootClauseAcceptedGoods rootClauses
+
 getRemainingGoods :: CIConstraints t => CiM t (Set (ProgState t))
 getRemainingGoods = do
-  goodStates  <- getGoodStates
-  rootClauses <- getRootClauses
-  let rootAccepted = Set.unions $ map rootClauseAcceptedGoods rootClauses
-  pure $ Set.difference goodStates rootAccepted
+  goodStates <- getGoodStates
+  getRootsAccepted >>= pure . Set.difference goodStates
 
 buildCurrentResult :: CIConstraints t => CiM t (Assertion t)
 buildCurrentResult = pure . aOr . (map rootClauseAssertion) =<< getRootClauses

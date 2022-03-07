@@ -10,7 +10,7 @@ import Orhle.CInvGen
 import Ceili.Assertion
 import Ceili.CeiliEnv
 import Ceili.Language.Imp
-import Control.Monad.Trans.State ( evalStateT )
+import Control.Monad.Trans.State ( evalStateT, runStateT )
 import qualified Data.Map as Map
 import Data.Set ( Set )
 import qualified Data.Set as Set
@@ -65,6 +65,11 @@ evalCeili task = do
 
 evalCI :: CiM t a -> CIEnv t -> IO a
 evalCI task env = evalCeili $ evalStateT task env
+
+runCI :: CiM t a -> CIEnv t -> IO (CIEnv t)
+runCI task env = do
+  (a, env) <- evalCeili $ runStateT task env
+  pure env
 
 ---------------------------------------------
 
@@ -183,9 +188,9 @@ test_usefulFeatures = do
       badState3 = state [("y", 3)]
       badState4 = state [("y", 4)]
       badStates = Set.fromList [badState1, badState2, badState3, badState4]
+  -- To start, our root clauses cover good states 1 and 2...
   feature1 <- feature "(and (= x 1) (< y 0))" badStates (Set.fromList [goodState1])
   feature2 <- feature "(and (= x 2) (< y 0))" badStates (Set.fromList [goodState2])
-  -- To start, our root clauses cover good states 1 and 2...
   let clause1 = Clause [feature1] (Set.fromList [goodState1])
   let clause2 = Clause [feature2] (Set.fromList [goodState2])
   let root1 = Root clause1 []
@@ -260,3 +265,93 @@ test_learnSeparator_returnsTrueWhenNoBadsOrGoods =
   in do
     sep <- evalCI learnSeparator env
     assertEqual (Just ATrue) sep
+
+
+-- Root Clause Update
+
+test_addRootClause_noCover = do
+  let goodState1 = state [("x", 1)]
+      goodState2 = state [("x", 2)]
+      goodState3 = state [("x", 3)]
+      goodStates = Set.fromList [goodState1, goodState2, goodState3]
+  -- To start, our root clauses cover good states 1 and 2.
+  feature1 <- feature "(= x 1)" Set.empty (Set.fromList [goodState1])
+  feature2 <- feature "(= x 2)" Set.empty (Set.fromList [goodState2])
+  let clause1 = Clause [feature1] (Set.fromList [goodState1])
+  let clause2 = Clause [feature2] (Set.fromList [goodState2])
+  let root1 = Root clause1 []
+  let root2 = Root clause2 []
+  -- Add a clause that covers good state 3.
+  newFeature <- feature "(= x 3)" Set.empty (Set.fromList [goodState3])
+  let newClause = Clause [newFeature] (Set.fromList [goodState3])
+  -- Our new clause list should include all three root clauses (the two original plus one new).
+  let expected = [root1, root2, Root newClause []]
+  let env = CIEnv Map.empty Set.empty goodStates [root1, root2] Set.empty [] (\_ -> pure ATrue) [] 8
+  actual <- evalCI (addRootClause newClause >> getRootClauses) env
+  assertEqual (Set.fromList expected) (Set.fromList actual)
+
+test_addRootClause_singleCover = do
+  let goodState1 = state [("x", 1)]
+      goodState2 = state [("x", 2)]
+      goodState3 = state [("x", 3)]
+      goodStates = Set.fromList [goodState1, goodState2, goodState3]
+  -- To start, our root clauses cover good states 1 and 2.
+  feature1 <- feature "(= x 1)" Set.empty (Set.fromList [goodState1])
+  feature2 <- feature "(= x 2)" Set.empty (Set.fromList [goodState2])
+  let clause1 = Clause [feature1] (Set.fromList [goodState1])
+  let clause2 = Clause [feature2] (Set.fromList [goodState2])
+  let root1 = Root clause1 []
+  let root2 = Root clause2 []
+  -- Add a clause that covers good states 2 and 3.
+  newFeature <- feature "(> x 1)" Set.empty (Set.fromList [goodState2, goodState3])
+  let newClause = Clause [newFeature] (Set.fromList [goodState2, goodState3])
+  -- Our new clause list should include the first root, plus the new clause covering
+  -- the second original root.
+  let expected = [root1, Root newClause [root2]]
+  let env = CIEnv Map.empty Set.empty goodStates [root1, root2] Set.empty [] (\_ -> pure ATrue) [] 8
+  actual <- evalCI (addRootClause newClause >> getRootClauses) env
+  assertEqual (Set.fromList expected) (Set.fromList actual)
+
+test_addRootClause_multiCover = do
+  let goodState1 = state [("x", 1)]
+      goodState2 = state [("x", 2)]
+      goodState3 = state [("x", 3)]
+      goodStates = Set.fromList [goodState1, goodState2, goodState3]
+  -- To start, our root clauses cover good states 1 and 2.
+  feature1 <- feature "(= x 1)" Set.empty (Set.fromList [goodState1])
+  feature2 <- feature "(= x 2)" Set.empty (Set.fromList [goodState2])
+  let clause1 = Clause [feature1] (Set.fromList [goodState1])
+  let clause2 = Clause [feature2] (Set.fromList [goodState2])
+  let root1 = Root clause1 []
+  let root2 = Root clause2 []
+  -- Add a clause that covers all good states.
+  newFeature <- feature "(< x 4)" Set.empty goodStates
+  let newClause = Clause [newFeature] goodStates
+  -- Our new clause list should include only the new clause, covering both original roots.
+  let expected = [Root newClause [root1, root2]]
+  let env = CIEnv Map.empty Set.empty goodStates [root1, root2] Set.empty [] (\_ -> pure ATrue) [] 8
+  actual <- evalCI (addRootClause newClause >> getRootClauses) env
+  assertEqual (Set.fromList expected) (Set.fromList actual)
+
+test_addRootClause_redundant = do
+  let goodState1 = state [("x", 1)]
+      goodState2 = state [("x", 2)]
+      goodState3 = state [("x", 3)]
+      goodStates = Set.fromList [goodState1, goodState2, goodState3]
+  -- To start, our root clauses cover good states 1 and 2.
+  feature1 <- feature "(= x 1)" Set.empty (Set.fromList [goodState1])
+  feature2 <- feature "(= x 2)" Set.empty (Set.fromList [goodState2])
+  let clause1 = Clause [feature1] (Set.fromList [goodState1])
+  let clause2 = Clause [feature2] (Set.fromList [goodState2])
+  let root1 = Root clause1 []
+  let root2 = Root clause2 []
+  -- Add a clause that also covers good states 1 and 2.
+  newFeature <- feature "(or (= x 1) (= x 2))" Set.empty (Set.fromList [goodState1, goodState2])
+  let newClause = Clause [newFeature] (Set.fromList [goodState1, goodState2])
+  -- The root clause list should not change.
+  -- (Note: it may ultimately be better to favor single clauses, but for
+  -- now expected behavior is all redundant clauses are ignored.)
+  let expected = [root1, root2]
+  let env = CIEnv Map.empty Set.empty goodStates [root1, root2] Set.empty [] (\_ -> pure ATrue) [] 8
+  actual <- evalCI (addRootClause newClause >> getRootClauses) env
+  assertEqual (Set.fromList expected) (Set.fromList actual)
