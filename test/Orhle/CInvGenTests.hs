@@ -440,9 +440,10 @@ test_addNewlyUsefulCandidates = do
   assertion3 <- assertionFromStr "(< x 3)" -- Does not reject new bad.
   assertion4 <- assertionFromStr "(< x 4)" -- Does not reject new bad.
   let candidates = [assertion1, assertion2, assertion3, assertion4]
-  let goodStates = states [[("x", 1)]]
-  let newBadState = state [("x", 2)]
-  let newBadStates = Set.singleton newBadState
+  let goodStates   = states [[("x", 1)]]
+  let oldBadStates = states [[("x", 0)]]
+  let newBadState  = state [("x", 2)]
+  let newBadStates = Set.insert newBadState oldBadStates
   expectedFeature2 <- feature "(< x 2)" (states [[("x", 2)]]) (states [[("x", 1)]])
   let expectedQueue = qInsert (Entry [expectedFeature2] (states [[("x", 2)]]) (states [[("x", 1)]]))
                     $ Map.empty
