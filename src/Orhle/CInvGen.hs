@@ -45,8 +45,10 @@ import Ceili.ProgState
 import Ceili.PTS ( BackwardPT )
 import qualified Ceili.SMT as SMT
 import Ceili.StatePredicate
+import Data.Cache.LRU ( LRU )
+import qualified Data.Cache.LRU as LRU
 import Data.Either ( partitionEithers )
-import Data.List ( partition )
+import Data.List ( partition, sort )
 import Data.Map ( Map )
 import qualified Data.Map as Map
 import Data.Set ( Set )
@@ -225,7 +227,9 @@ data CIEnv t = CIEnv { envQueue             :: Queue t
                      , envGoalQuery         :: Assertion t -> Ceili (Assertion t)
                      , envStateNames        :: [Name]
                      , envMaxClauseSize     :: Int
+                     , envAcceptedGoodsLRU  :: LRU (Assertion t) (Set (ProgState t))
                      }
+
 type CiM t = StateT (CIEnv t) Ceili
 
 mkCIEnv :: CIConstraints t => Configuration c p t -> Job p t -> CIEnv t
@@ -245,7 +249,7 @@ mkCIEnv config job =
       pure $ aAnd [ Imp (aAnd [candidate, negLoopCond]) (jobPostCond job) -- Establishes Post
                   , Imp (aAnd [candidate, loopCond]) weakestPre           -- Inductive
                   ]
-  in CIEnv Map.empty closedBads closedGoods [] Set.empty fCandidates goalQuery names maxClauseSize
+  in CIEnv Map.empty closedBads closedGoods [] Set.empty fCandidates goalQuery names maxClauseSize (LRU.newLRU $ Just 3000)
 
 getQueue :: CiM t (Queue t)
 getQueue = get >>= pure . envQueue
@@ -268,35 +272,46 @@ getFeatureCandidates = get >>= pure . envFeatureCandidates
 getMaxClauseSize :: CiM t Int
 getMaxClauseSize = get >>= pure . envMaxClauseSize
 
+getStateNames :: CiM t [Name]
+getStateNames = get >>= pure . envStateNames
+
+getAcceptedGoodsLRU :: CiM t (LRU (Assertion t) (Set (ProgState t)))
+getAcceptedGoodsLRU = get >>= pure . envAcceptedGoodsLRU
+
 putQueue :: Queue t -> CiM t ()
 putQueue queue = do
-  CIEnv _ bads goods roots features fCandidates goalQ names mcs <- get
-  put $ CIEnv queue bads goods roots features fCandidates goalQ names mcs
+  CIEnv _ bads goods roots features fCandidates goalQ names mcs lru <- get
+  put $ CIEnv queue bads goods roots features fCandidates goalQ names mcs lru
 
 putBadStates :: Set (ProgState t) -> CiM t ()
 putBadStates badStates = do
-  CIEnv queue _ goods roots features fCandidates goalQ names mcs <- get
-  put $ CIEnv queue badStates goods roots features fCandidates goalQ names mcs
+  CIEnv queue _ goods roots features fCandidates goalQ names mcs lru <- get
+  put $ CIEnv queue badStates goods roots features fCandidates goalQ names mcs lru
 
 putRootClauses :: [RootClause t] -> CiM t ()
 putRootClauses roots = do
-  CIEnv queue bads goods _ features fCandidates goalQ names mcs <- get
-  put $ CIEnv queue bads goods roots features fCandidates goalQ names mcs
+  CIEnv queue bads goods _ features fCandidates goalQ names mcs lru <- get
+  put $ CIEnv queue bads goods roots features fCandidates goalQ names mcs lru
 
 putFeatures :: Set (Feature t) -> CiM t ()
 putFeatures features = do
-  CIEnv queue bads goods roots _ fCandidates goalQ names mcs <- get
-  put $ CIEnv queue bads goods roots features fCandidates goalQ names mcs
+  CIEnv queue bads goods roots _ fCandidates goalQ names mcs lru <- get
+  put $ CIEnv queue bads goods roots features fCandidates goalQ names mcs lru
 
 putFeatureCandidates :: [Assertion t] -> CiM t ()
 putFeatureCandidates fCandidates = do
-  CIEnv queue bads goods roots features _ goalQ names mcs <- get
-  put $ CIEnv queue bads goods roots features fCandidates goalQ names mcs
+  CIEnv queue bads goods roots features _ goalQ names mcs lru <- get
+  put $ CIEnv queue bads goods roots features fCandidates goalQ names mcs lru
+
+putAcceptedGoodsLRU :: LRU (Assertion t) (Set (ProgState t)) -> CiM t ()
+putAcceptedGoodsLRU lru = do
+  CIEnv queue bads goods roots features fCandidates goalQ names mcs _ <- get
+  put $ CIEnv queue bads goods roots features fCandidates goalQ names mcs lru
 
 addFeature :: Ord t => Feature t -> CiM t ()
 addFeature feature = do
-  CIEnv queue bads goods roots features fCandidates goalQ names mcs <- get
-  put $ CIEnv queue bads goods roots (Set.insert feature features) fCandidates goalQ names mcs
+  CIEnv queue bads goods roots features fCandidates goalQ names mcs lru <- get
+  put $ CIEnv queue bads goods roots (Set.insert feature features) fCandidates goalQ names mcs lru
 
 enqueue :: CIConstraints t => Entry t -> CiM t ()
 enqueue entry = do
@@ -349,6 +364,7 @@ cInvGen' = do
       case goalStatus of
         GoalCex cex -> do
           clog_d . show $ pretty "[CInvGen] Found counterexample:" <+> (align . pretty) cex
+          putQueue $ Map.empty
           addBadState cex
           cInvGen'
         GoalMet -> do
@@ -357,7 +373,15 @@ cInvGen' = do
         SMTError msg -> do
           clog_e . show $ pretty "[CInvGen]" <+> pretty msg
                       <+> pretty "on candidate" <+> (align . pretty) separator
-          cInvGen' -- Continue now that the problematic assertion is out of the queue.
+          throwError "SMT error"
+          --cInvGen' -- Continue now that the problematic assertion is out of the queue.
+
+decimateRoots :: CIConstraints t => CiM t ()
+decimateRoots = do
+  rootClauses <- getRootClauses
+  let collectClauses (RootClause clause covers) = clause:(concat . map collectClauses $ covers)
+  let lowerClauses = concat . map collectClauses $ concat . map rcCovers $ rootClauses
+  putRootClauses $ foldr insertRootClause [] lowerClauses
 
 data GoalStatus t = GoalMet
                   | GoalCex (ProgState t)
@@ -366,11 +390,13 @@ data GoalStatus t = GoalMet
 checkGoal :: CIConstraints t => Assertion t -> CiM t (GoalStatus t)
 checkGoal candidate = do
   goalQuery <- get >>= pure . envGoalQuery
+--  cquery <- lift (goalQuery candidate)
+--  clog_d . show . align $ pretty "Goal query:" <+> pretty cquery
   mCex <- lift $ goalQuery candidate >>= findCounterexample
   case mCex of
     FormulaValid -> pure GoalMet
     Counterexample cex -> do
-      let cexState = extractState cex
+      cexState <- extractState cex
       pure $ GoalCex cexState
     SMTTimeout -> pure $ SMTError "SMT timeout"
     SMTUnknown -> pure $ SMTError "SMT returned unknown"
@@ -447,11 +473,14 @@ enqueueNextLevel entry@(Entry candidate enRejectedBads _) (newFeature:rest) = do
   let newCandidate = newFeature:candidate
   -- A useful feature *optimistically* accepted an interesting set of good
   -- states, but now we will do the SMT work to make sure.
-  goodStates    <- getGoodStates
   rootClauseAccepts <- pure . map (clauseAcceptedGoods . rcClause) =<< getRootClauses
   let newCandidateAssertion = aAnd $ map featAssertion newCandidate
+
+  goodStates <- getGoodStates
   (newAcceptedGoodsList, _) <- lift $ splitStates newCandidateAssertion $ Set.toList goodStates
   let newAcceptedGoods = Set.fromList newAcceptedGoodsList
+  --newAcceptedGoods <- lruAcceptedGoods newCandidateAssertion
+
   if (any (Set.isProperSubsetOf newAcceptedGoods) rootClauseAccepts)
     then
       -- It turns out the accepted good states are not intersting.
@@ -470,6 +499,22 @@ enqueueNextLevel entry@(Entry candidate enRejectedBads _) (newFeature:rest) = do
         else do
           enqueue $ Entry newCandidate newAcceptedGoods newRejectedBads
           enqueueNextLevel entry rest
+
+lruAcceptedGoods :: CIConstraints t => Assertion t -> CiM t (Set (ProgState t))
+lruAcceptedGoods assertion = do
+  lru <- getAcceptedGoodsLRU
+  let (lru', mStates) = LRU.lookup assertion lru
+  case mStates of
+    Just states -> do
+      clog_d "**** HIT"
+      putAcceptedGoodsLRU lru'
+      pure $ states
+    Nothing -> do
+      goodStates <- getGoodStates
+      (acceptedGoodsList, _) <- lift $ splitStates assertion $ Set.toList goodStates
+      let acceptedGoods = Set.fromList acceptedGoodsList
+      putAcceptedGoodsLRU $ LRU.insert assertion acceptedGoods lru
+      pure acceptedGoods
 
 
 ------------------------
@@ -654,12 +699,17 @@ splitStates assertion states = do
   let (accepted, rejected) = partition snd evaluations
   pure (map fst accepted, map fst rejected)
 
+
+extractState :: CIConstraints t => Assertion t -> CiM t (ProgState t)
+extractState assertion = do
+  stateNames <- getStateNames
+  pure $ closeNames stateNames $ extractState' assertion
+
 -- TODO: This is fragile.
--- TODO: Close names?
-extractState :: Pretty t => Assertion t -> ProgState t
-extractState assertion = case assertion of
+extractState' :: Pretty t => Assertion t -> ProgState t
+extractState' assertion = case assertion of
   Eq lhs rhs -> Map.fromList [(extractName lhs, extractInt rhs)]
-  And as     -> Map.unions $ map extractState as
+  And as     -> Map.unions $ map extractState' as
   _          -> error $ "Unexpected assertion: " ++ show assertion
   where
     extractName arith = case arith of
