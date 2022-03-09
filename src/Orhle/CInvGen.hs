@@ -405,14 +405,11 @@ learnSeparator' = do
           clog_d $ "[CInvGen] Search queue is empty, failing."
           pure Nothing
         Just entry -> do
-          traceM $ "--------"
-          traceM $ "Considering entry: " ++ (show . pretty $ entry)
           maxClauseSize <- getMaxClauseSize
           if length (entryCandidate entry) >= maxClauseSize
             then learnSeparator'
             else do
               nextFeatures <- usefulFeatures entry
-              traceM $ "Next features: " ++ (show . pretty $ nextFeatures)
               enqueueNextLevel entry nextFeatures
               learnSeparator'
 
@@ -495,10 +492,7 @@ insertRootClause newClause rootList =
       (RootClause rClause rCovers):rest -> (RootClause rClause (insertRootClause newClause rCovers)):rest
 
 addRootClause :: CIConstraints t => Clause t -> CiM t ()
-addRootClause clause = do
-  getRootClauses >>= pure . insertRootClause clause >>= putRootClauses
-  rootClauses <- getRootClauses
-  traceM $ "New root clauses: " ++ (show . pretty $ rootClauses)
+addRootClause clause = getRootClauses >>= pure . insertRootClause clause >>= putRootClauses
 
 isCoveredBy :: Ord t => Clause t -> Clause t -> Bool
 isCoveredBy clause1 clause2 = Set.isProperSubsetOf (clauseAcceptedGoods clause1) (clauseAcceptedGoods clause2)

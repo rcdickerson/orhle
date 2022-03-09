@@ -22,7 +22,7 @@ import qualified Data.Map as Map
 import Data.Set ( Set )
 import qualified Data.Set as Set
 import Data.UUID
-import qualified Orhle.CVInvGen as CVI
+import qualified Orhle.CInvGen as CI
 --import qualified Orhle.DTLearn2 as DTL
 import Orhle.SpecImp
 import Orhle.StepStrategy
@@ -199,11 +199,10 @@ inferInvariant stepStrategy ctx aloops eloops post =
       --                          headStates
       --                          separatorLearner
       --DTI.dtInvGen ctx 2 12 (relBackwardPT' stepStrategy) conds bodies post headStates lis
-      someHeadStates <- lift . lift $ randomSample 20 headStates
-      let cviJob        = CVI.Job Set.empty (Set.fromList $ someHeadStates) (aAnd conds) bodies post
-      let cviFeatureGen = CVI.FeatureGen 2 2 lis
-      let cviWps        = CVI.WeakestPre (relBackwardPT' stepStrategy) ctx
-      CVI.cvInvGen cviFeatureGen cviWps cviJob
+      someHeadStates <- lift . lift $ randomSample 5 headStates
+      let ciConfig = CI.Configuration 2 3 lis (relBackwardPT' stepStrategy) ctx
+      let ciJob    = CI.Job Set.empty (Set.fromList $ someHeadStates) (aAnd conds) bodies post
+      CI.cInvGen ciConfig ciJob
 
 body :: ImpWhile t e -> e
 body (ImpWhile _ b _) = b
