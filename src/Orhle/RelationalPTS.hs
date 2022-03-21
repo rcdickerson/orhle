@@ -199,8 +199,8 @@ inferInvariant stepStrategy ctx aloops eloops post =
       --                          headStates
       --                          separatorLearner
       --DTI.dtInvGen ctx 2 12 (relBackwardPT' stepStrategy) conds bodies post headStates lis
-      someHeadStates <- lift . lift $ randomSample 15 headStates
-      let ciConfig = CI.Configuration 2 12 lis (relBackwardPT' stepStrategy) ctx
+      someHeadStates <- lift . lift $ randomSample 5 headStates
+      let ciConfig = CI.Configuration 2 3 lis (relBackwardPT' stepStrategy) ctx
       let ciJob    = CI.Job Set.empty (Set.fromList $ someHeadStates) (aAnd conds) bodies post
       CI.cInvGen ciConfig ciJob
 

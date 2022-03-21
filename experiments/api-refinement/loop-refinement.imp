@@ -9,7 +9,7 @@ post: (= original!sum refinement!sum);
 
 aspecs:
   randOdd() {
-    post: (and (<= 0 ret!) (< ret! 10) (= (mod ret! 2) 1));
+    post: (and (<= 0 c) (< c 5) (= ret! (+ (* 2 c) 1)));
   }
 
   rand() {
