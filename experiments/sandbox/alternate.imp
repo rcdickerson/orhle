@@ -1,0 +1,40 @@
+exists: f;
+
+post: (= f!sum 0);
+
+especs:
+  g(j, k) {
+    post: (and
+            (=> (= j 0) (= ret! k))
+            (=> (= j 1) (= ret! (- k 1)))
+            (=> (or (< j 0) (> j 1)) (= ret! 1)));
+  }
+
+  flipCoin() {
+    choiceVars: n;
+    pre: (or (= n 0) (= n 1));
+    post: (= ret! n);
+  }
+
+
+fun f() {
+  sum := 0;
+  i   := 0;
+  j   := 0;
+  k   := 0;
+  while (i < 10) do
+//    @inv {
+//      (and (=> (<= f!i 5) (and (= f!j 0) (= f!k 0)))
+//           (=> (>  f!i 5) (and (= f!j 1) (= f!k 1)))
+//           (= f!sum 0))
+//    }
+    increment := g(j, k);
+    sum := sum + increment;
+
+    if (i == 5) then
+      j := 1;
+    endif
+    k := flipCoin();
+    i := i + 1;
+  end
+}
