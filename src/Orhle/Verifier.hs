@@ -44,7 +44,7 @@ rhleVerifier iFunEnv triple = do
   let cFunEnv = mapSpecImpEnvType Concrete iFunEnv
   let names = Set.union (namesIn aprogs) (namesIn eprogs)
   let lits  = Set.union (litsIn  aprogs) (litsIn eprogs)
-  let env = mkEnv LogLevelDebug 5000 names
+  let env = mkEnv LogLevelDebug 10000 names
   resultOrErr <- runCeili env $ do
     log_i $ "Collecting loop head states for loop invariant inference..."
     aLoopHeads <- mapM (headStates 5 cFunEnv) aprogs
@@ -63,6 +63,7 @@ rhleVerifier iFunEnv triple = do
         SMT.Valid         -> Right $ Success
         SMT.Invalid model -> Left  $ Failure $ "Verification conditions are invalid. Model: " ++ model
         SMT.ValidUnknown  -> Left  $ Failure "Solver returned unknown."
+        SMT.ValidTimeout  -> Left  $ Failure "Solver timed out."
 
 headStates :: Int
            -> SpecImpEnv CValue (SpecImpProgram CValue)

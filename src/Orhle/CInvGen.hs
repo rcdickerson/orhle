@@ -216,7 +216,12 @@ data Entry t = Entry
   { entryCandidate     :: [Feature t]
   , entryRejectedBads  :: Set (ProgState t)
   , entryAcceptedGoods :: Set (ProgState t)
-  } deriving (Eq, Ord, Show)
+  } deriving (Ord, Show)
+
+-- TODO: Is this actually a good idea?
+instance Ord t => Eq (Entry t) where
+  entry1 == entry2 =
+    Set.fromList (entryCandidate entry1) == Set.fromList (entryCandidate entry2)
 
 instance Pretty t => Pretty (Entry t) where
   pretty (Entry candidate rejected accepted) = align $
@@ -235,7 +240,9 @@ qInsert entry queue =
   let score = entryScore entry
   in case Map.lookup score queue of
     Nothing  -> Map.insert score (Set.singleton entry) queue
-    Just set -> Map.insert score (Set.insert entry set) queue
+    Just set ->
+      -- TODO: If the exact candidate feature set is already here, ignore?
+      Map.insert score (Set.insert entry set) queue
 
 qPop :: Queue t -> (Maybe (Entry t), Queue t)
 qPop queue = do
@@ -382,6 +389,9 @@ addFeature feature rejected = do
 enqueue :: CIConstraints t => Entry t -> CiM t ()
 enqueue entry = do
   queue <- getQueue
+  -- _ <- if (qSize queue `mod` 1000 == 1)
+  --   then traceM $ "Queue size: " ++ (show $ qSize queue - 1)
+  --   else pure ()
   putQueue $ qInsert entry queue
 
 dequeue :: CiM t (Maybe (Entry t))
@@ -473,7 +483,7 @@ learnSeparator = do
   badStates  <- getBadStates
   clog_d $ "[CInvGen] Beginning separator search."
   clog_d $ "[CInvGen]   Queue size: " ++ (show $ qSize queue)
-  clog_d $ "[CInvGen]   Root size:"   ++ (show $ length roots)
+  clog_d $ "[CInvGen]   Root size: "  ++ (show $ length roots)
   -- Short circuit on trivial separation cases.
   if Set.null badStates
     then do clog_d "[CInvGen] No bad states, returning true."; pure $ Just ATrue
@@ -498,8 +508,8 @@ learnSeparator' = do
             then learnSeparator'
             else do
               nextFeatures <- usefulFeatures entry
-              -- queue <- getQueue
-              -- clog_d $ "[CInvGen] Useful features: " ++ (show $ length nextFeatures) ++ ", queue size: " ++ (show $ qSize queue)
+              queue <- getQueue
+              clog_d $ "[CInvGen] Useful features: " ++ (show $ length nextFeatures) ++ ", queue size: " ++ (show $ qSize queue)
               enqueueNextLevel entry nextFeatures
               learnSeparator'
 
@@ -517,11 +527,8 @@ usefulFeatures (Entry candidate enRejectedBads enAcceptedGoods) = do
       _ ->  do
         -- A useful addition to an existing candidate rejects something new
         -- while not bringing the accepted states for the new candidate
-        -- down to either 1) the empty set or 2) a subset of of the good
-        -- states already accepted by the entry's clauses. (Note the former
-        -- condition is not a subcase of the latter since there may not
-        -- be any non-trivial root clauses yet, and empty set is a subset
-        -- of itself.)
+        -- down to a subset of of the good states already accepted by the
+        -- entry's clauses.
         let rootAcceptSet = Set.unions rootClauseAccepts
         acceptsSomethingGood <- case Set.null rootAcceptSet of
           True  -> pure . Set.unions =<< getFeaturesWhichAccept (Set.toList enAcceptedGoods)
@@ -550,7 +557,7 @@ enqueueNextLevel entry@(Entry candidate enRejectedBads _) (newFeature:rest) = do
   (newAcceptedGoodsList, _) <- lift $ splitStates newCandidateAssertion $ Set.toList goodStates
   let newAcceptedGoods = Set.fromList newAcceptedGoodsList
 
-  if (any (Set.isProperSubsetOf newAcceptedGoods) rootClauseAccepts)
+  if (any (newAcceptedGoods `Set.isProperSubsetOf`) rootClauseAccepts)
     then
       -- It turns out the accepted good states are not intersting.
       enqueueNextLevel entry rest
@@ -684,6 +691,8 @@ updateRootClauses newBadState rootClauses = do
   -- Collect and update all clauses, throw away now-bad clauses, and rebuild the tree.
   let collectClauses (RootClause clause covers) = clause:(concat . map collectClauses $ covers)
   let allClauses = concat . map collectClauses $ rootClauses
+  -- To throw away clauses altogether:
+  -- let allClauses = map rcClause rootClauses
   updatedClauses <- pure
                   . map fst
                   . filter (isRejects . snd)
