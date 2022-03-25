@@ -3,6 +3,7 @@
 
 module Orhle.CValueTests(htf_thisModulesTests) where
 import Test.Framework
+import Orhle.TestUtil
 
 import Ceili.Assertion
 import Ceili.CeiliEnv
@@ -164,6 +165,136 @@ test_twoEEvals =
     case result of
       Left err -> assertFailure err
       Right actual -> assertEqual expected actual
+
+
+-------------------
+-- State Testing --
+-------------------
+
+test_checkValid_concreteTrue = do
+  let xVal = Concrete 5
+  let yVal = Concrete 6
+  let state = Map.fromList [ (Name "x" 0, xVal)
+                           , (Name "y" 0, yVal)
+                           ]
+  assertion <- assertionFromStr "(= 11 (+ x y))"
+  let task = testState @(Assertion CValue) @CValue assertion state
+  result <- runCeili (defaultEnv $ namesIn [state]) task
+  case result of
+    Left err -> assertFailure err
+    Right actual -> assertEqual True actual
+
+test_checkValid_concreteFalse = do
+  let xVal = Concrete 5
+  let yVal = Concrete 6
+  let state = Map.fromList [ (Name "x" 0, xVal)
+                           , (Name "y" 0, yVal)
+                           ]
+  assertion <- assertionFromStr "(= 12 (+ x y))"
+  let task = testState @(Assertion CValue) @CValue assertion state
+  result <- runCeili (defaultEnv $ namesIn [state]) task
+  case result of
+    Left err -> assertFailure err
+    Right actual -> assertEqual False actual
+
+test_checkValid_forallWithinBounds = do
+  let xVal = Concrete 5
+  let yExpr = Add [Var $ Name "a" 0, Num 1]
+  constraint <- assertionFromStr "(and (<= 0 a) (< a 10))"
+  let yVal = Constrained yExpr Set.empty (Set.singleton constraint) Set.empty
+  let state = Map.fromList [ (Name "x" 0, xVal)
+                           , (Name "y" 0, yVal)
+                           ]
+  assertion <- assertionFromStr "(<= (+ x y) 15)"
+  let task = testState @(Assertion CValue) @CValue assertion state
+  result <- runCeili (defaultEnv $ namesIn [state]) task
+  case result of
+    Left err -> assertFailure err
+    Right actual -> assertEqual True actual
+
+test_checkValid_forallOutsideBounds = do
+  let xVal = Concrete 5
+  let yExpr = Add [Var $ Name "a" 0, Num 1]
+  constraint <- assertionFromStr "(and (<= 0 a) (< a 10))"
+  let yVal = Constrained yExpr Set.empty (Set.singleton constraint) Set.empty
+  let state = Map.fromList [ (Name "x" 0, xVal)
+                           , (Name "y" 0, yVal)
+                           ]
+  assertion <- assertionFromStr "(<= (+ x y) 14)"
+  let task = testState @(Assertion CValue) @CValue assertion state
+  result <- runCeili (defaultEnv $ namesIn [state]) task
+  case result of
+    Left err -> assertFailure err
+    Right actual -> assertEqual False actual
+
+test_checkValid_existsWithinBounds = do
+  let xVal = Concrete 5
+  let yExpr = Add [Var $ Name "c" 0, Num 1]
+  constraint <- assertionFromStr "(and (<= 0 c) (< c 10))"
+  let yVal = Constrained yExpr (Set.singleton $ Name "c" 0) Set.empty (Set.singleton constraint)
+  let state = Map.fromList [ (Name "x" 0, xVal)
+                           , (Name "y" 0, yVal)
+                           ]
+  assertion <- assertionFromStr "(<= (+ x y) 10)"
+  let task = testState @(Assertion CValue) @CValue assertion state
+  result <- runCeili (defaultEnv $ namesIn [state]) task
+  case result of
+    Left err -> assertFailure err
+    Right actual -> assertEqual True actual
+
+test_checkValid_existsOutsideBounds = do
+  let xVal = Concrete 5
+  let yExpr = Add [Var $ Name "c" 0, Num 1]
+  constraint <- assertionFromStr "(and (<= 0 c) (< c 10))"
+  let yVal = Constrained yExpr (Set.singleton $ Name "c" 0) Set.empty (Set.singleton constraint)
+  let state = Map.fromList [ (Name "x" 0, xVal)
+                           , (Name "y" 0, yVal)
+                           ]
+  assertion <- assertionFromStr "(> (+ x y) 20)"
+  let task = testState @(Assertion CValue) @CValue assertion state
+  result <- runCeili (defaultEnv $ namesIn [state]) task
+  case result of
+    Left err -> assertFailure err
+    Right actual -> assertEqual False actual
+
+test_checkValid_mixedWithinBounds = do
+  let xVal = Concrete 1
+  let yExpr = Add [Var $ Name "c" 0, Var $ Name "r" 0]
+  aConstraint <- assertionFromStr "(and (<= 0 r) (< r 10))"
+  eConstraint <- assertionFromStr "(and (<= 0 c) (< c 10))"
+  let yVal = Constrained yExpr
+                         (Set.singleton $ Name "c" 0)
+                         (Set.singleton aConstraint)
+                         (Set.singleton eConstraint)
+  let state = Map.fromList [ (Name "x" 0, xVal)
+                           , (Name "y" 0, yVal)
+                           ]
+  assertion <- assertionFromStr "(= (+ x y) 10)"
+  let task = testState @(Assertion CValue) @CValue assertion state
+  result <- runCeili (defaultEnv $ namesIn [state]) task
+  case result of
+    Left err -> assertFailure err
+    Right actual -> assertEqual True actual
+
+test_checkValid_mixedOutsideBounds = do
+  let xVal = Concrete 1
+  let yExpr = Add [Var $ Name "c" 0, Var $ Name "r" 0]
+  aConstraint <- assertionFromStr "(and (<= 0 r) (< r 10))"
+  eConstraint <- assertionFromStr "(and (<= 0 c) (< c 10))"
+  let yVal = Constrained yExpr
+                         (Set.singleton $ Name "c" 0)
+                         (Set.singleton aConstraint)
+                         (Set.singleton eConstraint)
+  let state = Map.fromList [ (Name "x" 0, xVal)
+                           , (Name "y" 0, yVal)
+                           ]
+  -- No suitable c *for all* r between 0 and 10.
+  assertion <- assertionFromStr "(= (+ x y) 11)"
+  let task = testState @(Assertion CValue) @CValue assertion state
+  result <- runCeili (defaultEnv $ namesIn [state]) task
+  case result of
+    Left err -> assertFailure err
+    Right actual -> assertEqual False actual
 
 
 -----------------
