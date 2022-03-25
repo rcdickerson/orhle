@@ -171,7 +171,7 @@ test_twoEEvals =
 -- State Testing --
 -------------------
 
-test_checkValid_concreteTrue = do
+test_testState_concreteTrue = do
   let xVal = Concrete 5
   let yVal = Concrete 6
   let state = Map.fromList [ (Name "x" 0, xVal)
@@ -184,7 +184,7 @@ test_checkValid_concreteTrue = do
     Left err -> assertFailure err
     Right actual -> assertEqual True actual
 
-test_checkValid_concreteFalse = do
+test_testState_concreteFalse = do
   let xVal = Concrete 5
   let yVal = Concrete 6
   let state = Map.fromList [ (Name "x" 0, xVal)
@@ -197,7 +197,7 @@ test_checkValid_concreteFalse = do
     Left err -> assertFailure err
     Right actual -> assertEqual False actual
 
-test_checkValid_forallWithinBounds = do
+test_testState_forallWithinBounds = do
   let xVal = Concrete 5
   let yExpr = Add [Var $ Name "a" 0, Num 1]
   constraint <- assertionFromStr "(and (<= 0 a) (< a 10))"
@@ -212,7 +212,7 @@ test_checkValid_forallWithinBounds = do
     Left err -> assertFailure err
     Right actual -> assertEqual True actual
 
-test_checkValid_forallOutsideBounds = do
+test_testState_forallOutsideBounds = do
   let xVal = Concrete 5
   let yExpr = Add [Var $ Name "a" 0, Num 1]
   constraint <- assertionFromStr "(and (<= 0 a) (< a 10))"
@@ -227,7 +227,7 @@ test_checkValid_forallOutsideBounds = do
     Left err -> assertFailure err
     Right actual -> assertEqual False actual
 
-test_checkValid_existsWithinBounds = do
+test_testState_existsWithinBounds = do
   let xVal = Concrete 5
   let yExpr = Add [Var $ Name "c" 0, Num 1]
   constraint <- assertionFromStr "(and (<= 0 c) (< c 10))"
@@ -242,7 +242,7 @@ test_checkValid_existsWithinBounds = do
     Left err -> assertFailure err
     Right actual -> assertEqual True actual
 
-test_checkValid_existsOutsideBounds = do
+test_testState_existsOutsideBounds = do
   let xVal = Concrete 5
   let yExpr = Add [Var $ Name "c" 0, Num 1]
   constraint <- assertionFromStr "(and (<= 0 c) (< c 10))"
@@ -257,7 +257,7 @@ test_checkValid_existsOutsideBounds = do
     Left err -> assertFailure err
     Right actual -> assertEqual False actual
 
-test_checkValid_mixedWithinBounds = do
+test_testState_mixedWithinBounds = do
   let xVal = Concrete 1
   let yExpr = Add [Var $ Name "c" 0, Var $ Name "r" 0]
   aConstraint <- assertionFromStr "(and (<= 0 r) (< r 10))"
@@ -276,7 +276,7 @@ test_checkValid_mixedWithinBounds = do
     Left err -> assertFailure err
     Right actual -> assertEqual True actual
 
-test_checkValid_mixedOutsideBounds = do
+test_testState_mixedOutsideBounds = do
   let xVal = Concrete 1
   let yExpr = Add [Var $ Name "c" 0, Var $ Name "r" 0]
   aConstraint <- assertionFromStr "(and (<= 0 r) (< r 10))"
