@@ -245,14 +245,14 @@ fcRejectedBads feature cache =
 -------------
 
 data Clause t = Clause
-  { clauseFeatures      :: [FeatureId]
+  { clauseFeatures      :: FeatureIdSet
   , clauseAcceptedGoods :: GoodStateIdSet
   } deriving (Eq, Ord, Show)
 
 instance Pretty t => Pretty (Clause t) where
   pretty (Clause features accepted) =
     align $ encloseSep lbracket rbracket space
-    [ pretty "Features:" <+> pretty features
+    [ pretty "Features:" <+> pretty (IntSet.toList features)
     , pretty "Clause accepts:" <+> pretty (IntSet.toList accepted)
     ]
 
@@ -278,7 +278,7 @@ rootClauseAcceptedGoods (RootClause clause _) = clauseAcceptedGoods clause
 
 rootClauseAssertion :: FeatureCache t -> RootClause t -> Assertion t
 rootClauseAssertion featureCache (RootClause clause _) =
-  aAnd . map (featAssertion . fcLookupFeature featureCache) . clauseFeatures $ clause
+  aAnd . map (featAssertion . fcLookupFeature featureCache) . IntSet.toList . clauseFeatures $ clause
 
 
 ------------------
@@ -306,6 +306,9 @@ instance Pretty t => Pretty (Entry t) where
     <>  pretty (IntSet.size rejected)
     <>  pretty "]:"
     <+> pretty candidate
+
+qEmpty :: Queue t
+qEmpty = Map.empty
 
 qSize :: Queue t -> Int
 qSize = Map.foldr (\set count -> count + Set.size set) 0
@@ -360,6 +363,7 @@ data CIEnv t = CIEnv { envQueue             :: Queue t
                      , envGoalQuery         :: Assertion t -> Ceili (Assertion t)
                      , envStateNames        :: [Name]
                      , envMaxClauseSize     :: Int
+                     , envClauseDenylist    :: Set FeatureIdSet
                      }
 
 type CiM t = StateT (CIEnv t) Ceili
@@ -384,7 +388,7 @@ mkCIEnv config job =
       pure $ aAnd [ Imp (aAnd [candidate, negLoopCond]) (jobPostCond job) -- Establishes Post
                   , Imp (aAnd [candidate, loopCond]) weakestPre           -- Inductive
                   ]
-  in CIEnv Map.empty states [] IntSet.empty fcEmpty fCandidates goalQuery names maxClauseSize
+  in CIEnv Map.empty states [] IntSet.empty fcEmpty fCandidates goalQuery names maxClauseSize Set.empty
 
 getQueue :: CiM t (Queue t)
 getQueue = get >>= pure . envQueue
@@ -461,37 +465,48 @@ getStateNames = get >>= pure . envStateNames
 
 putQueue :: Queue t -> CiM t ()
 putQueue queue = do
-  CIEnv _ states roots rootsAccepted features fCandidates goalQ names mcs <- get
-  put $ CIEnv queue states roots rootsAccepted features fCandidates goalQ names mcs
+  CIEnv _ states roots rootsAccepted features fCandidates goalQ names mcs denylist <- get
+  put $ CIEnv queue states roots rootsAccepted features fCandidates goalQ names mcs denylist
 
 addBadState :: Ord t => ProgState t -> CiM t (BadState t)
 addBadState state = do
-  CIEnv queue states roots rootsAccepted features fCandidates goalQ names mcs <- get
+  CIEnv queue states roots rootsAccepted features fCandidates goalQ names mcs denylist <- get
   let (badState, states') = stAddBadState state states
-  put $ CIEnv queue states' roots rootsAccepted features fCandidates goalQ names mcs
+  put $ CIEnv queue states' roots rootsAccepted features fCandidates goalQ names mcs denylist
   pure badState
 
 putRootClauses :: Ord t => [RootClause t] -> CiM t ()
 putRootClauses roots = do
-  CIEnv queue states _ _ features fCandidates goalQ names mcs <- get
+  CIEnv queue states _ _ features fCandidates goalQ names mcs denylist <- get
   let accepted = IntSet.unions $ map rootClauseAcceptedGoods roots
-  put $ CIEnv queue states roots accepted features fCandidates goalQ names mcs
+  put $ CIEnv queue states roots accepted features fCandidates goalQ names mcs denylist
 
 putFeatureCache :: FeatureCache t -> CiM t ()
 putFeatureCache featureCache = do
-  CIEnv queue states roots rootsAccepted _ fCandidates goalQ names mcs <- get
-  put $ CIEnv queue states roots rootsAccepted featureCache fCandidates goalQ names mcs
+  CIEnv queue states roots rootsAccepted _ fCandidates goalQ names mcs denylist <- get
+  put $ CIEnv queue states roots rootsAccepted featureCache fCandidates goalQ names mcs denylist
 
 putFeatureCandidates :: [Assertion t] -> CiM t ()
 putFeatureCandidates fCandidates = do
-  CIEnv queue states roots rootsAccepted features _ goalQ names mcs <- get
-  put $ CIEnv queue states roots rootsAccepted features fCandidates goalQ names mcs
+  CIEnv queue states roots rootsAccepted features _ goalQ names mcs denylist <- get
+  put $ CIEnv queue states roots rootsAccepted features fCandidates goalQ names mcs denylist
 
 addFeature :: Ord t => Feature t -> BadStateIdSet -> CiM t ()
 addFeature feature rejected = do
-  CIEnv queue states roots rootsAccepted featureCache fCandidates goalQ names mcs <- get
+  CIEnv queue states roots rootsAccepted featureCache fCandidates goalQ names mcs denylist <- get
   let featureCache' = fcAddFeature feature rejected featureCache
-  put $ CIEnv queue states roots rootsAccepted featureCache' fCandidates goalQ names mcs
+  put $ CIEnv queue states roots rootsAccepted featureCache' fCandidates goalQ names mcs denylist
+
+denyClause :: FeatureIdSet -> CiM t ()
+denyClause clause = do
+  CIEnv queue states roots rootsAccepted featureCache fCandidates goalQ names mcs denylist <- get
+  let denylist' = Set.insert clause denylist
+  put $ CIEnv queue states roots rootsAccepted featureCache fCandidates goalQ names mcs denylist'
+
+isDenied :: FeatureIdSet -> CiM t Bool
+isDenied clause = do
+  denylist <- get >>= pure . envClauseDenylist
+  pure $ Set.member clause denylist
 
 enqueue :: CIConstraints t => Entry t -> CiM t ()
 enqueue entry = do
@@ -538,10 +553,11 @@ cInvGen' = do
   clog_d . show $ pretty "[CInvGen]   bad states: " <+> pretty (Set.size badStates)
   -- Try to learn a separator. If we find one, check to see if it meets the goal criteria.
   -- If it does, return it. Otherwise, add the new counterexample and recurse.
+  origQueue <- getQueue
   mSeparator <- learnSeparator
   case mSeparator of
     Nothing -> clog_d "[CInvGen] Unable to find separator." >> pure Nothing
-    Just separator -> do
+    Just (separator, clauses) -> do
       clog_d . show $ pretty "[CInvGen] Candidate precondition:" <+> (align . pretty) separator
       goalStatus <- checkGoal separator
       case goalStatus of
@@ -556,8 +572,12 @@ cInvGen' = do
         SMTError msg -> do
           clog_e . show $ pretty "[CInvGen]" <+> pretty msg
                       <+> pretty "on candidate" <+> (align . pretty) separator
-          throwError "SMT error"
+          -- throwError "SMT error"
           --cInvGen' -- Continue now that the problematic assertion is out of the queue.
+          mapM_ denyClause $ map clauseFeatures clauses
+          putRootClauses []
+          putQueue origQueue
+          cInvGen'
 
 data GoalStatus t = GoalMet
                   | GoalCex (ProgState t)
@@ -582,7 +602,7 @@ checkGoal candidate = do
 -- Separator Learner --
 -----------------------
 
-learnSeparator :: CIConstraints t => CiM t (Maybe (Assertion t))
+learnSeparator :: CIConstraints t => CiM t (Maybe (Assertion t, [Clause t]))
 learnSeparator = do
   queue      <- getQueue
   roots      <- getRootClauses
@@ -593,16 +613,19 @@ learnSeparator = do
   clog_d $ "[CInvGen]   Root size: "  ++ (show $ length roots)
   -- Short circuit on trivial separation cases.
   if Set.null badStates
-    then do clog_d "[CInvGen] No bad states, returning true."; pure $ Just ATrue
+    then do clog_d "[CInvGen] No bad states, returning true."; pure $ Just (ATrue, [])
   else if Set.null goodStates
-    then do clog_d "[CInvGen] No good states, returning false."; pure $ Just AFalse
+    then do clog_d "[CInvGen] No good states, returning false."; pure $ Just (AFalse, [])
   else learnSeparator'
 
-learnSeparator' :: CIConstraints t => CiM t (Maybe (Assertion t))
+learnSeparator' :: CIConstraints t => CiM t (Maybe (Assertion t, [Clause t]))
 learnSeparator' = do
   remaining <- getRemainingGoods
   if IntSet.null remaining
-    then pure . Just =<< buildCurrentResult
+    then do
+      assertion <- buildCurrentResult
+      clauses <- pure . map rcClause =<< getRootClauses
+      pure $ Just (assertion, clauses)
     else do
       mEntry <- dequeue
       case mEntry of
@@ -654,34 +677,39 @@ enqueueNextLevel :: CIConstraints t => Entry t -> [FeatureId] -> CiM t ()
 enqueueNextLevel _ [] = pure ()
 enqueueNextLevel entry@(Entry candidate enRejectedBads _) (newFeature:rest) = do
   let newCandidateIds  = newFeature:candidate
-  newCandidateFeatures <- lookupFeatures newCandidateIds
-  -- A useful feature *optimistically* accepted an interesting set of good
-  -- states, but now we will do the SMT work to make sure.
-  rootClauseAccepts <- pure . map (clauseAcceptedGoods . rcClause) =<< getRootClauses
-  let newCandidateAssertion = aAnd $ map featAssertion newCandidateFeatures
-
-  goodStates <- getGoodStates
-  (newAcceptedGoodsList, _) <- lift $ splitGoodStates newCandidateAssertion $ Set.toList goodStates
-  let newAcceptedGoods = IntSet.fromList $ map gsId newAcceptedGoodsList
-
-  if (any (newAcceptedGoods `IntSet.isProperSubsetOf`) rootClauseAccepts)
-    then
-      -- It turns out the accepted good states are not intersting.
-      enqueueNextLevel entry rest
+  let newCandidate = IntSet.fromList newCandidateIds
+  denied <- isDenied newCandidate
+  if denied
+    then enqueueNextLevel entry rest
     else do
-      badStateIds <- getBadStateIds
-      newRejectedBads <- pure . IntSet.union enRejectedBads =<< getFeatureRejectedBads newFeature
-      if newRejectedBads == badStateIds
-        then do
-          -- We found a new root clause.
-          addRootClause $ Clause newCandidateIds newAcceptedGoods
-          remainingGoods <- getRemainingGoods
-          if IntSet.null remainingGoods
-            then pure ()
-            else enqueueNextLevel entry rest
+      newCandidateFeatures <- lookupFeatures newCandidateIds
+      -- A useful feature *optimistically* accepted an interesting set of good
+      -- states, but now we will do the SMT work to make sure.
+      rootClauseAccepts <- pure . map (clauseAcceptedGoods . rcClause) =<< getRootClauses
+      let newCandidateAssertion = aAnd $ map featAssertion newCandidateFeatures
+
+      goodStates <- getGoodStates
+      (newAcceptedGoodsList, _) <- lift $ splitGoodStates newCandidateAssertion $ Set.toList goodStates
+      let newAcceptedGoods = IntSet.fromList $ map gsId newAcceptedGoodsList
+
+      if (any (newAcceptedGoods `IntSet.isProperSubsetOf`) rootClauseAccepts)
+        then
+        -- It turns out the accepted good states are not intersting.
+        enqueueNextLevel entry rest
         else do
-          enqueue $ Entry newCandidateIds newAcceptedGoods newRejectedBads
-          enqueueNextLevel entry rest
+          badStateIds <- getBadStateIds
+          newRejectedBads <- pure . IntSet.union enRejectedBads =<< getFeatureRejectedBads newFeature
+          if newRejectedBads == badStateIds
+            then do
+              -- We found a new root clause.
+              addRootClause $ Clause newCandidate newAcceptedGoods
+              remainingGoods <- getRemainingGoods
+              if IntSet.null remainingGoods
+                then pure ()
+                else enqueueNextLevel entry rest
+            else do
+              enqueue $ Entry newCandidateIds newAcceptedGoods newRejectedBads
+              enqueueNextLevel entry rest
 
 
 ------------------------
@@ -697,7 +725,7 @@ insertRootClause newClause rootList =
     coveredBy              = filter checkCoveredBy rootList
     alreadyContained       = any (\rc -> newClause == rcClause rc) rootList
 
-    checkDuplicate rclause = Set.fromList (clauseFeatures newClause) == Set.fromList (clauseFeatures rclause)
+    checkDuplicate rclause = (clauseFeatures newClause) == (clauseFeatures rclause)
     duplicates             = any (checkDuplicate . rcClause) rootList
   in
     if alreadyContained || duplicates
@@ -724,8 +752,10 @@ addCounterexample cexState = do
   -- for all entries in learnSeparator / usefulFeatures.
   badState <- addBadState cexState
   getFeatureCache >>= updateFeatureCache badState >>= putFeatureCache
-  getRootClauses  >>= updateRootClauses  badState >>= putRootClauses
-  getQueue        >>= updateQueue        badState >>= putQueue
+  -- getRootClauses  >>= updateRootClauses  badState >>= putRootClauses
+  putRootClauses []
+  -- getQueue        >>= updateQueue        badState >>= putQueue
+  putQueue qEmpty
   addNewlyUsefulFeatures   badState
   addNewlyUsefulCandidates badState
 
@@ -768,7 +798,7 @@ seedFeature :: CIConstraints t => Feature t -> BadStateIdSet -> CiM t ()
 seedFeature feature rejectedBads = do
   badStateIds <- getBadStateIds
   if (IntSet.isSubsetOf badStateIds rejectedBads)
-    then addRootClause (Clause [featId feature] (featAcceptedGoods feature))
+    then addRootClause (Clause (IntSet.singleton $ featId feature) (featAcceptedGoods feature))
     else enqueue $ featureToEntry feature rejectedBads
 
 
@@ -789,7 +819,7 @@ tagFeature newBadState feature = do
 
 tagClause :: CIConstraints t => BadState t -> Clause t -> CiM t (Clause t, UpdateFlag)
 tagClause newBadState clause = do
-  features <- lookupFeatures $ clauseFeatures clause
+  features <- lookupFeatures $ IntSet.toList $ clauseFeatures clause
   (_, updateFlags) <- pure . unzip =<< mapM (tagFeature newBadState) features
   let flag = if any isRejects updateFlags then Rejects else Accepts
   pure (clause, flag)

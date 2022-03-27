@@ -44,7 +44,8 @@ rhleVerifier iFunEnv triple = do
   let cFunEnv = mapSpecImpEnvType Concrete iFunEnv
   let names = Set.union (namesIn aprogs) (namesIn eprogs)
   let lits  = Set.union (litsIn  aprogs) (litsIn eprogs)
-  let env = mkEnv LogLevelDebug 10000 names
+  solver <- mkSolver
+  let env = mkEnv solver LogLevelDebug 10000 names
   resultOrErr <- runCeili env $ do
     log_i $ "Collecting loop head states for loop invariant inference..."
     aLoopHeads <- mapM (headStates 5 cFunEnv) aprogs
