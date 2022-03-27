@@ -11,6 +11,7 @@ import Ceili.Evaluation
 import Ceili.Name
 import Ceili.StatePredicate
 import qualified Data.Map as Map
+import Data.Set ( Set )
 import qualified Data.Set as Set
 import Orhle.CValue
 import Orhle.SpecImp
@@ -89,10 +90,8 @@ test_oneAEval =
         [ (r, Constrained (Var ret) Set.empty (Set.singleton retConstr) Set.empty)
         , (rsum, Constrained (Add [Num 0, (Var ret)]) Set.empty (Set.singleton retConstr) Set.empty) ]
   in do
-    result <- runCeili (defaultEnv $ namesIn prog) task
-    case result of
-      Left err -> assertFailure err
-      Right actual -> assertEqual expected actual
+    actual <- evalCeili Set.empty task
+    assertEqual expected actual
 
 test_twoAEvals =
   let
@@ -111,10 +110,8 @@ test_twoAEvals =
                              (Set.fromList [retConst, ret1Const])
                               Set.empty) ]
   in do
-    result <- runCeili (defaultEnv $ namesIn prog) task
-    case result of
-      Left err -> assertFailure err
-      Right actual -> assertEqual expected actual
+    actual <- evalCeili Set.empty task
+    assertEqual expected actual
 
 test_oneEEval =
   let
@@ -132,10 +129,8 @@ test_oneEEval =
                               Set.empty
                              (Set.singleton $ aAnd [cConst, retConst])) ]
   in do
-    result <- runCeili (defaultEnv $ namesIn prog) task
-    case result of
-      Left err -> assertFailure err
-      Right actual -> assertEqual expected actual
+    actual <- evalCeili Set.empty task
+    assertEqual expected actual
 
 test_twoEEvals =
   let
@@ -161,10 +156,8 @@ test_twoEEvals =
                                            , aAnd [c1Const, ret1Const]
                                            ])) ]
   in do
-    result <- runCeili (defaultEnv $ namesIn prog) task
-    case result of
-      Left err -> assertFailure err
-      Right actual -> assertEqual expected actual
+    actual <- evalCeili Set.empty task
+    assertEqual expected actual
 
 
 -------------------
@@ -179,10 +172,8 @@ test_testState_concreteTrue = do
                            ]
   assertion <- assertionFromStr "(= 11 (+ x y))"
   let task = testState @(Assertion CValue) @CValue assertion state
-  result <- runCeili (defaultEnv $ namesIn [state]) task
-  case result of
-    Left err -> assertFailure err
-    Right actual -> assertEqual True actual
+  actual <- evalCeili (namesIn state) task
+  assertEqual True actual
 
 test_testState_concreteFalse = do
   let xVal = Concrete 5
@@ -192,10 +183,8 @@ test_testState_concreteFalse = do
                            ]
   assertion <- assertionFromStr "(= 12 (+ x y))"
   let task = testState @(Assertion CValue) @CValue assertion state
-  result <- runCeili (defaultEnv $ namesIn [state]) task
-  case result of
-    Left err -> assertFailure err
-    Right actual -> assertEqual False actual
+  actual <- evalCeili (namesIn state) task
+  assertEqual False actual
 
 test_testState_forallWithinBounds = do
   let xVal = Concrete 5
@@ -207,10 +196,8 @@ test_testState_forallWithinBounds = do
                            ]
   assertion <- assertionFromStr "(<= (+ x y) 15)"
   let task = testState @(Assertion CValue) @CValue assertion state
-  result <- runCeili (defaultEnv $ namesIn [state]) task
-  case result of
-    Left err -> assertFailure err
-    Right actual -> assertEqual True actual
+  actual <- evalCeili (namesIn state) task
+  assertEqual True actual
 
 test_testState_forallOutsideBounds = do
   let xVal = Concrete 5
@@ -222,10 +209,8 @@ test_testState_forallOutsideBounds = do
                            ]
   assertion <- assertionFromStr "(<= (+ x y) 14)"
   let task = testState @(Assertion CValue) @CValue assertion state
-  result <- runCeili (defaultEnv $ namesIn [state]) task
-  case result of
-    Left err -> assertFailure err
-    Right actual -> assertEqual False actual
+  actual <- evalCeili (namesIn state) task
+  assertEqual False actual
 
 test_testState_existsWithinBounds = do
   let xVal = Concrete 5
@@ -237,10 +222,8 @@ test_testState_existsWithinBounds = do
                            ]
   assertion <- assertionFromStr "(<= (+ x y) 10)"
   let task = testState @(Assertion CValue) @CValue assertion state
-  result <- runCeili (defaultEnv $ namesIn [state]) task
-  case result of
-    Left err -> assertFailure err
-    Right actual -> assertEqual True actual
+  actual <- evalCeili (namesIn state) task
+  assertEqual True actual
 
 test_testState_existsOutsideBounds = do
   let xVal = Concrete 5
@@ -252,10 +235,8 @@ test_testState_existsOutsideBounds = do
                            ]
   assertion <- assertionFromStr "(> (+ x y) 20)"
   let task = testState @(Assertion CValue) @CValue assertion state
-  result <- runCeili (defaultEnv $ namesIn [state]) task
-  case result of
-    Left err -> assertFailure err
-    Right actual -> assertEqual False actual
+  actual <- evalCeili (namesIn state) task
+  assertEqual False actual
 
 test_testState_mixedWithinBounds = do
   let xVal = Concrete 1
@@ -271,10 +252,8 @@ test_testState_mixedWithinBounds = do
                            ]
   assertion <- assertionFromStr "(= (+ x y) 10)"
   let task = testState @(Assertion CValue) @CValue assertion state
-  result <- runCeili (defaultEnv $ namesIn [state]) task
-  case result of
-    Left err -> assertFailure err
-    Right actual -> assertEqual True actual
+  actual <- evalCeili (namesIn state) task
+  assertEqual True actual
 
 test_testState_mixedOutsideBounds = do
   let xVal = Concrete 1
@@ -291,10 +270,8 @@ test_testState_mixedOutsideBounds = do
   -- No suitable c *for all* r between 0 and 10.
   assertion <- assertionFromStr "(= (+ x y) 11)"
   let task = testState @(Assertion CValue) @CValue assertion state
-  result <- runCeili (defaultEnv $ namesIn [state]) task
-  case result of
-    Left err -> assertFailure err
-    Right actual -> assertEqual False actual
+  actual <- evalCeili (namesIn state) task
+  assertEqual False actual
 
 
 -----------------
@@ -306,20 +283,16 @@ test_pieFilterClause_concreteConsistent = let
   candidate = Gt (Var $ Name "i" 0) (Num $ Concrete 5)
   task      = pieFilterClause [] [loopCond] ATrue candidate
   in do
-    result <- runCeili (defaultEnv $ namesIn [loopCond, candidate]) task
-    case result of
-      Left err -> assertFailure err
-      Right actual -> assertEqual True actual
+    actual <- evalCeili (namesIn [loopCond, candidate]) task
+    assertEqual True actual
 
 test_pieFilterClause_concreteInconsistent = let
   loopCond  = Lte (Var $ Name "i" 0) (Num $ Concrete 10)
   candidate = Lt (Var $ Name "i" 0) (Num $ Concrete 5)
   task      = pieFilterClause [] [loopCond] ATrue candidate
   in do
-    result <- runCeili (defaultEnv $ namesIn [loopCond, candidate]) task
-    case result of
-      Left err -> assertFailure err
-      Right actual -> assertEqual False actual
+    actual <- evalCeili (namesIn [loopCond, candidate]) task
+    assertEqual False actual
 
 test_pieFilterClause_abstractConsistent = let
   x_a  = Var $ Name "x_a" 0
@@ -335,10 +308,8 @@ test_pieFilterClause_abstractConsistent = let
   candidate = Eq (Var $ Name "i" 0) (Num $ Concrete 10)
   task      = pieFilterClause [] [loopCond] ATrue candidate
   in do
-    result <- runCeili (defaultEnv $ namesIn [loopCond, candidate]) task
-    case result of
-      Left err -> assertFailure err
-      Right actual -> assertEqual True actual
+    actual <- evalCeili (namesIn [loopCond, candidate]) task
+    assertEqual True actual
 
 test_pieFilterClause_abstractInconsistent = let
   x_a  = Var $ Name "x_a" 0
@@ -354,10 +325,8 @@ test_pieFilterClause_abstractInconsistent = let
   candidate = Eq (Var $ Name "i" 0) (Num $ Concrete 9)
   task      = pieFilterClause [] [loopCond] ATrue candidate
   in do
-    result <- runCeili (defaultEnv $ namesIn [loopCond, candidate]) task
-    case result of
-      Left err -> assertFailure err
-      Right actual -> assertEqual False actual
+    actual <- evalCeili (namesIn [loopCond, candidate]) task
+    assertEqual False actual
 
 test_separatingQuery = let
   goodState = Map.fromList [ (Name "e!retVal" 0, Concrete 0)
@@ -401,7 +370,5 @@ test_separatingQuery = let
     acceptsBad  <- testState @(Assertion CValue) @CValue separator badState
     return $ acceptsGood && (not acceptsBad)
   in do
-    result <- runCeili (defaultEnv $ namesIn [goodState, badState]) task
-    case result of
-      Left err -> assertFailure err
-      Right actual -> assertEqual True actual
+    actual <- evalCeili (namesIn [goodState, badState]) task
+    assertEqual True actual

@@ -39,13 +39,6 @@ bstates = Set.fromList . (map $ uncurry bstate)
 gstates :: [(Int, [(String, Integer)])] -> Set (GoodState Integer)
 gstates = Set.fromList . (map $ uncurry gstate)
 
-assertionFromStr :: AssertionParseable t => String -> IO (Assertion t)
-assertionFromStr str =
-  let assertion = parseAssertion str
-  in case assertion of
-    Left err -> assertFailure (show err)
-    Right a  -> pure a
-
 dummyConfig :: Configuration () (ImpProgram Integer) Integer
 dummyConfig = Configuration 3 8 (\ _ -> Set.empty) (\ _ _ _ -> pure ATrue) ()
 
@@ -60,7 +53,7 @@ feature featureId assertionStr accepted = do
 clause :: Ord t => [Feature t] -> Clause t
 clause features =
   let
-    featureIds = map featId features
+    featureIds = IntSet.fromList $ map featId features
   in Clause featureIds (intersection $ map featAcceptedGoods features)
 
 intersection :: [IntSet] -> IntSet
@@ -70,24 +63,16 @@ intersection (s:ss) = foldr IntSet.intersection s ss
 
 entry :: Ord t => [Feature t] -> IntSet -> Entry t
 entry features rejectedBads =
-  Entry (map featId features)
+  Entry (IntSet.fromList $ map featId features)
         rejectedBads
         (IntSet.unions $ map featAcceptedGoods features)
 
-evalCeili :: Ceili a -> IO a
-evalCeili task = do
-  let env = mkEnv LogLevelDebug 2000 Set.empty
-  mResult <- runCeili env task
-  case mResult of
-    Left err     -> assertFailure $ show err
-    Right result -> pure result
-
 evalC :: CiM t a -> CIEnv t -> IO a
-evalC task env = evalCeili $ evalStateT task env
+evalC task env = evalCeili Set.empty $ evalStateT task env
 
 runC :: CiM t a -> CIEnv t -> IO (CIEnv t)
 runC task env = do
-  (a, env) <- evalCeili $ runStateT task env
+  (a, env) <- evalCeili Set.empty $ runStateT task env
   pure env
 
 ---------------------------------------------
@@ -143,7 +128,7 @@ test_putRootsAndGetRemainingGoods = do
   let clause1 = RootClause (clause [feature1, feature2]) []
   let clause2 = RootClause (clause [feature3]) []
   let expected = IntSet.fromList [3]
-  let env = CIEnv { envQueue             = Map.empty
+  let env = CIEnv { envQueue             = qEmpty
                   , envStates            = mkStates Set.empty goods
                   , envRootClauses       = []
                   , envRootsAccepted     = IntSet.empty
@@ -170,7 +155,7 @@ test_buildCurrentResult = do
          $ fcAddFeature feature3 IntSet.empty
          $ fcEmpty
   expected <- assertionFromStr "(or (< x 4) (and (< x 3) (< x 2)))"
-  let env = CIEnv { envQueue             = Map.empty
+  let env = CIEnv { envQueue             = qEmpty
                   , envStates            = mkStates Set.empty Set.empty
                   , envRootClauses       = [clause1, clause2]
                   , envRootsAccepted     = IntSet.empty
@@ -200,9 +185,9 @@ test_qInsert = do
     entry2Score = entryScore entry2
     expected    = Map.insert entry1Score (Set.fromList [entry1])
                 $ Map.insert entry2Score (Set.fromList [entry2])
-                $ (Map.empty :: Queue Integer)
-    actual      = qInsert entry1 $ qInsert entry2 $ qInsert entry2 $ (Map.empty :: Queue Integer)
-  assertEqual expected actual
+                $ Map.empty
+    actual      = qInsert entry1 $ qInsert entry2 $ qInsert entry2 $ (qEmpty :: Queue Integer)
+  assertEqual expected (qQueue actual)
 
 test_qPop = do
   feature1 <- feature 1 "(< x 0)" $ IntSet.fromList [0]
@@ -216,16 +201,17 @@ test_qPop = do
     entry2      = entry [feature2] feature2Rejected
     entry1Score = entryScore entry1
     entry2Score = entryScore entry2
-    queue       = qInsert entry1 $ qInsert entry2 $ qInsert entry2 $ (Map.empty :: Queue Integer)
-    expected    = if entry1Score >= entry2Score
-                  then (Just entry1, qInsert entry2 Map.empty)
-                  else (Just entry2, qInsert entry1 Map.empty)
-    actual      = qPop queue
-  assertEqual expected actual
+    queue       = qInsert entry1 $ qInsert entry2 $ qInsert entry2 $ (qEmpty :: Queue Integer)
+    (expectedEntry, expectedQueue) = if entry1Score >= entry2Score
+                                     then (Just entry1, qQueue $ qInsert entry2 qEmpty)
+                                     else (Just entry2, qQueue $ qInsert entry1 qEmpty)
+    (actualEntry, actualQueue) = qPop queue
+  assertEqual expectedEntry actualEntry
+  assertEqual expectedQueue (qQueue actualQueue)
 
 test_qPop_empty =
   let
-    queue       = Map.empty :: Queue Integer
+    queue       = qEmpty :: Queue Integer
     expected    = (Nothing, queue)
     actual      = qPop queue
   in assertEqual expected actual
@@ -247,13 +233,13 @@ test_usefulFeatures = do
   -- To start, our root clauses cover good states 1 and 2...
   feature1 <- feature 1 "(and (= x 1) (< y 0))" $ IntSet.fromList [1]
   feature2 <- feature 2 "(and (= x 2) (< y 0))" $ IntSet.fromList [2]
-  let clause1 = Clause [1] (IntSet.fromList [1])
-  let clause2 = Clause [2] (IntSet.fromList [2])
+  let clause1 = Clause (IntSet.fromList [1]) (IntSet.fromList [1])
+  let clause2 = Clause (IntSet.fromList [2]) (IntSet.fromList [2])
   let root1 = RootClause clause1 []
   let root2 = RootClause clause2 []
   -- ... and we have an entry that accepts good states 2, 3, and 4, but only rejects bad state 1.
   entryFeature3 <- feature 3 "(and (> x 1) (not (= y 1)))" $ IntSet.fromList [2, 3, 4]
-  let entry1 = Entry [3]
+  let entry1 = Entry (IntSet.fromList [3])
                      (IntSet.fromList [1])
                      (IntSet.fromList [3, 4])
   -- A useful feature must keep the entry's accepted good states as a non-subset of the
@@ -279,7 +265,7 @@ test_usefulFeatures = do
          $ fcAddFeature nonUsefulFeature7 (IntSet.fromList [1, 2, 3, 4])
          $ fcAddFeature nonUsefulFeature8 (IntSet.fromList [1, 2, 3, 4])
          $ fcEmpty
-  let env = CIEnv { envQueue             = Map.empty
+  let env = CIEnv { envQueue             = qEmpty
                   , envStates            = mkStates badStates goodStates
                   , envRootClauses       = [root1, root2]
                   , envRootsAccepted     = IntSet.empty
@@ -300,7 +286,7 @@ test_learnSeparator_returnsTrueWhenNoBads =
     env = mkCIEnv dummyConfig (Job badStates goodStates ATrue impSkip ATrue)
   in do
     sep <- evalC learnSeparator env
-    assertEqual (Just ATrue) sep
+    assertEqual (Just (ATrue, [])) sep
 
 test_learnSeparator_returnsFalseWhenNoGoods =
   let
@@ -309,7 +295,7 @@ test_learnSeparator_returnsFalseWhenNoGoods =
     env = mkCIEnv dummyConfig (Job badStates goodStates ATrue impSkip ATrue)
   in do
     sep <- evalC learnSeparator env
-    assertEqual (Just AFalse) sep
+    assertEqual (Just (AFalse, [])) sep
 
 test_learnSeparator_returnsTrueWhenNoBadsOrGoods =
   let
@@ -318,7 +304,7 @@ test_learnSeparator_returnsTrueWhenNoBadsOrGoods =
     env = mkCIEnv dummyConfig (Job badStates goodStates ATrue impSkip ATrue)
   in do
     sep <- evalC learnSeparator env
-    assertEqual (Just ATrue) sep
+    assertEqual (Just (ATrue, [])) sep
 
 
 -- RootClause Clause Update
@@ -331,14 +317,14 @@ test_addRootClause_noCover = do
   -- To start, our root clauses cover good states 1 and 2.
   feature1 <- feature 1 "(= x 1)" (IntSet.fromList [1])
   feature2 <- feature 2 "(= x 2)" (IntSet.fromList [2])
-  let clause1 = Clause [1] (IntSet.fromList [1])
-  let clause2 = Clause [2] (IntSet.fromList [2])
+  let clause1 = Clause (IntSet.fromList [1]) (IntSet.fromList [1])
+  let clause2 = Clause (IntSet.fromList [2]) (IntSet.fromList [2])
   let root1 = RootClause clause1 []
   let root2 = RootClause clause2 []
   -- Add a clause that covers good state 3.
   newFeature <- feature 3 "(= x 3)" (IntSet.fromList [3])
-  let newClause = Clause [3] (IntSet.fromList [3])
-  let env = CIEnv { envQueue             = Map.empty
+  let newClause = Clause (IntSet.fromList [3]) (IntSet.fromList [3])
+  let env = CIEnv { envQueue             = qEmpty
                   , envStates            = mkStates Set.empty goodStates
                   , envRootClauses       = [root1, root2]
                   , envRootsAccepted     = IntSet.fromList [1, 2]
@@ -364,14 +350,14 @@ test_addRootClause_singleCover = do
   -- To start, our root clauses cover good states 1 and 2.
   feature1 <- feature 1 "(= x 1)" (IntSet.fromList [1])
   feature2 <- feature 2 "(= x 2)" (IntSet.fromList [2])
-  let clause1 = Clause [1] (IntSet.fromList [1])
-  let clause2 = Clause [2] (IntSet.fromList [2])
+  let clause1 = Clause (IntSet.fromList [1]) (IntSet.fromList [1])
+  let clause2 = Clause (IntSet.fromList [2]) (IntSet.fromList [2])
   let root1 = RootClause clause1 []
   let root2 = RootClause clause2 []
   -- Add a clause that covers good states 2 and 3.
   newFeature <- feature 3 "(> x 1)" (IntSet.fromList [2, 3])
-  let newClause = Clause [3] (IntSet.fromList [2, 3])
-  let env = CIEnv { envQueue             = Map.empty
+  let newClause = Clause (IntSet.fromList [3]) (IntSet.fromList [2, 3])
+  let env = CIEnv { envQueue             = qEmpty
                   , envStates            = mkStates Set.empty goodStates
                   , envRootClauses       = [root1, root2]
                   , envRootsAccepted     = IntSet.fromList [1, 2]
@@ -398,14 +384,14 @@ test_addRootClause_multiCover = do
   -- To start, our root clauses cover good states 1 and 2.
   feature1 <- feature 1 "(= x 1)" (IntSet.fromList [1])
   feature2 <- feature 2 "(= x 2)" (IntSet.fromList [2])
-  let clause1 = Clause [1] (IntSet.fromList [1])
-  let clause2 = Clause [2] (IntSet.fromList [2])
+  let clause1 = Clause (IntSet.fromList [1]) (IntSet.fromList [1])
+  let clause2 = Clause (IntSet.fromList [2]) (IntSet.fromList [2])
   let root1 = RootClause clause1 []
   let root2 = RootClause clause2 []
   -- Add a clause that covers all good states.
   newFeature <- feature 3 "(< x 4)" $ IntSet.fromList [1, 2, 3]
-  let newClause = Clause [3] $ IntSet.fromList [1, 2, 3]
-  let env = CIEnv { envQueue             = Map.empty
+  let newClause = Clause (IntSet.fromList [3]) $ IntSet.fromList [1, 2, 3]
+  let env = CIEnv { envQueue             = qEmpty
                   , envStates            = mkStates Set.empty goodStates
                   , envRootClauses       = [root1, root2]
                   , envRootsAccepted     = IntSet.fromList [1, 2]
@@ -431,18 +417,18 @@ test_addRootClause_exactCover = do
   -- To start, our root clauses cover good states 1 and 2.
   feature1 <- feature 1 "(= x 1)" (IntSet.fromList [1])
   feature2 <- feature 2 "(= x 2)" (IntSet.fromList [2])
-  let clause1 = Clause [1] (IntSet.fromList [1])
-  let clause2 = Clause [2] (IntSet.fromList [2])
+  let clause1 = Clause (IntSet.fromList [1]) (IntSet.fromList [1])
+  let clause2 = Clause (IntSet.fromList [2]) (IntSet.fromList [2])
   let root1 = RootClause clause1 []
   let root2 = RootClause clause2 []
   -- Add a clause that also covers good states 1 and 2.
   newFeature <- feature 3 "(or (= x 1) (= x 2))" (IntSet.fromList [1, 2])
-  let newClause = Clause [3] (IntSet.fromList [1, 2])
+  let newClause = Clause (IntSet.fromList [3]) (IntSet.fromList [1, 2])
   let fc = fcAddFeature feature1   IntSet.empty
          $ fcAddFeature feature2   IntSet.empty
          $ fcAddFeature newFeature IntSet.empty
          $ fcEmpty
-  let env = CIEnv { envQueue             = Map.empty
+  let env = CIEnv { envQueue             = qEmpty
                   , envStates            = mkStates Set.empty goodStates
                   , envRootClauses       = [root1, root2]
                   , envRootsAccepted     = IntSet.fromList [1, 2]
@@ -471,7 +457,7 @@ test_addRootClause_ignoresDuplicateAssertions = do
   let rclause   = clause [feature1, feature2]
   let covered   = clause [feature3]
   let root      = RootClause rclause [RootClause covered []]
-  let env = CIEnv { envQueue             = Map.empty
+  let env = CIEnv { envQueue             = qEmpty
                   , envStates            = mkStates Set.empty goodStates
                   , envRootClauses       = [root]
                   , envRootsAccepted     = IntSet.fromList[1, 2]
@@ -503,10 +489,10 @@ test_addRootClause_deepInsert = do
   feature2 <- feature 2 "(<= x 3)" (IntSet.fromList [3, 4, 5])
   feature3 <- feature 3 "(<= x 2)" (IntSet.fromList [2, 3, 4, 5])
   feature4 <- feature 4 "(<= x 1)" (IntSet.fromList [1, 2, 3, 4, 5])
-  let clause1 = Clause [1] (IntSet.fromList [5])
-      clause2 = Clause [2] (IntSet.fromList [3, 4, 5])
-      clause3 = Clause [3] (IntSet.fromList [2, 3, 4, 5])
-      clause4 = Clause [4] (IntSet.fromList [1, 2, 3, 4, 5])
+  let clause1 = Clause (IntSet.fromList [1]) (IntSet.fromList [5])
+      clause2 = Clause (IntSet.fromList [2]) (IntSet.fromList [3, 4, 5])
+      clause3 = Clause (IntSet.fromList [3]) (IntSet.fromList [2, 3, 4, 5])
+      clause4 = Clause (IntSet.fromList [4]) (IntSet.fromList [1, 2, 3, 4, 5])
   let root1 = RootClause clause1 []
       root2 = RootClause clause2 [root1]
       root3 = RootClause clause3 [root2]
@@ -515,14 +501,14 @@ test_addRootClause_deepInsert = do
   -- Add a clause that needs to be inserted between root2 and root1
   --   root4 <--- root3 <--- root2 <--- *newClause* <--- root1
   newFeature <- feature 5 "(<= x 4)" (IntSet.fromList [4, 5])
-  let newClause = Clause [5] (IntSet.fromList [4, 5])
+  let newClause = Clause (IntSet.fromList [5]) (IntSet.fromList [4, 5])
   let root1'  = RootClause clause1 []
       newRoot = RootClause newClause [root1']
       root2'  = RootClause clause2 [newRoot]
       root3'  = RootClause clause3 [root2']
       root4'  = RootClause clause4 [root3']
       expected = [root4']
-  let env = CIEnv { envQueue             = Map.empty
+  let env = CIEnv { envQueue             = qEmpty
                   , envStates            = mkStates Set.empty goodStates
                   , envRootClauses       = roots
                   , envRootsAccepted     = IntSet.fromList [3]
@@ -550,7 +536,7 @@ test_tagFeature_accepts = do
   let fc = fcAddFeature feature1 (IntSet.fromList [0])
          $ fcEmpty
   let newBadState = bstate 1 [("x", -2)]
-  let env = CIEnv { envQueue             = Map.empty
+  let env = CIEnv { envQueue             = qEmpty
                   , envStates            = mkStates (Set.insert newBadState badStates) goodStates
                   , envRootClauses       = []
                   , envRootsAccepted     = IntSet.empty
@@ -571,7 +557,7 @@ test_tagFeature_rejects = do
   let fc = fcAddFeature feature1 (IntSet.fromList [0])
          $ fcEmpty
   let newBadState = bstate 1 [("x", 2)]
-  let env = CIEnv { envQueue             = Map.empty
+  let env = CIEnv { envQueue             = qEmpty
                   , envStates            = mkStates (Set.insert newBadState badStates) goodStates
                   , envRootClauses       = []
                   , envRootsAccepted     = IntSet.empty
@@ -593,13 +579,13 @@ test_updateQueue = do
   feature1 <- feature 1 "(> x 1)" $ IntSet.fromList [0]
   feature2 <- feature 2 "(> x 3)" $ IntSet.fromList [0]
   feature3 <- feature 3 "(> x 4)" $ IntSet.fromList [0]
-  let queue = qInsert (Entry [1]    (IntSet.fromList [0])       (IntSet.fromList [0]))
-            $ qInsert (Entry [2]    (IntSet.fromList [0, 1, 3]) (IntSet.fromList [0]))
-            $ qInsert (Entry [3]    (IntSet.fromList [0, 1, 3]) (IntSet.fromList [0]))
-            $ qInsert (Entry [1, 2] (IntSet.fromList [0, 1, 3]) (IntSet.fromList [0]))
-            $ Map.empty
+  let queue = qInsert (Entry (IntSet.fromList [1])    (IntSet.fromList [0])       (IntSet.fromList [0]))
+            $ qInsert (Entry (IntSet.fromList [2])    (IntSet.fromList [0, 1, 3]) (IntSet.fromList [0]))
+            $ qInsert (Entry (IntSet.fromList [3])    (IntSet.fromList [0, 1, 3]) (IntSet.fromList [0]))
+            $ qInsert (Entry (IntSet.fromList [1, 2]) (IntSet.fromList [0, 1, 3]) (IntSet.fromList [0]))
+            $ qEmpty
   let newBadState = bstate 2 [("x", 2)]
-  let env = CIEnv { envQueue             = Map.empty
+  let env = CIEnv { envQueue             = qEmpty
                   , envStates            = mkStates (Set.insert newBadState bads) goods
                   , envRootClauses       = []
                   , envRootsAccepted     = IntSet.empty
@@ -612,11 +598,11 @@ test_updateQueue = do
                   , envStateNames        = []
                   , envMaxClauseSize     = 8
                   }
-  let expected = qInsert (Entry [1]    (IntSet.fromList [0])          (IntSet.fromList [0]))
-               $ qInsert (Entry [2]    (IntSet.fromList [0, 1, 2, 3]) (IntSet.fromList [0]))
-               $ qInsert (Entry [3]    (IntSet.fromList [0, 1, 2, 3]) (IntSet.fromList [0]))
-               $ qInsert (Entry [1, 2] (IntSet.fromList [0, 1, 2, 3]) (IntSet.fromList [0]))
-               $ Map.empty
+  let expected = qInsert (Entry (IntSet.fromList [1])    (IntSet.fromList [0])          (IntSet.fromList [0]))
+               $ qInsert (Entry (IntSet.fromList [2])    (IntSet.fromList [0, 1, 2, 3]) (IntSet.fromList [0]))
+               $ qInsert (Entry (IntSet.fromList [3])    (IntSet.fromList [0, 1, 2, 3]) (IntSet.fromList [0]))
+               $ qInsert (Entry (IntSet.fromList [1, 2]) (IntSet.fromList [0, 1, 2, 3]) (IntSet.fromList [0]))
+               $ qEmpty
   actual <- evalC (updateQueue newBadState queue) env
   assertEqual expected actual
 
@@ -633,11 +619,11 @@ test_addNewlyUsefulCandidates = do
   let newBadState  = bstate 1 [("x", 2)]
   let newBadStates = Set.insert newBadState oldBadStates
   expectedFeature <- feature 1 "(< x 2)" (IntSet.fromList [0])
-  let expectedQueue       = qInsert (Entry [1] (IntSet.fromList [1]) (IntSet.fromList [0]))
-                          $ Map.empty
+  let expectedQueue       = qInsert (Entry (IntSet.fromList [1]) (IntSet.fromList [1]) (IntSet.fromList [0]))
+                          $ qEmpty
   let expectedCandidates' = [assertion3, assertion4]
   let expectedFeatures'   = [expectedFeature]
-  let env = CIEnv { envQueue             = Map.empty
+  let env = CIEnv { envQueue             = qEmpty
                   , envStates            = mkStates newBadStates goodStates
                   , envRootClauses       = []
                   , envRootsAccepted     = IntSet.empty
@@ -693,12 +679,12 @@ test_updateRootClauses = do
   feature4 <- feature 4 assertion4 (IntSet.fromList [ 2, 4 ])
   feature5 <- feature 5 assertion5 (IntSet.fromList [ 3, 5 ])
   feature6 <- feature 6 assertion6 (IntSet.fromList [ 2, 3, 4, 5 ])
-  let clause1 = Clause [1] (IntSet.fromList [1])
-      clause2 = Clause [2] (IntSet.fromList [2])
-      clause3 = Clause [3] (IntSet.fromList [3])
-      clause4 = Clause [4] (IntSet.fromList [2, 4])
-      clause5 = Clause [5] (IntSet.fromList [3, 5])
-      clause6 = Clause [6] (IntSet.fromList [2, 3, 4, 5])
+  let clause1 = Clause (IntSet.fromList [1]) (IntSet.fromList [1])
+      clause2 = Clause (IntSet.fromList [2]) (IntSet.fromList [2])
+      clause3 = Clause (IntSet.fromList [3]) (IntSet.fromList [3])
+      clause4 = Clause (IntSet.fromList [4]) (IntSet.fromList [2, 4])
+      clause5 = Clause (IntSet.fromList [5]) (IntSet.fromList [3, 5])
+      clause6 = Clause (IntSet.fromList [6]) (IntSet.fromList [2, 3, 4, 5])
   let root1 = RootClause clause1 []
       root2 = RootClause clause2 []
       root3 = RootClause clause3 []
@@ -733,7 +719,7 @@ test_updateRootClauses = do
          $ fcAddFeature feature5 (IntSet.fromList [2])
          $ fcAddFeature feature6 (IntSet.fromList [1])
          $ fcEmpty
-  let env = CIEnv { envQueue             = Map.empty
+  let env = CIEnv { envQueue             = qEmpty
                   , envStates            = mkStates newBadStates goodStates
                   , envRootClauses       = origRootList
                   , envRootsAccepted     = IntSet.empty
@@ -766,9 +752,9 @@ test_updateRootClauses_combinesCoverage = do
   feature1 <- feature 1 "(< x 5)" (IntSet.fromList [1, 2])
   feature2 <- feature 2 "(< x 4)" (IntSet.fromList [1, 2])
   feature3 <- feature 3 "(= x 3)" (IntSet.fromList [1])
-  let clause1 = Clause [1] (IntSet.fromList [1, 2])
-      clause2 = Clause [2] (IntSet.fromList [1, 2])
-      clause3 = Clause [3] (IntSet.fromList [1])
+  let clause1 = Clause (IntSet.fromList [1]) (IntSet.fromList [1, 2])
+      clause2 = Clause (IntSet.fromList [2]) (IntSet.fromList [1, 2])
+      clause3 = Clause (IntSet.fromList [3]) (IntSet.fromList [1])
   let root2 = RootClause clause2 []
       root3 = RootClause clause3 []
       root1 = RootClause clause1 [root2, root3]
@@ -778,8 +764,8 @@ test_updateRootClauses_combinesCoverage = do
   --
   let newBadState  = bstate 2 [("x", 4)]
       newBadStates = Set.insert newBadState origBadStates
-  let clause2' = Clause [2] (IntSet.fromList [1, 2])
-      clause3' = Clause [3] (IntSet.fromList [1])
+  let clause2' = Clause (IntSet.fromList [2]) (IntSet.fromList [1, 2])
+      clause3' = Clause (IntSet.fromList [3]) (IntSet.fromList [1])
   --
   -- After update, the root list should be [root2] with root2 now covering root3:
   --
@@ -788,7 +774,7 @@ test_updateRootClauses_combinesCoverage = do
   let root3' = RootClause clause3' []
       root2' = RootClause clause2' [root3']
       expected = [root2']
-  let env = CIEnv { envQueue             = Map.empty
+  let env = CIEnv { envQueue             = qEmpty
                   , envStates            = mkStates newBadStates goodStates
                   , envRootClauses       = origRootList
                   , envRootsAccepted     = IntSet.empty
@@ -830,7 +816,7 @@ test_cvInvGen = do
           $ ImpPieContext Map.empty (Set.fromList [x, y]) (Set.singleton (10 :: Integer))
   let job = Job Set.empty goodStates loopCond loopBody postCond
   expected <- assertionFromStr "(and (<= x y) (<= y x))"
-  mActual  <- evalCeili $ cInvGen cfg job
+  mActual  <- evalCeili Set.empty $ cInvGen cfg job
   case mActual of
     Nothing     -> assertFailure "Unable to find separator."
     Just actual -> assertEquivalent expected actual

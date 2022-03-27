@@ -15,7 +15,7 @@ module Orhle.CInvGen
   , Feature(..)
   , FeatureCache(..)
   , GoodState(..)
-  , Queue
+  , Queue(..)
   , RootClause(..)
   , States(..)
   , UpdateFlag(..)
@@ -36,6 +36,7 @@ module Orhle.CInvGen
   , mkCIEnv
   , mkStates
   , putRootClauses
+  , qEmpty
   , qInsert
   , qPop
   , tagFeature
@@ -289,7 +290,7 @@ rootClauseAssertion featureCache (RootClause clause _) =
 data Queue t = Queue
   { qQueue :: Map Int (Set (Entry t))
   , qSeen  :: Set FeatureIdSet
-  }
+  } deriving (Ord, Eq, Show)
 
 data Entry t = Entry
   { entryCandidate     :: FeatureIdSet
@@ -638,6 +639,7 @@ learnSeparator' = do
       case mEntry of
         Nothing -> do
           clog_d $ "[CInvGen] Search queue is empty, failing."
+          --printSeen
           pure Nothing
         Just entry -> do
           maxClauseSize <- getMaxClauseSize
@@ -650,6 +652,13 @@ learnSeparator' = do
               clog_d $ "[CInvGen] Useful features: " ++ (show $ length nextFeatures) ++ ", queue size: " ++ (show $ qSize queue)
               enqueueNextLevel entry nextFeatures
               learnSeparator'
+
+printSeen :: Pretty t => CiM t ()
+printSeen = do
+  seenIds <- getQueue >>= pure . (map IntSet.toList) . Set.toList . qSeen
+  seenFeatures <- mapM lookupFeatures seenIds
+  let seenAssertions = map (aAnd . map featAssertion) seenFeatures
+  clog_d . show $ pretty "Seen features:" <+> pretty seenAssertions
 
 usefulFeatures :: CIConstraints t => Entry t -> CiM t [FeatureId]
 usefulFeatures (Entry candidate enRejectedBads enAcceptedGoods) = do
@@ -664,14 +673,10 @@ usefulFeatures (Entry candidate enRejectedBads enAcceptedGoods) = do
         -- while not bringing the accepted states for the new candidate
         -- down to a subset of of the good states already accepted by the
         -- entry's clauses.
-        let rootAcceptSet = IntSet.unions rootClauseAccepts
-        let interestingGoods = IntSet.toList $ IntSet.difference enAcceptedGoods rootAcceptSet
-        acceptsSomethingGood <- pure . IntSet.unions =<< getFeaturesWhichAccept interestingGoods
-            -- goodStateIds <- getGoodStateIds
-            -- outsideRoot <- pure $ IntSet.difference goodStateIds rootAcceptSet
-            -- acceptsOutsideRoot <- pure . IntSet.unions =<< getFeaturesWhichAccept (IntSet.toList outsideRoot)
-            -- acceptsInsideEntry <- pure . IntSet.unions =<< getFeaturesWhichAccept (IntSet.toList enAcceptedGoods)
-            -- pure $ IntSet.intersection acceptsOutsideRoot acceptsInsideEntry
+        acceptsSomethingGood <- do
+          let rootAcceptSet = IntSet.unions rootClauseAccepts
+          let interestingGoods = IntSet.toList $ IntSet.difference enAcceptedGoods rootAcceptSet
+          pure . IntSet.unions =<< getFeaturesWhichAccept interestingGoods
         rejectsSomethingBad <- do
           badStateIds <- getBadStateIds
           let remainingBads = IntSet.difference badStateIds enRejectedBads
@@ -707,10 +712,7 @@ enqueueNextLevel entry@(Entry candidate enRejectedBads _) (newFeature:rest) = do
             then do
               -- We found a new root clause.
               addRootClause $ Clause newCandidateIds newAcceptedGoods
-              remainingGoods <- getRemainingGoods
-              if IntSet.null remainingGoods
-                then pure ()
-                else enqueueNextLevel entry rest
+              enqueueNextLevel entry rest
             else do
               enqueue $ Entry newCandidateIds newAcceptedGoods newRejectedBads
               enqueueNextLevel entry rest

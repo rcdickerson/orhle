@@ -26,7 +26,7 @@ b_v  = Var b
 r_v  = Var r
 x_v  = Var x
 
-env = defaultEnv $ Set.fromList [a, b, c, r, x, y, z]
+-- env = defaultEnv $ Set.fromList [a, b, c, r, x, y, z]
 
 
 -- test_specAtCallsite = do

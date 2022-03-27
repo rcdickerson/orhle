@@ -4,6 +4,7 @@
 module Orhle.StepStrategyTests(htf_thisModulesTests) where
 
 import Test.Framework
+import Orhle.TestUtil
 
 import Ceili.CeiliEnv
 import Ceili.Name
@@ -23,8 +24,7 @@ loop1 = impWhile (BLt (AVar x) (ALit 10)) incX
 loop2 = impWhile (BLt (AVar y) (ALit 10)) incY
 loop3 = impWhile (BLt (AVar z) (ALit 10)) incZ
 
-env = defaultEnv
-      (namesIn [ incX, incY, incZ, loop1, loop2, loop3 ])
+names = namesIn [ incX, incY, incZ, loop1, loop2, loop3 ]
 
 toLoop :: SpecImpProgram Integer -> ImpWhile Integer (SpecImpProgram Integer)
 toLoop prog = case getLoop prog of
@@ -33,7 +33,9 @@ toLoop prog = case getLoop prog of
 
 
 test_backwardDisallowed = do
-  result <- runCeili emptyEnv $ backwardDisallowed [] []
+  solver <- mkSolver
+  let env = defaultEnv solver Set.empty
+  result <- runCeili env $ backwardDisallowed [] []
   case result of
     Left  _ -> return () -- Pass
     Right _ -> assertFailure "Unexpected success from backwardDisallowed strategy"
@@ -41,75 +43,57 @@ test_backwardDisallowed = do
 test_backwardWithFusion_emptySeqTreatedAsSkip =
   let expected = Step (ExistentialStatement impSkip) [incX] []
   in do
-    result <- runCeili env $ backwardWithFusion [incX] [impSeq []]
-    case result of
-      Left err -> assertFailure err
-      Right step -> assertEqual expected step
+    actual <- evalCeili names $ backwardWithFusion [incX] [impSeq []]
+    assertEqual expected actual
 
 test_backwardWithFusion_noProgramsReturnsNoSelectionFound =
   let expected = Step @Integer NoSelectionFound [] []
   in do
-    result <- runCeili env $ backwardWithFusion [] []
-    case result of
-      Left err -> assertFailure err
-      Right step -> assertEqual expected step
+    actual <- evalCeili names $ backwardWithFusion [] []
+    assertEqual expected actual
 
 
 test_backwardWithFusion_emptyUniversalsPicksExistential =
   let expected = Step (ExistentialStatement incX) [] []
   in do
-    result <- runCeili env $ backwardWithFusion [] [incX]
-    case result of
-      Left err -> assertFailure err
-      Right step -> assertEqual expected step
+    actual <- evalCeili names $ backwardWithFusion [] [incX]
+    assertEqual expected actual
 
 test_backwardWithFusion_emptyExistentialPicksUniversal =
   let expected = Step (UniversalStatement incX) [] []
   in do
-    result <- runCeili env $ backwardWithFusion [incX] []
-    case result of
-      Left err -> assertFailure err
-      Right step -> assertEqual expected step
+    actual <- evalCeili names $ backwardWithFusion [incX] []
+    assertEqual expected actual
 
 test_backwardWithFusion_favorsExistential =
   let expected = Step (ExistentialStatement incX) [incX] []
   in do
-    result <- runCeili env $ backwardWithFusion [incX] [incX]
-    case result of
-      Left err -> assertFailure err
-      Right step -> assertEqual expected step
+    actual <- evalCeili names $ backwardWithFusion [incX] [incX]
+    assertEqual expected actual
 
 test_backwardWithFusion_allLoopsInExistentialPicksUniversal =
   let expected = Step (UniversalStatement incY) [loop1] [impSeq [incX, loop2], loop3]
   in do
-    result <- runCeili env $ backwardWithFusion [loop1, incY] [impSeq [incX, loop2], loop3]
-    case result of
-      Left err -> assertFailure err
-      Right step -> assertEqual expected step
+    actual <- evalCeili names $ backwardWithFusion [loop1, incY] [impSeq [incX, loop2], loop3]
+    assertEqual expected actual
 
 test_backwardWithFusion_allLoopsInUniversalPicksExistential =
   let expected = Step (ExistentialStatement incY) [impSeq [incX, loop2], loop3] [loop1]
   in do
-    result <- runCeili env $ backwardWithFusion [impSeq [incX, loop2], loop3] [loop1, incY]
-    case result of
-      Left err -> assertFailure err
-      Right step -> assertEqual expected step
+    actual <- evalCeili names $ backwardWithFusion [impSeq [incX, loop2], loop3] [loop1, incY]
+    assertEqual expected actual
 
 test_backwardWithFusion_pickingUniversalPreservesRestOfSeq =
   let expected = Step (UniversalStatement incZ) [impSeq [incX, incY]] []
   in do
-    result <- runCeili env $ backwardWithFusion [impSeq [incX, incY, incZ]] []
-    case result of
-      Left err -> assertFailure err
-      Right step -> assertEqual expected step
+    actual <- evalCeili names $ backwardWithFusion [impSeq [incX, incY, incZ]] []
+    assertEqual expected actual
 
 test_backwardWithFusion_pickingExistentialPreservesRestOfSeq =
   let expected = Step (ExistentialStatement incZ) [] [impSeq [incX, incY]]
   in do
-    result <- runCeili env $ backwardWithFusion [] [impSeq [incX, incY, incZ]]
-    case result of
-      Left err -> assertFailure err
-      Right step -> assertEqual expected step
+    actual <- evalCeili names $ backwardWithFusion [] [impSeq [incX, incY, incZ]]
+    assertEqual expected actual
 
 test_backwardWithFusion_allLoopsPicksFusion =
   let
@@ -124,7 +108,5 @@ test_backwardWithFusion_allLoopsPicksFusion =
                     [impSeq [incX]]
                     [impSeq [incY]]
   in do
-    result <- runCeili env $ backwardWithFusion aprogs eprogs
-    case result of
-      Left err -> assertFailure err
-      Right step -> assertEqual expected step
+    actual <- evalCeili names $ backwardWithFusion aprogs eprogs
+    assertEqual expected actual
