@@ -42,9 +42,6 @@ library:
     - Orhle
     - Orhle.CInvGen
     - Orhle.CValue
-    - Orhle.CVInvGen
-    - Orhle.DTInvGen
-    - Orhle.DTLearn
     - Orhle.OrhleParser
     - Orhle.RelationalPTS
     - Orhle.SpecImp

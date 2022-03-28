@@ -123,8 +123,8 @@ instance Evaluable ctx
                                      True  -> vCallsitePre
                                      False -> Exists freshChoiceVars vCallsitePre
     case meetsPre of
-      False -> return []
-      True -> let
+      Rejected -> return []
+      Accepted -> let
         cvs = Set.fromList freshChoiceVars
         (CAssertion callsiteAssertion callsiteCvs callsiteAConstrs callsiteEConstrs)
           = toCAssertion $ aAnd [vCallsitePre, vCallsitePost]
@@ -139,6 +139,9 @@ instance Evaluable ctx
                                            (Set.insert callsiteAssertion callsiteEConstrs)
         stUpdater (assignee, retVar) = Map.insert assignee (constrValue retVar)
         in return [foldr stUpdater st (zip assignees freshRetVars)]
+      Error err -> do
+        log_e $ "SMT error: " ++ err
+        return []
 
 checkArglists :: Specification t -> (SpecCall t e) -> Ceili ()
 checkArglists (Specification params retVars _ _ _) (SpecCall _ args assignees) =
@@ -236,8 +239,13 @@ toCAssertion cvAssertion = case cvAssertion of
                       (Set.union aconstrs1 aconstrs2)
                       (Set.union econstrs1 econstrs2)
 
-verifyCAssertion :: Assertion CValue -> Ceili Bool
-verifyCAssertion assertion = checkValidB assertion
+verifyCAssertion :: Assertion CValue -> Ceili PredicateResult
+verifyCAssertion assertion = do
+  result <- checkValidE assertion
+  pure $ case result of
+    Right True  -> Accepted
+    Right False -> Rejected
+    Left err    -> Error err
 
 instance ValidCheckable CValue where
   checkValid logger assertion =
@@ -367,10 +375,10 @@ instance ArithAlgebra CValue where
 -- State Predicate --
 ---------------------
 
-evalCAssertion :: ProgState CValue -> Assertion CValue -> Ceili Bool
+evalCAssertion :: ProgState CValue -> Assertion CValue -> Ceili PredicateResult
 evalCAssertion state assertion = verifyCAssertion $ assertionAtState state assertion
 
-instance Evaluable c CValue (Assertion CValue) (Ceili Bool) where
+instance Evaluable c CValue (Assertion CValue) (Ceili PredicateResult) where
   eval _ = evalCAssertion
 
 instance StatePredicate (Assertion CValue) CValue where

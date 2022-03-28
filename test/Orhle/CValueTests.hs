@@ -11,7 +11,6 @@ import Ceili.Evaluation
 import Ceili.Name
 import Ceili.StatePredicate
 import qualified Data.Map as Map
-import Data.Set ( Set )
 import qualified Data.Set as Set
 import Orhle.CValue
 import Orhle.SpecImp
@@ -173,7 +172,7 @@ test_testState_concreteTrue = do
   assertion <- assertionFromStr "(= 11 (+ x y))"
   let task = testState @(Assertion CValue) @CValue assertion state
   actual <- evalCeili (namesIn state) task
-  assertEqual True actual
+  assertEqual Accepted actual
 
 test_testState_concreteFalse = do
   let xVal = Concrete 5
@@ -184,7 +183,7 @@ test_testState_concreteFalse = do
   assertion <- assertionFromStr "(= 12 (+ x y))"
   let task = testState @(Assertion CValue) @CValue assertion state
   actual <- evalCeili (namesIn state) task
-  assertEqual False actual
+  assertEqual Rejected actual
 
 test_testState_forallWithinBounds = do
   let xVal = Concrete 5
@@ -197,7 +196,7 @@ test_testState_forallWithinBounds = do
   assertion <- assertionFromStr "(<= (+ x y) 15)"
   let task = testState @(Assertion CValue) @CValue assertion state
   actual <- evalCeili (namesIn state) task
-  assertEqual True actual
+  assertEqual Accepted actual
 
 test_testState_forallOutsideBounds = do
   let xVal = Concrete 5
@@ -210,7 +209,7 @@ test_testState_forallOutsideBounds = do
   assertion <- assertionFromStr "(<= (+ x y) 14)"
   let task = testState @(Assertion CValue) @CValue assertion state
   actual <- evalCeili (namesIn state) task
-  assertEqual False actual
+  assertEqual Rejected actual
 
 test_testState_existsWithinBounds = do
   let xVal = Concrete 5
@@ -223,7 +222,7 @@ test_testState_existsWithinBounds = do
   assertion <- assertionFromStr "(<= (+ x y) 10)"
   let task = testState @(Assertion CValue) @CValue assertion state
   actual <- evalCeili (namesIn state) task
-  assertEqual True actual
+  assertEqual Accepted actual
 
 test_testState_existsOutsideBounds = do
   let xVal = Concrete 5
@@ -236,7 +235,7 @@ test_testState_existsOutsideBounds = do
   assertion <- assertionFromStr "(> (+ x y) 20)"
   let task = testState @(Assertion CValue) @CValue assertion state
   actual <- evalCeili (namesIn state) task
-  assertEqual False actual
+  assertEqual Rejected actual
 
 test_testState_mixedWithinBounds = do
   let xVal = Concrete 1
@@ -253,7 +252,7 @@ test_testState_mixedWithinBounds = do
   assertion <- assertionFromStr "(= (+ x y) 10)"
   let task = testState @(Assertion CValue) @CValue assertion state
   actual <- evalCeili (namesIn state) task
-  assertEqual True actual
+  assertEqual Accepted actual
 
 test_testState_mixedOutsideBounds = do
   let xVal = Concrete 1
@@ -271,7 +270,99 @@ test_testState_mixedOutsideBounds = do
   assertion <- assertionFromStr "(= (+ x y) 11)"
   let task = testState @(Assertion CValue) @CValue assertion state
   actual <- evalCeili (namesIn state) task
-  assertEqual False actual
+  assertEqual Rejected actual
+
+test_testState_sums = do
+  -- An actual example from a benchmark.
+  let originalSum = Constrained
+                    (Add [Add [Add [Add [Add [ Num 0
+                                             , Var $ Name "original!ret!!3" 0  ]
+                                             , Var $ Name "original!ret!!11" 0  ]
+                                             , Var $ Name "original!ret!!19" 0 ]
+                                             , Var $ Name "original!ret!!27" 0 ]
+                                             , Var $ Name "original!ret!!35" 0 ])
+                    (Set.fromList [ Name "original!n!3" 0
+                                  , Name "original!n!11" 0
+                                  , Name "original!n!19" 0
+                                  , Name "original!n!27" 0
+                                  , Name "original!n!35" 0
+                                  , Name "original!ret!!3" 0
+                                  , Name "original!ret!!11" 0
+                                  , Name "original!ret!!19" 0
+                                  , Name "original!ret!!27" 0
+                                  , Name "original!ret!!35" 0
+                                  ])
+                    Set.empty
+                    (Set.fromList [ And [ Lte (Num 0) (Var $ Name "original!ret!!3" 0)
+                                        , Lt  (Var $ Name "original!ret!!3" 0) (Num 10)
+                                        , Eq  (Var $ Name "original!ret!!3" 0) (Var $ Name "original!ret!!3" 0)
+                                        ]
+                                  , And [ Lte (Num 0) (Var $ Name "original!ret!!11" 0)
+                                        , Lt  (Var $ Name "original!ret!!11" 0) (Num 10)
+                                        , Eq  (Var $ Name "original!ret!!11" 0) (Var $ Name "original!ret!!11" 0)
+                                        ]
+                                  , And [ Lte (Num 0) (Var $ Name "original!ret!!19" 0)
+                                        , Lt  (Var $ Name "original!ret!!19" 0) (Num 10)
+                                        , Eq  (Var $ Name "original!ret!!19" 0) (Var $ Name "original!ret!!19" 0)
+                                        ]
+                                  , And [ Lte (Num 0) (Var $ Name "original!ret!!27" 0)
+                                        , Lt  (Var $ Name "original!ret!!27" 0) (Num 10)
+                                        , Eq  (Var $ Name "original!ret!!27" 0) (Var $ Name "original!ret!!27" 0)
+                                        ]
+                                  , And [ Lte (Num 0) (Var $ Name "original!ret!!35" 0)
+                                        , Lt  (Var $ Name "original!ret!!35" 0) (Num 10)
+                                        , Eq  (Var $ Name "original!ret!!35" 0) (Var $ Name "original!ret!!35" 0)
+                                        ]
+                                  ])
+  let refinementSum = Constrained
+                      (Add [Add [Add [Add [Add [ Num 0
+                                               , Var $ Name "refinement!ret!!3" 0  ]
+                                               , Var $ Name "refinement!ret!!11" 0  ]
+                                               , Var $ Name "refinement!ret!!19" 0 ]
+                                               , Var $ Name "refinement!ret!!27" 0 ]
+                                               , Var $ Name "refinement!ret!!35" 0 ])
+                      Set.empty
+                      (Set.fromList [ And [ Lte (Num 0) (Var $ Name "refinement!c" 0)
+                                          , Lt  (Var $ Name "refinement!c" 0) (Num 5)
+                                          , Eq  (Var $ Name "refinement!ret!!3" 0)
+                                                (Add [Mul[ Num 2, Var $ Name "refinement!c" 0], Num 1])
+                                          ]
+                                    , And [ Lte (Num 0) (Var $ Name "refinement!c" 0)
+                                          , Lt  (Var $ Name "refinement!c" 0) (Num 5)
+                                          , Eq  (Var $ Name "refinement!ret!!11" 0)
+                                                (Add [Mul[ Num 2, Var $ Name "refinement!c" 0], Num 1])
+                                          ]
+                                    , And [ Lte (Num 0) (Var $ Name "refinement!c" 0)
+                                          , Lt  (Var $ Name "refinement!c" 0) (Num 5)
+                                          , Eq  (Var $ Name "refinement!ret!!19" 0)
+                                                (Add [Mul[ Num 2, Var $ Name "refinement!c" 0], Num 1])
+                                          ]
+                                    , And [ Lte (Num 0) (Var $ Name "refinement!c" 0)
+                                          , Lt  (Var $ Name "refinement!c" 0) (Num 5)
+                                          , Eq  (Var $ Name "refinement!ret!!27" 0)
+                                                (Add [Mul[ Num 2, Var $ Name "refinement!c" 0], Num 1])
+                                          ]
+                                    , And [ Lte (Num 0) (Var $ Name "refinement!c" 0)
+                                          , Lt  (Var $ Name "refinement!c" 0) (Num 5)
+                                          , Eq  (Var $ Name "refinement!ret!!35" 0)
+                                                (Add [Mul[ Num 2, Var $ Name "refinement!c" 0], Num 1])
+                                          ]
+                                    ])
+                      Set.empty
+  let state = Map.fromList [ (Name "original!sum" 0, originalSum)
+                           , (Name "refinement!sum" 0, refinementSum)
+                           ]
+  let assertion = And [ Lte (Add [ Var $ Name "original!sum" 0
+                                 , Mul [ Num (Concrete $ -1)
+                                       , Var $ Name "refinement!sum" 0]])
+                            (Num $ Concrete 0)
+                      , Lte (Add [ Mul [ Num (Concrete $ -1)
+                                       , Var $ Name "original!sum" 0]
+                                 , Var $ Name "refinement!sum" 0 ])
+                            (Num $ Concrete 0)                      ]
+  let task = testState @(Assertion CValue) @CValue assertion state
+  actual <- evalCeili (namesIn state) task
+  assertEqual Accepted actual
 
 
 -----------------
@@ -366,9 +457,9 @@ test_separatingQuery = let
                           , (Name "a!sum" 0, Concrete 11) ]
   separator = Eq (Var $ Name "e!sum" 0) (Var $ Name "a!sum" 0)
   task = do
-    acceptsGood <- testState @(Assertion CValue) @CValue separator goodState
-    acceptsBad  <- testState @(Assertion CValue) @CValue separator badState
-    return $ acceptsGood && (not acceptsBad)
+    goodResult <- testState @(Assertion CValue) @CValue separator goodState
+    badResult  <- testState @(Assertion CValue) @CValue separator badState
+    pure $ goodResult == Accepted && badResult == Rejected
   in do
     actual <- evalCeili (namesIn [goodState, badState]) task
     assertEqual True actual
