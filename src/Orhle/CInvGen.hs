@@ -659,46 +659,9 @@ printSeen = do
   let seenAssertions = map (aAnd . map featAssertion) seenFeatures
   clog_d . show $ pretty "Seen features:" <+> pretty seenAssertions
 
--- (<= (+ original!sum (* -1 refinement!sum)) 0)
-
-target1 :: Assertion Integer
-target1 = Lte (Add [Var $ Name "original!sum" 0, Mul [Num (-1), Var $ Name "refinement!sum" 0] ]) (Num 0)
-
-target2 :: Assertion Integer
-target2 = Lte (Add [Mul [Num (-1), Var $ Name "original!sum" 0], Var $ Name "refinement!sum" 0 ]) (Num 0)
-
-arithSE :: (Embeddable b a, Eq a) => Arith a -> Arith b -> Bool
-arithSE arithA arithB = case (arithA, arithB) of
-  (Var a, Var b) -> a == b
-  (Num a, Num b) -> a == embed b
-  (Add as, Add bs) -> all (uncurry arithSE) (zip as bs)
-  (Mul as, Mul bs) -> all (uncurry arithSE) (zip as bs)
-  _ -> False
-
-structurallyEqual :: (Embeddable b a, Eq a) => Assertion a -> Assertion b -> Bool
-structurallyEqual assertionA assertionB =
-  case (assertionA, assertionB) of
-    (Lte al ar, Lte bl br) -> arithSE al bl && arithSE ar br
-    _ -> False
-
-checkForTargets ids = do
-  if IntSet.size ids <= 2
-    then do
-    assertions <- lookupFeatures (IntSet.toList ids) >>= pure . map featAssertion
-    case assertions of
-      [ca] | structurallyEqual ca target1 -> pure (True, False)
-      [ca] | structurallyEqual ca target2 -> pure (False, True)
-      [ca1, ca2] | structurallyEqual ca1 target1 && structurallyEqual ca2 target2 -> pure (True, True)
-      [ca1, ca2] | structurallyEqual ca1 target2 && structurallyEqual ca2 target1 -> pure (True, True)
-      _ -> pure (False, False)
-    else pure (False, False)
-
 usefulFeatures :: CIConstraints t => Entry t -> CiM t [FeatureId]
 usefulFeatures (Entry candidate enRejectedBads enAcceptedGoods) = do
   rootClauseAccepts <- pure . map (clauseAcceptedGoods . rcClause) =<< getRootClauses
---  (t1, t2) <- checkForTargets candidate
---  if t1 then clog_d $ "Finding useful features for " ++ (show . pretty $ target1) else pure ()
---  if t2 then clog_d $ "Finding useful features for " ++ (show . pretty $ target2) else pure ()
   if any (enAcceptedGoods `IntSet.isProperSubsetOf`) $ rootClauseAccepts
     then do
       -- if (t1 || t2)
@@ -721,82 +684,40 @@ usefulFeatures (Entry candidate enRejectedBads enAcceptedGoods) = do
           badStateIds <- getBadStateIds
           let remainingBads = IntSet.difference badStateIds enRejectedBads
           pure . IntSet.unions =<< getFeaturesWhichReject (IntSet.toList remainingBads)
-        -- if (t1 || t2)
-        --   then do
-        --     goodFeats <- lookupFeatures $ IntSet.toList acceptsSomethingGood
-        --     badFeats <- lookupFeatures $ IntSet.toList rejectsSomethingBad
-        --     clog_d $ "Accepts good: " ++ (show . pretty $ goodFeats)
-        --     clog_d $ "Rejects bad: " ++ (show . pretty $ badFeats)
-        --   else pure ()
         pure . IntSet.toList $ IntSet.intersection rejectsSomethingBad acceptsSomethingGood
 
 enqueueNextLevel :: CIConstraints t => Entry t -> [FeatureId] -> CiM t ()
 enqueueNextLevel _ [] = pure ()
-enqueueNextLevel entry@(Entry candidate enRejectedBads _) (newFeature:rest) = do
-  let newCandidateIds = IntSet.insert newFeature candidate
-  --(t1, t2) <- checkForTargets newCandidateIds
-  --if t1 && t2 then clog_d "**** See target in enqueueNextLevel" else pure ()
+enqueueNextLevel entry@(Entry candidateIds enRejectedBads enAcceptedGoods) (newFeatureId:rest) = do
+  let newCandidateIds = IntSet.insert newFeatureId candidateIds
   denied <- isDenied newCandidateIds
   if denied
-    then do
-      --if t1 && t2 then clog_d "**** No stairway?! Denied!" else pure ()
-      enqueueNextLevel entry rest
+    then enqueueNextLevel entry rest
     else do
-      newCandidateFeatures <- lookupFeatures $ IntSet.toList newCandidateIds
-      -- A useful feature *optimistically* accepted an interesting set of good
-      -- states, but now we will do the SMT work to make sure.
-      rootClauseAccepts <- pure . map (clauseAcceptedGoods . rcClause) =<< getRootClauses
-
-      goodStates <- getGoodStates
-      let newCandidateAssertion = aAnd $ map featAssertion newCandidateFeatures
-      (newAcceptedGoodsList, _) <- lift $ splitGoodStates newCandidateAssertion $ Set.toList goodStates
-      let newAcceptedGoods = IntSet.fromList $ map gsId newAcceptedGoodsList
-
-      if (any (newAcceptedGoods `IntSet.isProperSubsetOf`) rootClauseAccepts)
+      badStateIds <- getBadStateIds
+      featureRejectedBads <- getFeatureRejectedBads newFeatureId
+      let newRejectedBads = IntSet.union enRejectedBads featureRejectedBads
+      if not $ newRejectedBads == badStateIds
         then do
-        -- It turns out the accepted good states are not intersting.
-        -- if t1 && t2 then do
-        --   clog_d "**** New goods are a proper subset of root clauses"
-        --   newFeat <- lookupFeature newFeature
-        --   entryFeat <- lookupFeatures $ IntSet.toList candidate
-        --   clog_d $ "**** entryFeature: " ++ (show . pretty $ entryFeat)
-        --   clog_d $ "**** newFeature: " ++ (show . pretty $ newFeat)
-        --   clog_d $ "**** assertion: " ++ (show . pretty $ newCandidateAssertion)
-        --   clog_d $ "**** rootClauseAccepts: " ++ (show . pretty . map IntSet.toList $ rootClauseAccepts)
-        --   clog_d $ "**** newAcceptedGoods: " ++ (show . pretty . IntSet.toList $ newAcceptedGoods)
-        --   clog_d $ "**** goodStates: " ++ (show . pretty $ (map (\(GoodState sid st) -> (sid, st)) $ Set.toList goodStates))
-        --   else pure ()
-        enqueueNextLevel entry rest
+          newAcceptedGoodSet <- lookupFeature newFeatureId >>= pure . featAcceptedGoods
+          let newAcceptedGoods = IntSet.union newAcceptedGoodSet enAcceptedGoods
+          enqueue $ Entry newCandidateIds newAcceptedGoods newRejectedBads
+          enqueueNextLevel entry rest
         else do
-          badStateIds <- getBadStateIds
-          featureRejectedBads <- getFeatureRejectedBads newFeature
-          let newRejectedBads = IntSet.union enRejectedBads featureRejectedBads
-          -- if t1 && t2
-          --   then do
-          --     newFeat <- lookupFeature newFeature
-          --     entryFeat <- lookupFeatures $ IntSet.toList candidate
-          --     clog_d $ "**** entryFeature: " ++ (show . pretty $ entryFeat)
-          --     clog_d $ "**** newFeature: " ++ (show . pretty $ newFeat)
-          --     clog_d $ "**** enRejectedBads: " ++ (show . pretty . IntSet.toList $ enRejectedBads)
-          --     clog_d $ "**** featureRejectedBads: " ++ (show . pretty . IntSet.toList $ featureRejectedBads)
-          --     clog_d $ "**** bads: " ++ (show . pretty . IntSet.toList $ badStateIds)
-          --     let diff = IntSet.difference badStateIds newRejectedBads
-          --     badStates <- getBadStates >>= pure . Set.toList
-          --     let diffStates = filter (\st -> bsId st `IntSet.member` diff) badStates
-          --     clog_d $ "**** difference: " ++ (show . pretty $ diffStates)
-          --   else pure ()
-
-          if newRejectedBads == badStateIds
-            then do
-              -- We found a new root clause.
-              addRootClause $ Clause newCandidateIds newAcceptedGoods
-              --if t1 && t2 then clog_d "**** Target added as root clause (yay)" else pure ()
-              enqueueNextLevel entry rest
+          -- We found a new potential root clause.
+          -- We *optimistically* accepted an interesting set of good
+          -- states, but now we will do the SMT work to make sure.
+          goodStates <- getGoodStates
+          newCandidateFeatures <- lookupFeatures $ IntSet.toList newCandidateIds
+          let newCandidateAssertion = aAnd $ map featAssertion newCandidateFeatures
+          (newAcceptedGoodsList, _) <- lift $ splitGoodStates newCandidateAssertion $ Set.toList goodStates
+          let newAcceptedGoods = IntSet.fromList $ map gsId newAcceptedGoodsList
+          rootClauseAccepts <- pure . map (clauseAcceptedGoods . rcClause) =<< getRootClauses
+          if (any (newAcceptedGoods `IntSet.isProperSubsetOf`) rootClauseAccepts)
+            then enqueueNextLevel entry rest -- Turns out it was uninteresting.
             else do
-              enqueue $ Entry newCandidateIds newAcceptedGoods newRejectedBads
-              --if t1 && t2 then clog_d "**** Target enqueued (boo)" else pure ()
+              addRootClause $ Clause newCandidateIds newAcceptedGoods
               enqueueNextLevel entry rest
-
 
 ------------------------
 -- Root Clause Update --
