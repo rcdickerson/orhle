@@ -45,7 +45,7 @@ rhleVerifier iFunEnv triple = do
   let names = Set.union (namesIn aprogs) (namesIn eprogs)
   let lits  = Set.union (litsIn  aprogs) (litsIn eprogs)
   solver <- mkSolver
-  let env = mkEnv solver LogLevelDebug 10000 names
+  let env = mkEnv solver LogLevelDebug 2000 names
   resultOrErr <- runCeili env $ do
     log_i $ "Collecting loop head states for loop invariant inference..."
     aLoopHeads <- mapM (headStates 5 cFunEnv) aprogs
@@ -78,6 +78,8 @@ headStates numRandomStates env prog = do
             , Map.fromList $ map (\n -> (n, Concrete 0))  names
             , Map.fromList $ map (\n -> (n, Concrete $ -1))  names ]
             ++ randomStates
+  --lhss <- collectLoopHeadStates ctx sts prog
+  --pure $ Map.map (Map.map $ Set.map optimizeState) lhss
   collectLoopHeadStates ctx sts prog
 
 randomState :: [Name] -> Ceili (ProgState CValue)

@@ -293,25 +293,25 @@ test_testState_sums = do
                                   , Name "original!ret!!35" 0
                                   ])
                     Set.empty
-                    (Set.fromList [ And [ Lte (Num 0) (Var $ Name "original!ret!!3" 0)
-                                        , Lt  (Var $ Name "original!ret!!3" 0) (Num 10)
-                                        , Eq  (Var $ Name "original!ret!!3" 0) (Var $ Name "original!ret!!3" 0)
+                    (Set.fromList [ And [ Lte (Num 0) (Var $ Name "original!n!3" 0)
+                                        , Lt  (Var $ Name "original!n!3" 0) (Num 10)
+                                        , Eq  (Var $ Name "original!ret!!3" 0) (Var $ Name "original!n!3" 0)
                                         ]
-                                  , And [ Lte (Num 0) (Var $ Name "original!ret!!11" 0)
-                                        , Lt  (Var $ Name "original!ret!!11" 0) (Num 10)
-                                        , Eq  (Var $ Name "original!ret!!11" 0) (Var $ Name "original!ret!!11" 0)
+                                  , And [ Lte (Num 0) (Var $ Name "original!n!11" 0)
+                                        , Lt  (Var $ Name "original!n!11" 0) (Num 10)
+                                        , Eq  (Var $ Name "original!ret!!11" 0) (Var $ Name "original!n!11" 0)
                                         ]
-                                  , And [ Lte (Num 0) (Var $ Name "original!ret!!19" 0)
-                                        , Lt  (Var $ Name "original!ret!!19" 0) (Num 10)
-                                        , Eq  (Var $ Name "original!ret!!19" 0) (Var $ Name "original!ret!!19" 0)
+                                  , And [ Lte (Num 0) (Var $ Name "original!n!19" 0)
+                                        , Lt  (Var $ Name "original!n!19" 0) (Num 10)
+                                        , Eq  (Var $ Name "original!ret!!19" 0) (Var $ Name "original!n!19" 0)
                                         ]
-                                  , And [ Lte (Num 0) (Var $ Name "original!ret!!27" 0)
-                                        , Lt  (Var $ Name "original!ret!!27" 0) (Num 10)
-                                        , Eq  (Var $ Name "original!ret!!27" 0) (Var $ Name "original!ret!!27" 0)
+                                  , And [ Lte (Num 0) (Var $ Name "original!n!27" 0)
+                                        , Lt  (Var $ Name "original!n!27" 0) (Num 10)
+                                        , Eq  (Var $ Name "original!ret!!27" 0) (Var $ Name "original!n!27" 0)
                                         ]
-                                  , And [ Lte (Num 0) (Var $ Name "original!ret!!35" 0)
-                                        , Lt  (Var $ Name "original!ret!!35" 0) (Num 10)
-                                        , Eq  (Var $ Name "original!ret!!35" 0) (Var $ Name "original!ret!!35" 0)
+                                  , And [ Lte (Num 0) (Var $ Name "original!n!35" 0)
+                                        , Lt  (Var $ Name "original!n!35" 0) (Num 10)
+                                        , Eq  (Var $ Name "original!ret!!35" 0) (Var $ Name "original!n!35" 0)
                                         ]
                                   ])
   let refinementSum = Constrained
@@ -363,6 +363,165 @@ test_testState_sums = do
   let task = testState @(Assertion CValue) @CValue assertion state
   actual <- evalCeili (namesIn state) task
   assertEqual Accepted actual
+
+
+------------------
+-- Optimization --
+------------------
+
+test_optimizeConstraints_sums = do
+  -- An actual example from a benchmark.
+  let originalSum = Constrained
+                    (Add [Add [Add [Add [Add [ Num 0
+                                             , Var $ Name "original!ret!!3" 0  ]
+                                             , Var $ Name "original!ret!!11" 0  ]
+                                             , Var $ Name "original!ret!!19" 0 ]
+                                             , Var $ Name "original!ret!!27" 0 ]
+                                             , Var $ Name "original!ret!!35" 0 ])
+                    (Set.fromList [ Name "original!n!3" 0
+                                  , Name "original!n!11" 0
+                                  , Name "original!n!19" 0
+                                  , Name "original!n!27" 0
+                                  , Name "original!n!35" 0
+                                  , Name "original!ret!!3" 0
+                                  , Name "original!ret!!11" 0
+                                  , Name "original!ret!!19" 0
+                                  , Name "original!ret!!27" 0
+                                  , Name "original!ret!!35" 0
+                                  ])
+                    Set.empty
+                    (Set.fromList [ And [ Lte (Num 0) (Var $ Name "original!n!3" 0)
+                                        , Lt  (Var $ Name "original!n!3" 0) (Num 10)
+                                        , Eq  (Var $ Name "original!ret!!3" 0) (Var $ Name "original!n!3" 0)
+                                        ]
+                                  , And [ Lte (Num 0) (Var $ Name "original!n!11" 0)
+                                        , Lt  (Var $ Name "original!n!11" 0) (Num 10)
+                                        , Eq  (Var $ Name "original!ret!!11" 0) (Var $ Name "original!n!11" 0)
+                                        ]
+                                  , And [ Lte (Num 0) (Var $ Name "original!n!19" 0)
+                                        , Lt  (Var $ Name "original!n!19" 0) (Num 10)
+                                        , Eq  (Var $ Name "original!ret!!19" 0) (Var $ Name "original!n!19" 0)
+                                        ]
+                                  , And [ Lte (Num 0) (Var $ Name "original!n!27" 0)
+                                        , Lt  (Var $ Name "original!n!27" 0) (Num 10)
+                                        , Eq  (Var $ Name "original!ret!!27" 0) (Var $ Name "original!n!27" 0)
+                                        ]
+                                  , And [ Lte (Num 0) (Var $ Name "original!n!35" 0)
+                                        , Lt  (Var $ Name "original!n!35" 0) (Num 10)
+                                        , Eq  (Var $ Name "original!ret!!35" 0) (Var $ Name "original!n!35" 0)
+                                        ]
+                                  ])
+  let optimizedOriginalSum = Constrained
+                    (Add [Add [Add [Add [Add [ Num 0
+                                             , Var $ Name "original!ret!!3" 0  ]
+                                             , Var $ Name "original!ret!!11" 0  ]
+                                             , Var $ Name "original!ret!!19" 0 ]
+                                             , Var $ Name "original!ret!!27" 0 ]
+                                             , Var $ Name "original!ret!!35" 0 ])
+                    (Set.fromList [ Name "original!n!3" 0
+                                  , Name "original!n!11" 0
+                                  , Name "original!n!19" 0
+                                  , Name "original!n!27" 0
+                                  , Name "original!n!35" 0
+                                  , Name "original!ret!!3" 0
+                                  , Name "original!ret!!11" 0
+                                  , Name "original!ret!!19" 0
+                                  , Name "original!ret!!27" 0
+                                  , Name "original!ret!!35" 0
+                                  ])
+                    Set.empty
+                    (Set.fromList [ And [ Lte (Num 0) (Var $ Name "original!ret!!3" 0)
+                                        , Lt  (Var $ Name "original!ret!!3" 0) (Num 10)
+                                        ]
+                                  , And [ Lte (Num 0) (Var $ Name "original!ret!!11" 0)
+                                        , Lt  (Var $ Name "original!ret!!11" 0) (Num 10)
+                                        ]
+                                  , And [ Lte (Num 0) (Var $ Name "original!ret!!19" 0)
+                                        , Lt  (Var $ Name "original!ret!!19" 0) (Num 10)
+                                        ]
+                                  , And [ Lte (Num 0) (Var $ Name "original!ret!!27" 0)
+                                        , Lt  (Var $ Name "original!ret!!27" 0) (Num 10)
+                                        ]
+                                  , And [ Lte (Num 0) (Var $ Name "original!ret!!35" 0)
+                                        , Lt  (Var $ Name "original!ret!!35" 0) (Num 10)
+                                        ]
+                                  ])
+  let refinementSum = Constrained
+                      (Add [Add [Add [Add [Add [ Num 0
+                                               , Var $ Name "refinement!ret!!3" 0  ]
+                                               , Var $ Name "refinement!ret!!11" 0  ]
+                                               , Var $ Name "refinement!ret!!19" 0 ]
+                                               , Var $ Name "refinement!ret!!27" 0 ]
+                                               , Var $ Name "refinement!ret!!35" 0 ])
+                      Set.empty
+                      (Set.fromList [ And [ Lte (Num 0) (Var $ Name "refinement!c" 0)
+                                          , Lt  (Var $ Name "refinement!c" 0) (Num 5)
+                                          , Eq  (Var $ Name "refinement!ret!!3" 0)
+                                                (Add [Mul[ Num 2, Var $ Name "refinement!c" 0], Num 1])
+                                          ]
+                                    , And [ Lte (Num 0) (Var $ Name "refinement!c" 0)
+                                          , Lt  (Var $ Name "refinement!c" 0) (Num 5)
+                                          , Eq  (Var $ Name "refinement!ret!!11" 0)
+                                                (Add [Mul[ Num 2, Var $ Name "refinement!c" 0], Num 1])
+                                          ]
+                                    , And [ Lte (Num 0) (Var $ Name "refinement!c" 0)
+                                          , Lt  (Var $ Name "refinement!c" 0) (Num 5)
+                                          , Eq  (Var $ Name "refinement!ret!!19" 0)
+                                                (Add [Mul[ Num 2, Var $ Name "refinement!c" 0], Num 1])
+                                          ]
+                                    , And [ Lte (Num 0) (Var $ Name "refinement!c" 0)
+                                          , Lt  (Var $ Name "refinement!c" 0) (Num 5)
+                                          , Eq  (Var $ Name "refinement!ret!!27" 0)
+                                                (Add [Mul[ Num 2, Var $ Name "refinement!c" 0], Num 1])
+                                          ]
+                                    , And [ Lte (Num 0) (Var $ Name "refinement!c" 0)
+                                          , Lt  (Var $ Name "refinement!c" 0) (Num 5)
+                                          , Eq  (Var $ Name "refinement!ret!!35" 0)
+                                                (Add [Mul[ Num 2, Var $ Name "refinement!c" 0], Num 1])
+                                          ]
+                                    ])
+                      Set.empty
+
+  let optimizedRefinementSum = Constrained
+                      (Add [Add [Add [Add [Add [ Num 0
+                                               , Var $ Name "refinement!ret!!3" 0  ]
+                                               , Var $ Name "refinement!ret!!11" 0  ]
+                                               , Var $ Name "refinement!ret!!19" 0 ]
+                                               , Var $ Name "refinement!ret!!27" 0 ]
+                                               , Var $ Name "refinement!ret!!35" 0 ])
+                      Set.empty
+                      (Set.fromList [ And [ Lte (Num 0) (Var $ Name "refinement!c" 0)
+                                          , Lt  (Var $ Name "refinement!c" 0) (Num 5)
+                                          , Eq  (Var $ Name "refinement!ret!!3" 0)
+                                                (Add [Mul[ Num 2, Var $ Name "refinement!c" 0], Num 1])
+                                          ]
+                                    , And [ Lte (Num 0) (Var $ Name "refinement!c" 0)
+                                          , Lt  (Var $ Name "refinement!c" 0) (Num 5)
+                                          , Eq  (Var $ Name "refinement!ret!!11" 0)
+                                                (Add [Mul[ Num 2, Var $ Name "refinement!c" 0], Num 1])
+                                          ]
+                                    , And [ Lte (Num 0) (Var $ Name "refinement!c" 0)
+                                          , Lt  (Var $ Name "refinement!c" 0) (Num 5)
+                                          , Eq  (Var $ Name "refinement!ret!!19" 0)
+                                                (Add [Mul[ Num 2, Var $ Name "refinement!c" 0], Num 1])
+                                          ]
+                                    , And [ Lte (Num 0) (Var $ Name "refinement!c" 0)
+                                          , Lt  (Var $ Name "refinement!c" 0) (Num 5)
+                                          , Eq  (Var $ Name "refinement!ret!!27" 0)
+                                                (Add [Mul[ Num 2, Var $ Name "refinement!c" 0], Num 1])
+                                          ]
+                                    , And [ Lte (Num 0) (Var $ Name "refinement!c" 0)
+                                          , Lt  (Var $ Name "refinement!c" 0) (Num 5)
+                                          , Eq  (Var $ Name "refinement!ret!!35" 0)
+                                                (Add [Mul[ Num 2, Var $ Name "refinement!c" 0], Num 1])
+                                          ]
+                                    ])
+                      Set.empty
+
+  let actualOriginalOpt   = optimizeConstraints originalSum
+  let actualRefinementOpt = optimizeConstraints refinementSum
+  assertEqual optimizedOriginalSum    actualOriginalOpt
+  assertEqual optimizedRefinementSum  actualRefinementOpt
 
 
 -----------------

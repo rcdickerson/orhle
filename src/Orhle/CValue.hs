@@ -6,6 +6,8 @@
 module Orhle.CValue
   ( CValue(..)
   , CValuePEval(..)
+  , optimizeConstraints
+  , optimizeState
   , pevalCArith
   , pieFilterClause
   ) where
@@ -21,6 +23,7 @@ import Ceili.Name
 import Ceili.ProgState
 import qualified Ceili.SMT as SMT
 import Ceili.StatePredicate
+import Data.Either ( partitionEithers )
 import Data.Set ( Set )
 import qualified Data.Set as Set
 import qualified Data.Map as Map
@@ -57,6 +60,46 @@ instance Pretty CValue where
 
 instance AssertionParseable CValue where
   parseLiteral = integer >>= return . Concrete
+
+
+------------------
+-- Optimization --
+------------------
+
+-- Empirical evidence suggests Z3 performs much better with certain
+-- preprocessing on the constraints.
+optimizeConstraints :: CValue -> CValue
+optimizeConstraints (Concrete i) = Concrete i
+optimizeConstraints (Constrained value cvs aconstraints econstraints) =
+  let
+    valueNames    = namesIn value
+    possibleESubs = Set.difference (namesIn $ Set.toList econstraints) valueNames
+    econstraints' = eqSubstitutions (Set.toList possibleESubs) (Set.toList econstraints)
+  in Constrained value cvs aconstraints (Set.fromList econstraints')
+
+eqSubstitutions :: [Name] -> [Assertion Integer] -> [Assertion Integer]
+eqSubstitutions [] assertions = assertions
+eqSubstitutions (name:rest) assertions =
+  let
+    getClauses assertion = case assertion of
+                             And cs -> cs
+                             _      -> []
+    check clause = case clause of
+                     Eq (Var v) val | v == name -> Left val
+                     Eq val (Var v) | v == name -> Left val
+                     _ -> Right clause
+    process assertion = let
+                          clauses = getClauses assertion
+                          (subs, remaining) = partitionEithers (map check clauses)
+                          clauses' = case subs of
+                            []    -> remaining
+                            val:_ -> map (subArith name val) remaining
+                        in aAnd clauses'
+    assertions' = map process assertions
+  in eqSubstitutions rest assertions'
+
+optimizeState :: ProgState CValue -> ProgState CValue
+optimizeState = Map.map optimizeConstraints
 
 
 -----------------------------------

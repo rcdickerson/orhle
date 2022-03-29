@@ -903,6 +903,9 @@ data UpdateFlag = Accepts
 isRejects :: UpdateFlag -> Bool
 isRejects = (== Rejects)
 
+isAccepts :: UpdateFlag -> Bool
+isAccepts = (== Accepts)
+
 tagFeature :: CIConstraints t => BadState t -> Feature t -> CiM t (Feature t, UpdateFlag)
 tagFeature newBadState feature = do
   acceptsNewBad <- lift $ testState (featAssertion feature) (bsState newBadState)
@@ -924,12 +927,14 @@ updateRootClauses newBadState rootClauses = do
   -- Collect and update all clauses, throw away now-bad clauses, and rebuild the tree.
   let collectClauses (RootClause clause covers) = clause:(concat . map collectClauses $ covers)
   let allClauses = concat . map collectClauses $ rootClauses
-  -- To throw away clauses altogether:
-  -- let allClauses = map rcClause rootClauses
-  updatedClauses <- pure
-                  . map fst
-                  . filter (isRejects . snd)
-                  =<< mapM (tagClause newBadState) allClauses
+  taggedClauses <- mapM (tagClause newBadState) allClauses
+  let updatedClauses = map fst
+                     . filter (isRejects . snd)
+                     $ taggedClauses
+  -- let reenqueue (Clause features acceptedGoods) = do
+  --       rejectedBads <- mapM getFeatureRejectedBads (IntSet.toList features)
+  --       enqueue $ Entry features (IntSet.unions rejectedBads) acceptedGoods
+  -- mapM_ reenqueue $ map fst . filter (isAccepts . snd) $ taggedClauses
   pure $ foldr insertRootClause [] updatedClauses
 
 updateFeatureCache :: CIConstraints t => BadState t -> FeatureCache t -> CiM t (FeatureCache t)
