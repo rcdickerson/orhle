@@ -90,9 +90,7 @@ data Configuration c p t = Configuration
 data Job p t = Job
   { jobBadStates  :: Set (ProgState t)
   , jobGoodStates :: Set (ProgState t)
-  , jobLoopConds  :: [Assertion t]
-  , jobLoopBody   :: p
-  , jobPostCond   :: Assertion t
+  , jobGoalQuery  :: Assertion t -> Ceili (Assertion t)
   }
 
 ----------------------
@@ -413,15 +411,8 @@ mkCIEnv config job =
     goodStates          = Set.fromList . map (uncurry GoodState) $ zip [0..] (Set.toList closedGoods)
     states              = mkStates badStates goodStates
     fCandidates         = Set.toList $ (cfgFeatureGenerator config) (cfgMaxFeatureSize config)
-    loopConds           = aAnd $ jobLoopConds job
-    negLoopConds        = aAnd . map Not $ jobLoopConds job
     maxClauseSize       = cfgMaxClauseSize config
-    goalQuery candidate = do
-      weakestPre <- (cfgWpSemantics config) (cfgWpContext config) (jobLoopBody job) candidate
-      pure $ aAnd [ Imp (aAnd [candidate, negLoopConds]) (jobPostCond job) -- Establishes Post
-                  , Imp (aAnd [candidate, loopConds]) weakestPre           -- Inductive
-                  ]
-  in CIEnv qEmpty states [] IntSet.empty fcEmpty fCandidates goalQuery names maxClauseSize Set.empty Set.empty
+  in CIEnv qEmpty states [] IntSet.empty fcEmpty fCandidates (jobGoalQuery job) names maxClauseSize Set.empty Set.empty
 
 getQueue :: CiM t (Queue t)
 getQueue = get >>= pure . envQueue
