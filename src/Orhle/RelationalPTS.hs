@@ -114,8 +114,10 @@ relBackwardPT' stepStrategy ctx (ProgramRelation aprogs eprogs) post = do
         []    -> do
           let check invariant = do
                 isSufficient <- sufficiencyQuery aloops eloops post invariant
-                isInvariant  <- invarianceQuery stepStrategy ctx aloops eloops invariant
-                pure $ aAnd [isSufficient, isInvariant]
+                (isInvariant, QuerySubstitution freshNames names)
+                             <- invarianceQuery stepStrategy ctx aloops eloops invariant
+                let interpretCex = extractState freshNames names
+                pure $ (aAnd [isSufficient, isInvariant], interpretCex)
           mInvariant <- inferInvariant stepStrategy ctx aloops eloops check
           case mInvariant of
             Just inv -> continueWithInv inv
@@ -141,8 +143,8 @@ useInvariant :: ( Embeddable Integer t
              -> Assertion t
              -> Ceili (Assertion t)
 useInvariant invariant stepStrategy ctx aloops eloops aprogs' eprogs' post = do
-  isSufficient <- checkValid =<< sufficiencyQuery aloops eloops post invariant
-  isInvariant  <- checkValid =<< invarianceQuery stepStrategy ctx aloops eloops invariant
+  isSufficient <- checkValid       =<< sufficiencyQuery aloops eloops post invariant
+  isInvariant  <- checkValid . fst =<< invarianceQuery stepStrategy ctx aloops eloops invariant
   -- TODO: Lockstep
   case (isSufficient, isInvariant) of
     (SMT.Valid, SMT.Valid) -> do
@@ -175,6 +177,8 @@ sufficiencyQuery aloops eloops post invariant = do
   let conds = map condA (aloops ++ eloops)
   pure $ Imp (aAnd $ invariant:(map Not conds)) post
 
+data QuerySubstitution = QuerySubstitution [Name] [Name]
+
 invarianceQuery :: ( Embeddable Integer t
                    , Ord t
                    , AssertionParseable t
@@ -188,7 +192,7 @@ invarianceQuery :: ( Embeddable Integer t
                 -> [ImpWhile t (SpecImpProgram t)]
                 -> [ImpWhile t (SpecImpProgram t)]
                 -> Assertion t
-                -> Ceili (Assertion t)
+                -> Ceili (Assertion t, QuerySubstitution)
 invarianceQuery stepStrategy ctx aloops eloops invariant = do
   let conds = map condA (aloops ++ eloops)
   let measures = catMaybes $ map measure (aloops ++ eloops)
@@ -199,7 +203,22 @@ invarianceQuery stepStrategy ctx aloops eloops invariant = do
   wpInvar <- relBackwardPT stepStrategy ctx (map body aloops) (map body eloops) (aAnd $ invariant:measureConds)
   let frWpInvar = substituteAll names frNames wpInvar
   let frConds = substituteAll names frNames $ aAnd (invariant:conds)
-  pure $ Imp frConds frWpInvar
+  pure $ (Imp frConds frWpInvar, QuerySubstitution frNames names)
+
+
+-- TODO: This is fragile.
+extractState :: Pretty t => [Name] -> [Name] -> Assertion t -> Ceili (ProgState t)
+extractState freshNames names assertion = case assertion of
+  Eq lhs rhs -> pure $ Map.fromList [(extractName lhs, extractInt rhs)]
+  And as     -> pure . Map.unions =<< mapM (extractState freshNames names) as
+  _          -> error $ "Unexpected assertion: " ++ show assertion
+  where
+    extractName arith = case arith of
+      Var name -> substituteAll freshNames names name
+      _ -> error $ "Unexpected arith (expected name): " ++ show arith
+    extractInt arith = case arith of
+      Num n -> n
+      _ -> error $ "Unexpected arith (expected int): " ++ show arith
 
 
 inferInvariant :: ( Embeddable Integer t
@@ -214,7 +233,7 @@ inferInvariant :: ( Embeddable Integer t
                -> RelSpecImpPTSContext t (SpecImpProgram t)
                -> [ImpWhile t (SpecImpProgram t)]
                -> [ImpWhile t (SpecImpProgram t)]
-               -> (Assertion t -> Ceili (Assertion t))
+               -> (Assertion t -> Ceili (Assertion t, Assertion t -> Ceili (ProgState t)))
                -> Ceili (Maybe (Assertion t))
 inferInvariant stepStrategy ctx aloops eloops checkInv =
   let
@@ -238,7 +257,7 @@ inferInvariant stepStrategy ctx aloops eloops checkInv =
       --                        ]
       someHeadStates <- lift . lift $ randomSample 5 headStates
       let ciConfig = CI.Configuration 2 12 lis (relBackwardPT' stepStrategy) ctx
-      let ciJob    = CI.Job Set.empty (Set.fromList $ someHeadStates) checkInv
+      let ciJob    = CI.Job Set.empty (Set.fromList someHeadStates) checkInv
       CI.cInvGen ciConfig ciJob
 
 body :: ImpWhile t e -> e

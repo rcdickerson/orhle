@@ -48,9 +48,9 @@ rhleVerifier iFunEnv triple = do
   let env = mkEnv solver LogLevelDebug 2000 names
   resultOrErr <- runCeili env $ do
     log_i $ "Collecting loop head states for loop invariant inference..."
-    aLoopHeads <- mapM (headStates 100 cFunEnv) aprogs
-    eLoopHeads <- mapM (headStates 100 cFunEnv) eprogs
-    let loopHeads = Map.unions $ aLoopHeads ++ eLoopHeads
+    aLoopHeads <- mapM (headStates 5 cFunEnv) aprogs
+    eLoopHeads <- mapM (headStates 5 cFunEnv) eprogs
+    let loopHeads = Map.map (Map.map (Set.map optimizeState)) . Map.unions $ (aLoopHeads ++ eLoopHeads)
     -- log_d $ "Loop heads: " ++ show loopHeads
     log_i $ "Running backward relational analysis..."
     let namesNoRets = Set.filter (\(Name name _) -> not $ "!retVal" `isSuffixOf` name) names
@@ -73,12 +73,11 @@ headStates :: Int
 headStates numRandomStates env prog = do
   let ctx = SpecImpEvalContext (Fuel 10) env
   let names = Set.toList $ namesIn prog
---  randomStates <- sequence . take numRandomStates . repeat $ randomState names
+  randomStates <- sequence . take numRandomStates . repeat $ randomState names
   let sts = [ Map.fromList $ map (\n -> (n, Concrete 1)) names
             , Map.fromList $ map (\n -> (n, Concrete 0))  names
---            , Map.fromList $ map (\n -> (n, Concrete $ -1))  names
-            -- ] ++ randomStates
-            ]
+            , Map.fromList $ map (\n -> (n, Concrete $ -1))  names
+            ] ++ randomStates
   --lhss <- collectLoopHeadStates ctx sts prog
   --pure $ Map.map (Map.map $ Set.map optimizeState) lhss
   collectLoopHeadStates ctx sts prog

@@ -90,7 +90,7 @@ data Configuration c p t = Configuration
 data Job p t = Job
   { jobBadStates  :: Set (ProgState t)
   , jobGoodStates :: Set (ProgState t)
-  , jobGoalQuery  :: Assertion t -> Ceili (Assertion t)
+  , jobGoalQuery  :: Assertion t -> Ceili (Assertion t, Assertion t -> Ceili(ProgState t))
   }
 
 ----------------------
@@ -390,7 +390,7 @@ data CIEnv t = CIEnv { envQueue             :: Queue t
                      , envRootsAccepted     :: GoodStateIdSet
                      , envFeatureCache      :: FeatureCache t
                      , envFeatureCandidates :: [Assertion t]
-                     , envGoalQuery         :: Assertion t -> Ceili (Assertion t)
+                     , envGoalQuery         :: Assertion t -> Ceili (Assertion t, Assertion t -> Ceili (ProgState t))
                      , envStateNames        :: [Name]
                      , envMaxClauseSize     :: Int
                      , envClauseDenylist    :: Set FeatureIdSet
@@ -593,7 +593,7 @@ cInvGen' = do
     Nothing -> clog_d "[CInvGen] Unable to find separator." >> pure Nothing
     Just (separator, clauses) -> do
       clog_d . show $ pretty "[CInvGen] Candidate precondition:" <+> (align . pretty) separator
-      clog_d . show $ pretty "[CInvGen] Candidate clauses:" <+> (align . pretty) (map (IntSet.toList . clauseFeatures) clauses)
+--      clog_d . show $ pretty "[CInvGen] Candidate clauses:" <+> (align . pretty) (map (IntSet.toList . clauseFeatures) clauses)
       goalStatus <- checkGoal separator
       case goalStatus of
         GoalCex cex -> do
@@ -611,7 +611,7 @@ cInvGen' = do
           -- throwError "SMT error"
           --cInvGen' -- Continue now that the problematic assertion is out of the queue.
           mapM_ denyClause $ map clauseFeatures clauses
-          putRootClauses origRoots
+          putRootClauses $ filter (\(RootClause clause _) -> not $ clause `elem` clauses) origRoots
           putQueue origQueue
           cInvGen'
 
@@ -621,15 +621,15 @@ data GoalStatus t = GoalMet
 
 checkGoal :: CIConstraints t => Assertion t -> CiM t (GoalStatus t)
 checkGoal candidate = do
-  goalQuery <- get >>= pure . envGoalQuery
---  cquery <- lift (goalQuery candidate)
---  clog_d . show . align $ pretty "Goal query:" <+> pretty cquery
-  mCex <- lift $ goalQuery candidate >>= findCounterexample
+  gq <- get >>= pure . envGoalQuery
+  (goalQuery, cexInterpreter) <- lift $ gq candidate
+  mCex <- lift $ findCounterexample goalQuery
   case mCex of
     FormulaValid -> pure GoalMet
     Counterexample cex -> do
-      cexState <- extractState cex
-      pure $ GoalCex cexState
+      cexState <- lift $ cexInterpreter cex
+      stateNames <- getStateNames
+      pure $ GoalCex (closeNames stateNames cexState)
     SMTTimeout -> pure $ SMTError "SMT timeout"
     SMTUnknown -> pure $ SMTError "SMT returned unknown"
 
@@ -670,10 +670,10 @@ learnSeparator' = do
         Nothing -> do
           clog_d $ "[CInvGen] Search queue is empty, failing."
 --          printSeen
-          printKdes
-          printRejectSets
-          printAcceptSets
-          printFeatures
+--          printKdes
+--          printRejectSets
+--          printAcceptSets
+--          printFeatures
           pure Nothing
         Just entry -> do
           maxClauseSize <- getMaxClauseSize
@@ -876,17 +876,14 @@ addNewlyUsefulCandidates newBadState = do
             pure $ Left assertion
   (candidates', newlyUseful) <- pure . partitionEithers =<< mapM rejectsNewBad featureCandidates
   maybeUseful <- mapM assertionToFeature newlyUseful
-  let newFeatures = filter (not . IntSet.null . featAcceptedGoods . fst) maybeUseful
+  --let newFeatures = filter (not . IntSet.null . featAcceptedGoods . fst) maybeUseful
 
-  -- Remember the new features so we don't have do duplicate the SMT work,
-  -- but only actually enqueue the ones who accept new states.
-  rootClauseAccepts <- pure . map (clauseAcceptedGoods . rcClause) =<< getRootClauses
-  let useful (feature, _) = not $ (any (IntSet.isProperSubsetOf (featAcceptedGoods feature)) rootClauseAccepts)
-  let featuresToSeed = filter useful newFeatures
+  goodStates <- getGoodStates >>= pure . IntSet.fromList . Set.toList . Set.map gsId
+  let newFeatures = filter ((== goodStates) . featAcceptedGoods . fst) maybeUseful
 
   putFeatureCandidates candidates'
   mapM_ (uncurry addFeature) newFeatures
-  mapM_ (uncurry seedFeature) featuresToSeed
+  mapM_ (uncurry seedFeature) newFeatures
 
 seedFeature :: CIConstraints t => Feature t -> BadStateIdSet -> CiM t ()
 seedFeature feature rejectedBads = do
@@ -1017,7 +1014,7 @@ splitGoodStates assertion states = do
   let resultPairs state = do
         -- Optimistically assume errors accept good states.
         -- If over-optimistic, a future CEX will rule the feature out.
-        result <- testState assertion (gsState state) >>= treatErrorsAs assertion True
+        result <- testState assertion (gsState state) >>= treatErrorsAs (gsState state) assertion True
         pure (state, result)
   evaluations <- sequence $ map resultPairs states
   let (accepted, rejected) = partition snd evaluations
@@ -1028,33 +1025,18 @@ splitBadStates assertion states = do
   let resultPairs state = do
         -- Pessimistically assume errors accept bad states.
         -- We cannot optimistically accept features here, as this is the CEX check mechanism.
-        result <- testState assertion (bsState state) >>= treatErrorsAs assertion True
+        result <- testState assertion (bsState state) >>= treatErrorsAs (bsState state) assertion True
         pure (state, result)
   evaluations <- sequence $ map resultPairs states
   let (accepted, rejected) = partition snd evaluations
   pure (map fst accepted, map fst rejected)
 
-treatErrorsAs :: Pretty t => Assertion t -> Bool -> PredicateResult -> Ceili Bool
-treatErrorsAs assertion err result = case result of
+treatErrorsAs :: Pretty t => ProgState t -> Assertion t -> Bool -> PredicateResult -> Ceili Bool
+treatErrorsAs state assertion err result = case result of
   Accepted  -> pure True
   Rejected  -> pure False
-  Error msg -> (log_e $ "SMT error: " ++ msg ++ ", assertion: " ++ (show . pretty $ assertion)) >> pure err
-
-extractState :: CIConstraints t => Assertion t -> CiM t (ProgState t)
-extractState assertion = do
-  stateNames <- getStateNames
-  pure $ closeNames stateNames $ extractState' assertion
-
--- TODO: This is fragile.
-extractState' :: Pretty t => Assertion t -> ProgState t
-extractState' assertion = case assertion of
-  Eq lhs rhs -> Map.fromList [(extractName lhs, extractInt rhs)]
-  And as     -> Map.unions $ map extractState' as
-  _          -> error $ "Unexpected assertion: " ++ show assertion
-  where
-    extractName arith = case arith of
-      Var name -> name
-      _ -> error $ "Unexpected arith (expected name): " ++ show arith
-    extractInt arith = case arith of
-      Num n -> n
-      _ -> error $ "Unexpected arith (expected int): " ++ show arith
+  Error msg -> do
+    log_e . show $ pretty "SMT error:" <+> pretty msg
+                <> pretty ", assertion:" <+> pretty assertion
+                -- <> pretty ", state: " <+> pretty state
+    pure err
