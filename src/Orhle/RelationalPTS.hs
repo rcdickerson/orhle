@@ -117,7 +117,7 @@ relBackwardPT' stepStrategy ctx (ProgramRelation aprogs eprogs) post = do
                 (isInvariant, QuerySubstitution freshNames names)
                              <- invarianceQuery stepStrategy ctx aloops eloops invariant
                 let interpretCex = extractState freshNames names
-                pure $ (aAnd [isSufficient, isInvariant], interpretCex)
+                pure $ (aAnd [substituteAll names freshNames isSufficient, isInvariant], interpretCex)
           mInvariant <- inferInvariant stepStrategy ctx aloops eloops check
           case mInvariant of
             Just inv -> continueWithInv inv
@@ -144,7 +144,9 @@ useInvariant :: ( Embeddable Integer t
              -> Ceili (Assertion t)
 useInvariant invariant stepStrategy ctx aloops eloops aprogs' eprogs' post = do
   isSufficient <- checkValid       =<< sufficiencyQuery aloops eloops post invariant
-  isInvariant  <- checkValid . fst =<< invarianceQuery stepStrategy ctx aloops eloops invariant
+  invQuery <- invarianceQuery stepStrategy ctx aloops eloops invariant
+  isInvariant  <- checkValid . fst $ invQuery
+  log_d $ "Invariance query: " ++ (show . pretty . fst $ invQuery)
   -- TODO: Lockstep
   case (isSufficient, isInvariant) of
     (SMT.Valid, SMT.Valid) -> do
@@ -256,7 +258,7 @@ inferInvariant stepStrategy ctx aloops eloops checkInv =
       --                        , Eq (Var $ Name "test!2!currentTotal" 0) (Mul [Num $ embed @Integer 101, (Var $ Name "test!2!counter" 0)])
       --                        ]
       someHeadStates <- lift . lift $ randomSample 5 headStates
-      let ciConfig = CI.Configuration 2 12 lis (relBackwardPT' stepStrategy) ctx
+      let ciConfig = CI.Configuration 2 2 lis (relBackwardPT' stepStrategy) ctx
       let ciJob    = CI.Job Set.empty (Set.fromList someHeadStates) checkInv
       CI.cInvGen ciConfig ciJob
 

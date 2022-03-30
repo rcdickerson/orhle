@@ -687,6 +687,38 @@ learnSeparator' = do
               enqueueNextLevel entry nextFeatures
               learnSeparator'
 
+target1 :: Assertion Integer
+target1 = Lte (Add [Var $ Name "original!sum" 0, Mul [Num (-1), Var $ Name "refinement!sum" 0] ]) (Num 0)
+
+target2 :: Assertion Integer
+target2 = Lte (Add [Mul [Num (-1), Var $ Name "original!sum" 0], Var $ Name "refinement!sum" 0 ]) (Num 0)
+
+arithSE :: (Embeddable b a, Eq a) => Arith a -> Arith b -> Bool
+arithSE arithA arithB = case (arithA, arithB) of
+  (Var a, Var b) -> a == b
+  (Num a, Num b) -> a == embed b
+  (Add as, Add bs) -> all (uncurry arithSE) (zip as bs)
+  (Mul as, Mul bs) -> all (uncurry arithSE) (zip as bs)
+  _ -> False
+
+structurallyEqual :: (Embeddable b a, Eq a) => Assertion a -> Assertion b -> Bool
+structurallyEqual assertionA assertionB =
+  case (assertionA, assertionB) of
+    (Lte al ar, Lte bl br) -> arithSE al bl && arithSE ar br
+    _ -> False
+
+checkForTargets ids = do
+  if IntSet.size ids <= 2
+    then do
+    assertions <- lookupFeatures (IntSet.toList ids) >>= pure . map featAssertion
+    case assertions of
+      [ca] | structurallyEqual ca target1 -> pure (True, False)
+      [ca] | structurallyEqual ca target2 -> pure (False, True)
+      [ca1, ca2] | structurallyEqual ca1 target1 && structurallyEqual ca2 target2 -> pure (True, True)
+      [ca1, ca2] | structurallyEqual ca1 target2 && structurallyEqual ca2 target1 -> pure (True, True)
+      _ -> pure (False, False)
+    else pure (False, False)
+
 printSeen :: Pretty t => CiM t ()
 printSeen = do
   seenIds <- getQueue >>= pure . (map IntSet.toList) . Set.toList . qSeen
@@ -717,6 +749,9 @@ printFeatures = do
 usefulFeatures :: CIConstraints t => Entry t -> CiM t [FeatureId]
 usefulFeatures (Entry candidate enRejectedBads enAcceptedGoods _) = do
   rootClauseAccepts <- pure . IntSet.unions . map (clauseAcceptedGoods . rcClause) =<< getRootClauses
+  (t1, t2) <- checkForTargets candidate
+  if t1 then clog_d $ "Finding useful features for " ++ (show . pretty $ target1) else pure ()
+  if t2 then clog_d $ "Finding useful features for " ++ (show . pretty $ target2) else pure ()
   if enAcceptedGoods `IntSet.isSubsetOf` rootClauseAccepts
     then pure [] -- Short circuit if there are no possible useful features.
     else do
@@ -741,6 +776,9 @@ enqueueNextLevel :: CIConstraints t => Entry t -> [FeatureId] -> CiM t ()
 enqueueNextLevel _ [] = pure ()
 enqueueNextLevel entry@(Entry candidateIds enRejectedBads enAcceptedGoods _) (newFeatureId:rest) = do
   let newCandidateIds = IntSet.insert newFeatureId candidateIds
+  (t1, t2) <- checkForTargets newCandidateIds
+  if t1 && t2 then clog_d "**** See target in enqueueNextLevel" else pure ()
+
   --denied <- isDenied newCandidateIds
   knownDeadEnd <- isKnownDeadEnd newCandidateIds
   if knownDeadEnd -- denied || knownDeadEnd
@@ -751,6 +789,16 @@ enqueueNextLevel entry@(Entry candidateIds enRejectedBads enAcceptedGoods _) (ne
       let newRejectedBads = IntSet.union enRejectedBads featureRejectedBads
       if not $ newRejectedBads == badStateIds
         then do
+          if t1 && t2 then do
+            clog_d "**** Targets are not rejecting all bad states"
+            newFeat <- lookupFeature newFeatureId
+            entryFeat <- lookupFeatures $ IntSet.toList candidateIds
+            badStates <- getBadStates
+            clog_d $ "**** entryFeature: " ++ (show . pretty $ entryFeat)
+            clog_d $ "**** newFeature: " ++ (show . pretty $ newFeat)
+            clog_d $ "**** newRejectedBads: " ++ (show . pretty . IntSet.toList $ newRejectedBads)
+            clog_d $ "**** badStates: " ++ (show . pretty $ (map (\(BadState sid st) -> (sid, st)) $ Set.toList badStates))
+            else pure ()
           newAcceptedGoodSet <- lookupFeature newFeatureId >>= pure . featAcceptedGoods
           let newAcceptedGoods = IntSet.union newAcceptedGoodSet enAcceptedGoods
           enqueue $ Entry newCandidateIds newAcceptedGoods newRejectedBads (Just entry)
