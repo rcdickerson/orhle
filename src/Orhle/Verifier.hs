@@ -48,8 +48,8 @@ rhleVerifier iFunEnv triple = do
   let env = mkEnv solver LogLevelDebug 2000 names
   resultOrErr <- runCeili env $ do
     log_i $ "Collecting loop head states for loop invariant inference..."
-    aLoopHeads <- mapM (headStates 5 cFunEnv) aprogs
-    eLoopHeads <- mapM (headStates 5 cFunEnv) eprogs
+    aLoopHeads <- mapM (headStates 100 cFunEnv) aprogs
+    eLoopHeads <- mapM (headStates 100 cFunEnv) eprogs
     let loopHeads = Map.unions $ aLoopHeads ++ eLoopHeads
     -- log_d $ "Loop heads: " ++ show loopHeads
     log_i $ "Running backward relational analysis..."
@@ -73,11 +73,12 @@ headStates :: Int
 headStates numRandomStates env prog = do
   let ctx = SpecImpEvalContext (Fuel 10) env
   let names = Set.toList $ namesIn prog
-  randomStates <- sequence . take numRandomStates . repeat $ randomState names
+--  randomStates <- sequence . take numRandomStates . repeat $ randomState names
   let sts = [ Map.fromList $ map (\n -> (n, Concrete 1)) names
             , Map.fromList $ map (\n -> (n, Concrete 0))  names
-            , Map.fromList $ map (\n -> (n, Concrete $ -1))  names ]
-            ++ randomStates
+--            , Map.fromList $ map (\n -> (n, Concrete $ -1))  names
+            -- ] ++ randomStates
+            ]
   --lhss <- collectLoopHeadStates ctx sts prog
   --pure $ Map.map (Map.map $ Set.map optimizeState) lhss
   collectLoopHeadStates ctx sts prog
@@ -85,5 +86,5 @@ headStates numRandomStates env prog = do
 randomState :: [Name] -> Ceili (ProgState CValue)
 randomState names = do
   g <- lift . lift $ newStdGen
-  let values = map Concrete $ take (length names) (randomRs (-1000, 1000) g :: [Integer])
+  let values = map Concrete $ take (length names) (randomRs (0, 100000) g :: [Integer])
   pure $ Map.fromList $ zip names values

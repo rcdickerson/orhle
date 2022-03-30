@@ -15,7 +15,9 @@ import Ceili.Language.BExp ( bexpToAssertion )
 import Ceili.Language.Imp ( IterStateMap )
 import Ceili.Name
 import Ceili.ProgState
+import qualified Ceili.SMT as SMT
 import Ceili.StatePredicate
+import Control.Monad.State ( runState )
 import Control.Monad.Trans ( lift )
 import Data.Maybe ( catMaybes )
 import qualified Data.Map as Map
@@ -117,7 +119,6 @@ relBackwardPT' stepStrategy ctx (ProgramRelation aprogs eprogs) post = do
               log_e "[RelationalPTS] Unable to infer loop invariant, proceeding with False"
               continueWithInv AFalse -- TODO: Fall back to single stepping over loops.
 
-
 useInvariant :: ( Embeddable Integer t
                 , Ord t
                 , AssertionParseable t
@@ -136,20 +137,43 @@ useInvariant :: ( Embeddable Integer t
              -> Assertion t
              -> Ceili (Assertion t)
 useInvariant invariant stepStrategy ctx aloops eloops aprogs' eprogs' post = do
-  wpInvar <- relBackwardPT stepStrategy ctx (map body aloops) (map body eloops) invariant
   let conds = map condA (aloops ++ eloops)
-  isSufficient <- checkValidB $ Imp (And $ invariant:(map Not conds)) post
-  isInvariant  <- checkValidB $ Imp (And $ invariant:conds) wpInvar
+  let measures = catMaybes $ map measure (aloops ++ eloops)
+  isSufficient <- checkValid $ Imp (aAnd $ invariant:(map Not conds)) post
+
+  let names = Set.toList . Set.unions $ [ namesIn conds, namesIn invariant, namesIn aloops, namesIn eloops ]
+  frNames <- envFreshen names
+  let freshMeasures = substituteAll names frNames measures
+  let measureConds = map (uncurry Lt) (zip measures freshMeasures)
+  wpInvar <- relBackwardPT stepStrategy ctx (map body aloops) (map body eloops) (aAnd $ invariant:measureConds)
+  let frWpInvar = substituteAll names frNames wpInvar
+  let frConds = substituteAll names frNames $ aAnd (invariant:conds)
+  isInvariant  <- checkValid $ Imp frConds wpInvar
+
+--  log_d . show $ pretty "Sufficiency query:" <+> (pretty $ Imp (aAnd $ invariant:(map Not conds)) post)
+  log_d . show $ pretty "Invariance query:" <+> (pretty $ Imp frConds frWpInvar)
+
   -- TODO: Lockstep
-  -- TODO: Variant
   case (isSufficient, isInvariant) of
-    (True, True) -> do
+    (SMT.Valid, SMT.Valid) -> do
       relBackwardPT stepStrategy ctx aprogs' eprogs' invariant
-    (False, _)   -> do
+    (SMT.Invalid _, _) -> do
       log_e "[RelationalPTS] Invariant is insufficient to establish post"
       return AFalse
-    (_, False)   -> do
-      log_e "[RelationalPTS] Invariant is not invariant on loop body"
+    (_, SMT.Invalid _) -> do
+      log_e "[RelationalPTS] Invariant is not invariant on loop body or does not decrease measure"
+      return AFalse
+    (SMT.ValidTimeout, _) -> do
+      log_e "[RelationalPTS] SMT solver timed out when determining sufficency to establish post."
+      return AFalse
+    (SMT.ValidUnknown, _) -> do
+      log_e "[RelationalPTS] SMT solver returned unknown when determining sufficency to establish post."
+      return AFalse
+    (_, SMT.ValidTimeout) -> do
+      log_e "[RelationalPTS] SMT solver timed out when determining invariance on loop body."
+      return AFalse
+    (_, SMT.ValidUnknown) -> do
+      log_e "[RelationalPTS] SMT solver returned unknown when determining invariance on loop body."
       return AFalse
 
 
@@ -178,11 +202,11 @@ inferInvariant stepStrategy ctx aloops eloops post =
   in case headStates of
     [] -> throwError "Insufficient test head states for while loop, did you run populateTestStates?"
     _  -> do
-      let names = rsipc_programNames ctx
+--      let names = rsipc_programNames ctx
+      let names = Set.intersection (rsipc_programNames ctx) (Set.union (namesIn aloops) (namesIn eloops))
       let lits  = rsipc_programLits ctx
       let lis   = LI.linearInequalities (Set.map embed lits) names
-      --let separatorLearner =  Lig.SeparatorLearner DTL.emptyLearnerContext (DTL.learnSeparator 12 2 lis) DTL.resetQueue
-      -- let lis = Set.fromList [ Lte (Var $ Name "test!1!counter" 0) (Num $ embed @Integer 5)
+      -- let lis _ = Set.fromList [ Lte (Var $ Name "test!1!counter" 0) (Num $ embed @Integer 5)
       --                        , Lte (Var $ Name "test!2!counter" 0) (Num $ embed @Integer 5)
       --                        , Gte (Var $ Name "test!1!lastTime" 0) (Num $ embed @Integer 0)
       --                        , Gte (Var $ Name "test!2!lastTime" 0) (Num $ embed @Integer 0)
@@ -191,17 +215,9 @@ inferInvariant stepStrategy ctx aloops eloops post =
       --                        , Eq (Var $ Name "test!1!currentTotal" 0) (Mul [Num $ embed @Integer 100, (Var $ Name "test!1!counter" 0)])
       --                        , Eq (Var $ Name "test!2!currentTotal" 0) (Mul [Num $ embed @Integer 101, (Var $ Name "test!2!counter" 0)])
       --                        ]
-      -- result <- Lig.loopInvGen ctx
-      --                          (relBackwardPT' stepStrategy)
-      --                          conds
-      --                          bodies
-      --                          post
-      --                          headStates
-      --                          separatorLearner
-      --DTI.dtInvGen ctx 2 12 (relBackwardPT' stepStrategy) conds bodies post headStates lis
       someHeadStates <- lift . lift $ randomSample 5 headStates
       let ciConfig = CI.Configuration 2 12 lis (relBackwardPT' stepStrategy) ctx
-      let ciJob    = CI.Job Set.empty (Set.fromList $ someHeadStates) (aAnd conds) bodies post
+      let ciJob    = CI.Job Set.empty (Set.fromList $ someHeadStates) conds bodies post
       CI.cInvGen ciConfig ciJob
 
 body :: ImpWhile t e -> e
@@ -212,6 +228,10 @@ condA (ImpWhile c _ _) = bexpToAssertion c
 
 invar :: ImpWhile t e -> Maybe (Assertion t)
 invar (ImpWhile _ _ meta) = iwm_invariant meta
+
+measure :: ImpWhile t e -> Maybe (Arith t)
+measure (ImpWhile _ _ meta) = iwm_measure meta
+
 
 -- Adapted from https://www.programming-idioms.org/idiom/158/random-sublist/2123/haskell
 randomSample :: Int -> [a] -> IO [a]
