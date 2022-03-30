@@ -148,7 +148,7 @@ useInvariant invariant stepStrategy ctx aloops eloops aprogs' eprogs' post = do
   wpInvar <- relBackwardPT stepStrategy ctx (map body aloops) (map body eloops) (aAnd $ invariant:measureConds)
   let frWpInvar = substituteAll names frNames wpInvar
   let frConds = substituteAll names frNames $ aAnd (invariant:conds)
-  isInvariant  <- checkValid $ Imp frConds wpInvar
+  isInvariant  <- checkValid $ Imp frConds frWpInvar
 
 --  log_d . show $ pretty "Sufficiency query:" <+> (pretty $ Imp (aAnd $ invariant:(map Not conds)) post)
   log_d . show $ pretty "Invariance query:" <+> (pretty $ Imp frConds frWpInvar)
