@@ -24,6 +24,7 @@ import qualified Data.Map as Map
 import Data.Set ( Set )
 import qualified Data.Set as Set
 import Data.UUID
+import Orhle.CInvGen ( Configuration(..), Job(..) )
 import qualified Orhle.CInvGen as CI
 --import qualified Orhle.DTLearn2 as DTL
 import Orhle.SpecImp
@@ -138,7 +139,7 @@ useInvariant :: ( Embeddable Integer t
              -> Ceili (Assertion t)
 useInvariant invariant stepStrategy ctx aloops eloops aprogs' eprogs' post = do
   isSufficient <- checkValid =<< sufficiencyQuery aloops eloops post invariant
-  invQuery <- invarianceQuery stepStrategy ctx aloops eloops [] invariant
+  invQuery <- invarianceQuery stepStrategy ctx aloops eloops invariant
   isInvariant  <- checkValid . fst $ invQuery
   --log_d $ "Invariance query: " ++ (show . pretty . fst $ invQuery)
   -- TODO: Lockstep
@@ -187,20 +188,18 @@ invarianceQuery :: ( Embeddable Integer t
                 -> RelSpecImpPTSContext t (SpecImpProgram t)
                 -> [ImpWhile t (SpecImpProgram t)]
                 -> [ImpWhile t (SpecImpProgram t)]
-                -> [Assertion t]
                 -> Assertion t
                 -> Ceili (Assertion t, QuerySubstitution)
-invarianceQuery stepStrategy ctx aloops eloops assumptions invariant = do
-  let allAssumptions = aAnd $ invariant:assumptions
+invarianceQuery stepStrategy ctx aloops eloops invariant = do
   let conds = map condA (aloops ++ eloops)
   let measures = catMaybes $ map measure (aloops ++ eloops)
-  let names = Set.toList . Set.unions $ [ namesIn conds, namesIn allAssumptions, namesIn aloops, namesIn eloops ]
+  let names = Set.toList . Set.unions $ [ namesIn conds, namesIn invariant, namesIn aloops, namesIn eloops ]
   frNames <- envFreshen names
   let freshMeasures = substituteAll names frNames measures
   let measureConds = map (uncurry Lt) (zip measures freshMeasures)
-  wpInvar <- relBackwardPT stepStrategy ctx (map body aloops) (map body eloops) allAssumptions
+  wpInvar <- relBackwardPT stepStrategy ctx (map body aloops) (map body eloops) (aAnd $ invariant:measureConds)
   let frWpInvar = substituteAll names frNames wpInvar
-  let frConds = substituteAll names frNames $ allAssumptions
+  let frConds = substituteAll names frNames $ aAnd (invariant:conds)
   pure $ (Imp frConds frWpInvar, QuerySubstitution frNames names)
 
 
@@ -255,23 +254,21 @@ inferInvariant stepStrategy ctx aloops eloops post =
       --                        , Eq (Var $ Name "test!2!currentTotal" 0) (Mul [Num $ embed @Integer 101, (Var $ Name "test!2!counter" 0)])
       --                        ]
       someHeadStates <- lift . lift $ randomSample 5 headStates
-      let checkInvariant assumptions invariant = do
+      let goalQuery invariant = do
+            isSufficient <- sufficiencyQuery aloops eloops post invariant
             (isInvariant, QuerySubstitution freshNames origNames)
-                <- invarianceQuery stepStrategy ctx aloops eloops assumptions invariant
-            pure $ CI.CandidateQuery isInvariant (extractState freshNames origNames)
+                <- invarianceQuery stepStrategy ctx aloops eloops invariant
+            pure $ ( aAnd [substituteAll origNames freshNames isSufficient, isInvariant]
+                   , extractState freshNames origNames )
       let ciConfig = Configuration { cfgMaxFeatureSize   = 2
                                    , cfgMaxClauseSize    = 2
                                    , cfgFeatureGenerator = lis
                                    , cfgWpSemantics      = relBackwardPT' stepStrategy
                                    , cfgWpContext        = ctx
                                    }
-      let ciJob    = Job { jobBadStates       = Set.empty
-                         , jobGoodStates      = Set.fromList someHeadStates
-                         , jobLoopConds       = aAnd conds
-                         , jobNegLoopConds    = aAnd $ map Not conds
-                         , jobPost            = post
-                         , jobCexInterpreter  = extractState [] []
-                         , jobInvarianceQuery = checkInvariant
+      let ciJob    = Job { jobBadStates  = Set.empty
+                         , jobGoodStates = Set.fromList someHeadStates
+                         , jobGoalQuery  = goalQuery
                          }
       CI.cInvGen ciConfig ciJob
 
