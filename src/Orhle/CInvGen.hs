@@ -409,10 +409,18 @@ mkCIEnv config job =
     closedGoods         = Set.map (closeNames names) (jobGoodStates job)
     badStates           = Set.fromList . map (uncurry BadState)  $ zip [0..] (Set.toList closedBads)
     goodStates          = Set.fromList . map (uncurry GoodState) $ zip [0..] (Set.toList closedGoods)
-    states              = mkStates badStates goodStates
     fCandidates         = Set.toList $ (cfgFeatureGenerator config) (cfgMaxFeatureSize config)
-    maxClauseSize       = cfgMaxClauseSize config
-  in CIEnv qEmpty states [] IntSet.empty fcEmpty fCandidates (jobGoalQuery job) names maxClauseSize Set.empty Set.empty
+  in CIEnv { envQueue             = qEmpty
+           , envStates            = mkStates badStates goodStates
+           , envRootClauses       = []
+           , envRootsAccepted     = IntSet.empty
+           , envFeatureCache      = fcEmpty
+           , envFeatureCandidates = fCandidates
+           , envStateNames        = names
+           , envMaxClauseSize     = cfgMaxClauseSize config
+           , envClauseDenylist    = Set.empty
+           , envKnownDeadEnds     = Set.empty
+           }
 
 getQueue :: CiM t (Queue t)
 getQueue = get >>= pure . envQueue

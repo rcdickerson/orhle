@@ -112,13 +112,7 @@ relBackwardPT' stepStrategy ctx (ProgramRelation aprogs eprogs) post = do
       case annotatedInvars of
         (_:_) -> continueWithInv (And annotatedInvars)
         []    -> do
-          let check invariant = do
-                isSufficient <- sufficiencyQuery aloops eloops post invariant
-                (isInvariant, QuerySubstitution freshNames names)
-                             <- invarianceQuery stepStrategy ctx aloops eloops invariant
-                let interpretCex = extractState freshNames names
-                pure $ (aAnd [substituteAll names freshNames isSufficient, isInvariant], interpretCex)
-          mInvariant <- inferInvariant stepStrategy ctx aloops eloops check
+          mInvariant <- inferInvariant stepStrategy ctx aloops eloops post
           case mInvariant of
             Just inv -> continueWithInv inv
             Nothing -> do
@@ -143,10 +137,10 @@ useInvariant :: ( Embeddable Integer t
              -> Assertion t
              -> Ceili (Assertion t)
 useInvariant invariant stepStrategy ctx aloops eloops aprogs' eprogs' post = do
-  isSufficient <- checkValid       =<< sufficiencyQuery aloops eloops post invariant
-  invQuery <- invarianceQuery stepStrategy ctx aloops eloops invariant
+  isSufficient <- checkValid =<< sufficiencyQuery aloops eloops post invariant
+  invQuery <- invarianceQuery stepStrategy ctx aloops eloops [] invariant
   isInvariant  <- checkValid . fst $ invQuery
-  log_d $ "Invariance query: " ++ (show . pretty . fst $ invQuery)
+  --log_d $ "Invariance query: " ++ (show . pretty . fst $ invQuery)
   -- TODO: Lockstep
   case (isSufficient, isInvariant) of
     (SMT.Valid, SMT.Valid) -> do
@@ -193,18 +187,20 @@ invarianceQuery :: ( Embeddable Integer t
                 -> RelSpecImpPTSContext t (SpecImpProgram t)
                 -> [ImpWhile t (SpecImpProgram t)]
                 -> [ImpWhile t (SpecImpProgram t)]
+                -> [Assertion t]
                 -> Assertion t
                 -> Ceili (Assertion t, QuerySubstitution)
-invarianceQuery stepStrategy ctx aloops eloops invariant = do
+invarianceQuery stepStrategy ctx aloops eloops assumptions invariant = do
+  let allAssumptions = aAnd $ invariant:assumptions
   let conds = map condA (aloops ++ eloops)
   let measures = catMaybes $ map measure (aloops ++ eloops)
-  let names = Set.toList . Set.unions $ [ namesIn conds, namesIn invariant, namesIn aloops, namesIn eloops ]
+  let names = Set.toList . Set.unions $ [ namesIn conds, namesIn allAssumptions, namesIn aloops, namesIn eloops ]
   frNames <- envFreshen names
   let freshMeasures = substituteAll names frNames measures
   let measureConds = map (uncurry Lt) (zip measures freshMeasures)
-  wpInvar <- relBackwardPT stepStrategy ctx (map body aloops) (map body eloops) (aAnd $ invariant:measureConds)
+  wpInvar <- relBackwardPT stepStrategy ctx (map body aloops) (map body eloops) allAssumptions
   let frWpInvar = substituteAll names frNames wpInvar
-  let frConds = substituteAll names frNames $ aAnd (invariant:conds)
+  let frConds = substituteAll names frNames $ allAssumptions
   pure $ (Imp frConds frWpInvar, QuerySubstitution frNames names)
 
 
@@ -235,11 +231,12 @@ inferInvariant :: ( Embeddable Integer t
                -> RelSpecImpPTSContext t (SpecImpProgram t)
                -> [ImpWhile t (SpecImpProgram t)]
                -> [ImpWhile t (SpecImpProgram t)]
-               -> (Assertion t -> Ceili (Assertion t, Assertion t -> Ceili (ProgState t)))
+               -> Assertion t
                -> Ceili (Maybe (Assertion t))
-inferInvariant stepStrategy ctx aloops eloops checkInv =
+inferInvariant stepStrategy ctx aloops eloops post =
   let
     allLoops = aloops ++ eloops
+    conds = map condA (aloops ++ eloops)
     headStates = combineLoopHeadStates ctx $ catMaybes $ map (iwm_id . impWhile_meta) allLoops
   in case headStates of
     [] -> throwError "Insufficient test head states for while loop, did you run populateTestStates?"
@@ -258,8 +255,24 @@ inferInvariant stepStrategy ctx aloops eloops checkInv =
       --                        , Eq (Var $ Name "test!2!currentTotal" 0) (Mul [Num $ embed @Integer 101, (Var $ Name "test!2!counter" 0)])
       --                        ]
       someHeadStates <- lift . lift $ randomSample 5 headStates
-      let ciConfig = CI.Configuration 2 2 lis (relBackwardPT' stepStrategy) ctx
-      let ciJob    = CI.Job Set.empty (Set.fromList someHeadStates) checkInv
+      let checkInvariant assumptions invariant = do
+            (isInvariant, QuerySubstitution freshNames origNames)
+                <- invarianceQuery stepStrategy ctx aloops eloops assumptions invariant
+            pure $ CI.CandidateQuery isInvariant (extractState freshNames origNames)
+      let ciConfig = Configuration { cfgMaxFeatureSize   = 2
+                                   , cfgMaxClauseSize    = 2
+                                   , cfgFeatureGenerator = lis
+                                   , cfgWpSemantics      = relBackwardPT' stepStrategy
+                                   , cfgWpContext        = ctx
+                                   }
+      let ciJob    = Job { jobBadStates       = Set.empty
+                         , jobGoodStates      = Set.fromList someHeadStates
+                         , jobLoopConds       = aAnd conds
+                         , jobNegLoopConds    = aAnd $ map Not conds
+                         , jobPost            = post
+                         , jobCexInterpreter  = extractState [] []
+                         , jobInvarianceQuery = checkInvariant
+                         }
       CI.cInvGen ciConfig ciJob
 
 body :: ImpWhile t e -> e
