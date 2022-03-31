@@ -416,6 +416,7 @@ mkCIEnv config job =
            , envRootsAccepted     = IntSet.empty
            , envFeatureCache      = fcEmpty
            , envFeatureCandidates = fCandidates
+           , envGoalQuery         = jobGoalQuery job
            , envStateNames        = names
            , envMaxClauseSize     = cfgMaxClauseSize config
            , envClauseDenylist    = Set.empty

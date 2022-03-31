@@ -235,7 +235,6 @@ inferInvariant :: ( Embeddable Integer t
 inferInvariant stepStrategy ctx aloops eloops post =
   let
     allLoops = aloops ++ eloops
-    conds = map condA (aloops ++ eloops)
     headStates = combineLoopHeadStates ctx $ catMaybes $ map (iwm_id . impWhile_meta) allLoops
   in case headStates of
     [] -> throwError "Insufficient test head states for while loop, did you run populateTestStates?"
