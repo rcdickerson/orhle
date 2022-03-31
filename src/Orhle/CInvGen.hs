@@ -2,7 +2,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 module Orhle.CInvGen
-  ( Configuration(..)
+  ( CandidateQuery(..)
+  , Configuration(..)
   , Job(..)
   , cInvGen
 
@@ -87,10 +88,16 @@ data Configuration c p t = Configuration
 -- Jobs --
 ----------
 
+data CandidateQuery t = CandidateQuery
+  { cqQuery :: Assertion t
+  , cqCexInterpreter :: Assertion t -> Ceili (ProgState t)
+  }
+
 data Job p t = Job
-  { jobBadStates  :: Set (ProgState t)
-  , jobGoodStates :: Set (ProgState t)
-  , jobGoalQuery  :: Assertion t -> Ceili (Assertion t, Assertion t -> Ceili(ProgState t))
+  { jobBadStates        :: Set (ProgState t)
+  , jobGoodStates       :: Set (ProgState t)
+  , jobSufficiencyQuery :: Assertion t -> Ceili (CandidateQuery t)
+  , jobInvarianceQuery  :: Assertion t -> Ceili (CandidateQuery t)
   }
 
 ----------------------
@@ -390,7 +397,8 @@ data CIEnv t = CIEnv { envQueue             :: Queue t
                      , envRootsAccepted     :: GoodStateIdSet
                      , envFeatureCache      :: FeatureCache t
                      , envFeatureCandidates :: [Assertion t]
-                     , envGoalQuery         :: Assertion t -> Ceili (Assertion t, Assertion t -> Ceili (ProgState t))
+                     , envSufficiencyQuery  :: Assertion t -> Ceili (CandidateQuery t)
+                     , envInvarianceQuery   :: Assertion t -> Ceili (CandidateQuery t)
                      , envStateNames        :: [Name]
                      , envMaxClauseSize     :: Int
                      , envClauseDenylist    :: Set FeatureIdSet
@@ -416,7 +424,8 @@ mkCIEnv config job =
            , envRootsAccepted     = IntSet.empty
            , envFeatureCache      = fcEmpty
            , envFeatureCandidates = fCandidates
-           , envGoalQuery         = jobGoalQuery job
+           , envSufficiencyQuery  = jobSufficiencyQuery job
+           , envInvarianceQuery   = jobInvarianceQuery job
            , envStateNames        = names
            , envMaxClauseSize     = cfgMaxClauseSize config
            , envClauseDenylist    = Set.empty
@@ -480,6 +489,16 @@ getFeaturesWhichReject states = do
 getFeatureCandidates :: CiM t [Assertion t]
 getFeatureCandidates = get >>= pure . envFeatureCandidates
 
+sufficiencyQuery :: Assertion t -> CiM t (CandidateQuery t)
+sufficiencyQuery assertion = do
+  query <- get >>= pure . envSufficiencyQuery
+  lift $ query assertion
+
+invarianceQuery :: Assertion t -> CiM t (CandidateQuery t)
+invarianceQuery assertion = do
+  query <- get >>= pure . envInvarianceQuery
+  lift $ query assertion
+
 lookupFeature :: FeatureId -> CiM t (Feature t)
 lookupFeature featureId = do
   fc <- getFeatureCache
@@ -498,49 +517,49 @@ getStateNames = get >>= pure . envStateNames
 
 putQueue :: Queue t -> CiM t ()
 putQueue queue = do
-  CIEnv _ states roots rootsAccepted features fCandidates goalQ names mcs denylist kde <- get
-  put $ CIEnv queue states roots rootsAccepted features fCandidates goalQ names mcs denylist kde
+  CIEnv _ states roots rootsAccepted features fCandidates sufQ invQ names mcs denylist kde <- get
+  put $ CIEnv queue states roots rootsAccepted features fCandidates sufQ invQ names mcs denylist kde
 
 addBadState :: Ord t => ProgState t -> CiM t (BadState t)
 addBadState state = do
-  CIEnv queue states roots rootsAccepted features fCandidates goalQ names mcs denylist kde <- get
+  CIEnv queue states roots rootsAccepted features fCandidates sufQ invQ names mcs denylist kde <- get
   let (badState, states') = stAddBadState state states
-  put $ CIEnv queue states' roots rootsAccepted features fCandidates goalQ names mcs denylist kde
+  put $ CIEnv queue states' roots rootsAccepted features fCandidates sufQ invQ names mcs denylist kde
   pure badState
 
 putRootClauses :: Ord t => [RootClause t] -> CiM t ()
 putRootClauses roots = do
-  CIEnv queue states _ _ features fCandidates goalQ names mcs denylist kde <- get
+  CIEnv queue states _ _ features fCandidates sufQ invQ names mcs denylist kde <- get
   let accepted = IntSet.unions $ map rootClauseAcceptedGoods roots
-  put $ CIEnv queue states roots accepted features fCandidates goalQ names mcs denylist kde
+  put $ CIEnv queue states roots accepted features fCandidates sufQ invQ names mcs denylist kde
 
 putFeatureCache :: FeatureCache t -> CiM t ()
 putFeatureCache featureCache = do
-  CIEnv queue states roots rootsAccepted _ fCandidates goalQ names mcs denylist kde <- get
-  put $ CIEnv queue states roots rootsAccepted featureCache fCandidates goalQ names mcs denylist kde
+  CIEnv queue states roots rootsAccepted _ fCandidates sufQ invQ names mcs denylist kde <- get
+  put $ CIEnv queue states roots rootsAccepted featureCache fCandidates sufQ invQ names mcs denylist kde
 
 putFeatureCandidates :: [Assertion t] -> CiM t ()
 putFeatureCandidates fCandidates = do
-  CIEnv queue states roots rootsAccepted features _ goalQ names mcs denylist kde <- get
-  put $ CIEnv queue states roots rootsAccepted features fCandidates goalQ names mcs denylist kde
+  CIEnv queue states roots rootsAccepted features _ sufQ invQ names mcs denylist kde <- get
+  put $ CIEnv queue states roots rootsAccepted features fCandidates sufQ invQ names mcs denylist kde
 
 addFeature :: Ord t => Feature t -> BadStateIdSet -> CiM t ()
 addFeature feature rejected = do
-  CIEnv queue states roots rootsAccepted featureCache fCandidates goalQ names mcs denylist kde <- get
+  CIEnv queue states roots rootsAccepted featureCache fCandidates sufQ invQ names mcs denylist kde <- get
   let featureCache' = fcAddFeature feature rejected featureCache
-  put $ CIEnv queue states roots rootsAccepted featureCache' fCandidates goalQ names mcs denylist kde
+  put $ CIEnv queue states roots rootsAccepted featureCache' fCandidates sufQ invQ names mcs denylist kde
 
 denyClause :: FeatureIdSet -> CiM t ()
 denyClause clause = do
-  CIEnv queue states roots rootsAccepted featureCache fCandidates goalQ names mcs denylist kde <- get
+  CIEnv queue states roots rootsAccepted featureCache fCandidates sufQ invQ names mcs denylist kde <- get
   let denylist' = Set.insert clause denylist
-  put $ CIEnv queue states roots rootsAccepted featureCache fCandidates goalQ names mcs denylist' kde
+  put $ CIEnv queue states roots rootsAccepted featureCache fCandidates sufQ invQ names mcs denylist' kde
 
 addKnownDeadEnd :: FeatureIdSet -> CiM t ()
 addKnownDeadEnd clause = do
-  CIEnv queue states roots rootsAccepted featureCache fCandidates goalQ names mcs denylist kde <- get
+  CIEnv queue states roots rootsAccepted featureCache fCandidates sufQ invQ names mcs denylist kde <- get
   let kde' = Set.insert clause kde
-  put $ CIEnv queue states roots rootsAccepted featureCache fCandidates goalQ names mcs denylist kde'
+  put $ CIEnv queue states roots rootsAccepted featureCache fCandidates sufQ invQ names mcs denylist kde'
 
 isDenied :: FeatureIdSet -> CiM t Bool
 isDenied clause = do
@@ -593,45 +612,53 @@ cInvGen' = do
   clog_d $ "[CInvGen] Starting vPreGen pass"
   clog_d . show $ pretty "[CInvGen]   good states:" <+> pretty (Set.size goodStates)
   clog_d . show $ pretty "[CInvGen]   bad states: " <+> pretty (Set.size badStates)
-  -- Try to learn a separator. If we find one, check to see if it meets the goal criteria.
-  -- If it does, return it. Otherwise, add the new counterexample and recurse.
+
   origQueue <- getQueue
   origRoots <- getRootClauses
+  let onErr msg separator clauses = do
+        clog_e . show $ pretty "[CInvGen]" <+> pretty msg
+            <+> pretty "on candidate" <+> (align . pretty) separator
+        mapM_ denyClause $ map clauseFeatures clauses
+        putRootClauses $ filter (\(RootClause clause _) -> not $ clause `elem` clauses) origRoots
+        putQueue origQueue
+        cInvGen'
+
+  let onCex cex = do
+        clog_d . show $ pretty "[CInvGen] Found counterexample:" <+> (align . pretty) cex
+        putQueue qEmpty
+        putRootClauses []
+        addCounterexample cex
+        cInvGen'
+
+  -- Try to learn a separator. If we find one, check to see if it meets the goal criteria.
+  -- If it does, return it. Otherwise, add the new counterexample and recurse.
   mSeparator <- learnSeparator
   case mSeparator of
     Nothing -> clog_d "[CInvGen] Unable to find separator." >> pure Nothing
     Just (separator, clauses) -> do
       clog_d . show $ pretty "[CInvGen] Candidate precondition:" <+> (align . pretty) separator
 --      clog_d . show $ pretty "[CInvGen] Candidate clauses:" <+> (align . pretty) (map (IntSet.toList . clauseFeatures) clauses)
-      goalStatus <- checkGoal separator
-      case goalStatus of
-        GoalCex cex -> do
-          clog_d . show $ pretty "[CInvGen] Found counterexample:" <+> (align . pretty) cex
-          putQueue qEmpty
-          putRootClauses []
-          addCounterexample cex
-          cInvGen'
+      sufficient <- checkGoal =<< sufficiencyQuery separator
+      case sufficient of
+        SMTError msg -> onErr msg separator clauses
+        GoalCex cex  -> onCex cex
         GoalMet -> do
-          clog_d . show $ pretty "[CInvGen] Found invariant:" <+> (align . pretty) separator
-          pure $ Just separator
-        SMTError msg -> do
-          clog_e . show $ pretty "[CInvGen]" <+> pretty msg
-                      <+> pretty "on candidate" <+> (align . pretty) separator
-          -- throwError "SMT error"
-          --cInvGen' -- Continue now that the problematic assertion is out of the queue.
-          mapM_ denyClause $ map clauseFeatures clauses
-          putRootClauses $ filter (\(RootClause clause _) -> not $ clause `elem` clauses) origRoots
-          putQueue origQueue
-          cInvGen'
+          invariant <- checkGoal =<< invarianceQuery separator
+          case invariant of
+            SMTError msg -> onErr msg separator clauses
+            GoalCex cex  -> do
+              clog_d $ "****** Invariance CEX: " ++ (show . pretty $ cex)
+              onCex cex
+            GoalMet -> do
+              clog_d . show $ pretty "[CInvGen] Found invariant:" <+> (align . pretty) separator
+              pure $ Just separator
 
 data GoalStatus t = GoalMet
                   | GoalCex (ProgState t)
                   | SMTError String
 
-checkGoal :: CIConstraints t => Assertion t -> CiM t (GoalStatus t)
-checkGoal candidate = do
-  gq <- get >>= pure . envGoalQuery
-  (goalQuery, cexInterpreter) <- lift $ gq candidate
+checkGoal :: CIConstraints t => CandidateQuery t -> CiM t (GoalStatus t)
+checkGoal (CandidateQuery goalQuery cexInterpreter) = do
   mCex <- lift $ findCounterexample goalQuery
   case mCex of
     FormulaValid -> pure GoalMet

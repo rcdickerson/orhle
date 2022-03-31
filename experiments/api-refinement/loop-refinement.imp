@@ -10,17 +10,17 @@ post: (= original!sum refinement!sum);
 aspecs:
   randOdd() {
     // TODO: This isn't actually correct, as c does not get unique-ified across callsites.
-    post: (and (<= 1 ret!) (< ret! 10))
+    post: (and (<= 0 ret!) (< ret! 10))
   }
 
   rand() {
-    post: (and (<= 1 ret!) (< ret! 10));
+    post: (and (<= 0 ret!) (< ret! 10));
   }
 
 especs:
   rand() {
     choiceVars: n;
-    pre:  (and (<= 1 n) (< n 10));
+    pre:  (and (<= 0 n) (< n 10));
     post: (= ret! n);
   }
 

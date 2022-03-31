@@ -198,7 +198,7 @@ invarianceQuery stepStrategy ctx aloops eloops invariant = do
   let freshMeasures = substituteAll names frNames measures
   let measureConds = map (uncurry Lt) (zip measures freshMeasures)
                   ++ map (Num (embed 0) `Lte`) measures
-  wpInvar <- relBackwardPT stepStrategy ctx (map body aloops) (map body eloops) (aAnd $ invariant:measureConds)
+  wpInvar <- relBackwardPT stepStrategy ctx (map body aloops) (map body eloops) invariant --(aAnd $ invariant:measureConds)
   let frWpInvar = substituteAll names frNames wpInvar
   let frConds = substituteAll names frNames $ aAnd (invariant:conds)
   pure $ (Imp frConds frWpInvar, QuerySubstitution frNames names)
@@ -243,32 +243,34 @@ inferInvariant stepStrategy ctx aloops eloops post =
 --      let names = rsipc_programNames ctx
       let names = Set.intersection (rsipc_programNames ctx) (Set.union (namesIn aloops) (namesIn eloops))
       let lits  = rsipc_programLits ctx
-      let lis   = LI.linearInequalities (Set.map embed lits) names
-      -- let lis _ = Set.fromList [ Lte (Var $ Name "test!1!counter" 0) (Num $ embed @Integer 5)
-      --                        , Lte (Var $ Name "test!2!counter" 0) (Num $ embed @Integer 5)
-      --                        , Gte (Var $ Name "test!1!lastTime" 0) (Num $ embed @Integer 0)
-      --                        , Gte (Var $ Name "test!2!lastTime" 0) (Num $ embed @Integer 0)
-      --                        , Eq (Sub [Var $ Name "test!1!currentTime" 0, Var $ Name "test!1!lastTime" 0]) (Num $ embed @Integer 100)
-      --                        , Eq (Sub [Var $ Name "test!2!currentTime" 0, Var $ Name "test!2!lastTime" 0]) (Num $ embed @Integer 101)
-      --                        , Eq (Var $ Name "test!1!currentTotal" 0) (Mul [Num $ embed @Integer 100, (Var $ Name "test!1!counter" 0)])
-      --                        , Eq (Var $ Name "test!2!currentTotal" 0) (Mul [Num $ embed @Integer 101, (Var $ Name "test!2!counter" 0)])
-      --                        ]
+--      let lis   = LI.linearInequalities (Set.map embed lits) names
+      let lis _ = Set.fromList [ Lte (Var $ Name "test!1!counter" 0) (Num $ embed @Integer 5)
+                               , Lte (Var $ Name "test!2!counter" 0) (Num $ embed @Integer 5)
+                               , Gte (Var $ Name "test!1!lastTime" 0) (Num $ embed @Integer 0)
+                               , Gte (Var $ Name "test!2!lastTime" 0) (Num $ embed @Integer 0)
+                               , Eq (Sub [Var $ Name "test!1!currentTime" 0, Var $ Name "test!1!lastTime" 0]) (Num $ embed @Integer 100)
+                               , Eq (Sub [Var $ Name "test!2!currentTime" 0, Var $ Name "test!2!lastTime" 0]) (Num $ embed @Integer 101)
+                               , Eq (Var $ Name "test!1!currentTotal" 0) (Mul [Num $ embed @Integer 100, (Var $ Name "test!1!counter" 0)])
+                               , Eq (Var $ Name "test!2!currentTotal" 0) (Mul [Num $ embed @Integer 101, (Var $ Name "test!2!counter" 0)])
+                               ]
       someHeadStates <- lift . lift $ randomSample 5 headStates
-      let goalQuery invariant = do
-            isSufficient <- sufficiencyQuery aloops eloops post invariant
+      let sufficiency candidate = do
+            isSufficient <- sufficiencyQuery aloops eloops post candidate
+            pure $ CI.CandidateQuery isSufficient (extractState [] [])
+      let invariance candidate = do
             (isInvariant, QuerySubstitution freshNames origNames)
-                <- invarianceQuery stepStrategy ctx aloops eloops invariant
-            pure $ ( aAnd [substituteAll origNames freshNames isSufficient, isInvariant]
-                   , extractState freshNames origNames )
+                <- invarianceQuery stepStrategy ctx aloops eloops candidate
+            pure $ CI.CandidateQuery isInvariant (extractState freshNames origNames)
       let ciConfig = Configuration { cfgMaxFeatureSize   = 2
                                    , cfgMaxClauseSize    = 2
                                    , cfgFeatureGenerator = lis
                                    , cfgWpSemantics      = relBackwardPT' stepStrategy
                                    , cfgWpContext        = ctx
                                    }
-      let ciJob    = Job { jobBadStates  = Set.empty
-                         , jobGoodStates = Set.fromList someHeadStates
-                         , jobGoalQuery  = goalQuery
+      let ciJob    = Job { jobBadStates        = Set.empty
+                         , jobGoodStates       = Set.fromList someHeadStates
+                         , jobSufficiencyQuery = sufficiency
+                         , jobInvarianceQuery  = invariance
                          }
       CI.cInvGen ciConfig ciJob
 
