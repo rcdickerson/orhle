@@ -197,6 +197,7 @@ invarianceQuery stepStrategy ctx aloops eloops invariant = do
   frNames <- envFreshen names
   let freshMeasures = substituteAll names frNames measures
   let measureConds = map (uncurry Lt) (zip measures freshMeasures)
+                  ++ map (Num (embed 0) `Lte`) measures
   wpInvar <- relBackwardPT stepStrategy ctx (map body aloops) (map body eloops) (aAnd $ invariant:measureConds)
   let frWpInvar = substituteAll names frNames wpInvar
   let frConds = substituteAll names frNames $ aAnd (invariant:conds)

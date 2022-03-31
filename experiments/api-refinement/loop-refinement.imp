@@ -31,7 +31,7 @@ fun original() {
 //             (<= (+ (* -1 original!sum) refinement!sum) 0)
 //             (<= (+ original!sum (* -1 refinement!sum)) 0)
 //            )}
-    @var { (- 100 original!sum) }
+    @var { (- 200 original!sum) }
     r := rand();
     sum := sum + r;
   end
