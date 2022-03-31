@@ -707,9 +707,9 @@ learnSeparator' = do
           clog_d $ "[CInvGen] Search queue is empty, failing."
 --          printSeen
 --          printKdes
---          printRejectSets
---          printAcceptSets
---          printFeatures
+          printRejectSets
+          printAcceptSets
+          printFeatures
           pure Nothing
         Just entry -> do
           maxClauseSize <- getMaxClauseSize
