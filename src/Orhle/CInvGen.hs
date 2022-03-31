@@ -572,7 +572,9 @@ isKnownDeadEnd clause = do
   pure $ Set.member clause kdes
 
 enqueue :: CIConstraints t => Entry t -> CiM t ()
-enqueue entry = getQueue >>= pure . qInsert entry >>= putQueue
+enqueue entry = do
+--  clog_d $ "Enqueuing: " ++ (show . pretty . IntSet.toList . entryCandidate $ entry)
+  getQueue >>= pure . qInsert entry >>= putQueue
 
 dequeue :: CIConstraints t => CiM t (Maybe (Entry t))
 dequeue = do
