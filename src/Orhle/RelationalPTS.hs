@@ -192,6 +192,10 @@ invarianceQuery :: ( Embeddable Integer t
                 -> Ceili (Assertion t, QuerySubstitution)
 invarianceQuery stepStrategy ctx aloops eloops invariant = do
   let conds = map condA (aloops ++ eloops)
+  wpInvar <- relBackwardPT stepStrategy ctx (map body aloops) (map body eloops) invariant
+  pure $ (Imp (aAnd $ invariant:conds) wpInvar, QuerySubstitution [] [])
+{-
+  let conds = map condA (aloops ++ eloops)
   let measures = catMaybes $ map measure (aloops ++ eloops)
   let names = Set.toList . Set.unions $ [ namesIn conds, namesIn invariant, namesIn aloops, namesIn eloops ]
   frNames <- envFreshen names
@@ -202,7 +206,7 @@ invarianceQuery stepStrategy ctx aloops eloops invariant = do
   let frWpInvar = substituteAll names frNames wpInvar
   let frConds = substituteAll names frNames $ aAnd (invariant:conds)
   pure $ (Imp frConds frWpInvar, QuerySubstitution frNames names)
-
+-}
 
 -- TODO: This is fragile.
 extractState :: Pretty t => [Name] -> [Name] -> Assertion t -> Ceili (ProgState t)
@@ -258,13 +262,13 @@ inferInvariant stepStrategy ctx aloops eloops post =
       someHeadStates <- lift . lift $ randomSample 5 headStates
       let sufficiency candidate = do
             isSufficient <- sufficiencyQuery aloops eloops post candidate
-            pure $ CI.CandidateQuery isSufficient (extractState [] [])
+            pure $ CI.CandidateQuery isSufficient (pure . id) (extractState [] [])
       let invariance candidate = do
             (isInvariant, QuerySubstitution freshNames origNames)
                 <- invarianceQuery stepStrategy ctx aloops eloops candidate
-            pure $ CI.CandidateQuery isInvariant (extractState freshNames origNames)
+            pure $ CI.CandidateQuery isInvariant (pure . substituteAll origNames freshNames) (extractState freshNames origNames)
       let ciConfig = Configuration { cfgMaxFeatureSize   = 2
-                                   , cfgMaxClauseSize    = 12
+                                   , cfgMaxClauseSize    = 6
                                    , cfgFeatureGenerator = lis
                                    , cfgWpSemantics      = relBackwardPT' stepStrategy
                                    , cfgWpContext        = ctx
