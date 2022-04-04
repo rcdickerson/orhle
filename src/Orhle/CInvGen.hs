@@ -99,6 +99,7 @@ data Job p t = Job
   , jobGoodStates       :: Set (ProgState t)
   , jobSufficiencyQuery :: Assertion t -> Ceili (CandidateQuery t)
   , jobInvarianceQuery  :: Assertion t -> Ceili (CandidateQuery t)
+  , jobVacuityQuery     :: Assertion t -> Ceili (CandidateQuery t)
   }
 
 ----------------------
@@ -403,9 +404,10 @@ data CIEnv t = CIEnv { envQueue             :: Queue t
                      , envFeatureCache      :: FeatureCache t
                      , envFeatureCandidates :: [Assertion t]
                      , envGoalQuery         :: Assertion t -> Ceili (CandidateQuery t)
+                     , envVacuityQuery      :: Assertion t -> Ceili (CandidateQuery t)
                      , envStateNames        :: [Name]
                      , envMaxClauseSize     :: Int
-                     , envClauseDenylist    :: Set FeatureIdSet
+                     , envClauseDenylist    :: Set (Set FeatureIdSet)
                      , envKnownDeadEnds     :: Set FeatureIdSet
                      }
 
@@ -417,31 +419,35 @@ mkCIEnv :: CIConstraints t
         -> FeatureCache t
         -> Maybe [Assertion t]
         -> (Assertion t -> Ceili (CandidateQuery t))
-        -> CIEnv t
+        -> Ceili (CIEnv t)
 mkCIEnv config job featureCache featureCandidates goalQuery =
   let
-    nameList            = Set.unions . (map namesIn) . Set.toList
-    names               = Set.toList $ Set.union (nameList . jobBadStates  $ job)
-                                                 (nameList . jobGoodStates $ job)
-    closedBads          = Set.map (closeNames names) (jobBadStates job)
-    closedGoods         = Set.map (closeNames names) (jobGoodStates job)
-    badStates           = Set.fromList . map (uncurry BadState)  $ zip [0..] (Set.toList closedBads)
-    goodStates          = Set.fromList . map (uncurry GoodState) $ zip [0..] (Set.toList closedGoods)
-    fCandidates         = Set.toList $ (cfgFeatureGenerator config) (cfgMaxFeatureSize config)
-  in CIEnv { envQueue             = qEmpty
-           , envStates            = mkStates badStates goodStates
-           , envRootClauses       = []
-           , envRootsAccepted     = IntSet.empty
-           , envFeatureCache      = featureCache
-           , envFeatureCandidates = case featureCandidates of
-                                      Nothing    -> fCandidates
-                                      Just cands -> cands
-           , envGoalQuery         = goalQuery
-           , envStateNames        = names
-           , envMaxClauseSize     = cfgMaxClauseSize config
-           , envClauseDenylist    = Set.empty
-           , envKnownDeadEnds     = Set.empty
-           }
+    nameList             = Set.unions . (map namesIn) . Set.toList
+    names                = Set.toList $ Set.union (nameList . jobBadStates  $ job)
+                                                  (nameList . jobGoodStates $ job)
+    closedBads           = Set.map (closeNames names) (jobBadStates job)
+    closedGoods          = Set.map (closeNames names) (jobGoodStates job)
+    badStates            = Set.fromList . map (uncurry BadState)  $ zip [0..] (Set.toList closedBads)
+    goodStates           = Set.fromList . map (uncurry GoodState) $ zip [0..] (Set.toList closedGoods)
+    fCandidates          = Set.toList $ (cfgFeatureGenerator config) (cfgMaxFeatureSize config)
+    notVacuous candidate = checkSatB . cqQuery =<< (jobVacuityQuery job) candidate
+  in do
+    candidates <- case featureCandidates of
+                    Just cands -> pure cands
+                    Nothing -> filterM notVacuous fCandidates
+    pure $ CIEnv { envQueue             = qEmpty
+                 , envStates            = mkStates badStates goodStates
+                 , envRootClauses       = []
+                 , envRootsAccepted     = IntSet.empty
+                 , envFeatureCache      = featureCache
+                 , envFeatureCandidates = candidates
+                 , envGoalQuery         = goalQuery
+                 , envVacuityQuery      = jobVacuityQuery job
+                 , envStateNames        = names
+                 , envMaxClauseSize     = cfgMaxClauseSize config
+                 , envClauseDenylist    = Set.empty
+                 , envKnownDeadEnds     = Set.empty
+                 }
 
 getQueue :: CiM t (Queue t)
 getQueue = get >>= pure . envQueue
@@ -505,6 +511,11 @@ goalQuery assertion = do
   query <- get >>= pure . envGoalQuery
   lift $ query assertion
 
+vacuityQuery :: Assertion t -> CiM t (CandidateQuery t)
+vacuityQuery assertion = do
+  query <- get >>= pure . envVacuityQuery
+  lift $ query assertion
+
 lookupFeature :: FeatureId -> CiM t (Feature t)
 lookupFeature featureId = do
   fc <- getFeatureCache
@@ -523,51 +534,51 @@ getStateNames = get >>= pure . envStateNames
 
 putQueue :: Queue t -> CiM t ()
 putQueue queue = do
-  CIEnv _ states roots rootsAccepted features fCandidates invQ names mcs denylist kde <- get
-  put $ CIEnv queue states roots rootsAccepted features fCandidates invQ names mcs denylist kde
+  CIEnv _ states roots rootsAccepted features fCandidates invQ vacQ names mcs denylist kde <- get
+  put $ CIEnv queue states roots rootsAccepted features fCandidates invQ vacQ names mcs denylist kde
 
 addBadState :: Ord t => ProgState t -> CiM t (BadState t)
 addBadState state = do
-  CIEnv queue states roots rootsAccepted features fCandidates invQ names mcs denylist kde <- get
+  CIEnv queue states roots rootsAccepted features fCandidates invQ vacQ names mcs denylist kde <- get
   let (badState, states') = stAddBadState state states
-  put $ CIEnv queue states' roots rootsAccepted features fCandidates invQ names mcs denylist kde
+  put $ CIEnv queue states' roots rootsAccepted features fCandidates invQ vacQ names mcs denylist kde
   pure badState
 
 putRootClauses :: Ord t => [RootClause t] -> CiM t ()
 putRootClauses roots = do
-  CIEnv queue states _ _ features fCandidates invQ names mcs denylist kde <- get
+  CIEnv queue states _ _ features fCandidates invQ vacQ names mcs denylist kde <- get
   let accepted = IntSet.unions $ map rootClauseAcceptedGoods roots
-  put $ CIEnv queue states roots accepted features fCandidates invQ names mcs denylist kde
+  put $ CIEnv queue states roots accepted features fCandidates invQ vacQ names mcs denylist kde
 
 putFeatureCache :: FeatureCache t -> CiM t ()
 putFeatureCache featureCache = do
-  CIEnv queue states roots rootsAccepted _ fCandidates invQ names mcs denylist kde <- get
-  put $ CIEnv queue states roots rootsAccepted featureCache fCandidates invQ names mcs denylist kde
+  CIEnv queue states roots rootsAccepted _ fCandidates invQ vacQ names mcs denylist kde <- get
+  put $ CIEnv queue states roots rootsAccepted featureCache fCandidates invQ vacQ names mcs denylist kde
 
 putFeatureCandidates :: [Assertion t] -> CiM t ()
 putFeatureCandidates fCandidates = do
-  CIEnv queue states roots rootsAccepted features _ invQ names mcs denylist kde <- get
-  put $ CIEnv queue states roots rootsAccepted features fCandidates invQ names mcs denylist kde
+  CIEnv queue states roots rootsAccepted features _ invQ vacQ names mcs denylist kde <- get
+  put $ CIEnv queue states roots rootsAccepted features fCandidates invQ vacQ names mcs denylist kde
 
 addFeature :: Ord t => Feature t -> BadStateIdSet -> CiM t ()
 addFeature feature rejected = do
-  CIEnv queue states roots rootsAccepted featureCache fCandidates invQ names mcs denylist kde <- get
+  CIEnv queue states roots rootsAccepted featureCache fCandidates invQ vacQ names mcs denylist kde <- get
   let featureCache' = fcAddFeature feature rejected featureCache
-  put $ CIEnv queue states roots rootsAccepted featureCache' fCandidates invQ names mcs denylist kde
+  put $ CIEnv queue states roots rootsAccepted featureCache' fCandidates invQ vacQ names mcs denylist kde
 
-denyClause :: FeatureIdSet -> CiM t ()
+denyClause :: Set FeatureIdSet -> CiM t ()
 denyClause clause = do
-  CIEnv queue states roots rootsAccepted featureCache fCandidates invQ names mcs denylist kde <- get
+  CIEnv queue states roots rootsAccepted featureCache fCandidates invQ vacQ names mcs denylist kde <- get
   let denylist' = Set.insert clause denylist
-  put $ CIEnv queue states roots rootsAccepted featureCache fCandidates invQ names mcs denylist' kde
+  put $ CIEnv queue states roots rootsAccepted featureCache fCandidates invQ vacQ names mcs denylist' kde
 
 addKnownDeadEnd :: FeatureIdSet -> CiM t ()
 addKnownDeadEnd clause = do
-  CIEnv queue states roots rootsAccepted featureCache fCandidates invQ names mcs denylist kde <- get
+  CIEnv queue states roots rootsAccepted featureCache fCandidates invQ vacQ names mcs denylist kde <- get
   let kde' = Set.insert clause kde
-  put $ CIEnv queue states roots rootsAccepted featureCache fCandidates invQ names mcs denylist kde'
+  put $ CIEnv queue states roots rootsAccepted featureCache fCandidates invQ vacQ names mcs denylist kde'
 
-isDenied :: FeatureIdSet -> CiM t Bool
+isDenied :: Set FeatureIdSet -> CiM t Bool
 isDenied clause = do
   denylist <- get >>= pure . envClauseDenylist
   pure $ Set.member clause denylist
@@ -609,7 +620,7 @@ cInvGen :: CIConstraints t
         -> Ceili (Maybe (Assertion t))
 cInvGen config job = do
   log_i $ "[CInvGen] Beginning invariant inference"
-  let sufEnv = mkCIEnv config job fcEmpty Nothing (jobSufficiencyQuery job)
+  sufEnv <- mkCIEnv config job fcEmpty Nothing (jobSufficiencyQuery job)
   log_d $ "[CInvGen] " ++ (show . length . envFeatureCandidates $ sufEnv) ++ " initial feature candidates."
   sufficientize config job sufEnv
 
@@ -627,13 +638,15 @@ sufficientize config job env = do
       case mInv of
         Just inv -> pure $ Just inv
         Nothing  -> do
-          let denyAndReset = do
-                mapM_ denyClause $ map clauseFeatures $ filter ((== biggestClause clauses) . IntSet.size . clauseFeatures) clauses
-                putRootClauses []
-                putQueue qEmpty
-                mapM addNewlyUsefulFeatures . Set.toList =<< getBadStates
-          (_, env'') <- runStateT denyAndReset env'
-          sufficientize config job env''
+          log_e $ "[CInvGen] Unable to strengthen candidate: " ++ (show . pretty $ candidate)
+          pure Nothing
+          -- let denyAndReset = do
+          --       mapM_ denyClause $ map clauseFeatures $ filter ((== biggestClause clauses) . IntSet.size . clauseFeatures) clauses
+          --       putRootClauses []
+          --       putQueue qEmpty
+          --       mapM addNewlyUsefulFeatures . Set.toList =<< getBadStates
+          -- (_, env'') <- runStateT denyAndReset env'
+          -- sufficientize config job env''
 
 strengthen config job featureCache featureCandidates candidate maxClause = do
   (CandidateQuery invCondition invEncoder invCexInterp) <- (jobInvarianceQuery job) candidate
@@ -641,10 +654,10 @@ strengthen config job featureCache featureCandidates candidate maxClause = do
         encAssertion <- invEncoder assertion
         pure $ CandidateQuery (Imp encAssertion invCondition) invEncoder invCexInterp
   let setMaxClauseSize = do
-        CIEnv queue states roots rootsAccepted fc fCandidates invQ names mcs denylist kde <- get
-        put $ CIEnv queue states roots rootsAccepted fc fCandidates invQ names (mcs - maxClause) denylist kde
+        CIEnv queue states roots rootsAccepted fc fCandidates invQ vacQ names mcs denylist kde <- get
+        put $ CIEnv queue states roots rootsAccepted fc fCandidates invQ vacQ names (mcs - maxClause) denylist kde
   (_, env) <- runStateT setMaxClauseSize
-            $ mkCIEnv config job featureCache featureCandidates invQuery
+          =<< mkCIEnv config job featureCache featureCandidates invQuery
   (mInvariant, env') <- runStateT cInvGen' env
   case mInvariant of
     Nothing -> do
@@ -684,12 +697,13 @@ cInvGen' = do
   let onErr msg separator clauses = do
         clog_e . show $ pretty "[CInvGen]" <+> pretty msg
             <+> pretty "on candidate" <+> (align . pretty) separator
-        mapM_ denyClause $ map clauseFeatures clauses
+        denyClause . Set.fromList $ map clauseFeatures clauses
         putRootClauses $ filter (\(RootClause clause _) -> not $ clause `elem` clauses) origRoots
         putQueue origQueue
         cInvGen'
-  let onCex cex = do
-        clog_d . show $ pretty "[CInvGen] Found counterexample:" <+> (align . pretty) cex
+  let onCex desc cex = do
+        clog_d . show $ pretty "[CInvGen] Found counterexample (" <> pretty desc <> pretty "):"
+                   <+> (align . pretty) cex
         putQueue qEmpty
         putRootClauses []
         addCounterexample cex
@@ -705,7 +719,7 @@ cInvGen' = do
       goalStatus <- checkGoal =<< goalQuery separator
       case goalStatus of
         SMTError msg -> onErr msg separator clauses
-        GoalCex cex  -> onCex cex
+        GoalCex cex  -> onCex "sufficiency" cex
         GoalMet      -> do
           clog_d . show $ pretty "[CInvGen] cInvGen' found candidate:" <+> (align . pretty) separator
           pure $ Just (separator, clauses)
@@ -775,8 +789,8 @@ learnSeparator' = do
             else do
               nextFeatures <- usefulFeatures entry
               queue <- getQueue
-              clog_d $ "[CInvGen] Candidate: " ++ (show $ entryCandidate entry)
-              clog_d $ "[CInvGen] Useful features: " ++ (show $ length nextFeatures) ++ ", queue size: " ++ (show $ qSize queue)
+--              clog_d $ "[CInvGen] Candidate: " ++ (show $ entryCandidate entry)
+--              clog_d $ "[CInvGen] Useful features: " ++ (show $ length nextFeatures) ++ ", queue size: " ++ (show $ qSize queue)
               enqueueNextLevel entry nextFeatures
               learnSeparator'
 
@@ -911,8 +925,13 @@ enqueueNextLevel entry@(Entry candidateIds enRejectedBads enAcceptedGoods _) (ne
               interesting <- isInterestingGoods newAcceptedGoods
               if interesting
                 then do
-                  denied <- isDenied newCandidateIds
-                  if denied then pure () else addRootClause $ Clause newCandidateIds newAcceptedGoods
+                  denied <- isDenied $ Set.singleton newCandidateIds
+                  features <- lookupFeatures $ IntSet.toList newCandidateIds
+                  vq <- pure . cqQuery =<< vacuityQuery (aAnd $ map featAssertion features)
+                  nonVacuous <- lift $ checkSatB vq
+                  if denied || not nonVacuous
+                    then pure ()
+                    else addRootClause $ Clause newCandidateIds newAcceptedGoods
                   enqueueNextLevel entry rest
                 else do
                   enqueueNextLevel entry rest
@@ -1028,7 +1047,7 @@ addNewlyUsefulCandidates newBadState = do
 
 seedFeature :: CIConstraints t => Feature t -> BadStateIdSet -> CiM t ()
 seedFeature feature rejectedBads = do
-  denied <- isDenied $ IntSet.singleton (featId feature)
+  denied <- isDenied $ Set.singleton $ IntSet.singleton (featId feature)
   if denied then pure () else do
     badStateIds <- getBadStateIds
     if badStateIds == rejectedBads

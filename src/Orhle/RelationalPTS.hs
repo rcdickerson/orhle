@@ -170,9 +170,18 @@ sufficiencyQuery :: [ImpWhile t (SpecImpProgram t)]
                  -> Assertion t
                  -> Assertion t
                  -> Ceili (Assertion t)
-sufficiencyQuery aloops eloops post invariant = do
+sufficiencyQuery aloops eloops post assertion = do
   let conds = map condA (aloops ++ eloops)
-  pure $ Imp (aAnd $ invariant:(map Not conds)) post
+  pure $ Imp (aAnd $ assertion:(map Not conds)) post
+
+vacuityQuery :: [ImpWhile t (SpecImpProgram t)]
+             -> [ImpWhile t (SpecImpProgram t)]
+             -> Assertion t
+             -> Assertion t
+             -> Ceili (Assertion t)
+vacuityQuery aloops eloops post assertion = do
+  let conds = map condA (aloops ++ eloops)
+  pure $ (aAnd $ assertion:(map Not conds))
 
 data QuerySubstitution = QuerySubstitution [Name] [Name]
 
@@ -267,6 +276,9 @@ inferInvariant stepStrategy ctx aloops eloops post =
             (isInvariant, QuerySubstitution freshNames origNames)
                 <- invarianceQuery stepStrategy ctx aloops eloops candidate
             pure $ CI.CandidateQuery isInvariant (pure . substituteAll origNames freshNames) (extractState freshNames origNames)
+      let vacuity candidate = do
+            isNonVacuous <- vacuityQuery aloops eloops post candidate
+            pure $ CI.CandidateQuery isNonVacuous (pure . id) (extractState [] [])
       let ciConfig = Configuration { cfgMaxFeatureSize   = 2
                                    , cfgMaxClauseSize    = 6
                                    , cfgFeatureGenerator = lis
@@ -277,6 +289,7 @@ inferInvariant stepStrategy ctx aloops eloops post =
                          , jobGoodStates       = Set.fromList someHeadStates
                          , jobSufficiencyQuery = sufficiency
                          , jobInvarianceQuery  = invariance
+                         , jobVacuityQuery     = vacuity
                          }
       CI.cInvGen ciConfig ciJob
 
