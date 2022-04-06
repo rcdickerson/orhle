@@ -386,17 +386,25 @@ qAllDescendants entry queue =
       in Set.insert entry transitiveDescs
 
 
--------------------
--- Cost Function --
--------------------
+--------------------
+-- Cost Functions --
+--------------------
 
 entryScore :: CIConstraints t => Entry t -> Int
-entryScore (Entry candidate rejectedBads acceptedGoods _) =
+entryScore = cfBalanced
+
+cfBalanced :: CIConstraints t => Entry t -> Int
+cfBalanced (Entry candidate rejectedBads acceptedGoods _) =
   let
     numRejected   = IntSet.size rejectedBads
     candidateSize = IntSet.size candidate
     acceptedSize  = IntSet.size acceptedGoods
-  in -candidateSize -- (acceptedSize * numRejected) `div` candidateSize
+  in (acceptedSize * numRejected) `div` candidateSize
+
+cfBfs :: CIConstraints t => Entry t -> Int
+cfBfs (Entry candidate _ _ _) =
+  let candidateSize = IntSet.size candidate
+  in -candidateSize
 
 
 -----------------------
