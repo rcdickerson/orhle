@@ -30,6 +30,7 @@ dependencies:
 - simple-smt
 - smtLib
 - split
+- strings
 - text
 - transformers
 - unbounded-delays

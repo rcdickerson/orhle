@@ -23,10 +23,12 @@ import Data.Maybe ( catMaybes )
 import qualified Data.Map as Map
 import Data.Set ( Set )
 import qualified Data.Set as Set
+import Data.Strings ( strSplitAll )
 import Data.UUID
 import Orhle.CInvGen ( Configuration(..), Job(..) )
 import qualified Orhle.CInvGen as CI
 --import qualified Orhle.DTLearn2 as DTL
+import Orhle.FeatureGen (genFeatures, lia)
 import Orhle.SpecImp
 import Orhle.StepStrategy
 import Prettyprinter
@@ -231,6 +233,17 @@ extractState freshNames names assertion = case assertion of
       Num n -> n
       _ -> error $ "Unexpected arith (expected int): " ++ show arith
 
+varName :: Name -> String
+varName (Name handle tag) = (last $ strSplitAll "!" handle) ++ "!" ++ (show tag)
+
+collectSameNames :: [Name] -> [[Name]]
+collectSameNames names =
+  let
+    addName name nmap = case Map.lookup (varName name) nmap of
+                         Nothing  -> Map.insert (varName name) (Set.singleton name) nmap
+                         Just set -> Map.insert (varName name) (Set.insert name set) nmap
+    nameMap = foldr addName Map.empty names
+  in map Set.toList $ filter (\s -> Set.size s > 1) (Map.elems nameMap)
 
 inferInvariant :: ( Embeddable Integer t
                   , Ord t
@@ -254,9 +267,18 @@ inferInvariant stepStrategy ctx aloops eloops post =
     [] -> throwError "Insufficient test head states for while loop, did you run populateTestStates?"
     _  -> do
 --      let names = rsipc_programNames ctx
-      let names = Set.intersection (rsipc_programNames ctx) (Set.union (namesIn aloops) (namesIn eloops))
-      let lits  = rsipc_programLits ctx
-      let lis   = LI.linearInequalities (Set.map embed lits) names
+      let anames   = map (\loop -> Set.intersection (rsipc_programNames ctx) (namesIn loop)) aloops
+      let enames   = map (\loop -> Set.intersection (rsipc_programNames ctx) (namesIn loop)) eloops
+      let lits     = Set.union (rsipc_programLits ctx) (Set.fromList $ map embed [0, 1, 101])
+
+      let lis size = Set.fromList $
+                     (concat $ map (\names -> genFeatures lia (Set.toList lits) names size) (collectSameNames . Set.toList . Set.unions $ anames ++ enames))
+                  ++ (concat $ map (\names -> genFeatures lia (Set.toList lits) (Set.toList names) size) anames)
+                  ++ (concat $ map (\names -> genFeatures lia (Set.toList lits) (Set.toList names) size) enames)
+
+--Set.fromList $ genFeatures lia (Set.toList lits) (Set.toList $ Set.union anames enames) size
+
+--      let lis   = LI.linearInequalities (Set.map embed lits) (Set.union anames enames)
 
       -- let lis _ = Set.fromList [ Lte (Var $ Name "test!1!counter" 0) (Num $ embed @Integer 5)
       --                          , Lte (Var $ Name "test!2!counter" 0) (Num $ embed @Integer 5)

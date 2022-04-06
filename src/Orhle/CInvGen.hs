@@ -65,7 +65,7 @@ import Data.IntSet ( IntSet )
 import qualified Data.IntSet as IntSet
 import Data.Set ( Set )
 import qualified Data.Set as Set
-import Control.Monad ( filterM )
+import Control.Monad ( filterM, foldM )
 import Control.Monad.Trans ( lift )
 import Control.Monad.Trans.State ( StateT, evalStateT, get, put, runStateT )
 import Prettyprinter
@@ -416,7 +416,7 @@ type CiM t = StateT (CIEnv t) Ceili
 mkCIEnv :: CIConstraints t
         => Configuration c p t
         -> Job p t
-        -> FeatureCache t
+        -> Maybe (FeatureCache t)
         -> Maybe [Assertion t]
         -> (Assertion t -> Ceili (CandidateQuery t))
         -> Ceili (CIEnv t)
@@ -430,16 +430,18 @@ mkCIEnv config job featureCache featureCandidates goalQuery =
     badStates            = Set.fromList . map (uncurry BadState)  $ zip [0..] (Set.toList closedBads)
     goodStates           = Set.fromList . map (uncurry GoodState) $ zip [0..] (Set.toList closedGoods)
     fCandidates          = Set.toList $ (cfgFeatureGenerator config) (cfgMaxFeatureSize config)
-    notVacuous candidate = checkSatB . cqQuery =<< (jobVacuityQuery job) candidate
   in do
-    candidates <- case featureCandidates of
-                    Just cands -> pure cands
-                    Nothing -> filterM notVacuous fCandidates
+    let candidates = case featureCandidates of
+                       Just cands -> cands
+                       Nothing    -> fCandidates
+    fc <- case featureCache of
+            Nothing -> buildFeatureCache (jobVacuityQuery job) goodStates candidates
+            Just cache -> pure cache
     pure $ CIEnv { envQueue             = qEmpty
                  , envStates            = mkStates badStates goodStates
                  , envRootClauses       = []
                  , envRootsAccepted     = IntSet.empty
-                 , envFeatureCache      = featureCache
+                 , envFeatureCache      = fc
                  , envFeatureCandidates = candidates
                  , envGoalQuery         = goalQuery
                  , envVacuityQuery      = jobVacuityQuery job
@@ -448,6 +450,29 @@ mkCIEnv config job featureCache featureCandidates goalQuery =
                  , envClauseDenylist    = Set.empty
                  , envKnownDeadEnds     = Set.empty
                  }
+
+buildFeatureCache :: CIConstraints t
+                  => (Assertion t -> Ceili (CandidateQuery t))
+                  -> Set (GoodState t)
+                  -> [Assertion t]
+                  -> Ceili (FeatureCache t)
+buildFeatureCache vacuityQuery goodStates candidates =
+  let
+    addCandidate fc assertion =  do
+        vq <- vacuityQuery assertion
+        nonVacuous <- checkSatB (cqQuery vq)
+        if not nonVacuous
+          then pure fc
+          else do
+            (acceptedGoods, _)  <- splitGoodStates assertion $ Set.toList goodStates
+            if null acceptedGoods
+              then pure fc
+              else do
+                let (featureId, fc') = fcIncrementId fc
+                let acceptedIds = IntSet.fromList $ map gsId acceptedGoods
+                let feature = Feature featureId assertion acceptedIds
+                pure $ fcAddFeature feature IntSet.empty fc'
+  in foldM addCandidate fcEmpty candidates
 
 getQueue :: CiM t (Queue t)
 getQueue = get >>= pure . envQueue
@@ -620,8 +645,9 @@ cInvGen :: CIConstraints t
         -> Ceili (Maybe (Assertion t))
 cInvGen config job = do
   log_i $ "[CInvGen] Beginning invariant inference"
-  sufEnv <- mkCIEnv config job fcEmpty Nothing (jobSufficiencyQuery job)
+  sufEnv <- mkCIEnv config job Nothing Nothing (jobSufficiencyQuery job)
   log_d $ "[CInvGen] " ++ (show . length . envFeatureCandidates $ sufEnv) ++ " initial feature candidates."
+--  log_d $ "Candidates: " ++ (show . pretty . envFeatureCandidates $ sufEnv)
   sufficientize config job sufEnv
 
 sufficientize config job env = do
@@ -657,7 +683,7 @@ strengthen config job featureCache featureCandidates candidate maxClause = do
         CIEnv queue states roots rootsAccepted fc fCandidates invQ vacQ names mcs denylist kde <- get
         put $ CIEnv queue states roots rootsAccepted fc fCandidates invQ vacQ names (mcs - maxClause) denylist kde
   (_, env) <- runStateT setMaxClauseSize
-          =<< mkCIEnv config job featureCache featureCandidates invQuery
+          =<< mkCIEnv config job (Just featureCache) featureCandidates invQuery
   (mInvariant, env') <- runStateT cInvGen' env
   case mInvariant of
     Nothing -> do
@@ -778,8 +804,8 @@ learnSeparator' = do
           clog_d $ "[CInvGen] Search queue is empty, failing."
 --          printSeen
 --          printKdes
-          printRejectSets
-          printAcceptSets
+--          printRejectSets
+--          printAcceptSets
           printFeatures
           pure Nothing
         Just entry -> do
@@ -1002,7 +1028,7 @@ addCounterexample cexState = do
 --  getRootClauses  >>= updateRootClauses  badState >>= putRootClauses
 --  getQueue        >>= updateQueue        badState >>= putQueue
   addNewlyUsefulFeatures   badState
-  addNewlyUsefulCandidates badState
+--  addNewlyUsefulCandidates badState
 
 addNewlyUsefulFeatures :: CIConstraints t => BadState t -> CiM t ()
 addNewlyUsefulFeatures newBadState = do
@@ -1036,10 +1062,10 @@ addNewlyUsefulCandidates newBadState = do
             pure $ Left assertion
   (candidates', newlyUseful) <- pure . partitionEithers =<< mapM rejectsNewBad featureCandidates
   maybeUseful <- mapM assertionToFeature newlyUseful
-  --let newFeatures = filter (not . IntSet.null . featAcceptedGoods . fst) maybeUseful
+  let newFeatures = filter (not . IntSet.null . featAcceptedGoods . fst) maybeUseful
 
-  goodStates <- getGoodStates >>= pure . IntSet.fromList . Set.toList . Set.map gsId
-  let newFeatures = filter ((== goodStates) . featAcceptedGoods . fst) maybeUseful
+--  let rejectedFeatures = filter (\f -> not $ f `elem` newFeatures) maybeUseful
+--  clog_d $ "*** Rejecting features: " ++ (show . pretty . map (featAssertion . fst) $ rejectedFeatures)
 
   putFeatureCandidates candidates'
   mapM_ (uncurry addFeature) newFeatures
@@ -1051,7 +1077,13 @@ seedFeature feature rejectedBads = do
   if denied then pure () else do
     badStateIds <- getBadStateIds
     if badStateIds == rejectedBads
-      then addRootClause (Clause (IntSet.singleton $ featId feature) (featAcceptedGoods feature))
+      then do
+        addRootClause (Clause (IntSet.singleton $ featId feature) (featAcceptedGoods feature))
+        --vq <- vacuityQuery (featAssertion feature)
+        --nonVacuous <- lift $ checkSatB (cqQuery vq)
+        --if nonVacuous
+        --  then addRootClause (Clause (IntSet.singleton $ featId feature) (featAcceptedGoods feature))
+        --  else pure ()
       else enqueue $ featureToEntry feature rejectedBads
 
 

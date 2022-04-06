@@ -22,6 +22,13 @@ packages:
   original:
     git: https://github.com/rcdickerson/simple-smt
     commit: e462b960b2fb8b9ba803aa8ffc1342e64ba2260b
+- completed:
+    hackage: strings-1.1@sha256:0285dec4c8ab262359342b3e5ef1eb567074669461b9b38404f1cb870c881c5c,1617
+    pantry-tree:
+      size: 212
+      sha256: 876e5a679244143e2a7e74357427c7522a8d61f68a4cc3ae265fe4960b75a2e2
+  original:
+    hackage: strings-1.1@sha256:0285dec4c8ab262359342b3e5ef1eb567074669461b9b38404f1cb870c881c5c,1617
 snapshots:
 - completed:
     size: 567037
