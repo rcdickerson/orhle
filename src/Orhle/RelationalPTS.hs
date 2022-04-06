@@ -28,7 +28,7 @@ import Data.UUID
 import Orhle.CInvGen ( Configuration(..), Job(..) )
 import qualified Orhle.CInvGen as CI
 --import qualified Orhle.DTLearn2 as DTL
-import Orhle.FeatureGen (genFeatures, lia)
+--import Orhle.FeatureGen (genFeatures, lia)
 import Orhle.SpecImp
 import Orhle.StepStrategy
 import Prettyprinter
@@ -269,16 +269,16 @@ inferInvariant stepStrategy ctx aloops eloops post =
 --      let names = rsipc_programNames ctx
       let anames   = map (\loop -> Set.intersection (rsipc_programNames ctx) (namesIn loop)) aloops
       let enames   = map (\loop -> Set.intersection (rsipc_programNames ctx) (namesIn loop)) eloops
-      let lits     = Set.union (rsipc_programLits ctx) (Set.fromList $ map embed [0, 1, 101])
+      let lits     = Set.union (rsipc_programLits ctx) (Set.fromList $ map embed [-1, 0, 1])
 
-      let lis size = Set.fromList $
-                     (concat $ map (\names -> genFeatures lia (Set.toList lits) names size) (collectSameNames . Set.toList . Set.unions $ anames ++ enames))
-                  ++ (concat $ map (\names -> genFeatures lia (Set.toList lits) (Set.toList names) size) anames)
-                  ++ (concat $ map (\names -> genFeatures lia (Set.toList lits) (Set.toList names) size) enames)
+--      let lis size = Set.fromList $
+--                     (concat $ map (\names -> genFeatures lia (Set.toList lits) names size) (collectSameNames . Set.toList . Set.unions $ anames ++ enames))
+--                  ++ (concat $ map (\names -> genFeatures lia (Set.toList lits) (Set.toList names) size) anames)
+--                  ++ (concat $ map (\names -> genFeatures lia (Set.toList lits) (Set.toList names) size) enames)
 
---Set.fromList $ genFeatures lia (Set.toList lits) (Set.toList $ Set.union anames enames) size
+--      let lis = Set.fromList $ genFeatures lia (Set.toList lits) (Set.toList $ Set.union anames enames)
 
---      let lis   = LI.linearInequalities (Set.map embed lits) (Set.union anames enames)
+      let lis   = LI.linearInequalities (Set.map embed lits) (Set.unions $ anames ++ enames)
 
       -- let lis _ = Set.fromList [ Lte (Var $ Name "test!1!counter" 0) (Num $ embed @Integer 5)
       --                          , Lte (Var $ Name "test!2!counter" 0) (Num $ embed @Integer 5)
