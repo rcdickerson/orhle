@@ -25,10 +25,10 @@ import Data.Set ( Set )
 import qualified Data.Set as Set
 import Data.Strings ( strSplitAll )
 import Data.UUID
-import Orhle.CInvGen ( Configuration(..), Job(..) )
-import qualified Orhle.CInvGen as CI
---import qualified Orhle.DTLearn2 as DTL
---import Orhle.FeatureGen (genFeatures, lia)
+--import qualified Orhle.CInvGen as CI
+import Orhle.InvGen.OrhleInvGen ( Configuration(..), Job(..) )
+import qualified Orhle.InvGen.OrhleInvGen as OIG
+import Orhle.FeatureGen (genFeatures, lia)
 import Orhle.SpecImp
 import Orhle.StepStrategy
 import Prettyprinter
@@ -202,10 +202,10 @@ invarianceQuery :: ( Embeddable Integer t
                 -> Assertion t
                 -> Ceili (Assertion t, QuerySubstitution)
 invarianceQuery stepStrategy ctx aloops eloops invariant = do
-  let conds = map condA (aloops ++ eloops)
+{-  let conds = map condA (aloops ++ eloops)
   wpInvar <- relBackwardPT stepStrategy ctx (map body aloops) (map body eloops) invariant
   pure $ (Imp (aAnd $ invariant:conds) wpInvar, QuerySubstitution [] [])
-{-
+-}
   let conds = map condA (aloops ++ eloops)
   let measures = catMaybes $ map measure (aloops ++ eloops)
   let names = Set.toList . Set.unions $ [ namesIn conds, namesIn invariant, namesIn aloops, namesIn eloops ]
@@ -217,7 +217,6 @@ invarianceQuery stepStrategy ctx aloops eloops invariant = do
   let frWpInvar = substituteAll names frNames wpInvar
   let frConds = substituteAll names frNames $ aAnd (invariant:conds)
   pure $ (Imp frConds frWpInvar, QuerySubstitution frNames names)
--}
 
 -- TODO: This is fragile.
 extractState :: Pretty t => [Name] -> [Name] -> Assertion t -> Ceili (ProgState t)
@@ -271,14 +270,14 @@ inferInvariant stepStrategy ctx aloops eloops post =
       let enames   = map (\loop -> Set.intersection (rsipc_programNames ctx) (namesIn loop)) eloops
       let lits     = Set.union (rsipc_programLits ctx) (Set.fromList $ map embed [-1, 0, 1])
 
---      let lis size = Set.fromList $
---                     (concat $ map (\names -> genFeatures lia (Set.toList lits) names size) (collectSameNames . Set.toList . Set.unions $ anames ++ enames))
---                  ++ (concat $ map (\names -> genFeatures lia (Set.toList lits) (Set.toList names) size) anames)
---                  ++ (concat $ map (\names -> genFeatures lia (Set.toList lits) (Set.toList names) size) enames)
+      let lis size = Set.fromList $
+                     (concat $ map (\names -> genFeatures lia (Set.toList lits) names size) (collectSameNames . Set.toList . Set.unions $ anames ++ enames))
+                  ++ (concat $ map (\names -> genFeatures lia (Set.toList lits) (Set.toList names) size) anames)
+                  ++ (concat $ map (\names -> genFeatures lia (Set.toList lits) (Set.toList names) size) enames)
 
 --      let lis = Set.fromList $ genFeatures lia (Set.toList lits) (Set.toList $ Set.union anames enames)
 
-      let lis   = LI.linearInequalities (Set.map embed lits) (Set.unions $ anames ++ enames)
+--      let lis   = LI.linearInequalities (Set.map embed lits) (Set.unions $ anames ++ enames)
 
       -- let lis _ = Set.fromList [ Lte (Var $ Name "test!1!counter" 0) (Num $ embed @Integer 5)
       --                          , Lte (Var $ Name "test!2!counter" 0) (Num $ embed @Integer 5)
@@ -291,29 +290,33 @@ inferInvariant stepStrategy ctx aloops eloops post =
       --                          ]
 
       someHeadStates <- lift . lift $ randomSample 5 headStates
-      let sufficiency candidate = do
-            isSufficient <- sufficiencyQuery aloops eloops post candidate
-            pure $ CI.CandidateQuery isSufficient (pure . id) (extractState [] [])
-      let invariance candidate = do
-            (isInvariant, QuerySubstitution freshNames origNames)
-                <- invarianceQuery stepStrategy ctx aloops eloops candidate
-            pure $ CI.CandidateQuery isInvariant (pure . substituteAll origNames freshNames) (extractState freshNames origNames)
-      let vacuity candidate = do
-            isNonVacuous <- vacuityQuery aloops eloops post candidate
-            pure $ CI.CandidateQuery isNonVacuous (pure . id) (extractState [] [])
-      let ciConfig = Configuration { cfgMaxFeatureSize   = 2
-                                   , cfgMaxClauseSize    = 6
-                                   , cfgFeatureGenerator = lis
-                                   , cfgWpSemantics      = relBackwardPT' stepStrategy
-                                   , cfgWpContext        = ctx
+      let loopConds = map condA (aloops ++ eloops)
+      -- let sufficiency candidate = do
+      --       isSufficient <- sufficiencyQuery aloops eloops post candidate
+      --       pure $ CI.CandidateQuery isSufficient (pure . id) (extractState [] [])
+      -- let invariance candidate = do
+      --       (isInvariant, QuerySubstitution freshNames origNames)
+      --           <- invarianceQuery stepStrategy ctx aloops eloops candidate
+      --       pure $ CI.CandidateQuery isInvariant (pure . substituteAll origNames freshNames) (extractState freshNames origNames)
+      -- let vacuity candidate = do
+      --       isNonVacuous <- vacuityQuery aloops eloops post candidate
+      --       pure $ CI.CandidateQuery isNonVacuous (pure . id) (extractState [] [])
+      let oigConfig = Configuration { cfgMaxFeatureSize   = 2
+                                    , cfgMaxClauseSize    = 6
+                                    , cfgFeatureGenerator = lis
+                                    , cfgWpSemantics      = relBackwardPT' stepStrategy
+                                    , cfgWpContext        = ctx
                                    }
-      let ciJob    = Job { jobBadStates        = Set.empty
-                         , jobGoodStates       = Set.fromList someHeadStates
-                         , jobSufficiencyQuery = sufficiency
-                         , jobInvarianceQuery  = invariance
-                         , jobVacuityQuery     = vacuity
-                         }
-      CI.cInvGen ciConfig ciJob
+      let oigJob    = Job { jobBadStates          = []
+                          , jobConcreteGoodStates = [ Map.fromList [ (Name "original!sum" 0, embed 101)
+                                                                   , (Name "refinement!sum" 0, embed 101)
+                                                                   ]
+                                                    ]
+                          , jobAbstractGoodStates = someHeadStates
+                          , jobLoopConds          = loopConds
+                          , jobPost               = post
+                          }
+      OIG.orhleInvGen oigConfig oigJob
 
 body :: ImpWhile t e -> e
 body (ImpWhile _ b _) = b
