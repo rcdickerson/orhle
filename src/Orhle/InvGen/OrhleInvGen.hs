@@ -138,7 +138,7 @@ addClause :: Clause t -> OigM t ()
 addClause clause = do
   env <- get
   let search = envCurrentSearch env
-  let clauses' = clause:(searchFoundClauses search)
+  let clauses' = addClauseRemovingCovered (searchFoundClauses search) clause
   let search' = search { searchFoundClauses = clauses' }
   put $ env { envCurrentSearch = search' }
 

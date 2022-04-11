@@ -311,6 +311,9 @@ inferInvariant stepStrategy ctx aloops eloops post =
                           , jobConcreteGoodStates = [ Map.fromList [ (Name "original!sum" 0, embed 101)
                                                                    , (Name "refinement!sum" 0, embed 101)
                                                                    ]
+                                                    , Map.fromList [ (Name "original!sum" 0, embed 20)
+                                                                   , (Name "refinement!sum" 0, embed 20)
+                                                                   ]
                                                     ]
                           , jobAbstractGoodStates = someHeadStates
                           , jobLoopConds          = loopConds

@@ -1,5 +1,6 @@
 module Orhle.InvGen.Clause
   ( Clause(..)
+  , addClauseRemovingCovered
   , clausesAcceptedConGoods
   , clausesOptimisticAcceptedAbsGoods
   , clausesRejectedBads
@@ -49,3 +50,11 @@ clausesRejectedBads fc = IntSet.unions
 intersections :: [IntSet] -> IntSet
 intersections []     = IntSet.empty
 intersections (s:ss) = foldr IntSet.intersection s ss
+
+addClauseRemovingCovered :: [Clause t] -> Clause t -> [Clause t]
+addClauseRemovingCovered clauses newClause =
+  let
+    clause1 `covers` clause2 =
+      (clauseAcceptedConGoods clause2 `IntSet.isSubsetOf` clauseAcceptedConGoods clause1) &&
+      (clauseAcceptedAbsGoods clause2 `IntSet.isSubsetOf` clauseAcceptedAbsGoods clause1)
+  in newClause:(filter (\c -> not $ newClause `covers` c) clauses)
