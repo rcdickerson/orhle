@@ -259,6 +259,7 @@ extractState freshNames names assertion = case assertion of
       Num n -> n
       _ -> error $ "Unexpected arith (expected int): " ++ show arith
 
+
 -----------------------
 -- Separator Learner --
 -----------------------

@@ -54,8 +54,8 @@ data FeatureCache t = FeatureCache
   , fcFeatureIds                 :: FeatureIdSet
   , fcFeaturesById               :: Map FeatureId (Feature t)
   , fcRejectedByFeature          :: Map FeatureId BadStateIdSet
-  , fcFeaturesByConcreteAccepted :: Map FeatureId ConcreteGoodStateIdSet
-  , fcFeaturesByAbstractAccepted :: Map FeatureId AbstractGoodStateIdSet
+  , fcFeaturesByConcreteAccepted :: Map ConcreteGoodStateId FeatureIdSet
+  , fcFeaturesByAbstractAccepted :: Map AbstractGoodStateId FeatureIdSet
   , fcFeaturesByRejected         :: Map BadStateId FeatureIdSet
   }
 

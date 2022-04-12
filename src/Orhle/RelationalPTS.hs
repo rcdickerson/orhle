@@ -302,17 +302,32 @@ inferInvariant stepStrategy ctx aloops eloops post =
       --       isNonVacuous <- vacuityQuery aloops eloops post candidate
       --       pure $ CI.CandidateQuery isNonVacuous (pure . id) (extractState [] [])
       let oigConfig = Configuration { cfgMaxFeatureSize   = 2
-                                    , cfgMaxClauseSize    = 6
+                                    , cfgMaxClauseSize    = 10
                                     , cfgFeatureGenerator = lis
                                     , cfgWpSemantics      = relBackwardPT' stepStrategy
                                     , cfgWpContext        = ctx
                                    }
       let oigJob    = Job { jobBadStates          = []
-                          , jobConcreteGoodStates = [ Map.fromList [ (Name "original!sum" 0, embed 101)
-                                                                   , (Name "refinement!sum" 0, embed 101)
+                          -- , jobConcreteGoodStates = [ Map.fromList [ (Name "original!sum" 0, embed 101)
+                          --                                          , (Name "refinement!sum" 0, embed 101)
+                          --                                          ]
+                          --                           , Map.fromList [ (Name "original!sum" 0, embed 20)
+                          --                                          , (Name "refinement!sum" 0, embed 20)
+                          --                                          ]
+                          --                           ]
+                          , jobConcreteGoodStates = [ Map.fromList [ (Name "test!1!counter" 0, embed 5)
+                                                                   , (Name "test!2!counter" 0, embed 5)
+                                                                   , (Name "test!1!lastTime" 0, embed 400)
+                                                                   , (Name "test!2!lastTime" 0, embed 404)
+                                                                   , (Name "test!1!currentTotal" 0, embed 500)
+                                                                   , (Name "test!2!currentTotal" 0, embed 505)
                                                                    ]
-                                                    , Map.fromList [ (Name "original!sum" 0, embed 20)
-                                                                   , (Name "refinement!sum" 0, embed 20)
+                                                    , Map.fromList [ (Name "test!1!counter" 0, embed 3)
+                                                                   , (Name "test!2!counter" 0, embed 3)
+                                                                   , (Name "test!1!lastTime" 0, embed 200)
+                                                                   , (Name "test!2!lastTime" 0, embed 202)
+                                                                   , (Name "test!1!currentTotal" 0, embed 300)
+                                                                   , (Name "test!2!currentTotal" 0, embed 303)
                                                                    ]
                                                     ]
                           , jobAbstractGoodStates = someHeadStates
