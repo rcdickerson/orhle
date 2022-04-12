@@ -14,6 +14,7 @@ module Orhle.InvGen.Feature
   , fcLookupFeature
   , fcLookupFeatures
   , fcRejectedBads
+  , fcRemoveFeature
   ) where
 
 import Ceili.Assertion
@@ -50,17 +51,24 @@ instance Pretty t => Pretty (Feature t) where
 -------------------
 
 data FeatureCache t = FeatureCache
-  { fcNextFeatureId              :: FeatureId
-  , fcFeatureIds                 :: FeatureIdSet
-  , fcFeaturesById               :: Map FeatureId (Feature t)
-  , fcRejectedByFeature          :: Map FeatureId BadStateIdSet
-  , fcFeaturesByConcreteAccepted :: Map ConcreteGoodStateId FeatureIdSet
-  , fcFeaturesByAbstractAccepted :: Map AbstractGoodStateId FeatureIdSet
-  , fcFeaturesByRejected         :: Map BadStateId FeatureIdSet
+  { fcNextFeatureId         :: FeatureId
+  , fcFeatureIds            :: FeatureIdSet
+  , fcFeaturesById          :: Map FeatureId (Feature t)
+  , fcRejectedByFeature     :: Map FeatureId BadStateIdSet
+  , fcFeaturesByConAccepted :: Map ConcreteGoodStateId FeatureIdSet
+  , fcFeaturesByAbsAccepted :: Map AbstractGoodStateId FeatureIdSet
+  , fcFeaturesByRejected    :: Map BadStateId FeatureIdSet
   }
 
 fcEmpty :: FeatureCache t
-fcEmpty = FeatureCache 0 IntSet.empty Map.empty Map.empty Map.empty Map.empty Map.empty
+fcEmpty = FeatureCache { fcNextFeatureId         = 0
+                       , fcFeatureIds            = IntSet.empty
+                       , fcFeaturesById          = Map.empty
+                       , fcRejectedByFeature     = Map.empty
+                       , fcFeaturesByConAccepted = Map.empty
+                       , fcFeaturesByAbsAccepted = Map.empty
+                       , fcFeaturesByRejected    = Map.empty
+                       }
 
 fcClearBadStates :: FeatureCache t -> FeatureCache t
 fcClearBadStates fc = fc { fcRejectedByFeature  = Map.empty
@@ -74,13 +82,13 @@ fcIncrementId (FeatureCache nextId fids fById rejByFeat featByConAcc featByAbsAc
 fcAddFeature :: Ord t => Feature t -> BadStateIdSet -> FeatureCache t -> FeatureCache t
 fcAddFeature feature rejected featureCache =
   let
-    nextId                = fcNextFeatureId              featureCache
-    featureIds            = fcFeatureIds                 featureCache
-    featuresById          = fcFeaturesById               featureCache
-    rejectedByFeature     = fcRejectedByFeature          featureCache
-    featsByConAccepted    = fcFeaturesByConcreteAccepted featureCache
-    featsByAbsAccepted    = fcFeaturesByAbstractAccepted featureCache
-    featsByRejected       = fcFeaturesByRejected         featureCache
+    nextId                = fcNextFeatureId         featureCache
+    featureIds            = fcFeatureIds            featureCache
+    featuresById          = fcFeaturesById          featureCache
+    rejectedByFeature     = fcRejectedByFeature     featureCache
+    featsByConAccepted    = fcFeaturesByConAccepted featureCache
+    featsByAbsAccepted    = fcFeaturesByAbsAccepted featureCache
+    featsByRejected       = fcFeaturesByRejected    featureCache
     featureId             = featId feature
     nextId'               = if featureId < nextId then nextId else featureId + 1
     featureIds'           = IntSet.insert featureId featureIds
@@ -95,13 +103,45 @@ fcAddFeature feature rejected featureCache =
   in
     if featureId `IntSet.member` featureIds
     then error $ "Feature ID already in use: " ++ (show featureId)
-    else FeatureCache { fcNextFeatureId              = nextId'
-                      , fcFeatureIds                 = featureIds'
-                      , fcFeaturesById               = featuresById'
-                      , fcRejectedByFeature          = rejectedByFeature'
-                      , fcFeaturesByConcreteAccepted = featsByConAccepted'
-                      , fcFeaturesByAbstractAccepted = featsByAbsAccepted'
-                      , fcFeaturesByRejected         = featsByRejected'
+    else FeatureCache { fcNextFeatureId         = nextId'
+                      , fcFeatureIds            = featureIds'
+                      , fcFeaturesById          = featuresById'
+                      , fcRejectedByFeature     = rejectedByFeature'
+                      , fcFeaturesByConAccepted = featsByConAccepted'
+                      , fcFeaturesByAbsAccepted = featsByAbsAccepted'
+                      , fcFeaturesByRejected    = featsByRejected'
+                      }
+
+fcRemoveFeature :: Ord t => FeatureId -> FeatureCache t -> FeatureCache t
+fcRemoveFeature featureId featureCache =
+  let
+    feature               = fcLookupFeature featureCache featureId
+    rejected              = fcRejectedBads featureId featureCache
+    featureIds            = fcFeatureIds            featureCache
+    featuresById          = fcFeaturesById          featureCache
+    rejectedByFeature     = fcRejectedByFeature     featureCache
+    featsByConAccepted    = fcFeaturesByConAccepted featureCache
+    featsByAbsAccepted    = fcFeaturesByAbsAccepted featureCache
+    featsByRejected       = fcFeaturesByRejected    featureCache
+    featureIds'           = IntSet.delete featureId featureIds
+    featuresById'         = Map.delete featureId featuresById
+    rejectedByFeature'    = Map.delete featureId rejectedByFeature
+    featDelete stId stMap = case Map.lookup stId stMap of
+                              Nothing  -> stMap
+                              Just set -> Map.insert stId (IntSet.delete featureId set) stMap
+    featsByConAccepted'   = foldr featDelete featsByConAccepted $ IntSet.toList (featAcceptedConGoods feature)
+    featsByAbsAccepted'   = foldr featDelete featsByAbsAccepted $ IntSet.toList (featAcceptedAbsGoods feature)
+    featsByRejected'      = foldr featDelete featsByRejected $ IntSet.toList rejected
+  in
+    if featureId `IntSet.member` featureIds
+    then error $ "Feature ID already in use: " ++ (show featureId)
+    else FeatureCache { fcNextFeatureId         = fcNextFeatureId featureCache
+                      , fcFeatureIds            = featureIds'
+                      , fcFeaturesById          = featuresById'
+                      , fcRejectedByFeature     = rejectedByFeature'
+                      , fcFeaturesByConAccepted = featsByConAccepted'
+                      , fcFeaturesByAbsAccepted = featsByAbsAccepted'
+                      , fcFeaturesByRejected    = featsByRejected'
                       }
 
 fcAddBadState :: BadStateId -> (Feature t -> Ceili Bool) -> FeatureCache t -> Ceili (FeatureCache t)
@@ -138,7 +178,7 @@ fcFeaturesWhichAcceptConcrete :: Ord t => [ConcreteGoodStateId] -> FeatureCache 
 fcFeaturesWhichAcceptConcrete states cache =
   case states of
     [] -> []
-    (s:ss) -> case Map.lookup s (fcFeaturesByConcreteAccepted cache) of
+    (s:ss) -> case Map.lookup s (fcFeaturesByConAccepted cache) of
       Nothing -> fcFeaturesWhichAcceptConcrete ss cache
       Just features -> features:(fcFeaturesWhichAcceptConcrete ss cache)
 
@@ -146,7 +186,7 @@ fcFeaturesWhichAcceptAbstract :: Ord t => [AbstractGoodStateId] -> FeatureCache 
 fcFeaturesWhichAcceptAbstract states cache =
   case states of
     [] -> []
-    (s:ss) -> case Map.lookup s (fcFeaturesByAbstractAccepted cache) of
+    (s:ss) -> case Map.lookup s (fcFeaturesByAbsAccepted cache) of
       Nothing -> fcFeaturesWhichAcceptAbstract ss cache
       Just features -> features:(fcFeaturesWhichAcceptAbstract ss cache)
 
