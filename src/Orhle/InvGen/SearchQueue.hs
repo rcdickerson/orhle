@@ -31,16 +31,6 @@ data Entry t = Entry
   , entryAcceptedAbsGoods :: AbstractGoodStateIdSet
   } deriving (Ord, Show)
 
-
-------------
--- Queues --
-------------
-
-data Queue t = Queue
-  { qQueue    :: Map Int (Set (Entry t))
-  , qScoreFun :: ScoreFunction t
-  }
-
 instance Ord t => Eq (Entry t) where
   entry1 == entry2 = entryCandidate entry1 == entryCandidate entry2
 
@@ -52,6 +42,16 @@ instance Pretty t => Pretty (Entry t) where
     <>  pretty (IntSet.size rejected)
     <>  pretty "]:"
     <+> pretty (IntSet.toList candidate)
+
+
+------------
+-- Queues --
+------------
+
+data Queue t = Queue
+  { qQueue    :: Map Int (Set (Entry t))
+  , qScoreFun :: ScoreFunction t
+  }
 
 qEmpty :: ScoreFunction t -> Queue t
 qEmpty = Queue Map.empty

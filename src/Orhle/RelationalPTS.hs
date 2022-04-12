@@ -270,24 +270,24 @@ inferInvariant stepStrategy ctx aloops eloops post =
       let enames   = map (\loop -> Set.intersection (rsipc_programNames ctx) (namesIn loop)) eloops
       let lits     = Set.union (rsipc_programLits ctx) (Set.fromList $ map embed [-1, 0, 1])
 
-      let lis size = Set.fromList $
-                     (concat $ map (\names -> genFeatures lia (Set.toList lits) names size) (collectSameNames . Set.toList . Set.unions $ anames ++ enames))
-                  ++ (concat $ map (\names -> genFeatures lia (Set.toList lits) (Set.toList names) size) anames)
-                  ++ (concat $ map (\names -> genFeatures lia (Set.toList lits) (Set.toList names) size) enames)
+      -- let lis size = Set.fromList $
+      --                (concat $ map (\names -> genFeatures lia (Set.toList lits) names size) (collectSameNames . Set.toList . Set.unions $ anames ++ enames))
+      --             ++ (concat $ map (\names -> genFeatures lia (Set.toList lits) (Set.toList names) size) anames)
+      --             ++ (concat $ map (\names -> genFeatures lia (Set.toList lits) (Set.toList names) size) enames)
 
 --      let lis = Set.fromList $ genFeatures lia (Set.toList lits) (Set.toList $ Set.union anames enames)
 
 --      let lis   = LI.linearInequalities (Set.map embed lits) (Set.unions $ anames ++ enames)
 
-      -- let lis _ = Set.fromList [ Lte (Var $ Name "test!1!counter" 0) (Num $ embed @Integer 5)
-      --                          , Lte (Var $ Name "test!2!counter" 0) (Num $ embed @Integer 5)
-      --                          , Gte (Var $ Name "test!1!lastTime" 0) (Num $ embed @Integer 0)
-      --                          , Gte (Var $ Name "test!2!lastTime" 0) (Num $ embed @Integer 0)
-      --                          , Eq (Sub [Var $ Name "test!1!currentTime" 0, Var $ Name "test!1!lastTime" 0]) (Num $ embed @Integer 100)
-      --                          , Eq (Sub [Var $ Name "test!2!currentTime" 0, Var $ Name "test!2!lastTime" 0]) (Num $ embed @Integer 101)
-      --                          , Eq (Var $ Name "test!1!currentTotal" 0) (Mul [Num $ embed @Integer 100, (Var $ Name "test!1!counter" 0)])
-      --                          , Eq (Var $ Name "test!2!currentTotal" 0) (Mul [Num $ embed @Integer 101, (Var $ Name "test!2!counter" 0)])
-      --                          ]
+      let lis _ = Set.fromList [ Lte (Var $ Name "test!1!counter" 0) (Num $ embed @Integer 5)
+                               , Lte (Var $ Name "test!2!counter" 0) (Num $ embed @Integer 5)
+                               , Gte (Var $ Name "test!1!lastTime" 0) (Num $ embed @Integer 0)
+                               , Gte (Var $ Name "test!2!lastTime" 0) (Num $ embed @Integer 0)
+                               , Eq (Sub [Var $ Name "test!1!currentTime" 0, Var $ Name "test!1!lastTime" 0]) (Num $ embed @Integer 100)
+                               , Eq (Sub [Var $ Name "test!2!currentTime" 0, Var $ Name "test!2!lastTime" 0]) (Num $ embed @Integer 101)
+                               , Eq (Var $ Name "test!1!currentTotal" 0) (Mul [Num $ embed @Integer 100, (Var $ Name "test!1!counter" 0)])
+                               , Eq (Var $ Name "test!2!currentTotal" 0) (Mul [Num $ embed @Integer 101, (Var $ Name "test!2!counter" 0)])
+                               ]
 
       someHeadStates <- lift . lift $ randomSample 5 headStates
       let loopConds = map condA (aloops ++ eloops)
@@ -321,13 +321,6 @@ inferInvariant stepStrategy ctx aloops eloops post =
                                                                    , (Name "test!2!lastTime" 0, embed 404)
                                                                    , (Name "test!1!currentTotal" 0, embed 500)
                                                                    , (Name "test!2!currentTotal" 0, embed 505)
-                                                                   ]
-                                                    , Map.fromList [ (Name "test!1!counter" 0, embed 3)
-                                                                   , (Name "test!2!counter" 0, embed 3)
-                                                                   , (Name "test!1!lastTime" 0, embed 200)
-                                                                   , (Name "test!2!lastTime" 0, embed 202)
-                                                                   , (Name "test!1!currentTotal" 0, embed 300)
-                                                                   , (Name "test!2!currentTotal" 0, embed 303)
                                                                    ]
                                                     ]
                           , jobAbstractGoodStates = someHeadStates
