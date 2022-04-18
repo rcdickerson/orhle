@@ -14,7 +14,6 @@ import Ceili.Name
 import Ceili.ProgState
 import qualified Ceili.SMT as SMT
 import Ceili.StatePredicate
-import Ceili.PTS ( BackwardPT )
 import Control.Arrow ( (>>>) )
 import Control.Monad.Trans ( lift )
 import Control.Monad.Trans.State ( StateT, evalStateT, get, put )
@@ -195,7 +194,7 @@ orhleInvGen' post = do
   case mCandidate of
     Just result -> strengthen $ vpgAssertion result
     Nothing -> do
-      clog_i "[OrhleInvGen] Unable to infer initial invariant candidate." >> printFc
+      clog_i "[OrhleInvGen] Unable to infer initial invariant candidate." -- >> printFc
       pure Nothing
 
 strengthen :: OigConstraints t => Assertion t -> OigM t (Maybe (Assertion t))
@@ -222,7 +221,6 @@ strengthen candidate = do
         Nothing -> do
           clog_i $ "[OrhleInvGen] Unable to strengthen candidate to be inductive: "
                 ++ (show . pretty $ candidate)
-          printFc
           pure Nothing
 
 printFc :: Pretty t => OigM t ()
@@ -512,8 +510,11 @@ addNewlyUsefulCandidates newBadState = do
           Rejected  -> pure $ Right assertion
           Error err -> throwError $ "SMT error evaluating feature candidate: " ++ err
   (candidates', useful) <- pure . partitionEithers =<< mapM rejectsNewBad (envFeatureCandidates env)
-  let acceptsSomething feature = (not . IntSet.null . featAcceptedConGoods $ feature)
-                              && (not . IntSet.null . featAcceptedAbsGoods $ feature)
+
+  noConGoods <- pure . IntSet.null =<< (getEnv $ envStates >>> stConcreteGoodStateIds)
+  noAbsGoods <- pure . IntSet.null =<< (getEnv $ envStates >>> stAbstractGoodStateIds)
+  let acceptsSomething feature = (noConGoods || (not . IntSet.null . featAcceptedConGoods $ feature))
+                              && (noAbsGoods || (not . IntSet.null . featAcceptedAbsGoods $ feature))
   newFeatures <- mapM assertionToFeature useful >>= pure . filter (acceptsSomething . fst) . catMaybes
   let fc' = foldr (uncurry fcAddFeature) (envFeatureCache env) newFeatures
   put $ env { envFeatureCache      = fc'
