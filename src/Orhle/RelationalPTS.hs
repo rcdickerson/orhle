@@ -304,8 +304,7 @@ inferInvariant stepStrategy ctx aloops eloops post =
       let oigConfig = Configuration { cfgMaxFeatureSize   = 2
                                     , cfgMaxClauseSize    = 10
                                     , cfgFeatureGenerator = lis
-                                    , cfgWpSemantics      = relBackwardPT' stepStrategy
-                                    , cfgWpContext        = ctx
+                                    , cfgWpTransform      = relBackwardPT stepStrategy ctx (map body aloops) (map body eloops)
                                    }
       let oigJob    = Job { jobBadStates          = []
                           -- , jobConcreteGoodStates = [ Map.fromList [ (Name "original!sum" 0, embed 101)
@@ -319,6 +318,8 @@ inferInvariant stepStrategy ctx aloops eloops post =
                                                                    , (Name "test!2!counter" 0, embed 5)
                                                                    , (Name "test!1!lastTime" 0, embed 400)
                                                                    , (Name "test!2!lastTime" 0, embed 404)
+                                                                   , (Name "test!1!currentTime" 0, embed 500)
+                                                                   , (Name "test!2!currentTime" 0, embed 505)
                                                                    , (Name "test!1!currentTotal" 0, embed 500)
                                                                    , (Name "test!2!currentTotal" 0, embed 505)
                                                                    ]

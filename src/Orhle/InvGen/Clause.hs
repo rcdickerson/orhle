@@ -2,14 +2,13 @@ module Orhle.InvGen.Clause
   ( Clause(..)
   , addClauseRemovingCovered
   , clausesAcceptedConGoods
-  , clausesOptimisticAcceptedAbsGoods
+  , clausesAcceptedAbsGoods
   , clausesRejectedBads
   , clauseToAssertion
   , clausesToAssertion
   ) where
 
 import Ceili.Assertion
-import Data.IntSet ( IntSet )
 import qualified Data.IntSet as IntSet
 import Orhle.InvGen.Feature
 import Orhle.InvGen.State
@@ -35,10 +34,10 @@ clausesToAssertion :: FeatureCache t -> [Clause t] -> Assertion t
 clausesToAssertion fc = aOr . map (clauseToAssertion fc)
 
 clausesAcceptedConGoods :: [Clause t] -> ConcreteGoodStateIdSet
-clausesAcceptedConGoods = intersections . map clauseAcceptedConGoods
+clausesAcceptedConGoods = IntSet.unions . map clauseAcceptedConGoods
 
-clausesOptimisticAcceptedAbsGoods :: [Clause t] -> ConcreteGoodStateIdSet
-clausesOptimisticAcceptedAbsGoods = intersections . map clauseAcceptedAbsGoods
+clausesAcceptedAbsGoods :: [Clause t] -> ConcreteGoodStateIdSet
+clausesAcceptedAbsGoods = IntSet.unions . map clauseAcceptedAbsGoods
 
 clausesRejectedBads :: Ord t => FeatureCache t -> [Clause t] -> BadStateIdSet
 clausesRejectedBads fc = IntSet.unions
@@ -46,10 +45,6 @@ clausesRejectedBads fc = IntSet.unions
                        . IntSet.toList
                        . IntSet.unions
                        . map clauseFeatures
-
-intersections :: [IntSet] -> IntSet
-intersections []     = IntSet.empty
-intersections (s:ss) = foldr IntSet.intersection s ss
 
 addClauseRemovingCovered :: [Clause t] -> Clause t -> [Clause t]
 addClauseRemovingCovered clauses newClause =

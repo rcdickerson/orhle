@@ -36,12 +36,11 @@ import Prettyprinter
 -- Configuration --
 -------------------
 
-data Configuration c p t = Configuration
+data Configuration t = Configuration
   { cfgMaxFeatureSize   :: Int
   , cfgMaxClauseSize    :: Int
   , cfgFeatureGenerator :: Int -> Set (Assertion t)
-  , cfgWpSemantics      :: BackwardPT c p t
-  , cfgWpContext        :: c
+  , cfgWpTransform      :: Assertion t -> Ceili (Assertion t)
   }
 
 
@@ -49,7 +48,7 @@ data Configuration c p t = Configuration
 -- Jobs --
 ----------
 
-data Job p t = Job
+data Job t = Job
   { jobBadStates          :: [ProgState t]
   , jobConcreteGoodStates :: [ProgState t]
   , jobAbstractGoodStates :: [ProgState t]
@@ -93,11 +92,12 @@ data OigEnv t = OigEnv { envCurrentSearch     :: Search t
                        , envLoopConds         :: [Assertion t]
                        , envMaxClauseSize     :: Int
                        , envStates            :: States t
+                       , envWpTransform       :: Assertion t -> Ceili (Assertion t)
                        }
 
 mkOigEnv :: OigConstraints t
-         => Configuration c p t
-         -> Job p t
+         => Configuration t
+         -> Job t
          -> OigEnv t
 mkOigEnv config job =
   let
@@ -109,6 +109,7 @@ mkOigEnv config job =
             , envLoopConds         = jobLoopConds job
             , envMaxClauseSize     = cfgMaxClauseSize config
             , envStates            = states
+            , envWpTransform       = cfgWpTransform config
             }
 
 
@@ -149,23 +150,25 @@ addClause clause = do
 resetSearch :: OigM t ()
 resetSearch = do
   env <- get
-  let search = envCurrentSearch env
+  let search   = envCurrentSearch env
   let scoreFun = qScoreFun $ searchQueue search
-  let search' = search { searchFoundClauses = []
-                       , searchQueue = qEmpty scoreFun
-                       }
+  let search'  = search { searchFoundClauses = []
+                        , searchQueue = qEmpty scoreFun
+                        }
   put $ env { envCurrentSearch = search' }
-
 
 setCurrentSearch :: Search t -> OigM t ()
 setCurrentSearch search =
   get >>= (\env -> pure $ env { envCurrentSearch = search }) >>= put
 
+setGoal :: (Assertion t -> Assertion t) -> OigM t ()
+setGoal goal = do
+  search <- getEnv envCurrentSearch
+  let search' = search { searchGoalQuery = goal }
+  get >>= (\env -> pure $ env { envCurrentSearch = search' }) >>= put
+
 clog_d :: String -> OigM t ()
 clog_d = lift . log_d
-
-clog_e :: String -> OigM t ()
-clog_e = lift . log_e
 
 clog_i :: String -> OigM t ()
 clog_i = lift . log_i
@@ -176,32 +179,67 @@ clog_i = lift . log_i
 ------------------------------------
 
 orhleInvGen :: OigConstraints t
-            => Configuration c p t
-            -> Job p t
+            => Configuration t
+            -> Job t
             -> Ceili (Maybe (Assertion t))
 orhleInvGen config job = do
   log_i $ "[OrhleInvGen] Beginning invariant inference"
   let env =  mkOigEnv config job
-  evalStateT (orhleInvGen' job) env
+  evalStateT (orhleInvGen' $ jobPost job) env
 
-orhleInvGen' :: OigConstraints t
-             => Job p t
-             -> OigM t (Maybe (Assertion t))
-orhleInvGen' job = do
-  setCurrentSearch $ Search { searchFoundClauses = []
-                            , searchGoalQuery    = \candidate -> aImp candidate (jobPost job)
-                            , searchQueue        = qEmpty sfBreadthFirst
-                            }
+orhleInvGen' :: OigConstraints t => Assertion t -> OigM t (Maybe (Assertion t))
+orhleInvGen' post = do
+  nconds <- pure . map Not =<< getEnv envLoopConds
+  setGoal $ \assertion -> aImp (aAnd $ assertion:nconds) post
   mCandidate <- fPreGen
   case mCandidate of
+    Just result -> strengthen $ vpgAssertion result
     Nothing -> do
-      clog_i "[OrhleInvGen] Unable to infer initial invariant candidate."
+      clog_i "[OrhleInvGen] Unable to infer initial invariant candidate." >> printFc
       pure Nothing
-    Just result -> do
-      let candidate = vpgAssertion result
-      clog_d $ "[CInvGen] Initial candidate, may not be invariant: " ++ (show . pretty $ candidate)
-      -- TODO: Strengthen.
-      pure . Just $ candidate
+
+strengthen :: OigConstraints t => Assertion t -> OigM t (Maybe (Assertion t))
+strengthen candidate = do
+  conds       <- getEnv envLoopConds
+  wpTransform <- getEnv envWpTransform
+  wpInvar     <- lift $ wpTransform candidate
+  let invariance assertion = Imp (aAnd $ assertion:conds) wpInvar
+  invCex <- lift . findCounterexample . invariance $ candidate
+  case invCex of
+    FormulaValid -> pure $ Just candidate
+    SMTTimeout -> throwError "SMT timeout"
+    SMTUnknown -> throwError "SMT returned unknown"
+    Counterexample cex -> do
+      states <- getEnv envStates
+      cexState <- lift $ extractState [] [] cex >>= pure . stCloseNames states
+      clog_d . show $ pretty "[OrhleInvGen] Invariance counterexample:" <+> (align . pretty) cexState
+      resetSearch >> addCounterexample cexState >> seedRemainingGoods
+      clog_d $ "[OrhleInvGen] Strengthening: " ++ (show . pretty $ candidate)
+      setGoal invariance
+      mStrengthener <- fPreGen
+      case mStrengthener of
+        Just strengthener -> strengthen $ aAnd [candidate, vpgAssertion strengthener]
+        Nothing -> do
+          clog_i $ "[OrhleInvGen] Unable to strengthen candidate to be inductive: "
+                ++ (show . pretty $ candidate)
+          printFc
+          pure Nothing
+
+printFc :: Pretty t => OigM t ()
+printFc = do
+  fc <- getEnv envFeatureCache
+  let features = Map.toList $ fcFeaturesById fc
+  let rejected = fcRejectedByFeature fc
+  let printFeature (fid, feat) = do
+        let rej = case Map.lookup fid rejected of
+              Nothing  -> pretty "[]"
+              Just set -> pretty . IntSet.toList $ set
+        clog_d . show $ pretty "(" <> pretty fid <> pretty "," <+>
+          pretty feat <> pretty "," <+>
+          (pretty . IntSet.toList . featAcceptedConGoods $ feat) <> pretty "," <+>
+          (pretty . IntSet.toList . featAcceptedAbsGoods $ feat) <> pretty "," <+>
+          rej <> pretty ")"
+  mapM_ printFeature features
 
 
 -------------
@@ -224,10 +262,14 @@ fPreGen = do
   badStates     <- getEnv $ envStates >>> stBadStates
   conGoodStates <- getEnv $ envStates >>> stConcreteGoodStates
   absGoodStates <- getEnv $ envStates >>> stAbstractGoodStates
+  queue         <- getEnv $ envCurrentSearch >>> searchQueue
+  clauses       <- getEnv $ envCurrentSearch >>> searchFoundClauses
   clog_d $ "[OrhleInvGen] Starting vPreGen pass"
   clog_d . show $ pretty "[OrhleInvGen]   concrete good states:" <+> pretty (Map.size conGoodStates)
   clog_d . show $ pretty "[OrhleInvGen]   abstract good states:" <+> pretty (Map.size absGoodStates)
-  clog_d . show $ pretty "[OrhleInvGen]   bad states: "          <+> pretty (Map.size badStates)
+  clog_d . show $ pretty "[OrhleInvGen]   bad states:"           <+> pretty (Map.size badStates)
+  clog_d . show $ pretty "[OrhleInvGen]   queue size:"           <+> pretty (qSize queue)
+  clog_d . show $ pretty "[OrhleInvGen]   clauses:"              <+> pretty (length clauses)
 
   mSeparator <- learnSeparator
   case mSeparator of
@@ -247,21 +289,24 @@ fPreGen = do
           states <- getEnv envStates
           cexState <- lift $ extractState [] [] cex >>= pure . stCloseNames states
           clog_d . show $ pretty "[OrhleInvGen] Found counterexample:" <+> (align . pretty) cexState
-          resetSearch >> addCounterexample cexState >> fPreGen
+          resetSearch >> addCounterexample cexState >> seedRemainingGoods >> fPreGen
 
 -- TODO: This is fragile.
 extractState :: Pretty t => [Name] -> [Name] -> Assertion t -> Ceili (ProgState t)
-extractState freshNames names assertion = case assertion of
-  Eq lhs rhs -> pure $ Map.fromList [(extractName lhs, extractInt rhs)]
-  And as     -> pure . Map.unions =<< mapM (extractState freshNames names) as
-  _          -> error $ "Unexpected assertion: " ++ show assertion
-  where
-    extractName arith = case arith of
-      Var name -> substituteAll freshNames names name
-      _ -> error $ "Unexpected arith (expected name): " ++ show arith
-    extractInt arith = case arith of
-      Num n -> n
-      _ -> error $ "Unexpected arith (expected int): " ++ show arith
+extractState freshNames names assertion =
+  case assertion of
+    Eq lhs rhs -> pure $ Map.fromList [(extractName lhs, extractInt rhs)]
+    And as     -> pure . Map.unions =<< mapM (extractState freshNames names) as
+    _          -> error $ "Unexpected assertion: " ++ show assertion
+    where
+      extractName arith =
+        case arith of
+          Var name -> substituteAll freshNames names name
+          _        -> error $ "Unexpected arith (expected name): " ++ show arith
+      extractInt arith =
+        case arith of
+          Num n -> n
+          _     -> error $ "Unexpected arith (expected int): " ++ show arith
 
 
 -----------------------
@@ -297,11 +342,13 @@ processQueue = do
 
 processEntry :: OigConstraints t => Entry t -> OigM t (Maybe (VPreGenResult t))
 processEntry entry = do
+  -- clog_d $ "Processing entry: " ++ (show . pretty $ entry)
   maxClauseSize <- getEnv envMaxClauseSize
   if IntSet.size (entryCandidate entry) >= maxClauseSize
     then processQueue
     else do
       nextFeatures <- usefulFeatures entry
+      -- clog_d $ "Useful features: " ++ (show . pretty $ nextFeatures)
       mSuccess     <- enqueueNextLevel entry nextFeatures
       case mSuccess of
         Nothing      -> processQueue
@@ -344,7 +391,7 @@ usefulFeatures entry = do
     else do
       alreadyAcceptedAbsGoods <- getEnv $ envCurrentSearch
                                       >>> searchFoundClauses
-                                      >>> clausesOptimisticAcceptedAbsGoods
+                                      >>> clausesAcceptedAbsGoods
       if not (entryAcceptedAbsGoods entry `IntSet.isSubsetOf` alreadyAcceptedAbsGoods)
         then computeUsefulFeatures filterByAbs
         else pure [] --Entry is not interesting.
@@ -427,12 +474,14 @@ checkSuccess = do
 
 addCounterexample :: OigConstraints t => ProgState t -> OigM t ()
 addCounterexample cex = do
-  env <- get
-  let (badState, states') = stAddBadState cex (envStates env)
-  fc' <- lift $ fcAddBadState (bsId badState) (testFeatureRejects cex) (envFeatureCache env)
-  put $ env { envStates       = states'
-            , envFeatureCache = fc'
-            }
+  states <- getEnv envStates
+  let (badState, states') = stAddBadState cex states
+  get >>= \env -> put $ env { envStates = states' }
+
+  fc <- getEnv envFeatureCache
+  fc' <- lift $ fcAddBadState (bsId badState) (testFeatureRejects cex) fc
+  get >>= \env -> put $ env { envFeatureCache = fc' }
+
   addNewlyUsefulFeatures   badState
   addNewlyUsefulCandidates badState
 
@@ -499,6 +548,28 @@ assertionToFeature assertion = do
                             }
       let rejectedIds = IntSet.fromList . map bsId $ rejectedBads
       pure $ Just (feature, rejectedIds)
+
+seedRemainingGoods :: OigConstraints t => OigM t()
+seedRemainingGoods = do
+  allConGoods <- getEnv $ envStates >>> stConcreteGoodStateIds
+  alreadyAcceptedConGoods <- getEnv $ envCurrentSearch
+                                  >>> searchFoundClauses
+                                  >>> clausesAcceptedConGoods
+  let remainingConGoods = allConGoods `IntSet.difference` alreadyAcceptedConGoods
+
+  allAbsGoods <- getEnv $ envStates >>> stAbstractGoodStateIds
+  alreadyAcceptedAbsGoods <- getEnv $ envCurrentSearch
+                                  >>> searchFoundClauses
+                                  >>> clausesAcceptedConGoods
+  let remainingAbsGoods = allAbsGoods `IntSet.difference` alreadyAcceptedAbsGoods
+
+  fc <- getEnv envFeatureCache
+  let conSets = fcFeaturesWhichAcceptConcrete (IntSet.toList remainingConGoods) fc
+      absSets = fcFeaturesWhichAcceptConcrete (IntSet.toList remainingAbsGoods) fc
+      seedSet = IntSet.unions $ conSets ++ absSets
+  let fLookup fid = (fcLookupFeature fc fid, fcRejectedBads fid fc)
+      features    = map fLookup $ IntSet.toList seedSet
+  mapM_ (uncurry seedFeature) features
 
 seedFeature :: OigConstraints t => Feature t -> BadStateIdSet -> OigM t ()
 seedFeature feature rejectedBads = do

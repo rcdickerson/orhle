@@ -99,7 +99,7 @@ fcAddFeature feature rejected featureCache =
                               Just set -> Map.insert stId (IntSet.insert featureId set) stMap
     featsByConAccepted'   = foldr featInsert featsByConAccepted $ IntSet.toList (featAcceptedConGoods feature)
     featsByAbsAccepted'   = foldr featInsert featsByAbsAccepted $ IntSet.toList (featAcceptedAbsGoods feature)
-    featsByRejected'      = foldr featInsert featsByRejected $ IntSet.toList rejected
+    featsByRejected'      = foldr featInsert featsByRejected    $ IntSet.toList rejected
   in
     if featureId `IntSet.member` featureIds
     then error $ "Feature ID already in use: " ++ (show featureId)
@@ -156,12 +156,10 @@ markRejected stId featureId fc =
   let
     rbf      = fcRejectedByFeature  fc
     fbr      = fcFeaturesByRejected fc
-    mBsIdSet = Map.lookup featureId rbf
-    mFeatSet = Map.lookup stId fbr
-  in fc { fcRejectedByFeature  = case mBsIdSet of
+  in fc { fcRejectedByFeature  = case Map.lookup featureId rbf of
                                    Nothing  -> Map.insert featureId (IntSet.singleton stId)  rbf
                                    Just set -> Map.insert featureId (IntSet.insert stId set) rbf
-        , fcFeaturesByRejected = case mFeatSet of
+        , fcFeaturesByRejected = case Map.lookup stId fbr of
                                    Nothing  -> Map.insert stId (IntSet.singleton featureId)  fbr
                                    Just set -> Map.insert stId (IntSet.insert featureId set) fbr
         }
