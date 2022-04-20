@@ -268,7 +268,7 @@ inferInvariant stepStrategy ctx aloops eloops post =
 --      let names = rsipc_programNames ctx
       let anames   = map (\loop -> Set.intersection (rsipc_programNames ctx) (namesIn loop)) aloops
       let enames   = map (\loop -> Set.intersection (rsipc_programNames ctx) (namesIn loop)) eloops
-      let lits     = Set.union (rsipc_programLits ctx) (Set.fromList $ map embed [-1, 0, 1])
+      let lits     = Set.union (rsipc_programLits ctx) (Set.fromList $ map embed [-1, 0, 1, 101])
 
       let lis size = Set.fromList $
                      (concat $ map (\names -> genFeatures lia (Set.toList lits) names size) (collectSameNames . Set.toList . Set.unions $ anames ++ enames))
@@ -301,35 +301,43 @@ inferInvariant stepStrategy ctx aloops eloops post =
       -- let vacuity candidate = do
       --       isNonVacuous <- vacuityQuery aloops eloops post candidate
       --       pure $ CI.CandidateQuery isNonVacuous (pure . id) (extractState [] [])
+      let wpTransform = relBackwardPT stepStrategy ctx (map body aloops) (map body eloops)
       let oigConfig = Configuration { cfgMaxFeatureSize   = 2
                                     , cfgMaxClauseSize    = 10
                                     , cfgFeatureGenerator = lis
-                                    , cfgWpTransform      = relBackwardPT stepStrategy ctx (map body aloops) (map body eloops)
+                                    , cfgWpTransform      = wpTransform
                                    }
+
+      let testFixture = FLAKY_TEST
+      let concreteGoods = case testFixture of
+            NONE -> []
+            LOOP_REF -> [ Map.fromList [ (Name "original!sum" 0, embed 101)
+                                       , (Name "refinement!sum" 0, embed 101)
+                                       ]
+                        , Map.fromList [ (Name "original!sum" 0, embed 20)
+                                       , (Name "refinement!sum" 0, embed 20)
+                                       ]
+                        ]
+            FLAKY_TEST -> [ Map.fromList [ (Name "test!1!counter" 0, embed 5)
+                                         , (Name "test!2!counter" 0, embed 5)
+                                         , (Name "test!1!lastTime" 0, embed 400)
+                                         , (Name "test!2!lastTime" 0, embed 404)
+                                         , (Name "test!1!currentTime" 0, embed 500)
+                                         , (Name "test!2!currentTime" 0, embed 505)
+                                         , (Name "test!1!currentTotal" 0, embed 500)
+                                         , (Name "test!2!currentTotal" 0, embed 505)
+                                         ]
+                          ]
+
       let oigJob    = Job { jobBadStates          = []
-                          , jobConcreteGoodStates = []
-                          -- , jobConcreteGoodStates = [ Map.fromList [ (Name "original!sum" 0, embed 101)
-                          --                                          , (Name "refinement!sum" 0, embed 101)
-                          --                                          ]
-                          --                           , Map.fromList [ (Name "original!sum" 0, embed 20)
-                          --                                          , (Name "refinement!sum" 0, embed 20)
-                          --                                          ]
-                          --                           ]
-                          -- , jobConcreteGoodStates = [ Map.fromList [ (Name "test!1!counter" 0, embed 5)
-                          --                                          , (Name "test!2!counter" 0, embed 5)
-                          --                                          , (Name "test!1!lastTime" 0, embed 400)
-                          --                                          , (Name "test!2!lastTime" 0, embed 404)
-                          --                                          , (Name "test!1!currentTime" 0, embed 500)
-                          --                                          , (Name "test!2!currentTime" 0, embed 505)
-                          --                                          , (Name "test!1!currentTotal" 0, embed 500)
-                          --                                          , (Name "test!2!currentTotal" 0, embed 505)
-                          --                                          ]
-                          --                           ]
+                          , jobConcreteGoodStates = concreteGoods
                           , jobAbstractGoodStates = someHeadStates
                           , jobLoopConds          = loopConds
                           , jobPost               = post
                           }
       OIG.orhleInvGen oigConfig oigJob
+
+data TestFixture = NONE | LOOP_REF | FLAKY_TEST
 
 body :: ImpWhile t e -> e
 body (ImpWhile _ b _) = b

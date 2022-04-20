@@ -183,7 +183,12 @@ orhleInvGen :: OigConstraints t
             -> Ceili (Maybe (Assertion t))
 orhleInvGen config job = do
   log_i $ "[OrhleInvGen] Beginning invariant inference"
-  let env =  mkOigEnv config job
+  let env = mkOigEnv config job
+
+  let candidates = envFeatureCandidates env
+  log_d . show . pretty $ candidates
+  error ""
+
   evalStateT (orhleInvGen' $ jobPost job) env
 
 orhleInvGen' :: OigConstraints t => Assertion t -> OigM t (Maybe (Assertion t))
@@ -194,7 +199,7 @@ orhleInvGen' post = do
   case mCandidate of
     Just result -> strengthen $ vpgAssertion result
     Nothing -> do
-      clog_i "[OrhleInvGen] Unable to infer initial invariant candidate." -- >> printFc
+      clog_i "[OrhleInvGen] Unable to infer initial invariant candidate." >> printFc
       pure Nothing
 
 strengthen :: OigConstraints t => Assertion t -> OigM t (Maybe (Assertion t))
@@ -221,6 +226,7 @@ strengthen candidate = do
         Nothing -> do
           clog_i $ "[OrhleInvGen] Unable to strengthen candidate to be inductive: "
                 ++ (show . pretty $ candidate)
+          printFc
           pure Nothing
 
 printFc :: Pretty t => OigM t ()
