@@ -3,7 +3,6 @@ module Orhle.InvGen.Clause
   , addClauseRemovingCovered
   , clausesAcceptedConGoods
   , clausesAcceptedAbsGoods
-  , clausesRejectedBads
   , clauseToAssertion
   , clausesToAssertion
   ) where
@@ -38,13 +37,6 @@ clausesAcceptedConGoods = IntSet.unions . map clauseAcceptedConGoods
 
 clausesAcceptedAbsGoods :: [Clause t] -> ConcreteGoodStateIdSet
 clausesAcceptedAbsGoods = IntSet.unions . map clauseAcceptedAbsGoods
-
-clausesRejectedBads :: Ord t => FeatureCache t -> [Clause t] -> BadStateIdSet
-clausesRejectedBads fc = IntSet.unions
-                       . map (\fid -> fcRejectedBads fid fc)
-                       . IntSet.toList
-                       . IntSet.unions
-                       . map clauseFeatures
 
 addClauseRemovingCovered :: [Clause t] -> Clause t -> [Clause t]
 addClauseRemovingCovered clauses newClause =

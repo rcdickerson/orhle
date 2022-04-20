@@ -185,9 +185,9 @@ orhleInvGen config job = do
   log_i $ "[OrhleInvGen] Beginning invariant inference"
   let env = mkOigEnv config job
 
-  let candidates = envFeatureCandidates env
-  log_d . show . pretty $ candidates
-  error ""
+  -- let candidates = envFeatureCandidates env
+  -- log_d . show . pretty $ candidates
+  -- error ""
 
   evalStateT (orhleInvGen' $ jobPost job) env
 
@@ -199,7 +199,8 @@ orhleInvGen' post = do
   case mCandidate of
     Just result -> strengthen $ vpgAssertion result
     Nothing -> do
-      clog_i "[OrhleInvGen] Unable to infer initial invariant candidate." >> printFc
+      clog_i "[OrhleInvGen] Unable to infer initial invariant candidate."
+      -- printFc
       pure Nothing
 
 strengthen :: OigConstraints t => Assertion t -> OigM t (Maybe (Assertion t))
@@ -226,7 +227,7 @@ strengthen candidate = do
         Nothing -> do
           clog_i $ "[OrhleInvGen] Unable to strengthen candidate to be inductive: "
                 ++ (show . pretty $ candidate)
-          printFc
+          -- printFc
           pure Nothing
 
 printFc :: Pretty t => OigM t ()
@@ -361,17 +362,15 @@ processEntry entry = do
 usefulFeatures :: OigConstraints t => Entry t -> OigM t [Feature t]
 usefulFeatures entry = do
   let computeUsefulFeatures useful = do
-        fc                  <- getEnv $ envFeatureCache
-        allBads             <- getEnv $ envStates >>> stBadStateIds
-        alreadyRejectedBads <- getEnv $ envCurrentSearch
-                                    >>> searchFoundClauses
-                                    >>> clausesRejectedBads fc
-                                    >>> IntSet.union (entryRejectedBads entry)
-        let remainingBads = IntSet.toList
-                          $ allBads `IntSet.difference` alreadyRejectedBads
+        fc      <- getEnv $ envFeatureCache
+        allBads <- getEnv $ envStates >>> stBadStateIds
+        let alreadyRejectedBads = entryRejectedBads entry
+        let remainingBads       = IntSet.toList
+                                $ allBads `IntSet.difference` alreadyRejectedBads
         pure $ filter useful
              . fcLookupFeatures fc
-             . IntSet.toList . IntSet.unions
+             . IntSet.toList
+             . IntSet.unions
              $ fcFeaturesWhichReject remainingBads fc
 
   let filterByCons feature =
@@ -380,6 +379,7 @@ usefulFeatures entry = do
           entryAccepted     = entryAcceptedConGoods entry
           remainingAccepted = entryAccepted `IntSet.intersection` featAccepted
         in not $ IntSet.null remainingAccepted
+
   let filterByAbs feature =
         let
           featAccepted      = featAcceptedAbsGoods feature
