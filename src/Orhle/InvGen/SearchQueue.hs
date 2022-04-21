@@ -8,6 +8,7 @@ module Orhle.InvGen.SearchQueue
   , qSize
   , sfBalanced
   , sfBreadthFirst
+  , sfDepthFirst
   ) where
 
 import Data.Map ( Map )
@@ -100,3 +101,8 @@ sfBreadthFirst :: ScoreFunction t
 sfBreadthFirst (Entry candidate _ _ _) =
   let candidateSize = IntSet.size candidate
   in -candidateSize
+
+sfDepthFirst :: ScoreFunction t
+sfDepthFirst (Entry candidate _ _ _) =
+  let candidateSize = IntSet.size candidate
+  in candidateSize

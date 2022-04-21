@@ -187,6 +187,7 @@ vacuityQuery aloops eloops post assertion = do
 
 data QuerySubstitution = QuerySubstitution [Name] [Name]
 
+-- TODO: Learn an instantiation strategy instead?
 invarianceQuery :: ( Embeddable Integer t
                    , Ord t
                    , AssertionParseable t
@@ -308,7 +309,7 @@ inferInvariant stepStrategy ctx aloops eloops post =
                                     , cfgWpTransform      = wpTransform
                                    }
 
-      let testFixture = LOOP_REF
+      let testFixture = FLAKY_TEST
       let concreteGoods = case testFixture of
             NONE -> []
             LOOP_REF -> [ Map.fromList [ (Name "original!sum" 0, embed 101)

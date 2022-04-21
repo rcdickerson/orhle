@@ -102,7 +102,7 @@ mkOigEnv config job =
   let
     states     = mkClosedStates (jobBadStates job) (jobConcreteGoodStates job) (jobAbstractGoodStates job)
     candidates = Set.toList $ (cfgFeatureGenerator config) (cfgMaxFeatureSize config)
-  in OigEnv { envCurrentSearch     = Search [] (\_ -> ATrue) (qEmpty sfBreadthFirst)
+  in OigEnv { envCurrentSearch     = Search [] (\_ -> ATrue) (qEmpty sfDepthFirst) -- sfBreadthFirst)
             , envFeatureCache      = fcEmpty
             , envFeatureCandidates = candidates
             , envLoopConds         = jobLoopConds job
