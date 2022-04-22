@@ -1,7 +1,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module Orhle.InvGen.OrhleInvGen
+module Orhle.InvGen.OrhleInvGenConc
   ( Configuration(..)
   , Job(..)
   , orhleInvGen
@@ -24,10 +24,10 @@ import Data.Set ( Set )
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Data.Maybe ( catMaybes )
-import Orhle.InvGen.Clause
-import Orhle.InvGen.Feature
-import Orhle.InvGen.SearchQueue
-import Orhle.InvGen.State
+import Orhle.InvGen.ClauseConc
+import Orhle.InvGen.FeatureConc
+import Orhle.InvGen.SearchQueueConc
+import Orhle.InvGen.StateConc
 import Prettyprinter
 
 
@@ -48,11 +48,10 @@ data Configuration t = Configuration
 ----------
 
 data Job t = Job
-  { jobBadStates          :: [ProgState t]
-  , jobConcreteGoodStates :: [ProgState t]
-  , jobAbstractGoodStates :: [ProgState t]
-  , jobLoopConds          :: [Assertion t]
-  , jobPost               :: Assertion t
+  { jobBadStates  :: [ProgState t]
+  , jobGoodStates :: [ProgState t]
+  , jobLoopConds  :: [Assertion t]
+  , jobPost       :: Assertion t
   }
 
 
@@ -100,7 +99,7 @@ mkOigEnv :: OigConstraints t
          -> OigEnv t
 mkOigEnv config job =
   let
-    states     = mkClosedStates (jobBadStates job) (jobConcreteGoodStates job) (jobAbstractGoodStates job)
+    states     = mkClosedStates (jobBadStates job) (jobGoodStates job)
     candidates = Set.toList $ (cfgFeatureGenerator config) (cfgMaxFeatureSize config)
   in OigEnv { envCurrentSearch     = Search [] (\_ -> ATrue) (qEmpty sfBreadthFirst)
             , envFeatureCache      = fcEmpty
@@ -248,8 +247,7 @@ printFc = do
               Just set -> pretty . IntSet.toList $ set
         clog_d . show $ pretty "(" <> pretty fid <> pretty "," <+>
           pretty feat <> pretty "," <+>
-          (pretty . IntSet.toList . featAcceptedConGoods $ feat) <> pretty "," <+>
-          (pretty . IntSet.toList . featAcceptedAbsGoods $ feat) <> pretty "," <+>
+          (pretty . IntSet.toList . featAcceptedGoods $ feat) <> pretty "," <+>
           rej <> pretty ")"
   mapM_ printFeature features
 
@@ -271,17 +269,15 @@ vpgFalse = VPreGenResult AFalse []
 
 fPreGen :: OigConstraints t => OigM t (Maybe (VPreGenResult t))
 fPreGen = do
-  badStates     <- getEnv $ envStates >>> stBadStates
-  conGoodStates <- getEnv $ envStates >>> stConcreteGoodStates
-  absGoodStates <- getEnv $ envStates >>> stAbstractGoodStates
-  queue         <- getEnv $ envCurrentSearch >>> searchQueue
-  clauses       <- getEnv $ envCurrentSearch >>> searchFoundClauses
+  badStates  <- getEnv $ envStates >>> stBadStates
+  goodStates <- getEnv $ envStates >>> stGoodStates
+  queue      <- getEnv $ envCurrentSearch >>> searchQueue
+  clauses    <- getEnv $ envCurrentSearch >>> searchFoundClauses
   clog_d $ "[OrhleInvGen] Starting vPreGen pass"
-  clog_d . show $ pretty "[OrhleInvGen]   concrete good states:" <+> pretty (Map.size conGoodStates)
-  clog_d . show $ pretty "[OrhleInvGen]   abstract good states:" <+> pretty (Map.size absGoodStates)
-  clog_d . show $ pretty "[OrhleInvGen]   bad states:"           <+> pretty (Map.size badStates)
-  clog_d . show $ pretty "[OrhleInvGen]   queue size:"           <+> pretty (qSize queue)
-  clog_d . show $ pretty "[OrhleInvGen]   clauses:"              <+> pretty (length clauses)
+  clog_d . show $ pretty "[OrhleInvGen]   bad states:"  <+> pretty (Map.size badStates)
+  clog_d . show $ pretty "[OrhleInvGen]   good states:" <+> pretty (Map.size goodStates)
+  clog_d . show $ pretty "[OrhleInvGen]   queue size:"  <+> pretty (qSize queue)
+  clog_d . show $ pretty "[OrhleInvGen]   clauses:"     <+> pretty (length clauses)
 
   mSeparator <- learnSeparator
   case mSeparator of
@@ -328,13 +324,12 @@ extractState freshNames names assertion =
 learnSeparator :: OigConstraints t => OigM t (Maybe (VPreGenResult t))
 learnSeparator = do
   clog_d $ "[CInvGen] Beginning separator search."
-  badStates     <- getEnv $ envStates >>> stBadStates
-  conGoodStates <- getEnv $ envStates >>> stConcreteGoodStates
-  absGoodStates <- getEnv $ envStates >>> stAbstractGoodStates
+  badStates  <- getEnv $ envStates >>> stBadStates
+  goodStates <- getEnv $ envStates >>> stGoodStates
 
   if Map.null badStates
     then do clog_d "[OrhleInvGen] No bad states, returning true."; pure $ Just vpgTrue
-  else if Map.null conGoodStates && Map.null absGoodStates
+  else if Map.null goodStates
     then do clog_d "[OrhleInvGen] No good states, returning false."; pure $ Just vpgFalse
   else processQueue
 
@@ -380,32 +375,19 @@ usefulFeatures entry = do
              . IntSet.unions
              $ fcFeaturesWhichReject remainingBads fc
 
-  let filterByCons feature =
+  let filterByAccepted feature =
         let
-          featAccepted      = featAcceptedConGoods feature
-          entryAccepted     = entryAcceptedConGoods entry
+          featAccepted      = featAcceptedGoods feature
+          entryAccepted     = entryAcceptedGoods entry
           remainingAccepted = entryAccepted `IntSet.intersection` featAccepted
         in not $ IntSet.null remainingAccepted
 
-  let filterByAbs feature =
-        let
-          featAccepted      = featAcceptedAbsGoods feature
-          entryAccepted     = entryAcceptedAbsGoods entry
-          remainingAccepted = entryAccepted `IntSet.intersection` featAccepted
-        in not $ IntSet.null remainingAccepted
-
-  alreadyAcceptedConGoods <- getEnv $ envCurrentSearch
-                                  >>> searchFoundClauses
-                                  >>> clausesAcceptedConGoods
-  if not (entryAcceptedConGoods entry `IntSet.isSubsetOf` alreadyAcceptedConGoods)
-    then computeUsefulFeatures filterByCons
-    else do
-      alreadyAcceptedAbsGoods <- getEnv $ envCurrentSearch
-                                      >>> searchFoundClauses
-                                      >>> clausesAcceptedAbsGoods
-      if not (entryAcceptedAbsGoods entry `IntSet.isSubsetOf` alreadyAcceptedAbsGoods)
-        then computeUsefulFeatures filterByAbs
-        else pure [] --Entry is not interesting.
+  alreadyAcceptedGoods <- getEnv $ envCurrentSearch
+                               >>> searchFoundClauses
+                               >>> clausesAcceptedGoods
+  if not (entryAcceptedGoods entry `IntSet.isSubsetOf` alreadyAcceptedGoods)
+    then computeUsefulFeatures filterByAccepted
+    else pure [] --Entry is not interesting.
 
 
 enqueueNextLevel :: OigConstraints t => Entry t -> [Feature t] -> OigM t (Maybe (VPreGenResult t))
@@ -418,61 +400,34 @@ enqueueNextLevel entry (newFeature:rest) = do
   let newCandidateRejected = IntSet.unions $ map (\fid -> fcRejectedBads fid fc) newCandidateFeatureIds
   allBads <- getEnv $ envStates >>> stBadStateIds
   let remainingBads = allBads `IntSet.difference` newCandidateRejected
-  let newAcceptedCon = IntSet.intersection (entryAcceptedConGoods entry)
-                                           (featAcceptedConGoods  newFeature)
-  let newAcceptedAbs = IntSet.intersection (entryAcceptedAbsGoods entry)
-                                           (featAcceptedAbsGoods  newFeature)
+  let newAccepted = IntSet.intersection (entryAcceptedGoods entry)
+                                        (featAcceptedGoods  newFeature)
 
   if not $ IntSet.null remainingBads
     then do
-      enqueue $ Entry { entryCandidate               = IntSet.fromList newCandidateFeatureIds
-                      , entryRejectedBads            = newCandidateRejected
-                      , entryAcceptedConGoods        = newAcceptedCon
-                      , entryAcceptedAbsGoods        = newAcceptedAbs
+      enqueue $ Entry { entryCandidate     = IntSet.fromList newCandidateFeatureIds
+                      , entryRejectedBads  = newCandidateRejected
+                      , entryAcceptedGoods = newAccepted
                       }
       enqueueNextLevel entry rest
     else do
-      -- Found a new potential clause. Accepted abstract good states are optimistic,
-      -- compute the actual accepted abstract states to be sure.
-      let newCandidateFeatures = fcLookupFeatures fc newCandidateFeatureIds
-      states <- getEnv envStates
-      let maxAcceptedAbs = stLookupAbstractGoodStates states $ IntSet.toList newAcceptedAbs
-      actualAcceptedAbs <- computeActualAcceptedAbs newCandidateFeatures maxAcceptedAbs
-      if null actualAcceptedAbs
-        then enqueueNextLevel entry rest
-        else do
-          addClause $ Clause { clauseFeatures         = IntSet.fromList newCandidateFeatureIds
-                             , clauseAcceptedConGoods = newAcceptedCon
-                             , clauseAcceptedAbsGoods = IntSet.fromList . map agsId $ actualAcceptedAbs
-                             }
-          mSuccess <- checkSuccess
-          case mSuccess of
-            Nothing      -> enqueueNextLevel entry rest
-            Just success -> pure $ Just success
-
-computeActualAcceptedAbs :: OigConstraints t
-                         => [Feature t]
-                         -> [AbstractGoodState t]
-                         -> OigM t [AbstractGoodState t]
-computeActualAcceptedAbs features maxAcceptedStates = do
-  let assertion = aAnd $ map featAssertion features
-  evaluations <- lift $ mapM (testAgs assertion) maxAcceptedStates
-  let (accepted, _) = partition snd $ evaluations
-  pure $ map fst accepted
+      addClause $ Clause { clauseFeatures      = IntSet.fromList newCandidateFeatureIds
+                         , clauseAcceptedGoods = newAccepted
+                         }
+      mSuccess <- checkSuccess
+      case mSuccess of
+        Nothing      -> enqueueNextLevel entry rest
+        Just success -> pure $ Just success
 
 checkSuccess :: OigConstraints t => OigM t (Maybe (VPreGenResult t))
 checkSuccess = do
   foundClauses <- get >>= pure . searchFoundClauses . envCurrentSearch
-  let clauseAcceptedCon = IntSet.unions $ map clauseAcceptedConGoods foundClauses
-  let clauseAcceptedAbs = IntSet.unions $ map clauseAcceptedAbsGoods foundClauses
+  let clauseAccepted = IntSet.unions $ map clauseAcceptedGoods foundClauses
 
-  allCon <- getEnv $ envStates >>> stConcreteGoodStateIds
-  allAbs <- getEnv $ envStates >>> stAbstractGoodStateIds
+  allGoods <- getEnv $ envStates >>> stGoodStateIds
+  let remainingGoods = allGoods `IntSet.difference` clauseAccepted
 
-  let remainingCon = allCon `IntSet.difference` clauseAcceptedCon
-  let remainingAbs = allAbs `IntSet.difference` clauseAcceptedAbs
-
-  if IntSet.null remainingCon && IntSet.null remainingAbs
+  if IntSet.null remainingGoods
     then do
       fc <- getEnv envFeatureCache
       pure . Just $ VPreGenResult (clausesToAssertion fc foundClauses) foundClauses
@@ -524,10 +479,8 @@ addNewlyUsefulCandidates newBadState = do
           Error err -> throwError $ "SMT error evaluating feature candidate: " ++ err
   (candidates', useful) <- pure . partitionEithers =<< mapM rejectsNewBad (envFeatureCandidates env)
 
-  noConGoods <- pure . IntSet.null =<< (getEnv $ envStates >>> stConcreteGoodStateIds)
-  noAbsGoods <- pure . IntSet.null =<< (getEnv $ envStates >>> stAbstractGoodStateIds)
-  let acceptsSomething feature = (noConGoods || (not . IntSet.null . featAcceptedConGoods $ feature))
-                              && (noAbsGoods || (not . IntSet.null . featAcceptedAbsGoods $ feature))
+  noGoods <- pure . IntSet.null =<< (getEnv $ envStates >>> stGoodStateIds)
+  let acceptsSomething feature = (noGoods || (not . IntSet.null . featAcceptedGoods $ feature))
   newFeatures <- mapM assertionToFeature useful >>= pure . filter (acceptsSomething . fst) . catMaybes
   let fc' = foldr (uncurry fcAddFeature) (envFeatureCache env) newFeatures
   put $ env { envFeatureCache      = fc'
@@ -537,50 +490,33 @@ addNewlyUsefulCandidates newBadState = do
 
 assertionToFeature :: OigConstraints t => Assertion t -> OigM t (Maybe (Feature t, BadStateIdSet))
 assertionToFeature assertion = do
-  conGoodStates <- getEnv $ envStates >>> stConcreteGoodStates >>> Map.elems
-  acceptedCons <- lift $ mapM (testCgs assertion) conGoodStates
-              >>= pure . map fst . fst . partition snd
-  if (not . null $ conGoodStates) && (null acceptedCons)
-    then pure Nothing -- No need to do any more work.
-    else do
-      badStates     <- getEnv $ envStates >>> stBadStates >>> Map.elems
-      rejectedBads  <- lift $ mapM (testBs assertion) badStates
-                   >>= pure . map fst . fst . partition (not . snd)
+  conGoodStates <- getEnv $ envStates >>> stGoodStates >>> Map.elems
+  acceptedGoods <- lift $ mapM (testGs assertion) conGoodStates
+               >>= pure . map fst . fst . partition snd
+  badStates     <- getEnv $ envStates >>> stBadStates >>> Map.elems
+  rejectedBads  <- lift $ mapM (testBs assertion) badStates
+               >>= pure . map fst . fst . partition (not . snd)
+  env <- get
+  let (featureId, fc') = fcIncrementId $ envFeatureCache env
+  put $ env { envFeatureCache = fc' }
 
-      absGoodStates <- getEnv $ envStates >>> stAbstractGoodStates >>> Map.elems
-      acceptedAbs   <- lift $ mapM (testAgs assertion) absGoodStates
-                    >>= pure . map fst . fst . partition snd
-
-      env <- get
-      let (featureId, fc') = fcIncrementId $ envFeatureCache env
-      put $ env { envFeatureCache = fc' }
-
-      let feature = Feature { featId               = featureId
-                            , featAssertion        = assertion
-                            , featAcceptedConGoods = IntSet.fromList . map cgsId $ acceptedCons
-                            , featAcceptedAbsGoods = IntSet.fromList . map agsId $ acceptedAbs
-                            }
-      let rejectedIds = IntSet.fromList . map bsId $ rejectedBads
-      pure $ Just (feature, rejectedIds)
+  let feature = Feature { featId            = featureId
+                        , featAssertion     = assertion
+                        , featAcceptedGoods = IntSet.fromList . map gsId $ acceptedGoods
+                        }
+  let rejectedIds = IntSet.fromList . map bsId $ rejectedBads
+  pure $ Just (feature, rejectedIds)
 
 seedRemainingGoods :: OigConstraints t => OigM t()
 seedRemainingGoods = do
-  allConGoods <- getEnv $ envStates >>> stConcreteGoodStateIds
-  alreadyAcceptedConGoods <- getEnv $ envCurrentSearch
-                                  >>> searchFoundClauses
-                                  >>> clausesAcceptedConGoods
-  let remainingConGoods = allConGoods `IntSet.difference` alreadyAcceptedConGoods
-
-  allAbsGoods <- getEnv $ envStates >>> stAbstractGoodStateIds
-  alreadyAcceptedAbsGoods <- getEnv $ envCurrentSearch
-                                  >>> searchFoundClauses
-                                  >>> clausesAcceptedConGoods
-  let remainingAbsGoods = allAbsGoods `IntSet.difference` alreadyAcceptedAbsGoods
+  allGoods <- getEnv $ envStates >>> stGoodStateIds
+  alreadyAcceptedGoods <- getEnv $ envCurrentSearch
+                               >>> searchFoundClauses
+                               >>> clausesAcceptedGoods
+  let remainingGoods = allGoods `IntSet.difference` alreadyAcceptedGoods
 
   fc <- getEnv envFeatureCache
-  let conSets = fcFeaturesWhichAcceptConcrete (IntSet.toList remainingConGoods) fc
-      absSets = fcFeaturesWhichAcceptConcrete (IntSet.toList remainingAbsGoods) fc
-      seedSet = IntSet.unions $ conSets ++ absSets
+  let seedSet = IntSet.unions $ fcFeaturesWhichAccept (IntSet.toList remainingGoods) fc
   let fLookup fid = (fcLookupFeature fc fid, fcRejectedBads fid fc)
       features    = map fLookup $ IntSet.toList seedSet
   mapM_ (uncurry seedFeature) features
@@ -589,14 +525,12 @@ seedFeature :: OigConstraints t => Feature t -> BadStateIdSet -> OigM t ()
 seedFeature feature rejectedBads = do
   badStateIds <- getEnv $ envStates >>> stBadStateIds
   if badStateIds == rejectedBads
-    then addClause $ Clause { clauseFeatures         = IntSet.singleton $ featId feature
-                            , clauseAcceptedConGoods = featAcceptedConGoods feature
-                            , clauseAcceptedAbsGoods = featAcceptedAbsGoods feature
+    then addClause $ Clause { clauseFeatures      = IntSet.singleton $ featId feature
+                            , clauseAcceptedGoods = featAcceptedGoods feature
                             }
-    else enqueue   $ Entry  { entryCandidate         = IntSet.singleton $ featId feature
-                            , entryRejectedBads      = rejectedBads
-                            , entryAcceptedConGoods  = featAcceptedConGoods feature
-                            , entryAcceptedAbsGoods  = featAcceptedAbsGoods feature
+    else enqueue   $ Entry  { entryCandidate      = IntSet.singleton $ featId feature
+                            , entryRejectedBads   = rejectedBads
+                            , entryAcceptedGoods  = featAcceptedGoods feature
                             }
 
 
@@ -612,17 +546,9 @@ testBs assertion state = do
     Rejected  -> pure (state, False)
     Error err -> throwError err
 
-testCgs :: OigConstraints t => Assertion t -> ConcreteGoodState t -> Ceili (ConcreteGoodState t, Bool)
-testCgs assertion state = do
-  result <- testState assertion (cgsState state)
-  case result of
-    Accepted  -> pure (state, True)
-    Rejected  -> pure (state, False)
-    Error err -> throwError err
-
-testAgs :: OigConstraints t => Assertion t -> AbstractGoodState t -> Ceili (AbstractGoodState t, Bool)
-testAgs assertion state = do
-  result <- testState assertion (agsState state)
+testGs :: OigConstraints t => Assertion t -> GoodState t -> Ceili (GoodState t, Bool)
+testGs assertion state = do
+  result <- testState assertion (gsState state)
   case result of
     Accepted  -> pure (state, True)
     Rejected  -> pure (state, False)

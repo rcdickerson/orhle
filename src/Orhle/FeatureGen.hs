@@ -41,13 +41,13 @@ lia :: (Ord t, Embeddable Integer t) => Logic t
 lia = Logic
   { lName = "LIA"
   , lArithToBoolOps  = [ binop "=" Eq
---                       , binop "<" Lt
---                       , binop ">" Gt
+                       , binop "<" Lt
+                       , binop ">" Gt
                        , binop "<=" Lte
---                       , binop ">=" Gte
+                       , binop ">=" Gte
                        ]
-  , lArithToArithOps = [-- Operator "+" Add
-                         Operator "-" Sub
+  , lArithToArithOps = [ Operator "+" Add
+                       , Operator "-" Sub
                        , Operator "*" Mul
                        ]
   , lFeatureFilters  = [ eqRefl

@@ -26,8 +26,8 @@ import qualified Data.Set as Set
 import Data.Strings ( strSplitAll )
 import Data.UUID
 --import qualified Orhle.CInvGen as CI
-import Orhle.InvGen.OrhleInvGen ( Configuration(..), Job(..) )
-import qualified Orhle.InvGen.OrhleInvGen as OIG
+import Orhle.InvGen.OrhleInvGenConc ( Configuration(..), Job(..) )
+import qualified Orhle.InvGen.OrhleInvGenConc as OIG
 import Orhle.FeatureGen (genFeatures, lia)
 import Orhle.SpecImp
 import Orhle.StepStrategy
@@ -309,7 +309,7 @@ inferInvariant stepStrategy ctx aloops eloops post =
                                     , cfgWpTransform      = wpTransform
                                    }
 
-      let testFixture = FLAKY_TEST
+      let testFixture = LOOP_REF
       let concreteGoods = case testFixture of
             NONE -> []
             LOOP_REF -> [ Map.fromList [ (Name "original!sum" 0, embed 101)
@@ -331,8 +331,7 @@ inferInvariant stepStrategy ctx aloops eloops post =
                           ]
 
       let oigJob    = Job { jobBadStates          = []
-                          , jobConcreteGoodStates = concreteGoods
-                          , jobAbstractGoodStates = someHeadStates
+                          , jobGoodStates = concreteGoods
                           , jobLoopConds          = loopConds
                           , jobPost               = post
                           }
