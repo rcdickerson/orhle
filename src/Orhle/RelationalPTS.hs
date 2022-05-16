@@ -1,4 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Orhle.RelationalPTS
@@ -10,7 +12,7 @@ import Ceili.Assertion
 import Ceili.CeiliEnv
 import Ceili.Embedding
 import qualified Ceili.FeatureLearning.LinearInequalities as LI
---import qualified Ceili.InvariantInference.LoopInvGen as Lig
+import qualified Ceili.InvariantInference.LoopInvGen as Lig
 import Ceili.Language.BExp ( bexpToAssertion )
 import Ceili.Language.Imp ( IterStateMap )
 import Ceili.Name
@@ -20,14 +22,16 @@ import Ceili.StatePredicate
 import Control.Monad.State ( runState )
 import Control.Monad.Trans ( lift )
 import Data.Maybe ( catMaybes )
+import Data.Map ( Map )
 import qualified Data.Map as Map
 import Data.Set ( Set )
 import qualified Data.Set as Set
 import Data.Strings ( strSplitAll )
 import Data.UUID
---import qualified Orhle.CInvGen as CI
-import Orhle.InvGen.OrhleInvGenConc ( Configuration(..), Job(..) )
-import qualified Orhle.InvGen.OrhleInvGenConc as OIG
+import Orhle.CValue
+import qualified Orhle.DTLearn as DTL
+-- import Orhle.InvGen.OrhleInvGenConc ( Configuration(..), Job(..) )
+-- import qualified Orhle.InvGen.OrhleInvGenConc as OIG
 import Orhle.FeatureGen (genFeatures, lia)
 import Orhle.SpecImp
 import Orhle.StepStrategy
@@ -44,6 +48,15 @@ toSinglePTSContext :: SpecImpQuant -> RelSpecImpPTSContext t e -> SpecImpPTSCont
 toSinglePTSContext quant (RelSpecImpPTSContext specEnv headStates names lits) =
   SpecImpPTSContext quant specEnv headStates names lits
 
+mapRelSpecImpPTSContextType :: (Embeddable t t', MapImpType t t' e e', Ord t')
+                            => (t -> t') -> RelSpecImpPTSContext t e -> RelSpecImpPTSContext t' e'
+mapRelSpecImpPTSContextType f ctx =
+  RelSpecImpPTSContext { rsipc_specEnv        = mapSpecImpEnvType f $ rsipc_specEnv ctx
+                       , rsipc_loopHeadStates = fmap (Map.map $ Set.map $ fmap f) $ rsipc_loopHeadStates ctx
+                       , rsipc_programNames   = rsipc_programNames ctx
+                       , rsipc_programLits    = Set.map f $ rsipc_programLits ctx
+                       }
+
 combineLoopHeadStates :: Ord t => RelSpecImpPTSContext t e -> [UUID] -> [ProgState t]
 combineLoopHeadStates ctx uuids =
   let
@@ -56,10 +69,12 @@ combineIterStateMaps = Map.unionsWith $ \left right ->
   Set.map (uncurry Map.union) $ Set.cartesianProduct left right
 
 relBackwardPT :: ( Embeddable Integer t
+                 , Embeddable t Integer
                  , Ord t
                  , AssertionParseable t
                  , ValidCheckable t
                  , Pretty t
+                 , Reifiable t Integer
                  , StatePredicate (Assertion t) t
                  , SatCheckable t
                  )
@@ -74,12 +89,14 @@ relBackwardPT stepStrategy ctx aprogs eprogs post =
 
 
 relBackwardPT' :: ( Embeddable Integer t
+                  , Embeddable t Integer
                   , Ord t
                   , Pretty t
                   , AssertionParseable t
                   , ValidCheckable t
                   , SatCheckable t
                   , Pretty t
+                  , Reifiable t Integer
                   , StatePredicate (Assertion t) t
                   )
                => BackwardStepStrategy t
@@ -123,11 +140,13 @@ relBackwardPT' stepStrategy ctx (ProgramRelation aprogs eprogs) post = do
               continueWithInv AFalse -- TODO: Fall back to single stepping over loops.
 
 useInvariant :: ( Embeddable Integer t
+                , Embeddable t Integer
                 , Ord t
                 , AssertionParseable t
                 , ValidCheckable t
                 , SatCheckable t
                 , Pretty t
+                , Reifiable t Integer
                 , StatePredicate (Assertion t) t
                 )
              => Assertion t
@@ -189,11 +208,13 @@ data QuerySubstitution = QuerySubstitution [Name] [Name]
 
 -- TODO: Learn an instantiation strategy instead?
 invarianceQuery :: ( Embeddable Integer t
+                   , Embeddable t Integer
                    , Ord t
                    , AssertionParseable t
                    , ValidCheckable t
                    , SatCheckable t
                    , Pretty t
+                   , Reifiable t Integer
                    , StatePredicate (Assertion t) t
                    )
                 => BackwardStepStrategy t
@@ -245,12 +266,15 @@ collectSameNames names =
     nameMap = foldr addName Map.empty names
   in map Set.toList $ filter (\s -> Set.size s > 1) (Map.elems nameMap)
 
-inferInvariant :: ( Embeddable Integer t
+inferInvariant :: forall t.
+                  ( Embeddable Integer t
+                  , Embeddable t Integer
                   , Ord t
                   , AssertionParseable t
                   , SatCheckable t
                   , ValidCheckable t
                   , Pretty t
+                  , Reifiable t Integer
                   , StatePredicate (Assertion t) t
                   )
                => BackwardStepStrategy t
@@ -263,14 +287,15 @@ inferInvariant stepStrategy ctx aloops eloops post =
   let
     allLoops = aloops ++ eloops
     headStates = combineLoopHeadStates ctx $ catMaybes $ map (iwm_id . impWhile_meta) allLoops
+    choiceStrat = Map.fromList [(Name "original!sum" 0, Var $ Name "refinement!sum" 0)]
   in case headStates of
     [] -> throwError "Insufficient test head states for while loop, did you run populateTestStates?"
     _  -> do
 --      let names = rsipc_programNames ctx
       let anames   = map (\loop -> Set.intersection (rsipc_programNames ctx) (namesIn loop)) aloops
       let enames   = map (\loop -> Set.intersection (rsipc_programNames ctx) (namesIn loop)) eloops
-      let lits     = Set.union (rsipc_programLits ctx) (Set.fromList $ map embed [-1, 0, 1, 101])
-
+      let lits     = Set.fromList [(-1), 0, 1] :: Set Integer
+                  -- Set.union (Set.map reifyCValue $ rsipc_programLits ctx) (Set.fromList [-1, 0, 1, 101])
       let lis size = Set.fromList $
                      (concat $ map (\names -> genFeatures lia (Set.toList lits) names size) (collectSameNames . Set.toList . Set.unions $ anames ++ enames))
                   ++ (concat $ map (\names -> genFeatures lia (Set.toList lits) (Set.toList names) size) anames)
@@ -291,7 +316,8 @@ inferInvariant stepStrategy ctx aloops eloops post =
       --                          ]
 
       someHeadStates <- lift . lift $ randomSample 5 headStates
-      let loopConds = map condA (aloops ++ eloops)
+      let reifiedHeads = map (reify choiceStrat) someHeadStates :: [ProgState Integer]
+      let loopConds = map (embedAssertion . condA) (aloops ++ eloops)
       -- let sufficiency candidate = do
       --       isSufficient <- sufficiencyQuery aloops eloops post candidate
       --       pure $ CI.CandidateQuery isSufficient (pure . id) (extractState [] [])
@@ -303,39 +329,29 @@ inferInvariant stepStrategy ctx aloops eloops post =
       --       isNonVacuous <- vacuityQuery aloops eloops post candidate
       --       pure $ CI.CandidateQuery isNonVacuous (pure . id) (extractState [] [])
       let wpTransform = relBackwardPT stepStrategy ctx (map body aloops) (map body eloops)
-      let oigConfig = Configuration { cfgMaxFeatureSize   = 2
-                                    , cfgMaxClauseSize    = 10
-                                    , cfgFeatureGenerator = lis
-                                    , cfgWpTransform      = wpTransform
-                                   }
+      let bodies = ProgramRelation (map (embedImp . body) aloops) (map (embedImp . body) eloops)
+      let learnSep _ bads goods = do
+            result <- DTL.learnSeparator 4 lis bads goods
+            pure ((), result)
 
-      let testFixture = LOOP_REF
-      let concreteGoods = case testFixture of
-            NONE -> []
-            LOOP_REF -> [ Map.fromList [ (Name "original!sum" 0, embed 101)
-                                       , (Name "refinement!sum" 0, embed 101)
-                                       ]
-                        , Map.fromList [ (Name "original!sum" 0, embed 20)
-                                       , (Name "refinement!sum" 0, embed 20)
-                                       ]
-                        ]
-            FLAKY_TEST -> [ Map.fromList [ (Name "test!1!counter" 0, embed 5)
-                                         , (Name "test!2!counter" 0, embed 5)
-                                         , (Name "test!1!lastTime" 0, embed 400)
-                                         , (Name "test!2!lastTime" 0, embed 404)
-                                         , (Name "test!1!currentTime" 0, embed 500)
-                                         , (Name "test!2!currentTime" 0, embed 505)
-                                         , (Name "test!1!currentTotal" 0, embed 500)
-                                         , (Name "test!2!currentTotal" 0, embed 505)
-                                         ]
-                          ]
+      let intCtx = (mapRelSpecImpPTSContextType (embed @t @Integer) ctx) :: RelSpecImpPTSContext Integer (SpecImpProgram Integer)
+      let intStepStrat = convertStrategyType @t @Integer stepStrategy
 
-      let oigJob    = Job { jobBadStates          = []
-                          , jobGoodStates = concreteGoods
-                          , jobLoopConds          = loopConds
-                          , jobPost               = post
-                          }
-      OIG.orhleInvGen oigConfig oigJob
+      mResult <- Lig.loopInvGen intCtx
+                                (relBackwardPT' intStepStrat)
+                                loopConds bodies
+                                (embedAssertion post)
+                                reifiedHeads
+                                (Lig.SeparatorLearner () learnSep (\_ -> pure ()))
+      pure $ case mResult of
+        Nothing -> Nothing
+        Just result -> Just $ fmap (embed @Integer @t) result
+
+embedImp :: forall t. Embeddable t Integer => SpecImpProgram t -> SpecImpProgram Integer
+embedImp = mapImpType (embed @t @Integer)
+
+embedAssertion :: forall t. Embeddable t Integer => Assertion t -> Assertion Integer
+embedAssertion = fmap (embed @t @Integer)
 
 data TestFixture = NONE | LOOP_REF | FLAKY_TEST
 

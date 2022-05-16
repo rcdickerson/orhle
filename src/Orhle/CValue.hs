@@ -6,8 +6,8 @@
 module Orhle.CValue
   ( CValue(..)
   , CValuePEval(..)
-  , optimizeConstraints
-  , optimizeState
+  , ChoiceStrategy
+  , Reifiable(..)
   , pevalCArith
   , pieFilterClause
   ) where
@@ -23,12 +23,15 @@ import Ceili.Name
 import Ceili.ProgState
 import qualified Ceili.SMT as SMT
 import Ceili.StatePredicate
-import Data.Either ( partitionEithers )
+import Data.Maybe ( catMaybes )
 import Data.Set ( Set )
 import qualified Data.Set as Set
+import Data.Map ( Map )
 import qualified Data.Map as Map
 import Orhle.SpecImp
 import Prettyprinter
+
+import Debug.Trace
 
 
 ------------
@@ -62,44 +65,65 @@ instance AssertionParseable CValue where
   parseLiteral = integer >>= return . Concrete
 
 
-------------------
--- Optimization --
-------------------
+-----------------
+-- Reification --
+-----------------
 
--- Empirical evidence suggests Z3 performs much better with certain
--- preprocessing on the constraints.
-optimizeConstraints :: CValue -> CValue
-optimizeConstraints (Concrete i) = Concrete i
-optimizeConstraints (Constrained value cvs aconstraints econstraints) =
+class Reifiable from to where
+  reify :: ChoiceStrategy to -> ProgState from -> ProgState to
+
+type ChoiceStrategy t = Map Name (Arith t)
+
+instance Reifiable t t where
+  reify _ = id
+
+instance Reifiable CValue Integer where
+  reify strat state = reifyState (reifyOrDrop strat state) strat state
+
+reifyState :: ProgState Integer -> ChoiceStrategy Integer -> ProgState CValue -> ProgState Integer
+reifyState context strategy = Map.map (reifyCValue context strategy)
+
+reifyCValue :: ProgState Integer -> ChoiceStrategy Integer -> CValue -> Integer
+reifyCValue context strategy cvalue =
+  case cvalue of
+    Concrete i -> i
+    Constrained value cvars _ _ ->
+      let
+        choose cvar = case Map.lookup cvar strategy of
+                        Nothing    -> error $ "No choice strategy for: " ++ show cvar
+                        Just arith -> (cvar, arith)
+        choices = map choose (Set.toList cvars)
+        reifiedVal = foldr (uncurry subArith) value choices
+      in (trace $ "Reifying: " ++ (show . pretty $ cvalue)) $
+        eval () context reifiedVal
+
+reifyOrDrop :: ChoiceStrategy Integer -> ProgState CValue -> ProgState Integer
+reifyOrDrop strategy state =
   let
-    valueNames    = namesIn value
-    possibleESubs = Set.difference (namesIn $ Set.toList econstraints) valueNames
-    econstraints' = eqSubstitutions (Set.toList possibleESubs) (Set.toList econstraints)
-  in Constrained value cvs aconstraints (Set.fromList econstraints')
+    dropNonConc (name, cval) = case cval of
+                                 Concrete i -> Just (name, i)
+                                 _          -> Nothing
+    context = Map.fromList . catMaybes . map dropNonConc . Map.toList $ state
+    dropMaybes (name, mval) = case mval of
+                                Nothing  -> Nothing
+                                Just val -> Just (name, val)
+  in Map.fromList . catMaybes . map dropMaybes . Map.toList $ Map.map (reifyOrDropCValue context strategy) state
 
-eqSubstitutions :: [Name] -> [Assertion Integer] -> [Assertion Integer]
-eqSubstitutions [] assertions = assertions
-eqSubstitutions (name:rest) assertions =
-  let
-    getClauses assertion = case assertion of
-                             And cs -> cs
-                             _      -> []
-    check clause = case clause of
-                     Eq (Var v) val | v == name -> Left val
-                     Eq val (Var v) | v == name -> Left val
-                     _ -> Right clause
-    process assertion = let
-                          clauses = getClauses assertion
-                          (subs, remaining) = partitionEithers (map check clauses)
-                          clauses' = case subs of
-                            []    -> remaining
-                            val:_ -> map (subArith name val) remaining
-                        in aAnd clauses'
-    assertions' = map process assertions
-  in eqSubstitutions rest assertions'
-
-optimizeState :: ProgState CValue -> ProgState CValue
-optimizeState = Map.map optimizeConstraints
+reifyOrDropCValue :: ProgState Integer -> ChoiceStrategy Integer -> CValue -> Maybe Integer
+reifyOrDropCValue context strategy cvalue =
+  case cvalue of
+    Concrete i -> Just i
+    Constrained value cvars _ _ ->
+      let
+        choose cvar = case Map.lookup cvar strategy of
+                        Nothing    -> Nothing
+                        Just arith -> Just (cvar, arith)
+        mChoices = map choose (Set.toList cvars)
+        choices  = catMaybes mChoices
+        reifiedVal = foldr (uncurry subArith) value choices
+      in if length choices == length mChoices
+            then Just $ eval () context reifiedVal
+            else Nothing
 
 
 -----------------------------------
@@ -359,6 +383,10 @@ toSMTQuery cvAssertion = let
 ---------------------------
 
 instance Embeddable Integer CValue where embed = Concrete
+
+instance Embeddable CValue Integer where
+  embed (Concrete i) = i
+  embed _ = error "Can only embed concrete values to Integer"
 
 cvalAdd :: CValue -> CValue -> CValue
 cvalAdd = cvalBinop (+) (\l r -> Add [l, r])

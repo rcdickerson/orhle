@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -10,10 +11,13 @@ module Orhle.StepStrategy
   , Step(..)
   , backwardDisallowed
   , backwardWithFusion
+  , convertStrategyType
   ) where
 
 import Ceili.CeiliEnv
+import Ceili.Embedding
 import Ceili.Language.Compose
+import Ceili.Language.Imp ( mapImpType )
 import Data.List ( partition )
 import Data.Maybe ( catMaybes )
 import Orhle.SpecImp
@@ -48,6 +52,38 @@ scanPossibleSteps aprogs eprogs options =
   in case steps of
        []     -> Step NoSelectionFound aprogs eprogs
        step:_ -> step
+
+
+-----------------------
+-- Step Type Mapping --
+-----------------------
+
+mapSelectionType :: (t -> t') -> Selection t -> Selection t'
+mapSelectionType f selection =
+  let
+    convert      = mapImpType f
+    convertWhile = mapImpType f
+  in case selection of
+    UniversalStatement prog    -> UniversalStatement   $ convert prog
+    ExistentialStatement prog  -> ExistentialStatement $ convert prog
+    LoopFusion aWhiles eWhiles -> LoopFusion (map convertWhile aWhiles) (map convertWhile eWhiles)
+    NoSelectionFound           -> NoSelectionFound
+
+mapStepType :: (t -> t') -> Step t -> Step t'
+mapStepType f (Step selection aprogs eprogs) =
+  let convert = mapImpType f
+  in Step (mapSelectionType f selection)
+          (map convert aprogs)
+          (map convert eprogs)
+
+convertStrategyType :: forall t t'. ( Embeddable t t', Embeddable t' t ) =>
+                               BackwardStepStrategy t -> BackwardStepStrategy t'
+convertStrategyType strat aProgs' eProgs' = do
+  let toTProg = mapImpType (embed @t' @t)
+  let aProgs = map toTProg aProgs'
+  let eProgs = map toTProg eProgs'
+  result <- strat aProgs eProgs
+  pure $ mapStepType (embed @t @t') result
 
 
 ---------------------

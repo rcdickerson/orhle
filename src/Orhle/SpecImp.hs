@@ -76,8 +76,6 @@ import Data.Map ( Map )
 import qualified Data.Map as Map
 import Data.Set ( Set )
 import qualified Data.Set as Set
-import Data.UUID
-import qualified Data.UUID.V4 as UUID
 import Prettyprinter
 
 
@@ -181,11 +179,11 @@ sie_qspecs = fse_qspecs . sie_specs
 -- semantics which looks for either an implementation
 -- or a specification.
 
-data SpecCall t e = SpecCall { sc_callId    :: CallId
-                             , sc_args      :: [AExp t]
-                             , sc_assignees :: [Name]
-                             }
-  deriving (Eq, Ord, Show, Functor)
+data SpecCall t e = SpecCall
+  { sc_callId    :: CallId
+  , sc_args      :: [AExp t]
+  , sc_assignees :: [Name]
+  } deriving (Eq, Ord, Show, Functor)
 
 instance CollectableNames (SpecCall t e) where
   namesIn (SpecCall _ args assignees) =
