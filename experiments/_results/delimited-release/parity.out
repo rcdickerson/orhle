@@ -1,3 +1,4 @@
+Running backward relational analysis...
 
 *******************************************
 ****               ORHLE               ****
@@ -9,67 +10,37 @@
   parity[2] (exists)
 
 :: Universal Programs
-[ SSeq
-    [ SAsgn parity ! 1 ! h (AMod (AVar parity ! 1 ! h) (ALit 2))
-    , SIf
-        (BEq (AVar parity ! 1 ! h) (ALit 1))
-        (SSeq
-           [ SAsgn parity ! 1 ! l (ALit 1) , SAsgn parity ! 1 ! h (ALit 1) ])
-        (SSeq
-           [ SAsgn parity ! 1 ! l (ALit 0) , SAsgn parity ! 1 ! h (ALit 0) ])
-    , SAsgn parity ! 1 ! parity ! retVal (ALit 0)
-    ]
-]
+    --------
+    parity!1!h := parity!1!h % 2;
+    if parity!1!h == 1 then
+      parity!1!l := 1;
+      parity!1!h := 1;
+    else
+      parity!1!l := 0;
+      parity!1!h := 0;
+    endif;
+    parity!1!parity!retVal := 0;
 
 :: Existential Programs
-[ SSeq
-    [ SAsgn parity ! 2 ! h (AMod (AVar parity ! 2 ! h) (ALit 2))
-    , SIf
-        (BEq (AVar parity ! 2 ! h) (ALit 1))
-        (SSeq
-           [ SAsgn parity ! 2 ! l (ALit 1) , SAsgn parity ! 2 ! h (ALit 1) ])
-        (SSeq
-           [ SAsgn parity ! 2 ! l (ALit 0) , SAsgn parity ! 2 ! h (ALit 0) ])
-    , SAsgn parity ! 2 ! parity ! retVal (ALit 0)
-    ]
-]
-
-:: Universal Specifications
-fromList []
-
-:: Existential Specifications
-fromList []
+    --------
+    parity!2!h := parity!2!h % 2;
+    if parity!2!h == 1 then
+      parity!2!l := 1;
+      parity!2!h := 1;
+    else
+      parity!2!l := 0;
+      parity!2!h := 0;
+    endif;
+    parity!2!parity!retVal := 0;
 
 :: Precondition
-And
-  [ Eq (Var parity ! 1 ! l) (Var parity ! 2 ! l)
-  , Eq
-      (Mod (Var parity ! 1 ! h) (Num 2))
-      (Mod (Var parity ! 2 ! h) (Num 2))
-  ]
+(and (= parity!1!l parity!2!l) (= (mod parity!1!h 2) (mod parity!2!h 2)))
 
 :: Postcondition
-Eq (Var parity ! 1 ! l) (Var parity ! 2 ! l)
+(= parity!1!l parity!2!l)
 
-[send->] (set-option :print-success true )
-[<-recv] success
-[send->] (set-option :produce-models true )
-[<-recv] success
-[send->] (declare-const parity!1!h Int)
-[<-recv] success
-[send->] (declare-const parity!1!l Int)
-[<-recv] success
-[send->] (declare-const parity!2!h Int)
-[<-recv] success
-[send->] (declare-const parity!2!l Int)
-[<-recv] success
-[send->] (assert (not (=> (and (= parity!1!l parity!2!l) (= (mod parity!1!h 2) (mod parity!2!h 2))) (and (=> (= (mod parity!2!h 2) 1) (and (=> (= (mod parity!1!h 2) 1) (= 1 1)) (=> (not (= (mod parity!1!h 2) 1)) (= 0 1)))) (=> (not (= (mod parity!2!h 2) 1)) (and (=> (= (mod parity!1!h 2) 1) (= 1 0)) (=> (not (= (mod parity!1!h 2) 1)) (= 0 0))))))) )
-[<-recv] success
-[send->] (check-sat )
-[<-recv] unsat
-[send->] (exit )
 Valid.
 
-real	0m0.187s
-user	0m0.174s
-sys	0m0.016s
+real	0m0.213s
+user	0m0.193s
+sys	0m0.013s

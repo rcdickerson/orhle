@@ -1,4 +1,3 @@
-Populating test states for loop invariant inference...
 Running backward relational analysis...
 
 *******************************************
@@ -10,99 +9,21 @@ Running backward relational analysis...
   play (exists)
 
 :: Universal Programs
-[]
+    
 
 :: Existential Programs
-[ ImpSeq
-    [ ImpAsgn
-        Name { nHandle = "play!play!retVal" , nId = 0 }
-        (AVar Name { nHandle = "play!handValue" , nId = 0 })
-    ]
-]
-
-:: Universal Specifications
-fromList []
-
-:: Existential Specifications
-fromList
-  [ ( "play!draw"
-    , Specification
-        { spec_params = []
-        , spec_returnVars = [ Name { nHandle = "play!ret!" , nId = 0 } ]
-        , spec_choiceVars =
-            [ TypedName
-                { tnName = Name { nHandle = "play!c" , nId = 0 } , tnType = Int }
-            ]
-        , spec_preCondition =
-            And
-              [ Gte
-                  (Var
-                     TypedName
-                       { tnName = Name { nHandle = "play!c" , nId = 0 } , tnType = Int })
-                  (Num 1)
-              , Lte
-                  (Var
-                     TypedName
-                       { tnName = Name { nHandle = "play!c" , nId = 0 } , tnType = Int })
-                  (Num 10)
-              ]
-        , spec_postCondition =
-            Eq
-              (Var
-                 TypedName
-                   { tnName = Name { nHandle = "play!ret!" , nId = 0 }
-                   , tnType = Int
-                   })
-              (Var
-                 TypedName
-                   { tnName = Name { nHandle = "play!c" , nId = 0 } , tnType = Int })
-        }
-    )
-  ]
+    --------
+    play!play!retVal := play!handValue;
 
 :: Precondition
-And
-  [ Gte
-      (Var
-         TypedName
-           { tnName = Name { nHandle = "play!handValue" , nId = 0 }
-           , tnType = Int
-           })
-      (Num 2)
-  , Lte
-      (Var
-         TypedName
-           { tnName = Name { nHandle = "play!handValue" , nId = 0 }
-           , tnType = Int
-           })
-      (Num 20)
-  ]
+(and (>= play!handValue 2) (<= play!handValue 20))
 
 :: Postcondition
-Eq
-  (Var
-     TypedName
-       { tnName = Name { nHandle = "play!handValue" , nId = 0 }
-       , tnType = Int
-       })
-  (Num 21)
+(= play!handValue 21)
 
-[send->] (set-option :print-success true )
-[<-recv] success
-[send->] (set-option :produce-models true )
-[<-recv] success
-[send->] (declare-const play!handValue Int)
-[<-recv] success
-[send->] (assert (not (=> (and (>= play!handValue 2) (<= play!handValue 20)) (= play!handValue 21))) )
-[<-recv] success
-[send->] (check-sat )
-[<-recv] sat
-[send->] (get-model )
-[<-recv] (model (define-fun play!handValue () Int 19 ) )
-[send->] (exit )
 Failure:
-  Verification conditions are invalid. Model: (model (define-fun play!handValue () Int 19 ) )
+  Verification conditions are invalid. Model: (model (define-fun play!handValue () Int 19))
 
-real	0m0.206s
-user	0m0.195s
-sys	0m0.026s
+real	0m0.207s
+user	0m0.175s
+sys	0m0.020s

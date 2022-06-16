@@ -22,7 +22,7 @@ especs:
 fun original() {
   sum := 0;
   while (sum <= 100) do
-    // @inv { (= original!sum refinement!sum) }
+    @inv { (= original!sum refinement!sum) }
     r := rand();
     sum := sum + r;
   end
@@ -32,7 +32,7 @@ fun original() {
 fun refinement() {
   sum := 0;
   while (sum <= 100) do
-    // @inv { (= original!sum refinement!sum) }
+    @inv { (= original!sum refinement!sum) }
     r := biggerRand();
     sum := sum + r;
   end

@@ -1,3 +1,4 @@
+Running backward relational analysis...
 
 *******************************************
 ****               ORHLE               ****
@@ -9,76 +10,34 @@
   buy[2] (exists)
 
 :: Universal Programs
-[ SSeq
-    [ SIf
-        (BGe (AVar buy ! 1 ! funds) (AVar buy ! 1 ! cost))
-        (SSeq
-           [ SAsgn buy !
-               1 ! funds (ASub (AVar buy ! 1 ! funds) (AVar buy ! 1 ! cost))
-           , SAsgn buy !
-               1 ! spent (AAdd (AVar buy ! 1 ! spent) (AVar buy ! 1 ! cost))
-           ])
-        SSkip
-    , SAsgn buy ! 1 ! buy ! retVal (ALit 0)
-    ]
-]
+    --------
+    if buy!1!funds >= buy!1!cost then
+      buy!1!funds := buy!1!funds - buy!1!cost;
+      buy!1!spent := buy!1!spent + buy!1!cost;
+    else
+      skip
+    endif;
+    buy!1!buy!retVal := 0;
 
 :: Existential Programs
-[ SSeq
-    [ SIf
-        (BGe (AVar buy ! 2 ! funds) (AVar buy ! 2 ! cost))
-        (SSeq
-           [ SAsgn buy !
-               2 ! funds (ASub (AVar buy ! 2 ! funds) (AVar buy ! 2 ! cost))
-           , SAsgn buy !
-               2 ! spent (AAdd (AVar buy ! 2 ! spent) (AVar buy ! 2 ! cost))
-           ])
-        SSkip
-    , SAsgn buy ! 2 ! buy ! retVal (ALit 0)
-    ]
-]
-
-:: Universal Specifications
-fromList []
-
-:: Existential Specifications
-fromList []
+    --------
+    if buy!2!funds >= buy!2!cost then
+      buy!2!funds := buy!2!funds - buy!2!cost;
+      buy!2!spent := buy!2!spent + buy!2!cost;
+    else
+      skip
+    endif;
+    buy!2!buy!retVal := 0;
 
 :: Precondition
-And
-  [ Eq (Var buy ! 1 ! spent) (Var buy ! 2 ! spent)
-  , Eq (Var buy ! 1 ! cost) (Var buy ! 2 ! cost)
-  ]
+(and (= buy!1!spent buy!2!spent) (= buy!1!cost buy!2!cost))
 
 :: Postcondition
-Eq (Var buy ! 1 ! spent) (Var buy ! 2 ! spent)
+(= buy!1!spent buy!2!spent)
 
-[send->] (set-option :print-success true )
-[<-recv] success
-[send->] (set-option :produce-models true )
-[<-recv] success
-[send->] (declare-const buy!1!cost Int)
-[<-recv] success
-[send->] (declare-const buy!1!funds Int)
-[<-recv] success
-[send->] (declare-const buy!1!spent Int)
-[<-recv] success
-[send->] (declare-const buy!2!cost Int)
-[<-recv] success
-[send->] (declare-const buy!2!funds Int)
-[<-recv] success
-[send->] (declare-const buy!2!spent Int)
-[<-recv] success
-[send->] (assert (not (=> (and (= buy!1!spent buy!2!spent) (= buy!1!cost buy!2!cost)) (and (=> (>= buy!2!funds buy!2!cost) (and (=> (>= buy!1!funds buy!1!cost) (= (+ buy!1!spent buy!1!cost) (+ buy!2!spent buy!2!cost))) (=> (not (>= buy!1!funds buy!1!cost)) (= buy!1!spent (+ buy!2!spent buy!2!cost))))) (=> (not (>= buy!2!funds buy!2!cost)) (and (=> (>= buy!1!funds buy!1!cost) (= (+ buy!1!spent buy!1!cost) buy!2!spent)) (=> (not (>= buy!1!funds buy!1!cost)) (= buy!1!spent buy!2!spent))))))) )
-[<-recv] success
-[send->] (check-sat )
-[<-recv] sat
-[send->] (get-model )
-[<-recv] (model (define-fun buy!2!cost () Int (- 1 ) ) (define-fun buy!1!funds () Int (- 2 ) ) (define-fun buy!2!funds () Int (- 1 ) ) (define-fun buy!1!cost () Int (- 1 ) ) (define-fun buy!2!spent () Int 0 ) (define-fun buy!1!spent () Int 0 ) )
-[send->] (exit )
 Failure:
-  Verification conditions are invalid. Model: (model (define-fun buy!2!cost () Int (- 1 ) ) (define-fun buy!1!funds () Int (- 2 ) ) (define-fun buy!2!funds () Int (- 1 ) ) (define-fun buy!1!cost () Int (- 1 ) ) (define-fun buy!2!spent () Int 0 ) (define-fun buy!1!spent () Int 0 ) )
+  Verification conditions are invalid. Model: (model (define-fun buy!2!cost () Int 1) (define-fun buy!1!funds () Int 0) (define-fun buy!2!funds () Int 1) (define-fun buy!1!cost () Int 1) (define-fun buy!2!spent () Int 0) (define-fun buy!1!spent () Int 0))
 
-real	0m0.188s
-user	0m0.182s
-sys	0m0.011s
+real	0m0.207s
+user	0m0.188s
+sys	0m0.019s

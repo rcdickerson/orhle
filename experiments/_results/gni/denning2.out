@@ -1,3 +1,5 @@
+Running backward relational analysis...
+[RelationalPTS] Invariant is insufficient to establish post
 
 *******************************************
 ****               ORHLE               ****
@@ -9,121 +11,56 @@
   denning[E] (exists)
 
 :: Universal Programs
-[ SSeq
-    [ SAsgn denning ! A ! i (ALit 1)
-    , SAsgn denning ! A ! n (ALit 0)
-    , SAsgn denning ! A ! sum (ALit 0)
-    , SWhile
-        (BLe (AVar denning ! A ! i) (ALit 100))
-        (SSeq
-           [ SAsgn denning ! A ! flag (AVar denning ! A ! f1_L)
-           , SAsgn denning ! A ! f2_L (AVar denning ! A ! flag)
-           , SAsgn denning ! A ! x (AVar denning ! A ! f3_H)
-           , SIf
-               (BNot (BEq (AVar denning ! A ! flag) (ALit 0)))
-               (SSeq
-                  [ SAsgn denning ! A ! n (AAdd (AVar denning ! A ! n) (ALit 1))
-                  , SAsgn denning !
-                      A ! sum (AAdd (AVar denning ! A ! sum) (AVar denning ! A ! x))
-                  ])
-               SSkip
-           , SAsgn denning ! A ! i (AAdd (AVar denning ! A ! i) (ALit 1))
-           ])
-        ( And
-            [ Eq (Var denning ! A ! f1_L) (Var denning ! E ! f1_L)
-            , Eq (Var denning ! A ! f2_L) (Var denning ! E ! f2_L)
-            , Eq (Var denning ! A ! i) (Var denning ! E ! i)
-            ]
-        , Num 0
-        )
-    , SAsgn denning !
-        A !
-        f2_L
-          (AAdd
-             (AAdd (AVar denning ! A ! n) (AVar denning ! A ! sum))
-             (ADiv (AVar denning ! A ! sum) (AVar denning ! A ! n)))
-    , SAsgn denning ! A ! f1_L (AVar denning ! A ! f2_L)
-    , SAsgn denning ! A ! denning ! retVal (AVar denning ! A ! f1_L)
-    ]
-]
+    --------
+    denning!A!i := 1;
+    denning!A!n := 0;
+    denning!A!sum := 0;
+    while denning!A!i <= 100
+      denning!A!flag := denning!A!f1_L;
+      denning!A!f2_L := denning!A!flag;
+      denning!A!x := denning!A!f3_H;
+      if !(denning!A!flag == 0) then
+        denning!A!n := denning!A!n + 1;
+        denning!A!sum := denning!A!sum + denning!A!x;
+      else
+        skip
+      endif;
+      denning!A!i := denning!A!i + 1;
+    end;
+    denning!A!f2_L := (denning!A!n + denning!A!sum) + (denning!A!sum / denning!A!n);
+    denning!A!f1_L := denning!A!f2_L;
+    denning!A!denning!retVal := denning!A!f1_L;
 
 :: Existential Programs
-[ SSeq
-    [ SAsgn denning ! E ! i (ALit 1)
-    , SAsgn denning ! E ! n (ALit 0)
-    , SAsgn denning ! E ! sum (ALit 0)
-    , SWhile
-        (BLe (AVar denning ! E ! i) (ALit 100))
-        (SSeq
-           [ SAsgn denning ! E ! flag (AVar denning ! E ! f1_L)
-           , SAsgn denning ! E ! f2_L (AVar denning ! E ! flag)
-           , SAsgn denning ! E ! x (AVar denning ! E ! f3_H)
-           , SIf
-               (BNot (BEq (AVar denning ! E ! flag) (ALit 0)))
-               (SSeq
-                  [ SAsgn denning ! E ! n (AAdd (AVar denning ! E ! n) (ALit 1))
-                  , SAsgn denning !
-                      E ! sum (AAdd (AVar denning ! E ! sum) (AVar denning ! E ! x))
-                  ])
-               SSkip
-           , SAsgn denning ! E ! i (AAdd (AVar denning ! E ! i) (ALit 1))
-           ])
-        ( And
-            [ Eq (Var denning ! A ! f1_L) (Var denning ! E ! f1_L)
-            , Eq (Var denning ! A ! f2_L) (Var denning ! E ! f2_L)
-            , Eq (Var denning ! A ! i) (Var denning ! E ! i)
-            ]
-        , Num 0
-        )
-    , SAsgn denning !
-        E !
-        f2_L
-          (AAdd
-             (AAdd (AVar denning ! E ! n) (AVar denning ! E ! sum))
-             (ADiv (AVar denning ! E ! sum) (AVar denning ! E ! n)))
-    , SAsgn denning ! E ! f1_L (AVar denning ! E ! f2_L)
-    , SAsgn denning ! E ! denning ! retVal (AVar denning ! E ! f1_L)
-    ]
-]
-
-:: Universal Specifications
-fromList []
-
-:: Existential Specifications
-fromList []
+    --------
+    denning!E!i := 1;
+    denning!E!n := 0;
+    denning!E!sum := 0;
+    while denning!E!i <= 100
+      denning!E!flag := denning!E!f1_L;
+      denning!E!f2_L := denning!E!flag;
+      denning!E!x := denning!E!f3_H;
+      if !(denning!E!flag == 0) then
+        denning!E!n := denning!E!n + 1;
+        denning!E!sum := denning!E!sum + denning!E!x;
+      else
+        skip
+      endif;
+      denning!E!i := denning!E!i + 1;
+    end;
+    denning!E!f2_L := (denning!E!n + denning!E!sum) + (denning!E!sum / denning!E!n);
+    denning!E!f1_L := denning!E!f2_L;
+    denning!E!denning!retVal := denning!E!f1_L;
 
 :: Precondition
-And
-  [ Eq (Var denning ! A ! f1_L) (Var denning ! E ! f1_L)
-  , Eq (Var denning ! A ! f2_L) (Var denning ! E ! f2_L)
-  ]
+(and (= denning!A!f1_L denning!E!f1_L) (= denning!A!f2_L denning!E!f2_L))
 
 :: Postcondition
-And
-  [ Eq (Var denning ! A ! f1_L) (Var denning ! E ! f1_L)
-  , Eq (Var denning ! A ! f2_L) (Var denning ! E ! f2_L)
-  ]
+(and (= denning!A!f1_L denning!E!f1_L) (= denning!A!f2_L denning!E!f2_L))
 
-[send->] (set-option :print-success true )
-[<-recv] success
-[send->] (set-option :produce-models true )
-[<-recv] success
-[send->] (declare-const denning!A!f1_L Int)
-[<-recv] success
-[send->] (declare-const denning!A!f2_L Int)
-[<-recv] success
-[send->] (declare-const denning!E!f1_L Int)
-[<-recv] success
-[send->] (declare-const denning!E!f2_L Int)
-[<-recv] success
-[send->] (assert (not (=> (and (= denning!A!f1_L denning!E!f1_L) (= denning!A!f2_L denning!E!f2_L)) (and (and (= denning!A!f1_L denning!E!f1_L) (= denning!A!f2_L denning!E!f2_L) (= 1 1)) (forall ((denning!A!f1_L!1 Int) (denning!A!f2_L!1 Int) (denning!A!f3_H!1 Int) (denning!A!flag!1 Int) (denning!A!i!2 Int) (denning!A!n!2 Int) (denning!A!sum!2 Int) (denning!A!x!1 Int) (denning!E!f1_L!1 Int) (denning!E!f2_L!1 Int) (denning!E!f3_H!1 Int) (denning!E!flag!1 Int) (denning!E!i!5 Int) (denning!E!n!2 Int) (denning!E!sum!2 Int) (denning!E!x!1 Int)) (=> (and (and (= denning!A!f1_L!1 denning!E!f1_L!1) (= denning!A!f2_L!1 denning!E!f2_L!1) (= denning!A!i!2 denning!E!i!5)) (not (<= denning!A!i!2 100)) (not (<= denning!E!i!5 100))) (and (= (+ (+ denning!A!n!2 denning!A!sum!2) (/ denning!A!sum!2 denning!A!n!2)) (+ (+ denning!E!n!2 denning!E!sum!2) (/ denning!E!sum!2 denning!E!n!2))) (= (+ (+ denning!A!n!2 denning!A!sum!2) (/ denning!A!sum!2 denning!A!n!2)) (+ (+ denning!E!n!2 denning!E!sum!2) (/ denning!E!sum!2 denning!E!n!2)))))) (forall ((denning!A!f1_L!1 Int) (denning!A!f2_L!1 Int) (denning!A!f3_H!1 Int) (denning!A!flag!1 Int) (denning!A!i!2 Int) (denning!A!n!2 Int) (denning!A!sum!2 Int) (denning!A!x!1 Int) (denning!E!f1_L!1 Int) (denning!E!f2_L!1 Int) (denning!E!f3_H!1 Int) (denning!E!flag!1 Int) (denning!E!i!5 Int) (denning!E!n!2 Int) (denning!E!sum!2 Int) (denning!E!x!1 Int)) (=> (and (and (= denning!A!f1_L!1 denning!E!f1_L!1) (= denning!A!f2_L!1 denning!E!f2_L!1) (= denning!A!i!2 denning!E!i!5)) (<= denning!A!i!2 100) (<= denning!E!i!5 100)) (and (=> (not (= denning!E!f1_L!1 0)) (and (=> (not (= denning!A!f1_L!1 0)) (and (and (= denning!A!f1_L!1 denning!E!f1_L!1) (= denning!A!f1_L!1 denning!E!f1_L!1) (= (+ denning!A!i!2 1) (+ denning!E!i!5 1))) true)) (=> (not (not (= denning!A!f1_L!1 0))) (and (and (= denning!A!f1_L!1 denning!E!f1_L!1) (= denning!A!f1_L!1 denning!E!f1_L!1) (= (+ denning!A!i!2 1) (+ denning!E!i!5 1))) true)))) (=> (not (not (= denning!E!f1_L!1 0))) (and (=> (not (= denning!A!f1_L!1 0)) (and (and (= denning!A!f1_L!1 denning!E!f1_L!1) (= denning!A!f1_L!1 denning!E!f1_L!1) (= (+ denning!A!i!2 1) (+ denning!E!i!5 1))) true)) (=> (not (not (= denning!A!f1_L!1 0))) (and (and (= denning!A!f1_L!1 denning!E!f1_L!1) (= denning!A!f1_L!1 denning!E!f1_L!1) (= (+ denning!A!i!2 1) (+ denning!E!i!5 1))) true))))))) (forall ((denning!A!f1_L!1 Int) (denning!A!f2_L!1 Int) (denning!A!f3_H!1 Int) (denning!A!flag!1 Int) (denning!A!i!2 Int) (denning!A!n!2 Int) (denning!A!sum!2 Int) (denning!A!x!1 Int) (denning!E!f1_L!1 Int) (denning!E!f2_L!1 Int) (denning!E!f3_H!1 Int) (denning!E!flag!1 Int) (denning!E!i!5 Int) (denning!E!n!2 Int) (denning!E!sum!2 Int) (denning!E!x!1 Int)) (=> (and (and (= denning!A!f1_L!1 denning!E!f1_L!1) (= denning!A!f2_L!1 denning!E!f2_L!1) (= denning!A!i!2 denning!E!i!5)) (not (and (<= denning!A!i!2 100) (<= denning!E!i!5 100)))) (and (not (<= denning!A!i!2 100)) (not (<= denning!E!i!5 100)))))))) )
-[<-recv] success
-[send->] (check-sat )
-[<-recv] unknown
-[send->] (exit )
 Failure:
-  Solver returned unknown.
+  Verification conditions are invalid. Model: (model (define-fun denning!E!f2_L () Int 0) (define-fun denning!A!f2_L () Int 0) (define-fun denning!E!f1_L () Int 0) (define-fun denning!A!f1_L () Int 0))
 
-real	0m0.201s
-user	0m0.191s
-sys	0m0.028s
+real	0m0.247s
+user	0m0.185s
+sys	0m0.052s

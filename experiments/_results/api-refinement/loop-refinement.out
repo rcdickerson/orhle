@@ -1,16 +1,40 @@
+Running backward relational analysis...
 
 *******************************************
 ****               ORHLE               ****
 ****     The Oracular RHLE Verifier    ****
 *******************************************
 
-Parse error: (line 45, column 1):
-unexpected end of input
-expecting end of input
-(line 5, column 15):
-unexpected "r"
-expecting operator or ";"
+:: Executions
+  refinement (forall)
+  original (exists)
 
-real	0m0.192s
-user	0m0.173s
-sys	0m0.031s
+:: Universal Programs
+    --------
+    refinement!sum := 0;
+    while refinement!sum <= 100
+      refinement!r := refinement!randOdd();
+      refinement!sum := refinement!sum + refinement!r;
+    end;
+    refinement!refinement!retVal := refinement!sum;
+
+:: Existential Programs
+    --------
+    original!sum := 0;
+    while original!sum <= 100
+      original!r := original!rand();
+      original!sum := original!sum + original!r;
+    end;
+    original!original!retVal := original!sum;
+
+:: Precondition
+true
+
+:: Postcondition
+(= original!sum refinement!sum)
+
+Valid.
+
+real	0m0.218s
+user	0m0.250s
+sys	0m0.005s

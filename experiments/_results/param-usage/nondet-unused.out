@@ -1,3 +1,4 @@
+Running backward relational analysis...
 
 *******************************************
 ****               ORHLE               ****
@@ -11,110 +12,57 @@
   unused[2B] (exists)
 
 :: Universal Programs
-[ SSeq
-    [ SAsgn unused !
-        1A !
-        x (AAdd (AVar unused ! 1A ! param1) (AVar unused ! 1A ! param2))
-    , SCall "unused!1A!flip" [] [ unused ! 1A ! r ]
-    , SIf
-        (BEq (AVar unused ! 1A ! r) (ALit 0))
-        (SAsgn unused !
-           1A ! ret (ASub (AVar unused ! 1A ! x) (AVar unused ! 1A ! param2)))
-        (SAsgn unused ! 1A ! ret (AVar unused ! 1A ! param1))
-    , SAsgn unused ! 1A ! unused ! retVal (AVar unused ! 1A ! ret)
-    ]
-, SSeq
-    [ SAsgn unused !
-        2A !
-        x (AAdd (AVar unused ! 2A ! param1) (AVar unused ! 2A ! param2))
-    , SCall "unused!2A!flip" [] [ unused ! 2A ! r ]
-    , SIf
-        (BEq (AVar unused ! 2A ! r) (ALit 0))
-        (SAsgn unused !
-           2A ! ret (ASub (AVar unused ! 2A ! x) (AVar unused ! 2A ! param2)))
-        (SAsgn unused ! 2A ! ret (AVar unused ! 2A ! param1))
-    , SAsgn unused ! 2A ! unused ! retVal (AVar unused ! 2A ! ret)
-    ]
-]
+    --------
+    unused!1A!x := unused!1A!param1 + unused!1A!param2;
+    unused!1A!r := unused!1A!flip();
+    if unused!1A!r == 0 then
+      unused!1A!ret := unused!1A!x - unused!1A!param2
+    else
+      unused!1A!ret := unused!1A!param1
+    endif;
+    unused!1A!unused!retVal := unused!1A!ret;
+    --------
+    unused!2A!x := unused!2A!param1 + unused!2A!param2;
+    unused!2A!r := unused!2A!flip();
+    if unused!2A!r == 0 then
+      unused!2A!ret := unused!2A!x - unused!2A!param2
+    else
+      unused!2A!ret := unused!2A!param1
+    endif;
+    unused!2A!unused!retVal := unused!2A!ret;
 
 :: Existential Programs
-[ SSeq
-    [ SAsgn unused !
-        1B !
-        x (AAdd (AVar unused ! 1B ! param1) (AVar unused ! 1B ! param2))
-    , SCall "unused!1B!flip" [] [ unused ! 1B ! r ]
-    , SIf
-        (BEq (AVar unused ! 1B ! r) (ALit 0))
-        (SAsgn unused !
-           1B ! ret (ASub (AVar unused ! 1B ! x) (AVar unused ! 1B ! param2)))
-        (SAsgn unused ! 1B ! ret (AVar unused ! 1B ! param1))
-    , SAsgn unused ! 1B ! unused ! retVal (AVar unused ! 1B ! ret)
-    ]
-, SSeq
-    [ SAsgn unused !
-        2B !
-        x (AAdd (AVar unused ! 2B ! param1) (AVar unused ! 2B ! param2))
-    , SCall "unused!2B!flip" [] [ unused ! 2B ! r ]
-    , SIf
-        (BEq (AVar unused ! 2B ! r) (ALit 0))
-        (SAsgn unused !
-           2B ! ret (ASub (AVar unused ! 2B ! x) (AVar unused ! 2B ! param2)))
-        (SAsgn unused ! 2B ! ret (AVar unused ! 2B ! param1))
-    , SAsgn unused ! 2B ! unused ! retVal (AVar unused ! 2B ! ret)
-    ]
-]
-
-:: Universal Specifications
-fromList [("unused!1A!flip",Spec {spec_params = [], spec_choiceVars = [], spec_preCondition = ATrue, spec_postCondition = Or [Eq (Var ret!) (Num 0),Eq (Var ret!) (Num 1)]}),("unused!2A!flip",Spec {spec_params = [], spec_choiceVars = [], spec_preCondition = ATrue, spec_postCondition = Or [Eq (Var ret!) (Num 0),Eq (Var ret!) (Num 1)]})]
-
-:: Existential Specifications
-fromList [("unused!1B!flip",Spec {spec_params = [], spec_choiceVars = [unused!1B!n], spec_preCondition = Or [Eq (Var unused!1B!n) (Num 0),Eq (Var unused!1B!n) (Num 1)], spec_postCondition = Eq (Var ret!) (Var unused!1B!n)}),("unused!2B!flip",Spec {spec_params = [], spec_choiceVars = [unused!2B!n], spec_preCondition = Or [Eq (Var unused!2B!n) (Num 0),Eq (Var unused!2B!n) (Num 1)], spec_postCondition = Eq (Var ret!) (Var unused!2B!n)})]
+    --------
+    unused!1B!x := unused!1B!param1 + unused!1B!param2;
+    unused!1B!r := unused!1B!flip();
+    if unused!1B!r == 0 then
+      unused!1B!ret := unused!1B!x - unused!1B!param2
+    else
+      unused!1B!ret := unused!1B!param1
+    endif;
+    unused!1B!unused!retVal := unused!1B!ret;
+    --------
+    unused!2B!x := unused!2B!param1 + unused!2B!param2;
+    unused!2B!r := unused!2B!flip();
+    if unused!2B!r == 0 then
+      unused!2B!ret := unused!2B!x - unused!2B!param2
+    else
+      unused!2B!ret := unused!2B!param1
+    endif;
+    unused!2B!unused!retVal := unused!2B!ret;
 
 :: Precondition
-And
-  [ Eq (Var unused ! 1A ! param1) (Var unused ! 1B ! param1)
-  , Not (Eq (Var unused ! 1A ! param2) (Var unused ! 1B ! param2))
-  , Not (Eq (Var unused ! 2A ! param1) (Var unused ! 2B ! param1))
-  , Eq (Var unused ! 2A ! param2) (Var unused ! 2B ! param2)
-  ]
+(and
+ (= unused!1A!param1 unused!1B!param1)
+ (not (= unused!1A!param2 unused!1B!param2))
+ (not (= unused!2A!param1 unused!2B!param1))
+ (= unused!2A!param2 unused!2B!param2))
 
 :: Postcondition
-Or
-  [ Eq (Var unused ! 1A ! ret) (Var unused ! 1B ! ret)
-  , Eq (Var unused ! 2A ! ret) (Var unused ! 2B ! ret)
-  ]
+(or (= unused!1A!ret unused!1B!ret) (= unused!2A!ret unused!2B!ret))
 
-[send->] (set-option :print-success true )
-[<-recv] success
-[send->] (set-option :produce-models true )
-[<-recv] success
-[send->] (declare-const unused!1A!param1 Int)
-[<-recv] success
-[send->] (declare-const unused!1A!param2 Int)
-[<-recv] success
-[send->] (declare-const unused!1A!r!1 Int)
-[<-recv] success
-[send->] (declare-const unused!1B!param1 Int)
-[<-recv] success
-[send->] (declare-const unused!1B!param2 Int)
-[<-recv] success
-[send->] (declare-const unused!2A!param1 Int)
-[<-recv] success
-[send->] (declare-const unused!2A!param2 Int)
-[<-recv] success
-[send->] (declare-const unused!2A!r!1 Int)
-[<-recv] success
-[send->] (declare-const unused!2B!param1 Int)
-[<-recv] success
-[send->] (declare-const unused!2B!param2 Int)
-[<-recv] success
-[send->] (assert (not (=> (and (= unused!1A!param1 unused!1B!param1) (not (= unused!1A!param2 unused!1B!param2)) (not (= unused!2A!param1 unused!2B!param1)) (= unused!2A!param2 unused!2B!param2)) (exists ((unused!2B!n!1 Int)) (and (or (= unused!2B!n!1 0) (= unused!2B!n!1 1)) (exists ((unused!2B!r!1 Int)) (= unused!2B!r!1 unused!2B!n!1)) (forall ((unused!2B!r!1 Int)) (=> (= unused!2B!r!1 unused!2B!n!1) (and (=> (= unused!2B!r!1 0) (exists ((unused!1B!n!1 Int)) (and (or (= unused!1B!n!1 0) (= unused!1B!n!1 1)) (exists ((unused!1B!r!1 Int)) (= unused!1B!r!1 unused!1B!n!1)) (forall ((unused!1B!r!1 Int)) (=> (= unused!1B!r!1 unused!1B!n!1) (and (=> (= unused!1B!r!1 0) (and true (=> (or (= unused!2A!r!1 0) (= unused!2A!r!1 1)) (and (=> (= unused!2A!r!1 0) (and true (=> (or (= unused!1A!r!1 0) (= unused!1A!r!1 1)) (and (=> (= unused!1A!r!1 0) (or (= (- (+ unused!1A!param1 unused!1A!param2) unused!1A!param2) (- (+ unused!1B!param1 unused!1B!param2) unused!1B!param2)) (= (- (+ unused!2A!param1 unused!2A!param2) unused!2A!param2) (- (+ unused!2B!param1 unused!2B!param2) unused!2B!param2)))) (=> (not (= unused!1A!r!1 0)) (or (= unused!1A!param1 (- (+ unused!1B!param1 unused!1B!param2) unused!1B!param2)) (= (- (+ unused!2A!param1 unused!2A!param2) unused!2A!param2) (- (+ unused!2B!param1 unused!2B!param2) unused!2B!param2)))))))) (=> (not (= unused!2A!r!1 0)) (and true (=> (or (= unused!1A!r!1 0) (= unused!1A!r!1 1)) (and (=> (= unused!1A!r!1 0) (or (= (- (+ unused!1A!param1 unused!1A!param2) unused!1A!param2) (- (+ unused!1B!param1 unused!1B!param2) unused!1B!param2)) (= unused!2A!param1 (- (+ unused!2B!param1 unused!2B!param2) unused!2B!param2)))) (=> (not (= unused!1A!r!1 0)) (or (= unused!1A!param1 (- (+ unused!1B!param1 unused!1B!param2) unused!1B!param2)) (= unused!2A!param1 (- (+ unused!2B!param1 unused!2B!param2) unused!2B!param2)))))))))))) (=> (not (= unused!1B!r!1 0)) (and true (=> (or (= unused!2A!r!1 0) (= unused!2A!r!1 1)) (and (=> (= unused!2A!r!1 0) (and true (=> (or (= unused!1A!r!1 0) (= unused!1A!r!1 1)) (and (=> (= unused!1A!r!1 0) (or (= (- (+ unused!1A!param1 unused!1A!param2) unused!1A!param2) unused!1B!param1) (= (- (+ unused!2A!param1 unused!2A!param2) unused!2A!param2) (- (+ unused!2B!param1 unused!2B!param2) unused!2B!param2)))) (=> (not (= unused!1A!r!1 0)) (or (= unused!1A!param1 unused!1B!param1) (= (- (+ unused!2A!param1 unused!2A!param2) unused!2A!param2) (- (+ unused!2B!param1 unused!2B!param2) unused!2B!param2)))))))) (=> (not (= unused!2A!r!1 0)) (and true (=> (or (= unused!1A!r!1 0) (= unused!1A!r!1 1)) (and (=> (= unused!1A!r!1 0) (or (= (- (+ unused!1A!param1 unused!1A!param2) unused!1A!param2) unused!1B!param1) (= unused!2A!param1 (- (+ unused!2B!param1 unused!2B!param2) unused!2B!param2)))) (=> (not (= unused!1A!r!1 0)) (or (= unused!1A!param1 unused!1B!param1) (= unused!2A!param1 (- (+ unused!2B!param1 unused!2B!param2) unused!2B!param2)))))))))))))))))) (=> (not (= unused!2B!r!1 0)) (exists ((unused!1B!n!1 Int)) (and (or (= unused!1B!n!1 0) (= unused!1B!n!1 1)) (exists ((unused!1B!r!1 Int)) (= unused!1B!r!1 unused!1B!n!1)) (forall ((unused!1B!r!1 Int)) (=> (= unused!1B!r!1 unused!1B!n!1) (and (=> (= unused!1B!r!1 0) (and true (=> (or (= unused!2A!r!1 0) (= unused!2A!r!1 1)) (and (=> (= unused!2A!r!1 0) (and true (=> (or (= unused!1A!r!1 0) (= unused!1A!r!1 1)) (and (=> (= unused!1A!r!1 0) (or (= (- (+ unused!1A!param1 unused!1A!param2) unused!1A!param2) (- (+ unused!1B!param1 unused!1B!param2) unused!1B!param2)) (= (- (+ unused!2A!param1 unused!2A!param2) unused!2A!param2) unused!2B!param1))) (=> (not (= unused!1A!r!1 0)) (or (= unused!1A!param1 (- (+ unused!1B!param1 unused!1B!param2) unused!1B!param2)) (= (- (+ unused!2A!param1 unused!2A!param2) unused!2A!param2) unused!2B!param1))))))) (=> (not (= unused!2A!r!1 0)) (and true (=> (or (= unused!1A!r!1 0) (= unused!1A!r!1 1)) (and (=> (= unused!1A!r!1 0) (or (= (- (+ unused!1A!param1 unused!1A!param2) unused!1A!param2) (- (+ unused!1B!param1 unused!1B!param2) unused!1B!param2)) (= unused!2A!param1 unused!2B!param1))) (=> (not (= unused!1A!r!1 0)) (or (= unused!1A!param1 (- (+ unused!1B!param1 unused!1B!param2) unused!1B!param2)) (= unused!2A!param1 unused!2B!param1))))))))))) (=> (not (= unused!1B!r!1 0)) (and true (=> (or (= unused!2A!r!1 0) (= unused!2A!r!1 1)) (and (=> (= unused!2A!r!1 0) (and true (=> (or (= unused!1A!r!1 0) (= unused!1A!r!1 1)) (and (=> (= unused!1A!r!1 0) (or (= (- (+ unused!1A!param1 unused!1A!param2) unused!1A!param2) unused!1B!param1) (= (- (+ unused!2A!param1 unused!2A!param2) unused!2A!param2) unused!2B!param1))) (=> (not (= unused!1A!r!1 0)) (or (= unused!1A!param1 unused!1B!param1) (= (- (+ unused!2A!param1 unused!2A!param2) unused!2A!param2) unused!2B!param1))))))) (=> (not (= unused!2A!r!1 0)) (and true (=> (or (= unused!1A!r!1 0) (= unused!1A!r!1 1)) (and (=> (= unused!1A!r!1 0) (or (= (- (+ unused!1A!param1 unused!1A!param2) unused!1A!param2) unused!1B!param1) (= unused!2A!param1 unused!2B!param1))) (=> (not (= unused!1A!r!1 0)) (or (= unused!1A!param1 unused!1B!param1) (= unused!2A!param1 unused!2B!param1)))))))))))))))))))))))) )
-[<-recv] success
-[send->] (check-sat )
-[<-recv] unsat
-[send->] (exit )
 Valid.
 
-real	0m0.197s
-user	0m0.214s
-sys	0m0.013s
+real	0m0.220s
+user	0m0.228s
+sys	0m0.027s

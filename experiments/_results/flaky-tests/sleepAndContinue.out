@@ -1,3 +1,4 @@
+Running backward relational analysis...
 
 *******************************************
 ****               ORHLE               ****
@@ -9,152 +10,66 @@
   test[2] (exists)
 
 :: Universal Programs
-[]
+    
 
 :: Existential Programs
-[ SSeq
-    [ SAsgn test ! 1 ! currentTime (ALit 0)
-    , SAsgn test ! 1 ! lastTime (ALit (-1))
-    , SAsgn test ! 1 ! currentTotal (ALit 0)
-    , SCall
-        "test!1!recordTimestamp"
-        [ AVar test ! 1 ! currentTime
-        , AVar test ! 1 ! currentTotal
-        , AVar test ! 1 ! lastTime
-        ]
-        [ test ! 1 ! currentTotal , test ! 1 ! lastTime ]
-    , SCall
-        "test!1!sleep"
-        [ ALit 100 , AVar test ! 1 ! currentTime ]
-        [ test ! 1 ! currentTime ]
-    , SAsgn test ! 1 ! counter (ALit 0)
-    , SWhile
-        (BLt (AVar test ! 1 ! counter) (ALit 5))
-        (SSeq
-           [ SCall
-               "test!1!recordTimestamp"
-               [ AVar test ! 1 ! currentTime
-               , AVar test ! 1 ! currentTotal
-               , AVar test ! 1 ! lastTime
-               ]
-               [ test ! 1 ! currentTotal , test ! 1 ! lastTime ]
-           , SCall
-               "test!1!sleep"
-               [ ALit 100 , AVar test ! 1 ! currentTime ]
-               [ test ! 1 ! currentTime ]
-           , SAsgn test !
-               1 ! counter (AAdd (AVar test ! 1 ! counter) (ALit 1))
-           ])
-        ( And
-            [ Eq
-                (Mul [ Num 100 , Var test ! 1 ! counter ])
-                (Var test ! 1 ! currentTotal)
-            , Eq
-                (Num 100)
-                (Sub [ Var test ! 1 ! currentTime , Var test ! 1 ! lastTime ])
-            , Lte (Num 0) (Var test ! 1 ! lastTime)
-            , Eq
-                (Mul [ Num 101 , Var test ! 2 ! counter ])
-                (Var test ! 2 ! currentTotal)
-            , Eq
-                (Num 101)
-                (Sub [ Var test ! 2 ! currentTime , Var test ! 2 ! lastTime ])
-            , Lte (Num 0) (Var test ! 2 ! lastTime)
-            , Eq (Var test ! 1 ! counter) (Var test ! 2 ! counter)
-            , Lte (Var test ! 1 ! counter) (Num 5)
-            ]
-        , Sub [ Num 10 , Var test ! 1 ! counter ]
-        )
-    , SIf
-        (BEq (AVar test ! 1 ! currentTotal) (ALit 500))
-        (SAsgn test ! 1 ! success (ALit 1))
-        (SAsgn test ! 1 ! success (ALit 0))
-    , SAsgn test ! 1 ! test ! retVal (AVar test ! 1 ! success)
-    ]
-, SSeq
-    [ SAsgn test ! 2 ! currentTime (ALit 0)
-    , SAsgn test ! 2 ! lastTime (ALit (-1))
-    , SAsgn test ! 2 ! currentTotal (ALit 0)
-    , SCall
-        "test!2!recordTimestamp"
-        [ AVar test ! 2 ! currentTime
-        , AVar test ! 2 ! currentTotal
-        , AVar test ! 2 ! lastTime
-        ]
-        [ test ! 2 ! currentTotal , test ! 2 ! lastTime ]
-    , SCall
-        "test!2!sleep"
-        [ ALit 100 , AVar test ! 2 ! currentTime ]
-        [ test ! 2 ! currentTime ]
-    , SAsgn test ! 2 ! counter (ALit 0)
-    , SWhile
-        (BLt (AVar test ! 2 ! counter) (ALit 5))
-        (SSeq
-           [ SCall
-               "test!2!recordTimestamp"
-               [ AVar test ! 2 ! currentTime
-               , AVar test ! 2 ! currentTotal
-               , AVar test ! 2 ! lastTime
-               ]
-               [ test ! 2 ! currentTotal , test ! 2 ! lastTime ]
-           , SCall
-               "test!2!sleep"
-               [ ALit 100 , AVar test ! 2 ! currentTime ]
-               [ test ! 2 ! currentTime ]
-           , SAsgn test !
-               2 ! counter (AAdd (AVar test ! 2 ! counter) (ALit 1))
-           ])
-        ( And
-            [ Eq
-                (Mul [ Num 100 , Var test ! 1 ! counter ])
-                (Var test ! 1 ! currentTotal)
-            , Eq
-                (Num 100)
-                (Sub [ Var test ! 1 ! currentTime , Var test ! 1 ! lastTime ])
-            , Lte (Num 0) (Var test ! 1 ! lastTime)
-            , Eq
-                (Mul [ Num 101 , Var test ! 2 ! counter ])
-                (Var test ! 2 ! currentTotal)
-            , Eq
-                (Num 101)
-                (Sub [ Var test ! 2 ! currentTime , Var test ! 2 ! lastTime ])
-            , Lte (Num 0) (Var test ! 2 ! lastTime)
-            , Eq (Var test ! 1 ! counter) (Var test ! 2 ! counter)
-            , Lte (Var test ! 1 ! counter) (Num 5)
-            ]
-        , Sub [ Num 10 , Var test ! 1 ! counter ]
-        )
-    , SIf
-        (BEq (AVar test ! 2 ! currentTotal) (ALit 500))
-        (SAsgn test ! 2 ! success (ALit 1))
-        (SAsgn test ! 2 ! success (ALit 0))
-    , SAsgn test ! 2 ! test ! retVal (AVar test ! 2 ! success)
-    ]
-]
-
-:: Universal Specifications
-fromList []
-
-:: Existential Specifications
-fromList [("test!1!getCurrentTimeMs",Spec {spec_params = [], spec_choiceVars = [test!1!currentTime], spec_preCondition = Lt (Num 0) (Var test!1!currentTime), spec_postCondition = Eq (Var ret!) (Var test!1!currentTime)}),("test!1!sleep",Spec {spec_params = [test!1!interval,test!1!currentTime], spec_choiceVars = [test!1!sleepTime], spec_preCondition = And [Lte (Num 0) (Var test!1!sleepTime),Lte (Sub [Var test!1!interval,Num 20]) (Var test!1!sleepTime),Lte (Var test!1!sleepTime) (Add [Var test!1!interval,Num 20])], spec_postCondition = Eq (Var ret!) (Add [Var test!1!currentTime,Var test!1!sleepTime])}),("test!2!getCurrentTimeMs",Spec {spec_params = [], spec_choiceVars = [test!2!currentTime], spec_preCondition = Lt (Num 0) (Var test!2!currentTime), spec_postCondition = Eq (Var ret!) (Var test!2!currentTime)}),("test!2!sleep",Spec {spec_params = [test!2!interval,test!2!currentTime], spec_choiceVars = [test!2!sleepTime], spec_preCondition = And [Lte (Num 0) (Var test!2!sleepTime),Lte (Sub [Var test!2!interval,Num 20]) (Var test!2!sleepTime),Lte (Var test!2!sleepTime) (Add [Var test!2!interval,Num 20])], spec_postCondition = Eq (Var ret!) (Add [Var test!2!currentTime,Var test!2!sleepTime])})]
+    --------
+    test!1!currentTime := test!1!getCurrentTimeMs();
+    test!1!lastTime := -1;
+    test!1!currentTotal := 0;
+    (test!1!currentTotal
+    ,test!1!lastTime) := test!1!recordTimestamp(test!1!currentTime
+    ,test!1!currentTotal
+    ,test!1!lastTime);
+    test!1!currentTime := test!1!sleep(100,test!1!currentTime);
+    test!1!counter := 0;
+    while test!1!counter < 5
+      (test!1!currentTotal
+      ,test!1!lastTime) := test!1!recordTimestamp(test!1!currentTime
+      ,test!1!currentTotal
+      ,test!1!lastTime);
+      test!1!currentTime := test!1!sleep(100,test!1!currentTime);
+      test!1!counter := test!1!counter + 1;
+    end;
+    if test!1!currentTotal == 500 then
+      test!1!success := 1
+    else
+      test!1!success := 0
+    endif;
+    test!1!test!retVal := test!1!success;
+    --------
+    test!2!currentTime := test!2!getCurrentTimeMs();
+    test!2!lastTime := -1;
+    test!2!currentTotal := 0;
+    (test!2!currentTotal
+    ,test!2!lastTime) := test!2!recordTimestamp(test!2!currentTime
+    ,test!2!currentTotal
+    ,test!2!lastTime);
+    test!2!currentTime := test!2!sleep(100,test!2!currentTime);
+    test!2!counter := 0;
+    while test!2!counter < 5
+      (test!2!currentTotal
+      ,test!2!lastTime) := test!2!recordTimestamp(test!2!currentTime
+      ,test!2!currentTotal
+      ,test!2!lastTime);
+      test!2!currentTime := test!2!sleep(100,test!2!currentTime);
+      test!2!counter := test!2!counter + 1;
+    end;
+    if test!2!currentTotal == 500 then
+      test!2!success := 1
+    else
+      test!2!success := 0
+    endif;
+    test!2!test!retVal := test!2!success;
 
 :: Precondition
-ATrue
+true
 
 :: Postcondition
-Not (Eq (Var test ! 1 ! success) (Var test ! 2 ! success))
+(not (= test!1!success test!2!success))
 
-[send->] (set-option :print-success true )
-[<-recv] success
-[send->] (set-option :produce-models true )
-[<-recv] success
-[send->] (assert (not (=> true (and (=> (>= -1 0) (exists ((test!1!sleepTime!2 Int)) (and (and (<= 0 test!1!sleepTime!2) (<= (- 100 20) test!1!sleepTime!2) (<= test!1!sleepTime!2 (+ 100 20))) (exists ((test!1!currentTime!8 Int)) (= test!1!currentTime!8 (+ 0 test!1!sleepTime!2))) (forall ((test!1!currentTime!8 Int)) (=> (= test!1!currentTime!8 (+ 0 test!1!sleepTime!2)) (and (=> (>= -1 0) (exists ((test!2!sleepTime!2 Int)) (and (and (<= 0 test!2!sleepTime!2) (<= (- 100 20) test!2!sleepTime!2) (<= test!2!sleepTime!2 (+ 100 20))) (exists ((test!2!currentTime!8 Int)) (= test!2!currentTime!8 (+ 0 test!2!sleepTime!2))) (forall ((test!2!currentTime!8 Int)) (=> (= test!2!currentTime!8 (+ 0 test!2!sleepTime!2)) (and (and (= (* 100 0) (+ 0 (- 0 -1))) (= 100 (- test!1!currentTime!8 0)) (<= 0 0) (= (* 101 0) (+ 0 (- 0 -1))) (= 101 (- test!2!currentTime!8 0)) (<= 0 0) (= 0 0) (<= 0 5)) (forall ((test!1!counter!1 Int) (test!1!currentTime!6 Int) (test!1!currentTime!5 Int) (test!1!currentTotal!8 Int) (test!1!currentTotal!7 Int) (test!1!elapsedTime!4 Int) (test!1!lastTime!8 Int) (test!1!lastTime!7 Int) (test!1!recordTimestamp!retVal!9 Int) (test!1!recordTimestamp!retVal!8 Int) (test!2!counter!1 Int) (test!2!currentTime!6 Int) (test!2!currentTime!5 Int) (test!2!currentTotal!8 Int) (test!2!currentTotal!7 Int) (test!2!elapsedTime!4 Int) (test!2!lastTime!8 Int) (test!2!lastTime!7 Int) (test!2!recordTimestamp!retVal!9 Int) (test!2!recordTimestamp!retVal!8 Int)) (=> (and (and (= (* 100 test!1!counter!1) test!1!currentTotal!8) (= 100 (- test!1!currentTime!6 test!1!lastTime!8)) (<= 0 test!1!lastTime!8) (= (* 101 test!2!counter!1) test!2!currentTotal!8) (= 101 (- test!2!currentTime!6 test!2!lastTime!8)) (<= 0 test!2!lastTime!8) (= test!1!counter!1 test!2!counter!1) (<= test!1!counter!1 5)) (not (< test!2!counter!1 5)) (not (< test!1!counter!1 5))) (and (=> (= test!2!currentTotal!8 500) (and (=> (= test!1!currentTotal!8 500) (not (= 1 1))) (=> (not (= test!1!currentTotal!8 500)) (not (= 0 1))))) (=> (not (= test!2!currentTotal!8 500)) (and (=> (= test!1!currentTotal!8 500) (not (= 1 0))) (=> (not (= test!1!currentTotal!8 500)) (not (= 0 0)))))))) (forall ((test!1!counter!1 Int) (test!1!currentTime!6 Int) (test!1!currentTime!5 Int) (test!1!currentTotal!8 Int) (test!1!currentTotal!7 Int) (test!1!elapsedTime!4 Int) (test!1!lastTime!8 Int) (test!1!lastTime!7 Int) (test!1!recordTimestamp!retVal!9 Int) (test!1!recordTimestamp!retVal!8 Int) (test!2!counter!1 Int) (test!2!currentTime!6 Int) (test!2!currentTime!5 Int) (test!2!currentTotal!8 Int) (test!2!currentTotal!7 Int) (test!2!elapsedTime!4 Int) (test!2!lastTime!8 Int) (test!2!lastTime!7 Int) (test!2!recordTimestamp!retVal!9 Int) (test!2!recordTimestamp!retVal!8 Int)) (=> (and (and (= (* 100 test!1!counter!1) test!1!currentTotal!8) (= 100 (- test!1!currentTime!6 test!1!lastTime!8)) (<= 0 test!1!lastTime!8) (= (* 101 test!2!counter!1) test!2!currentTotal!8) (= 101 (- test!2!currentTime!6 test!2!lastTime!8)) (<= 0 test!2!lastTime!8) (= test!1!counter!1 test!2!counter!1) (<= test!1!counter!1 5)) (< test!2!counter!1 5) (< test!1!counter!1 5)) (and (=> (>= test!1!lastTime!8 0) (exists ((test!1!sleepTime!1 Int)) (and (and (<= 0 test!1!sleepTime!1) (<= (- 100 20) test!1!sleepTime!1) (<= test!1!sleepTime!1 (+ 100 20))) (exists ((test!1!currentTime!7 Int)) (= test!1!currentTime!7 (+ test!1!currentTime!6 test!1!sleepTime!1))) (forall ((test!1!currentTime!7 Int)) (=> (= test!1!currentTime!7 (+ test!1!currentTime!6 test!1!sleepTime!1)) (and (=> (>= test!2!lastTime!8 0) (exists ((test!2!sleepTime!1 Int)) (and (and (<= 0 test!2!sleepTime!1) (<= (- 100 20) test!2!sleepTime!1) (<= test!2!sleepTime!1 (+ 100 20))) (exists ((test!2!currentTime!7 Int)) (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1))) (forall ((test!2!currentTime!7 Int)) (=> (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1)) (and (and (= (* 100 (+ test!1!counter!1 1)) (+ test!1!currentTotal!8 (- test!1!currentTime!6 test!1!lastTime!8))) (= 100 (- test!1!currentTime!7 test!1!currentTime!6)) (<= 0 test!1!currentTime!6) (= (* 101 (+ test!2!counter!1 1)) (+ test!2!currentTotal!8 (- test!2!currentTime!6 test!2!lastTime!8))) (= 101 (- test!2!currentTime!7 test!2!currentTime!6)) (<= 0 test!2!currentTime!6) (= (+ test!1!counter!1 1) (+ test!2!counter!1 1)) (<= (+ test!1!counter!1 1) 5)) (and (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1)) (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1))))))))) (=> (not (>= test!2!lastTime!8 0)) (exists ((test!2!sleepTime!1 Int)) (and (and (<= 0 test!2!sleepTime!1) (<= (- 100 20) test!2!sleepTime!1) (<= test!2!sleepTime!1 (+ 100 20))) (exists ((test!2!currentTime!7 Int)) (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1))) (forall ((test!2!currentTime!7 Int)) (=> (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1)) (and (and (= (* 100 (+ test!1!counter!1 1)) (+ test!1!currentTotal!8 (- test!1!currentTime!6 test!1!lastTime!8))) (= 100 (- test!1!currentTime!7 test!1!currentTime!6)) (<= 0 test!1!currentTime!6) (= (* 101 (+ test!2!counter!1 1)) test!2!currentTotal!8) (= 101 (- test!2!currentTime!7 test!2!currentTime!6)) (<= 0 test!2!currentTime!6) (= (+ test!1!counter!1 1) (+ test!2!counter!1 1)) (<= (+ test!1!counter!1 1) 5)) (and (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1)) (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1))))))))))))))) (=> (not (>= test!1!lastTime!8 0)) (exists ((test!1!sleepTime!1 Int)) (and (and (<= 0 test!1!sleepTime!1) (<= (- 100 20) test!1!sleepTime!1) (<= test!1!sleepTime!1 (+ 100 20))) (exists ((test!1!currentTime!7 Int)) (= test!1!currentTime!7 (+ test!1!currentTime!6 test!1!sleepTime!1))) (forall ((test!1!currentTime!7 Int)) (=> (= test!1!currentTime!7 (+ test!1!currentTime!6 test!1!sleepTime!1)) (and (=> (>= test!2!lastTime!8 0) (exists ((test!2!sleepTime!1 Int)) (and (and (<= 0 test!2!sleepTime!1) (<= (- 100 20) test!2!sleepTime!1) (<= test!2!sleepTime!1 (+ 100 20))) (exists ((test!2!currentTime!7 Int)) (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1))) (forall ((test!2!currentTime!7 Int)) (=> (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1)) (and (and (= (* 100 (+ test!1!counter!1 1)) test!1!currentTotal!8) (= 100 (- test!1!currentTime!7 test!1!currentTime!6)) (<= 0 test!1!currentTime!6) (= (* 101 (+ test!2!counter!1 1)) (+ test!2!currentTotal!8 (- test!2!currentTime!6 test!2!lastTime!8))) (= 101 (- test!2!currentTime!7 test!2!currentTime!6)) (<= 0 test!2!currentTime!6) (= (+ test!1!counter!1 1) (+ test!2!counter!1 1)) (<= (+ test!1!counter!1 1) 5)) (and (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1)) (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1))))))))) (=> (not (>= test!2!lastTime!8 0)) (exists ((test!2!sleepTime!1 Int)) (and (and (<= 0 test!2!sleepTime!1) (<= (- 100 20) test!2!sleepTime!1) (<= test!2!sleepTime!1 (+ 100 20))) (exists ((test!2!currentTime!7 Int)) (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1))) (forall ((test!2!currentTime!7 Int)) (=> (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1)) (and (and (= (* 100 (+ test!1!counter!1 1)) test!1!currentTotal!8) (= 100 (- test!1!currentTime!7 test!1!currentTime!6)) (<= 0 test!1!currentTime!6) (= (* 101 (+ test!2!counter!1 1)) test!2!currentTotal!8) (= 101 (- test!2!currentTime!7 test!2!currentTime!6)) (<= 0 test!2!currentTime!6) (= (+ test!1!counter!1 1) (+ test!2!counter!1 1)) (<= (+ test!1!counter!1 1) 5)) (and (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1)) (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1)))))))))))))))))) (forall ((test!1!counter!1 Int) (test!1!currentTime!6 Int) (test!1!currentTime!5 Int) (test!1!currentTotal!8 Int) (test!1!currentTotal!7 Int) (test!1!elapsedTime!4 Int) (test!1!lastTime!8 Int) (test!1!lastTime!7 Int) (test!1!recordTimestamp!retVal!9 Int) (test!1!recordTimestamp!retVal!8 Int) (test!2!counter!1 Int) (test!2!currentTime!6 Int) (test!2!currentTime!5 Int) (test!2!currentTotal!8 Int) (test!2!currentTotal!7 Int) (test!2!elapsedTime!4 Int) (test!2!lastTime!8 Int) (test!2!lastTime!7 Int) (test!2!recordTimestamp!retVal!9 Int) (test!2!recordTimestamp!retVal!8 Int)) (=> (and (and (= (* 100 test!1!counter!1) test!1!currentTotal!8) (= 100 (- test!1!currentTime!6 test!1!lastTime!8)) (<= 0 test!1!lastTime!8) (= (* 101 test!2!counter!1) test!2!currentTotal!8) (= 101 (- test!2!currentTime!6 test!2!lastTime!8)) (<= 0 test!2!lastTime!8) (= test!1!counter!1 test!2!counter!1) (<= test!1!counter!1 5)) (not (and (< test!2!counter!1 5) (< test!1!counter!1 5)))) (and (not (< test!2!counter!1 5)) (not (< test!1!counter!1 5))))))))))) (=> (not (>= -1 0)) (exists ((test!2!sleepTime!2 Int)) (and (and (<= 0 test!2!sleepTime!2) (<= (- 100 20) test!2!sleepTime!2) (<= test!2!sleepTime!2 (+ 100 20))) (exists ((test!2!currentTime!8 Int)) (= test!2!currentTime!8 (+ 0 test!2!sleepTime!2))) (forall ((test!2!currentTime!8 Int)) (=> (= test!2!currentTime!8 (+ 0 test!2!sleepTime!2)) (and (and (= (* 100 0) (+ 0 (- 0 -1))) (= 100 (- test!1!currentTime!8 0)) (<= 0 0) (= (* 101 0) 0) (= 101 (- test!2!currentTime!8 0)) (<= 0 0) (= 0 0) (<= 0 5)) (forall ((test!1!counter!1 Int) (test!1!currentTime!6 Int) (test!1!currentTime!5 Int) (test!1!currentTotal!8 Int) (test!1!currentTotal!7 Int) (test!1!elapsedTime!4 Int) (test!1!lastTime!8 Int) (test!1!lastTime!7 Int) (test!1!recordTimestamp!retVal!9 Int) (test!1!recordTimestamp!retVal!8 Int) (test!2!counter!1 Int) (test!2!currentTime!6 Int) (test!2!currentTime!5 Int) (test!2!currentTotal!8 Int) (test!2!currentTotal!7 Int) (test!2!elapsedTime!4 Int) (test!2!lastTime!8 Int) (test!2!lastTime!7 Int) (test!2!recordTimestamp!retVal!9 Int) (test!2!recordTimestamp!retVal!8 Int)) (=> (and (and (= (* 100 test!1!counter!1) test!1!currentTotal!8) (= 100 (- test!1!currentTime!6 test!1!lastTime!8)) (<= 0 test!1!lastTime!8) (= (* 101 test!2!counter!1) test!2!currentTotal!8) (= 101 (- test!2!currentTime!6 test!2!lastTime!8)) (<= 0 test!2!lastTime!8) (= test!1!counter!1 test!2!counter!1) (<= test!1!counter!1 5)) (not (< test!2!counter!1 5)) (not (< test!1!counter!1 5))) (and (=> (= test!2!currentTotal!8 500) (and (=> (= test!1!currentTotal!8 500) (not (= 1 1))) (=> (not (= test!1!currentTotal!8 500)) (not (= 0 1))))) (=> (not (= test!2!currentTotal!8 500)) (and (=> (= test!1!currentTotal!8 500) (not (= 1 0))) (=> (not (= test!1!currentTotal!8 500)) (not (= 0 0)))))))) (forall ((test!1!counter!1 Int) (test!1!currentTime!6 Int) (test!1!currentTime!5 Int) (test!1!currentTotal!8 Int) (test!1!currentTotal!7 Int) (test!1!elapsedTime!4 Int) (test!1!lastTime!8 Int) (test!1!lastTime!7 Int) (test!1!recordTimestamp!retVal!9 Int) (test!1!recordTimestamp!retVal!8 Int) (test!2!counter!1 Int) (test!2!currentTime!6 Int) (test!2!currentTime!5 Int) (test!2!currentTotal!8 Int) (test!2!currentTotal!7 Int) (test!2!elapsedTime!4 Int) (test!2!lastTime!8 Int) (test!2!lastTime!7 Int) (test!2!recordTimestamp!retVal!9 Int) (test!2!recordTimestamp!retVal!8 Int)) (=> (and (and (= (* 100 test!1!counter!1) test!1!currentTotal!8) (= 100 (- test!1!currentTime!6 test!1!lastTime!8)) (<= 0 test!1!lastTime!8) (= (* 101 test!2!counter!1) test!2!currentTotal!8) (= 101 (- test!2!currentTime!6 test!2!lastTime!8)) (<= 0 test!2!lastTime!8) (= test!1!counter!1 test!2!counter!1) (<= test!1!counter!1 5)) (< test!2!counter!1 5) (< test!1!counter!1 5)) (and (=> (>= test!1!lastTime!8 0) (exists ((test!1!sleepTime!1 Int)) (and (and (<= 0 test!1!sleepTime!1) (<= (- 100 20) test!1!sleepTime!1) (<= test!1!sleepTime!1 (+ 100 20))) (exists ((test!1!currentTime!7 Int)) (= test!1!currentTime!7 (+ test!1!currentTime!6 test!1!sleepTime!1))) (forall ((test!1!currentTime!7 Int)) (=> (= test!1!currentTime!7 (+ test!1!currentTime!6 test!1!sleepTime!1)) (and (=> (>= test!2!lastTime!8 0) (exists ((test!2!sleepTime!1 Int)) (and (and (<= 0 test!2!sleepTime!1) (<= (- 100 20) test!2!sleepTime!1) (<= test!2!sleepTime!1 (+ 100 20))) (exists ((test!2!currentTime!7 Int)) (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1))) (forall ((test!2!currentTime!7 Int)) (=> (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1)) (and (and (= (* 100 (+ test!1!counter!1 1)) (+ test!1!currentTotal!8 (- test!1!currentTime!6 test!1!lastTime!8))) (= 100 (- test!1!currentTime!7 test!1!currentTime!6)) (<= 0 test!1!currentTime!6) (= (* 101 (+ test!2!counter!1 1)) (+ test!2!currentTotal!8 (- test!2!currentTime!6 test!2!lastTime!8))) (= 101 (- test!2!currentTime!7 test!2!currentTime!6)) (<= 0 test!2!currentTime!6) (= (+ test!1!counter!1 1) (+ test!2!counter!1 1)) (<= (+ test!1!counter!1 1) 5)) (and (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1)) (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1))))))))) (=> (not (>= test!2!lastTime!8 0)) (exists ((test!2!sleepTime!1 Int)) (and (and (<= 0 test!2!sleepTime!1) (<= (- 100 20) test!2!sleepTime!1) (<= test!2!sleepTime!1 (+ 100 20))) (exists ((test!2!currentTime!7 Int)) (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1))) (forall ((test!2!currentTime!7 Int)) (=> (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1)) (and (and (= (* 100 (+ test!1!counter!1 1)) (+ test!1!currentTotal!8 (- test!1!currentTime!6 test!1!lastTime!8))) (= 100 (- test!1!currentTime!7 test!1!currentTime!6)) (<= 0 test!1!currentTime!6) (= (* 101 (+ test!2!counter!1 1)) test!2!currentTotal!8) (= 101 (- test!2!currentTime!7 test!2!currentTime!6)) (<= 0 test!2!currentTime!6) (= (+ test!1!counter!1 1) (+ test!2!counter!1 1)) (<= (+ test!1!counter!1 1) 5)) (and (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1)) (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1))))))))))))))) (=> (not (>= test!1!lastTime!8 0)) (exists ((test!1!sleepTime!1 Int)) (and (and (<= 0 test!1!sleepTime!1) (<= (- 100 20) test!1!sleepTime!1) (<= test!1!sleepTime!1 (+ 100 20))) (exists ((test!1!currentTime!7 Int)) (= test!1!currentTime!7 (+ test!1!currentTime!6 test!1!sleepTime!1))) (forall ((test!1!currentTime!7 Int)) (=> (= test!1!currentTime!7 (+ test!1!currentTime!6 test!1!sleepTime!1)) (and (=> (>= test!2!lastTime!8 0) (exists ((test!2!sleepTime!1 Int)) (and (and (<= 0 test!2!sleepTime!1) (<= (- 100 20) test!2!sleepTime!1) (<= test!2!sleepTime!1 (+ 100 20))) (exists ((test!2!currentTime!7 Int)) (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1))) (forall ((test!2!currentTime!7 Int)) (=> (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1)) (and (and (= (* 100 (+ test!1!counter!1 1)) test!1!currentTotal!8) (= 100 (- test!1!currentTime!7 test!1!currentTime!6)) (<= 0 test!1!currentTime!6) (= (* 101 (+ test!2!counter!1 1)) (+ test!2!currentTotal!8 (- test!2!currentTime!6 test!2!lastTime!8))) (= 101 (- test!2!currentTime!7 test!2!currentTime!6)) (<= 0 test!2!currentTime!6) (= (+ test!1!counter!1 1) (+ test!2!counter!1 1)) (<= (+ test!1!counter!1 1) 5)) (and (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1)) (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1))))))))) (=> (not (>= test!2!lastTime!8 0)) (exists ((test!2!sleepTime!1 Int)) (and (and (<= 0 test!2!sleepTime!1) (<= (- 100 20) test!2!sleepTime!1) (<= test!2!sleepTime!1 (+ 100 20))) (exists ((test!2!currentTime!7 Int)) (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1))) (forall ((test!2!currentTime!7 Int)) (=> (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1)) (and (and (= (* 100 (+ test!1!counter!1 1)) test!1!currentTotal!8) (= 100 (- test!1!currentTime!7 test!1!currentTime!6)) (<= 0 test!1!currentTime!6) (= (* 101 (+ test!2!counter!1 1)) test!2!currentTotal!8) (= 101 (- test!2!currentTime!7 test!2!currentTime!6)) (<= 0 test!2!currentTime!6) (= (+ test!1!counter!1 1) (+ test!2!counter!1 1)) (<= (+ test!1!counter!1 1) 5)) (and (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1)) (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1)))))))))))))))))) (forall ((test!1!counter!1 Int) (test!1!currentTime!6 Int) (test!1!currentTime!5 Int) (test!1!currentTotal!8 Int) (test!1!currentTotal!7 Int) (test!1!elapsedTime!4 Int) (test!1!lastTime!8 Int) (test!1!lastTime!7 Int) (test!1!recordTimestamp!retVal!9 Int) (test!1!recordTimestamp!retVal!8 Int) (test!2!counter!1 Int) (test!2!currentTime!6 Int) (test!2!currentTime!5 Int) (test!2!currentTotal!8 Int) (test!2!currentTotal!7 Int) (test!2!elapsedTime!4 Int) (test!2!lastTime!8 Int) (test!2!lastTime!7 Int) (test!2!recordTimestamp!retVal!9 Int) (test!2!recordTimestamp!retVal!8 Int)) (=> (and (and (= (* 100 test!1!counter!1) test!1!currentTotal!8) (= 100 (- test!1!currentTime!6 test!1!lastTime!8)) (<= 0 test!1!lastTime!8) (= (* 101 test!2!counter!1) test!2!currentTotal!8) (= 101 (- test!2!currentTime!6 test!2!lastTime!8)) (<= 0 test!2!lastTime!8) (= test!1!counter!1 test!2!counter!1) (<= test!1!counter!1 5)) (not (and (< test!2!counter!1 5) (< test!1!counter!1 5)))) (and (not (< test!2!counter!1 5)) (not (< test!1!counter!1 5))))))))))))))))) (=> (not (>= -1 0)) (exists ((test!1!sleepTime!2 Int)) (and (and (<= 0 test!1!sleepTime!2) (<= (- 100 20) test!1!sleepTime!2) (<= test!1!sleepTime!2 (+ 100 20))) (exists ((test!1!currentTime!8 Int)) (= test!1!currentTime!8 (+ 0 test!1!sleepTime!2))) (forall ((test!1!currentTime!8 Int)) (=> (= test!1!currentTime!8 (+ 0 test!1!sleepTime!2)) (and (=> (>= -1 0) (exists ((test!2!sleepTime!2 Int)) (and (and (<= 0 test!2!sleepTime!2) (<= (- 100 20) test!2!sleepTime!2) (<= test!2!sleepTime!2 (+ 100 20))) (exists ((test!2!currentTime!8 Int)) (= test!2!currentTime!8 (+ 0 test!2!sleepTime!2))) (forall ((test!2!currentTime!8 Int)) (=> (= test!2!currentTime!8 (+ 0 test!2!sleepTime!2)) (and (and (= (* 100 0) 0) (= 100 (- test!1!currentTime!8 0)) (<= 0 0) (= (* 101 0) (+ 0 (- 0 -1))) (= 101 (- test!2!currentTime!8 0)) (<= 0 0) (= 0 0) (<= 0 5)) (forall ((test!1!counter!1 Int) (test!1!currentTime!6 Int) (test!1!currentTime!5 Int) (test!1!currentTotal!8 Int) (test!1!currentTotal!7 Int) (test!1!elapsedTime!4 Int) (test!1!lastTime!8 Int) (test!1!lastTime!7 Int) (test!1!recordTimestamp!retVal!9 Int) (test!1!recordTimestamp!retVal!8 Int) (test!2!counter!1 Int) (test!2!currentTime!6 Int) (test!2!currentTime!5 Int) (test!2!currentTotal!8 Int) (test!2!currentTotal!7 Int) (test!2!elapsedTime!4 Int) (test!2!lastTime!8 Int) (test!2!lastTime!7 Int) (test!2!recordTimestamp!retVal!9 Int) (test!2!recordTimestamp!retVal!8 Int)) (=> (and (and (= (* 100 test!1!counter!1) test!1!currentTotal!8) (= 100 (- test!1!currentTime!6 test!1!lastTime!8)) (<= 0 test!1!lastTime!8) (= (* 101 test!2!counter!1) test!2!currentTotal!8) (= 101 (- test!2!currentTime!6 test!2!lastTime!8)) (<= 0 test!2!lastTime!8) (= test!1!counter!1 test!2!counter!1) (<= test!1!counter!1 5)) (not (< test!2!counter!1 5)) (not (< test!1!counter!1 5))) (and (=> (= test!2!currentTotal!8 500) (and (=> (= test!1!currentTotal!8 500) (not (= 1 1))) (=> (not (= test!1!currentTotal!8 500)) (not (= 0 1))))) (=> (not (= test!2!currentTotal!8 500)) (and (=> (= test!1!currentTotal!8 500) (not (= 1 0))) (=> (not (= test!1!currentTotal!8 500)) (not (= 0 0)))))))) (forall ((test!1!counter!1 Int) (test!1!currentTime!6 Int) (test!1!currentTime!5 Int) (test!1!currentTotal!8 Int) (test!1!currentTotal!7 Int) (test!1!elapsedTime!4 Int) (test!1!lastTime!8 Int) (test!1!lastTime!7 Int) (test!1!recordTimestamp!retVal!9 Int) (test!1!recordTimestamp!retVal!8 Int) (test!2!counter!1 Int) (test!2!currentTime!6 Int) (test!2!currentTime!5 Int) (test!2!currentTotal!8 Int) (test!2!currentTotal!7 Int) (test!2!elapsedTime!4 Int) (test!2!lastTime!8 Int) (test!2!lastTime!7 Int) (test!2!recordTimestamp!retVal!9 Int) (test!2!recordTimestamp!retVal!8 Int)) (=> (and (and (= (* 100 test!1!counter!1) test!1!currentTotal!8) (= 100 (- test!1!currentTime!6 test!1!lastTime!8)) (<= 0 test!1!lastTime!8) (= (* 101 test!2!counter!1) test!2!currentTotal!8) (= 101 (- test!2!currentTime!6 test!2!lastTime!8)) (<= 0 test!2!lastTime!8) (= test!1!counter!1 test!2!counter!1) (<= test!1!counter!1 5)) (< test!2!counter!1 5) (< test!1!counter!1 5)) (and (=> (>= test!1!lastTime!8 0) (exists ((test!1!sleepTime!1 Int)) (and (and (<= 0 test!1!sleepTime!1) (<= (- 100 20) test!1!sleepTime!1) (<= test!1!sleepTime!1 (+ 100 20))) (exists ((test!1!currentTime!7 Int)) (= test!1!currentTime!7 (+ test!1!currentTime!6 test!1!sleepTime!1))) (forall ((test!1!currentTime!7 Int)) (=> (= test!1!currentTime!7 (+ test!1!currentTime!6 test!1!sleepTime!1)) (and (=> (>= test!2!lastTime!8 0) (exists ((test!2!sleepTime!1 Int)) (and (and (<= 0 test!2!sleepTime!1) (<= (- 100 20) test!2!sleepTime!1) (<= test!2!sleepTime!1 (+ 100 20))) (exists ((test!2!currentTime!7 Int)) (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1))) (forall ((test!2!currentTime!7 Int)) (=> (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1)) (and (and (= (* 100 (+ test!1!counter!1 1)) (+ test!1!currentTotal!8 (- test!1!currentTime!6 test!1!lastTime!8))) (= 100 (- test!1!currentTime!7 test!1!currentTime!6)) (<= 0 test!1!currentTime!6) (= (* 101 (+ test!2!counter!1 1)) (+ test!2!currentTotal!8 (- test!2!currentTime!6 test!2!lastTime!8))) (= 101 (- test!2!currentTime!7 test!2!currentTime!6)) (<= 0 test!2!currentTime!6) (= (+ test!1!counter!1 1) (+ test!2!counter!1 1)) (<= (+ test!1!counter!1 1) 5)) (and (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1)) (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1))))))))) (=> (not (>= test!2!lastTime!8 0)) (exists ((test!2!sleepTime!1 Int)) (and (and (<= 0 test!2!sleepTime!1) (<= (- 100 20) test!2!sleepTime!1) (<= test!2!sleepTime!1 (+ 100 20))) (exists ((test!2!currentTime!7 Int)) (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1))) (forall ((test!2!currentTime!7 Int)) (=> (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1)) (and (and (= (* 100 (+ test!1!counter!1 1)) (+ test!1!currentTotal!8 (- test!1!currentTime!6 test!1!lastTime!8))) (= 100 (- test!1!currentTime!7 test!1!currentTime!6)) (<= 0 test!1!currentTime!6) (= (* 101 (+ test!2!counter!1 1)) test!2!currentTotal!8) (= 101 (- test!2!currentTime!7 test!2!currentTime!6)) (<= 0 test!2!currentTime!6) (= (+ test!1!counter!1 1) (+ test!2!counter!1 1)) (<= (+ test!1!counter!1 1) 5)) (and (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1)) (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1))))))))))))))) (=> (not (>= test!1!lastTime!8 0)) (exists ((test!1!sleepTime!1 Int)) (and (and (<= 0 test!1!sleepTime!1) (<= (- 100 20) test!1!sleepTime!1) (<= test!1!sleepTime!1 (+ 100 20))) (exists ((test!1!currentTime!7 Int)) (= test!1!currentTime!7 (+ test!1!currentTime!6 test!1!sleepTime!1))) (forall ((test!1!currentTime!7 Int)) (=> (= test!1!currentTime!7 (+ test!1!currentTime!6 test!1!sleepTime!1)) (and (=> (>= test!2!lastTime!8 0) (exists ((test!2!sleepTime!1 Int)) (and (and (<= 0 test!2!sleepTime!1) (<= (- 100 20) test!2!sleepTime!1) (<= test!2!sleepTime!1 (+ 100 20))) (exists ((test!2!currentTime!7 Int)) (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1))) (forall ((test!2!currentTime!7 Int)) (=> (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1)) (and (and (= (* 100 (+ test!1!counter!1 1)) test!1!currentTotal!8) (= 100 (- test!1!currentTime!7 test!1!currentTime!6)) (<= 0 test!1!currentTime!6) (= (* 101 (+ test!2!counter!1 1)) (+ test!2!currentTotal!8 (- test!2!currentTime!6 test!2!lastTime!8))) (= 101 (- test!2!currentTime!7 test!2!currentTime!6)) (<= 0 test!2!currentTime!6) (= (+ test!1!counter!1 1) (+ test!2!counter!1 1)) (<= (+ test!1!counter!1 1) 5)) (and (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1)) (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1))))))))) (=> (not (>= test!2!lastTime!8 0)) (exists ((test!2!sleepTime!1 Int)) (and (and (<= 0 test!2!sleepTime!1) (<= (- 100 20) test!2!sleepTime!1) (<= test!2!sleepTime!1 (+ 100 20))) (exists ((test!2!currentTime!7 Int)) (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1))) (forall ((test!2!currentTime!7 Int)) (=> (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1)) (and (and (= (* 100 (+ test!1!counter!1 1)) test!1!currentTotal!8) (= 100 (- test!1!currentTime!7 test!1!currentTime!6)) (<= 0 test!1!currentTime!6) (= (* 101 (+ test!2!counter!1 1)) test!2!currentTotal!8) (= 101 (- test!2!currentTime!7 test!2!currentTime!6)) (<= 0 test!2!currentTime!6) (= (+ test!1!counter!1 1) (+ test!2!counter!1 1)) (<= (+ test!1!counter!1 1) 5)) (and (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1)) (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1)))))))))))))))))) (forall ((test!1!counter!1 Int) (test!1!currentTime!6 Int) (test!1!currentTime!5 Int) (test!1!currentTotal!8 Int) (test!1!currentTotal!7 Int) (test!1!elapsedTime!4 Int) (test!1!lastTime!8 Int) (test!1!lastTime!7 Int) (test!1!recordTimestamp!retVal!9 Int) (test!1!recordTimestamp!retVal!8 Int) (test!2!counter!1 Int) (test!2!currentTime!6 Int) (test!2!currentTime!5 Int) (test!2!currentTotal!8 Int) (test!2!currentTotal!7 Int) (test!2!elapsedTime!4 Int) (test!2!lastTime!8 Int) (test!2!lastTime!7 Int) (test!2!recordTimestamp!retVal!9 Int) (test!2!recordTimestamp!retVal!8 Int)) (=> (and (and (= (* 100 test!1!counter!1) test!1!currentTotal!8) (= 100 (- test!1!currentTime!6 test!1!lastTime!8)) (<= 0 test!1!lastTime!8) (= (* 101 test!2!counter!1) test!2!currentTotal!8) (= 101 (- test!2!currentTime!6 test!2!lastTime!8)) (<= 0 test!2!lastTime!8) (= test!1!counter!1 test!2!counter!1) (<= test!1!counter!1 5)) (not (and (< test!2!counter!1 5) (< test!1!counter!1 5)))) (and (not (< test!2!counter!1 5)) (not (< test!1!counter!1 5))))))))))) (=> (not (>= -1 0)) (exists ((test!2!sleepTime!2 Int)) (and (and (<= 0 test!2!sleepTime!2) (<= (- 100 20) test!2!sleepTime!2) (<= test!2!sleepTime!2 (+ 100 20))) (exists ((test!2!currentTime!8 Int)) (= test!2!currentTime!8 (+ 0 test!2!sleepTime!2))) (forall ((test!2!currentTime!8 Int)) (=> (= test!2!currentTime!8 (+ 0 test!2!sleepTime!2)) (and (and (= (* 100 0) 0) (= 100 (- test!1!currentTime!8 0)) (<= 0 0) (= (* 101 0) 0) (= 101 (- test!2!currentTime!8 0)) (<= 0 0) (= 0 0) (<= 0 5)) (forall ((test!1!counter!1 Int) (test!1!currentTime!6 Int) (test!1!currentTime!5 Int) (test!1!currentTotal!8 Int) (test!1!currentTotal!7 Int) (test!1!elapsedTime!4 Int) (test!1!lastTime!8 Int) (test!1!lastTime!7 Int) (test!1!recordTimestamp!retVal!9 Int) (test!1!recordTimestamp!retVal!8 Int) (test!2!counter!1 Int) (test!2!currentTime!6 Int) (test!2!currentTime!5 Int) (test!2!currentTotal!8 Int) (test!2!currentTotal!7 Int) (test!2!elapsedTime!4 Int) (test!2!lastTime!8 Int) (test!2!lastTime!7 Int) (test!2!recordTimestamp!retVal!9 Int) (test!2!recordTimestamp!retVal!8 Int)) (=> (and (and (= (* 100 test!1!counter!1) test!1!currentTotal!8) (= 100 (- test!1!currentTime!6 test!1!lastTime!8)) (<= 0 test!1!lastTime!8) (= (* 101 test!2!counter!1) test!2!currentTotal!8) (= 101 (- test!2!currentTime!6 test!2!lastTime!8)) (<= 0 test!2!lastTime!8) (= test!1!counter!1 test!2!counter!1) (<= test!1!counter!1 5)) (not (< test!2!counter!1 5)) (not (< test!1!counter!1 5))) (and (=> (= test!2!currentTotal!8 500) (and (=> (= test!1!currentTotal!8 500) (not (= 1 1))) (=> (not (= test!1!currentTotal!8 500)) (not (= 0 1))))) (=> (not (= test!2!currentTotal!8 500)) (and (=> (= test!1!currentTotal!8 500) (not (= 1 0))) (=> (not (= test!1!currentTotal!8 500)) (not (= 0 0)))))))) (forall ((test!1!counter!1 Int) (test!1!currentTime!6 Int) (test!1!currentTime!5 Int) (test!1!currentTotal!8 Int) (test!1!currentTotal!7 Int) (test!1!elapsedTime!4 Int) (test!1!lastTime!8 Int) (test!1!lastTime!7 Int) (test!1!recordTimestamp!retVal!9 Int) (test!1!recordTimestamp!retVal!8 Int) (test!2!counter!1 Int) (test!2!currentTime!6 Int) (test!2!currentTime!5 Int) (test!2!currentTotal!8 Int) (test!2!currentTotal!7 Int) (test!2!elapsedTime!4 Int) (test!2!lastTime!8 Int) (test!2!lastTime!7 Int) (test!2!recordTimestamp!retVal!9 Int) (test!2!recordTimestamp!retVal!8 Int)) (=> (and (and (= (* 100 test!1!counter!1) test!1!currentTotal!8) (= 100 (- test!1!currentTime!6 test!1!lastTime!8)) (<= 0 test!1!lastTime!8) (= (* 101 test!2!counter!1) test!2!currentTotal!8) (= 101 (- test!2!currentTime!6 test!2!lastTime!8)) (<= 0 test!2!lastTime!8) (= test!1!counter!1 test!2!counter!1) (<= test!1!counter!1 5)) (< test!2!counter!1 5) (< test!1!counter!1 5)) (and (=> (>= test!1!lastTime!8 0) (exists ((test!1!sleepTime!1 Int)) (and (and (<= 0 test!1!sleepTime!1) (<= (- 100 20) test!1!sleepTime!1) (<= test!1!sleepTime!1 (+ 100 20))) (exists ((test!1!currentTime!7 Int)) (= test!1!currentTime!7 (+ test!1!currentTime!6 test!1!sleepTime!1))) (forall ((test!1!currentTime!7 Int)) (=> (= test!1!currentTime!7 (+ test!1!currentTime!6 test!1!sleepTime!1)) (and (=> (>= test!2!lastTime!8 0) (exists ((test!2!sleepTime!1 Int)) (and (and (<= 0 test!2!sleepTime!1) (<= (- 100 20) test!2!sleepTime!1) (<= test!2!sleepTime!1 (+ 100 20))) (exists ((test!2!currentTime!7 Int)) (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1))) (forall ((test!2!currentTime!7 Int)) (=> (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1)) (and (and (= (* 100 (+ test!1!counter!1 1)) (+ test!1!currentTotal!8 (- test!1!currentTime!6 test!1!lastTime!8))) (= 100 (- test!1!currentTime!7 test!1!currentTime!6)) (<= 0 test!1!currentTime!6) (= (* 101 (+ test!2!counter!1 1)) (+ test!2!currentTotal!8 (- test!2!currentTime!6 test!2!lastTime!8))) (= 101 (- test!2!currentTime!7 test!2!currentTime!6)) (<= 0 test!2!currentTime!6) (= (+ test!1!counter!1 1) (+ test!2!counter!1 1)) (<= (+ test!1!counter!1 1) 5)) (and (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1)) (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1))))))))) (=> (not (>= test!2!lastTime!8 0)) (exists ((test!2!sleepTime!1 Int)) (and (and (<= 0 test!2!sleepTime!1) (<= (- 100 20) test!2!sleepTime!1) (<= test!2!sleepTime!1 (+ 100 20))) (exists ((test!2!currentTime!7 Int)) (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1))) (forall ((test!2!currentTime!7 Int)) (=> (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1)) (and (and (= (* 100 (+ test!1!counter!1 1)) (+ test!1!currentTotal!8 (- test!1!currentTime!6 test!1!lastTime!8))) (= 100 (- test!1!currentTime!7 test!1!currentTime!6)) (<= 0 test!1!currentTime!6) (= (* 101 (+ test!2!counter!1 1)) test!2!currentTotal!8) (= 101 (- test!2!currentTime!7 test!2!currentTime!6)) (<= 0 test!2!currentTime!6) (= (+ test!1!counter!1 1) (+ test!2!counter!1 1)) (<= (+ test!1!counter!1 1) 5)) (and (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1)) (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1))))))))))))))) (=> (not (>= test!1!lastTime!8 0)) (exists ((test!1!sleepTime!1 Int)) (and (and (<= 0 test!1!sleepTime!1) (<= (- 100 20) test!1!sleepTime!1) (<= test!1!sleepTime!1 (+ 100 20))) (exists ((test!1!currentTime!7 Int)) (= test!1!currentTime!7 (+ test!1!currentTime!6 test!1!sleepTime!1))) (forall ((test!1!currentTime!7 Int)) (=> (= test!1!currentTime!7 (+ test!1!currentTime!6 test!1!sleepTime!1)) (and (=> (>= test!2!lastTime!8 0) (exists ((test!2!sleepTime!1 Int)) (and (and (<= 0 test!2!sleepTime!1) (<= (- 100 20) test!2!sleepTime!1) (<= test!2!sleepTime!1 (+ 100 20))) (exists ((test!2!currentTime!7 Int)) (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1))) (forall ((test!2!currentTime!7 Int)) (=> (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1)) (and (and (= (* 100 (+ test!1!counter!1 1)) test!1!currentTotal!8) (= 100 (- test!1!currentTime!7 test!1!currentTime!6)) (<= 0 test!1!currentTime!6) (= (* 101 (+ test!2!counter!1 1)) (+ test!2!currentTotal!8 (- test!2!currentTime!6 test!2!lastTime!8))) (= 101 (- test!2!currentTime!7 test!2!currentTime!6)) (<= 0 test!2!currentTime!6) (= (+ test!1!counter!1 1) (+ test!2!counter!1 1)) (<= (+ test!1!counter!1 1) 5)) (and (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1)) (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1))))))))) (=> (not (>= test!2!lastTime!8 0)) (exists ((test!2!sleepTime!1 Int)) (and (and (<= 0 test!2!sleepTime!1) (<= (- 100 20) test!2!sleepTime!1) (<= test!2!sleepTime!1 (+ 100 20))) (exists ((test!2!currentTime!7 Int)) (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1))) (forall ((test!2!currentTime!7 Int)) (=> (= test!2!currentTime!7 (+ test!2!currentTime!6 test!2!sleepTime!1)) (and (and (= (* 100 (+ test!1!counter!1 1)) test!1!currentTotal!8) (= 100 (- test!1!currentTime!7 test!1!currentTime!6)) (<= 0 test!1!currentTime!6) (= (* 101 (+ test!2!counter!1 1)) test!2!currentTotal!8) (= 101 (- test!2!currentTime!7 test!2!currentTime!6)) (<= 0 test!2!currentTime!6) (= (+ test!1!counter!1 1) (+ test!2!counter!1 1)) (<= (+ test!1!counter!1 1) 5)) (and (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1)) (< (- 10 (+ test!1!counter!1 1)) (- 10 test!1!counter!1)))))))))))))))))) (forall ((test!1!counter!1 Int) (test!1!currentTime!6 Int) (test!1!currentTime!5 Int) (test!1!currentTotal!8 Int) (test!1!currentTotal!7 Int) (test!1!elapsedTime!4 Int) (test!1!lastTime!8 Int) (test!1!lastTime!7 Int) (test!1!recordTimestamp!retVal!9 Int) (test!1!recordTimestamp!retVal!8 Int) (test!2!counter!1 Int) (test!2!currentTime!6 Int) (test!2!currentTime!5 Int) (test!2!currentTotal!8 Int) (test!2!currentTotal!7 Int) (test!2!elapsedTime!4 Int) (test!2!lastTime!8 Int) (test!2!lastTime!7 Int) (test!2!recordTimestamp!retVal!9 Int) (test!2!recordTimestamp!retVal!8 Int)) (=> (and (and (= (* 100 test!1!counter!1) test!1!currentTotal!8) (= 100 (- test!1!currentTime!6 test!1!lastTime!8)) (<= 0 test!1!lastTime!8) (= (* 101 test!2!counter!1) test!2!currentTotal!8) (= 101 (- test!2!currentTime!6 test!2!lastTime!8)) (<= 0 test!2!lastTime!8) (= test!1!counter!1 test!2!counter!1) (<= test!1!counter!1 5)) (not (and (< test!2!counter!1 5) (< test!1!counter!1 5)))) (and (not (< test!2!counter!1 5)) (not (< test!1!counter!1 5)))))))))))))))))))) )
-[<-recv] success
-[send->] (check-sat )
-[<-recv] unsat
-[send->] (exit )
 Valid.
 
-real	0m0.242s
-user	0m0.266s
-sys	0m0.067s
+real	0m0.227s
+user	0m0.198s
+sys	0m0.019s

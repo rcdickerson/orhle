@@ -33,7 +33,7 @@ especs:
 
 fun used(param1, param2) {
   x := param1 + param2;
-  r := call flip();
+  r := flip();
   if (r == 0) then
     ret := x;
   else

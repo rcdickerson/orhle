@@ -9,28 +9,25 @@ post: (= original!sum refinement!sum);
 
 aspecs:
   randOdd() {
-    // TODO: This isn't actually correct, as c does not get unique-ified across callsites.
-    post: (and (<= 1 ret!) (< ret! 10))
+    post: (and (<= 0 ret!) (< ret! 10)
+               (= (mod ret! 2) 1));
   }
 
   rand() {
-    post: (and (<= 1 ret!) (< ret! 10));
+    post: (and (<= 0 ret!) (< ret! 10));
   }
 
 especs:
   rand() {
     choiceVars: n;
-    pre:  (and (<= 1 n) (< n 10));
+    pre:  (and (<= 0 n) (< n 10));
     post: (= ret! n);
   }
 
 fun original() {
   sum := 0;
   while (sum <= 100) do
-//    @inv { (and
-//             (<= (+ (* -1 original!sum) refinement!sum) 0)
-//             (<= (+ original!sum (* -1 refinement!sum)) 0)
-//            )}
+    @inv { (= original!sum refinement!sum) }
     @var { (- 200 original!sum) }
     r := rand();
     sum := sum + r;
@@ -41,7 +38,8 @@ fun original() {
 fun refinement() {
   sum := 0;
   while (sum <= 100) do
-    // @inv { (= original!sum refinement!sum) }
+    @inv { (= original!sum refinement!sum) }
+    @var { (- 200 refinement!sum) }
     r := randOdd();
     sum := sum + r;
   end

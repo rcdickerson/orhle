@@ -33,7 +33,7 @@ especs:
 
 fun unused(param1, param2) {
   x := param1 + param2;
-  r := call flip();
+  r := flip();
   if (r == 0) then
     ret := x - param2;
   else

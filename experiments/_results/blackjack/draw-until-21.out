@@ -1,16 +1,32 @@
+Running backward relational analysis...
 
 *******************************************
 ****               ORHLE               ****
 ****     The Oracular RHLE Verifier    ****
 *******************************************
 
-Parse error: (line 34, column 2):
-unexpected end of input
-expecting end of input
-(line 5, column 18):
-unexpected "d"
-expecting operator or ";"
+:: Executions
+  play (exists)
 
-real	0m0.196s
-user	0m0.188s
-sys	0m0.018s
+:: Universal Programs
+    
+
+:: Existential Programs
+    --------
+    while play!handValue < 21
+      play!card := play!draw();
+      play!handValue := play!handValue + play!card;
+    end;
+    play!play!retVal := play!handValue;
+
+:: Precondition
+(and (>= play!handValue 2) (<= play!handValue 20))
+
+:: Postcondition
+(= play!handValue 21)
+
+Valid.
+
+real	0m0.218s
+user	0m0.169s
+sys	0m0.033s

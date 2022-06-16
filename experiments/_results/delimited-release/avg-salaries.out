@@ -1,0 +1,57 @@
+Running backward relational analysis...
+
+*******************************************
+****               ORHLE               ****
+****     The Oracular RHLE Verifier    ****
+*******************************************
+
+:: Executions
+  calc_avg[1] (forall)
+  calc_avg[2] (forall)
+  calc_avg[3] (exists)
+
+:: Universal Programs
+    --------
+    calc_avg!1!sum := 0;
+    calc_avg!1!sum := calc_avg!1!sum + calc_avg!1!salary1;
+    calc_avg!1!sum := calc_avg!1!sum + calc_avg!1!salary2;
+    calc_avg!1!sum := calc_avg!1!sum + calc_avg!1!salary3;
+    calc_avg!1!avg := calc_avg!1!sum / 3;
+    calc_avg!1!calc_avg!retVal := calc_avg!1!avg;
+    --------
+    calc_avg!2!sum := 0;
+    calc_avg!2!sum := calc_avg!2!sum + calc_avg!2!salary1;
+    calc_avg!2!sum := calc_avg!2!sum + calc_avg!2!salary2;
+    calc_avg!2!sum := calc_avg!2!sum + calc_avg!2!salary3;
+    calc_avg!2!avg := calc_avg!2!sum / 3;
+    calc_avg!2!calc_avg!retVal := calc_avg!2!avg;
+
+:: Existential Programs
+    --------
+    calc_avg!3!sum := 0;
+    calc_avg!3!sum := calc_avg!3!sum + calc_avg!3!salary1;
+    calc_avg!3!sum := calc_avg!3!sum + calc_avg!3!salary2;
+    calc_avg!3!sum := calc_avg!3!sum + calc_avg!3!salary3;
+    calc_avg!3!avg := calc_avg!3!sum / 3;
+    calc_avg!3!calc_avg!retVal := calc_avg!3!avg;
+
+:: Precondition
+(and
+ (= calc_avg!1!salary1 calc_avg!3!salary1)
+ (= calc_avg!1!salary2 calc_avg!3!salary2)
+ (= calc_avg!1!salary3 calc_avg!3!salary3)
+ (=
+ (+ calc_avg!1!salary1 calc_avg!1!salary2 calc_avg!1!salary3)
+ (+ calc_avg!2!salary1 calc_avg!2!salary2 calc_avg!2!salary3))
+ (=
+ (+ calc_avg!2!salary1 calc_avg!2!salary2 calc_avg!2!salary3)
+ (+ calc_avg!3!salary1 calc_avg!3!salary2 calc_avg!3!salary3)))
+
+:: Postcondition
+(= calc_avg!2!avg calc_avg!3!avg)
+
+Valid.
+
+real	0m0.218s
+user	0m0.242s
+sys	0m0.019s

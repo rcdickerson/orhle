@@ -1,16 +1,62 @@
+Running backward relational analysis...
 
 *******************************************
 ****               ORHLE               ****
 ****     The Oracular RHLE Verifier    ****
 *******************************************
 
-Parse error: (line 59, column 2):
-unexpected end of input
-expecting end of input
-(line 2, column 8):
-unexpected "["
-expecting letter or digit, "_", "!" or ":="
+:: Executions
+  refinement (forall)
+  original (exists)
 
-real	0m0.200s
-user	0m0.207s
-sys	0m0.036s
+:: Universal Programs
+    --------
+    (refinement!list_0
+    ,refinement!list_1
+    ,refinement!list_2) := refinement!refinedGetValues();
+    refinement!sum := (refinement!list_0 + refinement!list_1) + refinement!list_2;
+    refinement!refinement!retVal := refinement!sum;
+
+:: Existential Programs
+    --------
+    (original!list_0
+    ,original!list_1
+    ,original!list_2) := original!originalGetValues();
+    original!sum := (original!list_0 + original!list_1) + original!list_2;
+    original!original!retVal := original!sum;
+
+:: Precondition
+(or
+ (and
+ (= original!list_0 refinement!list_0)
+ (= original!list_1 refinement!list_1)
+ (= original!list_2 refinement!list_2))
+ (and
+ (= original!list_0 refinement!list_0)
+ (= original!list_1 refinement!list_2)
+ (= original!list_2 refinement!list_1))
+ (and
+ (= original!list_0 refinement!list_1)
+ (= original!list_1 refinement!list_0)
+ (= original!list_2 refinement!list_2))
+ (and
+ (= original!list_0 refinement!list_1)
+ (= original!list_1 refinement!list_2)
+ (= original!list_2 refinement!list_0))
+ (and
+ (= original!list_0 refinement!list_2)
+ (= original!list_1 refinement!list_0)
+ (= original!list_2 refinement!list_1))
+ (and
+ (= original!list_0 refinement!list_2)
+ (= original!list_1 refinement!list_1)
+ (= original!list_2 refinement!list_0)))
+
+:: Postcondition
+(= original!sum refinement!sum)
+
+Valid.
+
+real	0m0.207s
+user	0m0.194s
+sys	0m0.013s

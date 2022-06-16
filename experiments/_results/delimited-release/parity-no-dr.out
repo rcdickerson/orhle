@@ -1,3 +1,4 @@
+Running backward relational analysis...
 
 *******************************************
 ****               ORHLE               ****
@@ -9,65 +10,38 @@
   parity[2] (exists)
 
 :: Universal Programs
-[ SSeq
-    [ SAsgn parity ! 1 ! h (AMod (AVar parity ! 1 ! h) (ALit 2))
-    , SIf
-        (BEq (AVar parity ! 1 ! h) (ALit 1))
-        (SSeq
-           [ SAsgn parity ! 1 ! l (ALit 1) , SAsgn parity ! 1 ! h (ALit 1) ])
-        (SSeq
-           [ SAsgn parity ! 1 ! l (ALit 0) , SAsgn parity ! 1 ! h (ALit 0) ])
-    , SAsgn parity ! 1 ! parity ! retVal (ALit 0)
-    ]
-]
+    --------
+    parity!1!h := parity!1!h % 2;
+    if parity!1!h == 1 then
+      parity!1!l := 1;
+      parity!1!h := 1;
+    else
+      parity!1!l := 0;
+      parity!1!h := 0;
+    endif;
+    parity!1!parity!retVal := 0;
 
 :: Existential Programs
-[ SSeq
-    [ SAsgn parity ! 2 ! h (AMod (AVar parity ! 2 ! h) (ALit 2))
-    , SIf
-        (BEq (AVar parity ! 2 ! h) (ALit 1))
-        (SSeq
-           [ SAsgn parity ! 2 ! l (ALit 1) , SAsgn parity ! 2 ! h (ALit 1) ])
-        (SSeq
-           [ SAsgn parity ! 2 ! l (ALit 0) , SAsgn parity ! 2 ! h (ALit 0) ])
-    , SAsgn parity ! 2 ! parity ! retVal (ALit 0)
-    ]
-]
-
-:: Universal Specifications
-fromList []
-
-:: Existential Specifications
-fromList []
+    --------
+    parity!2!h := parity!2!h % 2;
+    if parity!2!h == 1 then
+      parity!2!l := 1;
+      parity!2!h := 1;
+    else
+      parity!2!l := 0;
+      parity!2!h := 0;
+    endif;
+    parity!2!parity!retVal := 0;
 
 :: Precondition
-Eq (Var parity ! 1 ! l) (Var parity ! 2 ! l)
+(= parity!1!l parity!2!l)
 
 :: Postcondition
-Eq (Var parity ! 1 ! l) (Var parity ! 2 ! l)
+(= parity!1!l parity!2!l)
 
-[send->] (set-option :print-success true )
-[<-recv] success
-[send->] (set-option :produce-models true )
-[<-recv] success
-[send->] (declare-const parity!1!h Int)
-[<-recv] success
-[send->] (declare-const parity!1!l Int)
-[<-recv] success
-[send->] (declare-const parity!2!h Int)
-[<-recv] success
-[send->] (declare-const parity!2!l Int)
-[<-recv] success
-[send->] (assert (not (=> (= parity!1!l parity!2!l) (and (=> (= (mod parity!2!h 2) 1) (and (=> (= (mod parity!1!h 2) 1) (= 1 1)) (=> (not (= (mod parity!1!h 2) 1)) (= 0 1)))) (=> (not (= (mod parity!2!h 2) 1)) (and (=> (= (mod parity!1!h 2) 1) (= 1 0)) (=> (not (= (mod parity!1!h 2) 1)) (= 0 0))))))) )
-[<-recv] success
-[send->] (check-sat )
-[<-recv] sat
-[send->] (get-model )
-[<-recv] (model (define-fun parity!2!h () Int 2 ) (define-fun parity!1!h () Int (- 3 ) ) (define-fun parity!2!l () Int 0 ) (define-fun parity!1!l () Int 0 ) )
-[send->] (exit )
 Failure:
-  Verification conditions are invalid. Model: (model (define-fun parity!2!h () Int 2 ) (define-fun parity!1!h () Int (- 3 ) ) (define-fun parity!2!l () Int 0 ) (define-fun parity!1!l () Int 0 ) )
+  Verification conditions are invalid. Model: (model (define-fun parity!2!h () Int 0) (define-fun parity!1!h () Int 1) (define-fun parity!2!l () Int 0) (define-fun parity!1!l () Int 0))
 
-real	0m0.188s
-user	0m0.163s
-sys	0m0.028s
+real	0m0.208s
+user	0m0.177s
+sys	0m0.020s

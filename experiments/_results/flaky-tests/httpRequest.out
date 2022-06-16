@@ -1,3 +1,4 @@
+Running backward relational analysis...
 
 *******************************************
 ****               ORHLE               ****
@@ -9,58 +10,36 @@
   test[2] (exists)
 
 :: Universal Programs
-[]
+    
 
 :: Existential Programs
-[ SSeq
-    [ SAsgn test ! 1 ! url (ALit 1111)
-    , SCall
-        "test!1!makeRequest"
-        [ AVar test ! 1 ! url ]
-        [ test ! 1 ! response ]
-    , SIf
-        (BEq (AVar test ! 1 ! response) (ALit 0))
-        (SAsgn test ! 1 ! success (ALit 0))
-        (SAsgn test ! 1 ! success (ALit 1))
-    , SAsgn test ! 1 ! test ! retVal (AVar test ! 1 ! success)
-    ]
-, SSeq
-    [ SAsgn test ! 2 ! url (ALit 1111)
-    , SCall
-        "test!2!makeRequest"
-        [ AVar test ! 2 ! url ]
-        [ test ! 2 ! response ]
-    , SIf
-        (BEq (AVar test ! 2 ! response) (ALit 0))
-        (SAsgn test ! 2 ! success (ALit 0))
-        (SAsgn test ! 2 ! success (ALit 1))
-    , SAsgn test ! 2 ! test ! retVal (AVar test ! 2 ! success)
-    ]
-]
-
-:: Universal Specifications
-fromList []
-
-:: Existential Specifications
-fromList [("test!1!service",Spec {spec_params = [test!1!url], spec_choiceVars = [test!1!k], spec_preCondition = Or [Eq (Var test!1!k) (Num 0),Eq (Var test!1!k) (Num 1),Eq (Var test!1!k) (Num 3)], spec_postCondition = And [Imp (Eq (Var test!1!k) (Num 0)) (Eq (Var ret!) (Num 200)),Imp (Eq (Var test!1!k) (Num 1)) (Eq (Var ret!) (Num 400)),Imp (Eq (Var test!1!k) (Num 2)) (Eq (Var ret!) (Num 500))]}),("test!2!service",Spec {spec_params = [test!2!url], spec_choiceVars = [test!2!k], spec_preCondition = Or [Eq (Var test!2!k) (Num 0),Eq (Var test!2!k) (Num 1),Eq (Var test!2!k) (Num 3)], spec_postCondition = And [Imp (Eq (Var test!2!k) (Num 0)) (Eq (Var ret!) (Num 200)),Imp (Eq (Var test!2!k) (Num 1)) (Eq (Var ret!) (Num 400)),Imp (Eq (Var test!2!k) (Num 2)) (Eq (Var ret!) (Num 500))]})]
+    --------
+    test!1!url := 1111;
+    test!1!response := test!1!makeRequest(test!1!url);
+    if test!1!response == 0 then
+      test!1!success := 0
+    else
+      test!1!success := 1
+    endif;
+    test!1!test!retVal := test!1!success;
+    --------
+    test!2!url := 1111;
+    test!2!response := test!2!makeRequest(test!2!url);
+    if test!2!response == 0 then
+      test!2!success := 0
+    else
+      test!2!success := 1
+    endif;
+    test!2!test!retVal := test!2!success;
 
 :: Precondition
-ATrue
+true
 
 :: Postcondition
-Not (Eq (Var test ! 1 ! success) (Var test ! 2 ! success))
+(not (= test!1!success test!2!success))
 
-[send->] (set-option :print-success true )
-[<-recv] success
-[send->] (set-option :produce-models true )
-[<-recv] success
-[send->] (assert (not (=> true (exists ((test!2!k!1 Int)) (and (or (= test!2!k!1 0) (= test!2!k!1 1) (= test!2!k!1 3)) (exists ((test!2!response!2 Int)) (and (=> (= test!2!k!1 0) (= test!2!response!2 200)) (=> (= test!2!k!1 1) (= test!2!response!2 400)) (=> (= test!2!k!1 2) (= test!2!response!2 500)))) (forall ((test!2!response!2 Int)) (=> (and (=> (= test!2!k!1 0) (= test!2!response!2 200)) (=> (= test!2!k!1 1) (= test!2!response!2 400)) (=> (= test!2!k!1 2) (= test!2!response!2 500))) (and (=> (= test!2!response!2 200) (and (=> (= 1 0) (exists ((test!1!k!1 Int)) (and (or (= test!1!k!1 0) (= test!1!k!1 1) (= test!1!k!1 3)) (exists ((test!1!response!2 Int)) (and (=> (= test!1!k!1 0) (= test!1!response!2 200)) (=> (= test!1!k!1 1) (= test!1!response!2 400)) (=> (= test!1!k!1 2) (= test!1!response!2 500)))) (forall ((test!1!response!2 Int)) (=> (and (=> (= test!1!k!1 0) (= test!1!response!2 200)) (=> (= test!1!k!1 1) (= test!1!response!2 400)) (=> (= test!1!k!1 2) (= test!1!response!2 500))) (and (=> (= test!1!response!2 200) (and (=> (= 1 0) (not (= 0 0))) (=> (not (= 1 0)) (not (= 1 0))))) (=> (not (= test!1!response!2 200)) (and (=> (= 0 0) (not (= 0 0))) (=> (not (= 0 0)) (not (= 1 0))))))))))) (=> (not (= 1 0)) (exists ((test!1!k!1 Int)) (and (or (= test!1!k!1 0) (= test!1!k!1 1) (= test!1!k!1 3)) (exists ((test!1!response!2 Int)) (and (=> (= test!1!k!1 0) (= test!1!response!2 200)) (=> (= test!1!k!1 1) (= test!1!response!2 400)) (=> (= test!1!k!1 2) (= test!1!response!2 500)))) (forall ((test!1!response!2 Int)) (=> (and (=> (= test!1!k!1 0) (= test!1!response!2 200)) (=> (= test!1!k!1 1) (= test!1!response!2 400)) (=> (= test!1!k!1 2) (= test!1!response!2 500))) (and (=> (= test!1!response!2 200) (and (=> (= 1 0) (not (= 0 1))) (=> (not (= 1 0)) (not (= 1 1))))) (=> (not (= test!1!response!2 200)) (and (=> (= 0 0) (not (= 0 1))) (=> (not (= 0 0)) (not (= 1 1))))))))))))) (=> (not (= test!2!response!2 200)) (and (=> (= 0 0) (exists ((test!1!k!1 Int)) (and (or (= test!1!k!1 0) (= test!1!k!1 1) (= test!1!k!1 3)) (exists ((test!1!response!2 Int)) (and (=> (= test!1!k!1 0) (= test!1!response!2 200)) (=> (= test!1!k!1 1) (= test!1!response!2 400)) (=> (= test!1!k!1 2) (= test!1!response!2 500)))) (forall ((test!1!response!2 Int)) (=> (and (=> (= test!1!k!1 0) (= test!1!response!2 200)) (=> (= test!1!k!1 1) (= test!1!response!2 400)) (=> (= test!1!k!1 2) (= test!1!response!2 500))) (and (=> (= test!1!response!2 200) (and (=> (= 1 0) (not (= 0 0))) (=> (not (= 1 0)) (not (= 1 0))))) (=> (not (= test!1!response!2 200)) (and (=> (= 0 0) (not (= 0 0))) (=> (not (= 0 0)) (not (= 1 0))))))))))) (=> (not (= 0 0)) (exists ((test!1!k!1 Int)) (and (or (= test!1!k!1 0) (= test!1!k!1 1) (= test!1!k!1 3)) (exists ((test!1!response!2 Int)) (and (=> (= test!1!k!1 0) (= test!1!response!2 200)) (=> (= test!1!k!1 1) (= test!1!response!2 400)) (=> (= test!1!k!1 2) (= test!1!response!2 500)))) (forall ((test!1!response!2 Int)) (=> (and (=> (= test!1!k!1 0) (= test!1!response!2 200)) (=> (= test!1!k!1 1) (= test!1!response!2 400)) (=> (= test!1!k!1 2) (= test!1!response!2 500))) (and (=> (= test!1!response!2 200) (and (=> (= 1 0) (not (= 0 1))) (=> (not (= 1 0)) (not (= 1 1))))) (=> (not (= test!1!response!2 200)) (and (=> (= 0 0) (not (= 0 1))) (=> (not (= 0 0)) (not (= 1 1)))))))))))))))))))) )
-[<-recv] success
-[send->] (check-sat )
-[<-recv] unsat
-[send->] (exit )
 Valid.
 
-real	0m0.189s
-user	0m0.182s
+real	0m0.207s
+user	0m0.186s
 sys	0m0.018s

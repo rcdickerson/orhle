@@ -1,3 +1,4 @@
+Running backward relational analysis...
 
 *******************************************
 ****               ORHLE               ****
@@ -8,43 +9,25 @@
   body (forall)
 
 :: Universal Programs
-[ SSeq
-    [ SAsgn body ! p (ALit 0)
-    , SWhile
-        (BGt (AVar body ! y) (ALit 0))
-        (SAsgn body ! y (ASub (AVar body ! y) (ALit 1)))
-        ( ATrue , Var body ! y )
-    , SAsgn body ! p (ALit 1)
-    , SAsgn body ! body ! retVal (ALit 0)
-    ]
-]
+    --------
+    body!p := 0;
+    while body!y > 0
+      body!y := body!y - 1
+    end;
+    body!p := 1;
+    body!body!retVal := 0;
 
 :: Existential Programs
-[]
-
-:: Universal Specifications
-fromList []
-
-:: Existential Specifications
-fromList []
+    
 
 :: Precondition
-ATrue
+true
 
 :: Postcondition
-Gt (Var body ! p) (Num 0)
+(> body!p 0)
 
-[send->] (set-option :print-success true )
-[<-recv] success
-[send->] (set-option :produce-models true )
-[<-recv] success
-[send->] (assert (not (=> true (and true (forall ((body!y!1 Int)) (=> (and true (not (> body!y!1 0))) (> 1 0))) (forall ((body!y!1 Int)) (=> (and true (> body!y!1 0)) (and true true))) (forall ((body!y!1 Int)) (=> (and true (not (and (> body!y!1 0)))) (and (not (> body!y!1 0)))))))) )
-[<-recv] success
-[send->] (check-sat )
-[<-recv] unsat
-[send->] (exit )
 Valid.
 
-real	0m0.190s
-user	0m0.171s
-sys	0m0.017s
+real	0m0.209s
+user	0m0.169s
+sys	0m0.027s

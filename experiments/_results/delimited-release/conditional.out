@@ -1,3 +1,4 @@
+Running backward relational analysis...
 
 *******************************************
 ****               ORHLE               ****
@@ -10,94 +11,52 @@
   cond[3] (exists)
 
 :: Universal Programs
-[ SSeq
-    [ SIf
-        (BEq (AVar cond ! 1 ! l) (ALit 0))
-        (SAsgn cond ! 1 ! ret (AMod (AVar cond ! 1 ! h1) (ALit 2)))
-        (SAsgn cond ! 1 ! ret (AMod (AVar cond ! 1 ! h2) (ALit 2)))
-    , SAsgn cond ! 1 ! cond ! retVal (AVar cond ! 1 ! ret)
-    ]
-, SSeq
-    [ SIf
-        (BEq (AVar cond ! 2 ! l) (ALit 0))
-        (SAsgn cond ! 2 ! ret (AMod (AVar cond ! 2 ! h1) (ALit 2)))
-        (SAsgn cond ! 2 ! ret (AMod (AVar cond ! 2 ! h2) (ALit 2)))
-    , SAsgn cond ! 2 ! cond ! retVal (AVar cond ! 2 ! ret)
-    ]
-]
+    --------
+    if cond!1!l == 0 then
+      cond!1!ret := cond!1!h1 % 2
+    else
+      cond!1!ret := cond!1!h2 % 2
+    endif;
+    cond!1!cond!retVal := cond!1!ret;
+    --------
+    if cond!2!l == 0 then
+      cond!2!ret := cond!2!h1 % 2
+    else
+      cond!2!ret := cond!2!h2 % 2
+    endif;
+    cond!2!cond!retVal := cond!2!ret;
 
 :: Existential Programs
-[ SSeq
-    [ SIf
-        (BEq (AVar cond ! 3 ! l) (ALit 0))
-        (SAsgn cond ! 3 ! ret (AMod (AVar cond ! 3 ! h1) (ALit 2)))
-        (SAsgn cond ! 3 ! ret (AMod (AVar cond ! 3 ! h2) (ALit 2)))
-    , SAsgn cond ! 3 ! cond ! retVal (AVar cond ! 3 ! ret)
-    ]
-]
-
-:: Universal Specifications
-fromList []
-
-:: Existential Specifications
-fromList []
+    --------
+    if cond!3!l == 0 then
+      cond!3!ret := cond!3!h1 % 2
+    else
+      cond!3!ret := cond!3!h2 % 2
+    endif;
+    cond!3!cond!retVal := cond!3!ret;
 
 :: Precondition
-And
-  [ Eq (Var cond ! 1 ! h1) (Var cond ! 3 ! h1)
-  , Eq (Var cond ! 1 ! h2) (Var cond ! 3 ! h2)
-  , Eq (Var cond ! 1 ! l) (Var cond ! 2 ! l)
-  , Eq (Var cond ! 2 ! l) (Var cond ! 3 ! l)
-  , Imp
-      (Eq (Var cond ! 1 ! l) (Num 0))
-      (And
-         [ Eq
-             (Mod (Var cond ! 1 ! h1) (Num 2)) (Mod (Var cond ! 2 ! h1) (Num 2))
-         , Eq
-             (Mod (Var cond ! 2 ! h1) (Num 2)) (Mod (Var cond ! 3 ! h1) (Num 2))
-         ])
-  , Imp
-      (Not (Eq (Var cond ! 1 ! l) (Num 0)))
-      (And
-         [ Eq
-             (Mod (Var cond ! 1 ! h2) (Num 2)) (Mod (Var cond ! 2 ! h2) (Num 2))
-         , Eq
-             (Mod (Var cond ! 2 ! h2) (Num 2)) (Mod (Var cond ! 3 ! h2) (Num 2))
-         ])
-  ]
+(and
+ (= cond!1!h1 cond!3!h1)
+ (= cond!1!h2 cond!3!h2)
+ (= cond!1!l cond!2!l)
+ (= cond!2!l cond!3!l)
+ (=>
+ (= cond!1!l 0)
+ (and
+ (= (mod cond!1!h1 2) (mod cond!2!h1 2))
+ (= (mod cond!2!h1 2) (mod cond!3!h1 2))))
+ (=>
+ (not (= cond!1!l 0))
+ (and
+ (= (mod cond!1!h2 2) (mod cond!2!h2 2))
+ (= (mod cond!2!h2 2) (mod cond!3!h2 2)))))
 
 :: Postcondition
-Eq (Var cond ! 2 ! ret) (Var cond ! 3 ! ret)
+(= cond!2!ret cond!3!ret)
 
-[send->] (set-option :print-success true )
-[<-recv] success
-[send->] (set-option :produce-models true )
-[<-recv] success
-[send->] (declare-const cond!1!h1 Int)
-[<-recv] success
-[send->] (declare-const cond!1!h2 Int)
-[<-recv] success
-[send->] (declare-const cond!1!l Int)
-[<-recv] success
-[send->] (declare-const cond!2!h1 Int)
-[<-recv] success
-[send->] (declare-const cond!2!h2 Int)
-[<-recv] success
-[send->] (declare-const cond!2!l Int)
-[<-recv] success
-[send->] (declare-const cond!3!h1 Int)
-[<-recv] success
-[send->] (declare-const cond!3!h2 Int)
-[<-recv] success
-[send->] (declare-const cond!3!l Int)
-[<-recv] success
-[send->] (assert (not (=> (and (= cond!1!h1 cond!3!h1) (= cond!1!h2 cond!3!h2) (= cond!1!l cond!2!l) (= cond!2!l cond!3!l) (=> (= cond!1!l 0) (and (= (mod cond!1!h1 2) (mod cond!2!h1 2)) (= (mod cond!2!h1 2) (mod cond!3!h1 2)))) (=> (not (= cond!1!l 0)) (and (= (mod cond!1!h2 2) (mod cond!2!h2 2)) (= (mod cond!2!h2 2) (mod cond!3!h2 2))))) (and (=> (= cond!3!l 0) (and (=> (= cond!2!l 0) (and (=> (= cond!1!l 0) (= (mod cond!2!h1 2) (mod cond!3!h1 2))) (=> (not (= cond!1!l 0)) (= (mod cond!2!h1 2) (mod cond!3!h1 2))))) (=> (not (= cond!2!l 0)) (and (=> (= cond!1!l 0) (= (mod cond!2!h2 2) (mod cond!3!h1 2))) (=> (not (= cond!1!l 0)) (= (mod cond!2!h2 2) (mod cond!3!h1 2))))))) (=> (not (= cond!3!l 0)) (and (=> (= cond!2!l 0) (and (=> (= cond!1!l 0) (= (mod cond!2!h1 2) (mod cond!3!h2 2))) (=> (not (= cond!1!l 0)) (= (mod cond!2!h1 2) (mod cond!3!h2 2))))) (=> (not (= cond!2!l 0)) (and (=> (= cond!1!l 0) (= (mod cond!2!h2 2) (mod cond!3!h2 2))) (=> (not (= cond!1!l 0)) (= (mod cond!2!h2 2) (mod cond!3!h2 2)))))))))) )
-[<-recv] success
-[send->] (check-sat )
-[<-recv] unsat
-[send->] (exit )
 Valid.
 
-real	0m0.188s
-user	0m0.167s
-sys	0m0.030s
+real	0m0.208s
+user	0m0.195s
+sys	0m0.009s

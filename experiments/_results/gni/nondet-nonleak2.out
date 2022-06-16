@@ -1,3 +1,4 @@
+Running backward relational analysis...
 
 *******************************************
 ****               ORHLE               ****
@@ -9,68 +10,43 @@
   run[2] (exists)
 
 :: Universal Programs
-[ SSeq
-    [ SIf
-        (BLt (AVar run ! 1 ! low) (AVar run ! 1 ! high))
-        (SAsgn run ! 1 ! low (ALit 0))
-        (SAsgn run ! 1 ! low (ALit 1))
-    , SCall "run!1!flipCoin" [] [ run ! 1 ! flip ]
-    , SIf
-        (BEq (AVar run ! 1 ! flip) (ALit 0))
-        (SAsgn run ! 1 ! low (ASub (ALit 1) (AVar run ! 1 ! low)))
-        SSkip
-    , SAsgn run ! 1 ! run ! retVal (AVar run ! 1 ! low)
-    ]
-]
+    --------
+    if run!1!low < run!1!high then
+      run!1!low := 0
+    else
+      run!1!low := 1
+    endif;
+    run!1!flip := run!1!flipCoin();
+    if run!1!flip == 0 then
+      run!1!low := 1 - run!1!low
+    else
+      skip
+    endif;
+    run!1!run!retVal := run!1!low;
 
 :: Existential Programs
-[ SSeq
-    [ SIf
-        (BLt (AVar run ! 2 ! low) (AVar run ! 2 ! high))
-        (SAsgn run ! 2 ! low (ALit 0))
-        (SAsgn run ! 2 ! low (ALit 1))
-    , SCall "run!2!flipCoin" [] [ run ! 2 ! flip ]
-    , SIf
-        (BEq (AVar run ! 2 ! flip) (ALit 0))
-        (SAsgn run ! 2 ! low (ASub (ALit 1) (AVar run ! 2 ! low)))
-        SSkip
-    , SAsgn run ! 2 ! run ! retVal (AVar run ! 2 ! low)
-    ]
-]
-
-:: Universal Specifications
-fromList [("run!1!flipCoin",Spec {spec_params = [], spec_choiceVars = [], spec_preCondition = ATrue, spec_postCondition = Or [Eq (Var ret!) (Num 0),Eq (Var ret!) (Num 1)]})]
-
-:: Existential Specifications
-fromList [("run!2!flipCoin",Spec {spec_params = [], spec_choiceVars = [run!2!n], spec_preCondition = Or [Eq (Var run!2!n) (Num 0),Eq (Var run!2!n) (Num 1)], spec_postCondition = Eq (Var ret!) (Var run!2!n)})]
+    --------
+    if run!2!low < run!2!high then
+      run!2!low := 0
+    else
+      run!2!low := 1
+    endif;
+    run!2!flip := run!2!flipCoin();
+    if run!2!flip == 0 then
+      run!2!low := 1 - run!2!low
+    else
+      skip
+    endif;
+    run!2!run!retVal := run!2!low;
 
 :: Precondition
-Eq (Var run ! 1 ! low) (Var run ! 2 ! low)
+(= run!1!low run!2!low)
 
 :: Postcondition
-Eq (Var run ! 1 ! low) (Var run ! 2 ! low)
+(= run!1!low run!2!low)
 
-[send->] (set-option :print-success true )
-[<-recv] success
-[send->] (set-option :produce-models true )
-[<-recv] success
-[send->] (declare-const run!1!flip!1 Int)
-[<-recv] success
-[send->] (declare-const run!1!high Int)
-[<-recv] success
-[send->] (declare-const run!1!low Int)
-[<-recv] success
-[send->] (declare-const run!2!high Int)
-[<-recv] success
-[send->] (declare-const run!2!low Int)
-[<-recv] success
-[send->] (assert (not (=> (= run!1!low run!2!low) (and (=> (< run!2!low run!2!high) (exists ((run!2!n!1 Int)) (and (or (= run!2!n!1 0) (= run!2!n!1 1)) (exists ((run!2!flip!1 Int)) (= run!2!flip!1 run!2!n!1)) (forall ((run!2!flip!1 Int)) (=> (= run!2!flip!1 run!2!n!1) (and (=> (= run!2!flip!1 0) (and (=> (< run!1!low run!1!high) (and true (=> (or (= run!1!flip!1 0) (= run!1!flip!1 1)) (and (=> (= run!1!flip!1 0) (= (- 1 0) (- 1 0))) (=> (not (= run!1!flip!1 0)) (= 0 (- 1 0))))))) (=> (not (< run!1!low run!1!high)) (and true (=> (or (= run!1!flip!1 0) (= run!1!flip!1 1)) (and (=> (= run!1!flip!1 0) (= (- 1 1) (- 1 0))) (=> (not (= run!1!flip!1 0)) (= 1 (- 1 0))))))))) (=> (not (= run!2!flip!1 0)) (and (=> (< run!1!low run!1!high) (and true (=> (or (= run!1!flip!1 0) (= run!1!flip!1 1)) (and (=> (= run!1!flip!1 0) (= (- 1 0) 0)) (=> (not (= run!1!flip!1 0)) (= 0 0)))))) (=> (not (< run!1!low run!1!high)) (and true (=> (or (= run!1!flip!1 0) (= run!1!flip!1 1)) (and (=> (= run!1!flip!1 0) (= (- 1 1) 0)) (=> (not (= run!1!flip!1 0)) (= 1 0)))))))))))))) (=> (not (< run!2!low run!2!high)) (exists ((run!2!n!1 Int)) (and (or (= run!2!n!1 0) (= run!2!n!1 1)) (exists ((run!2!flip!1 Int)) (= run!2!flip!1 run!2!n!1)) (forall ((run!2!flip!1 Int)) (=> (= run!2!flip!1 run!2!n!1) (and (=> (= run!2!flip!1 0) (and (=> (< run!1!low run!1!high) (and true (=> (or (= run!1!flip!1 0) (= run!1!flip!1 1)) (and (=> (= run!1!flip!1 0) (= (- 1 0) (- 1 1))) (=> (not (= run!1!flip!1 0)) (= 0 (- 1 1))))))) (=> (not (< run!1!low run!1!high)) (and true (=> (or (= run!1!flip!1 0) (= run!1!flip!1 1)) (and (=> (= run!1!flip!1 0) (= (- 1 1) (- 1 1))) (=> (not (= run!1!flip!1 0)) (= 1 (- 1 1))))))))) (=> (not (= run!2!flip!1 0)) (and (=> (< run!1!low run!1!high) (and true (=> (or (= run!1!flip!1 0) (= run!1!flip!1 1)) (and (=> (= run!1!flip!1 0) (= (- 1 0) 1)) (=> (not (= run!1!flip!1 0)) (= 0 1)))))) (=> (not (< run!1!low run!1!high)) (and true (=> (or (= run!1!flip!1 0) (= run!1!flip!1 1)) (and (=> (= run!1!flip!1 0) (= (- 1 1) 1)) (=> (not (= run!1!flip!1 0)) (= 1 1))))))))))))))))) )
-[<-recv] success
-[send->] (check-sat )
-[<-recv] unsat
-[send->] (exit )
 Valid.
 
-real	0m0.197s
-user	0m0.189s
-sys	0m0.008s
+real	0m0.209s
+user	0m0.214s
+sys	0m0.017s

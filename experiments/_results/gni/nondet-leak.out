@@ -1,3 +1,4 @@
+Running backward relational analysis...
 
 *******************************************
 ****               ORHLE               ****
@@ -9,68 +10,34 @@
   leak[2] (exists)
 
 :: Universal Programs
-[ SSeq
-    [ SCall "leak!1!randInt" [] [ leak ! 1 ! r ]
-    , SIf
-        (BEq (AVar leak ! 1 ! r) (ALit 50))
-        (SAsgn leak !
-           1 ! ret (AAdd (AVar leak ! 1 ! high) (AVar leak ! 1 ! low)))
-        (SAsgn leak ! 1 ! ret (AVar leak ! 1 ! low))
-    , SAsgn leak ! 1 ! leak ! retVal (AVar leak ! 1 ! ret)
-    ]
-]
+    --------
+    leak!1!r := leak!1!randInt();
+    if leak!1!r == 50 then
+      leak!1!ret := leak!1!high + leak!1!low
+    else
+      leak!1!ret := leak!1!low
+    endif;
+    leak!1!leak!retVal := leak!1!ret;
 
 :: Existential Programs
-[ SSeq
-    [ SCall "leak!2!randInt" [] [ leak ! 2 ! r ]
-    , SIf
-        (BEq (AVar leak ! 2 ! r) (ALit 50))
-        (SAsgn leak !
-           2 ! ret (AAdd (AVar leak ! 2 ! high) (AVar leak ! 2 ! low)))
-        (SAsgn leak ! 2 ! ret (AVar leak ! 2 ! low))
-    , SAsgn leak ! 2 ! leak ! retVal (AVar leak ! 2 ! ret)
-    ]
-]
-
-:: Universal Specifications
-fromList [("leak!1!randInt",Spec {spec_params = [], spec_choiceVars = [], spec_preCondition = ATrue, spec_postCondition = And [Gte (Var ret!) (Num 0),Lt (Var ret!) (Num 100)]})]
-
-:: Existential Specifications
-fromList [("leak!2!randInt",Spec {spec_params = [], spec_choiceVars = [leak!2!n], spec_preCondition = And [Gte (Var leak!2!n) (Num 0),Lt (Var leak!2!n) (Num 100)], spec_postCondition = Eq (Var ret!) (Var leak!2!n)})]
+    --------
+    leak!2!r := leak!2!randInt();
+    if leak!2!r == 50 then
+      leak!2!ret := leak!2!high + leak!2!low
+    else
+      leak!2!ret := leak!2!low
+    endif;
+    leak!2!leak!retVal := leak!2!ret;
 
 :: Precondition
-Eq (Var leak ! 1 ! low) (Var leak ! 2 ! low)
+(= leak!1!low leak!2!low)
 
 :: Postcondition
-And
-  [ Eq (Var leak ! 1 ! low) (Var leak ! 2 ! low)
-  , Eq (Var leak ! 1 ! ret) (Var leak ! 2 ! ret)
-  ]
+(and (= leak!1!low leak!2!low) (= leak!1!ret leak!2!ret))
 
-[send->] (set-option :print-success true )
-[<-recv] success
-[send->] (set-option :produce-models true )
-[<-recv] success
-[send->] (declare-const leak!1!high Int)
-[<-recv] success
-[send->] (declare-const leak!1!low Int)
-[<-recv] success
-[send->] (declare-const leak!1!r!1 Int)
-[<-recv] success
-[send->] (declare-const leak!2!high Int)
-[<-recv] success
-[send->] (declare-const leak!2!low Int)
-[<-recv] success
-[send->] (assert (not (=> (= leak!1!low leak!2!low) (exists ((leak!2!n!1 Int)) (and (and (>= leak!2!n!1 0) (< leak!2!n!1 100)) (exists ((leak!2!r!1 Int)) (= leak!2!r!1 leak!2!n!1)) (forall ((leak!2!r!1 Int)) (=> (= leak!2!r!1 leak!2!n!1) (and (=> (= leak!2!r!1 50) (and true (=> (and (>= leak!1!r!1 0) (< leak!1!r!1 100)) (and (=> (= leak!1!r!1 50) (and (= leak!1!low leak!2!low) (= (+ leak!1!high leak!1!low) (+ leak!2!high leak!2!low)))) (=> (not (= leak!1!r!1 50)) (and (= leak!1!low leak!2!low) (= leak!1!low (+ leak!2!high leak!2!low)))))))) (=> (not (= leak!2!r!1 50)) (and true (=> (and (>= leak!1!r!1 0) (< leak!1!r!1 100)) (and (=> (= leak!1!r!1 50) (and (= leak!1!low leak!2!low) (= (+ leak!1!high leak!1!low) leak!2!low))) (=> (not (= leak!1!r!1 50)) (and (= leak!1!low leak!2!low) (= leak!1!low leak!2!low)))))))))))))) )
-[<-recv] success
-[send->] (check-sat )
-[<-recv] sat
-[send->] (get-model )
-[<-recv] (model (define-fun leak!1!r!1 () Int 50 ) (define-fun leak!2!high () Int 1 ) (define-fun leak!1!high () Int 2 ) (define-fun leak!2!low () Int 0 ) (define-fun leak!1!low () Int 0 ) )
-[send->] (exit )
 Failure:
-  Verification conditions are invalid. Model: (model (define-fun leak!1!r!1 () Int 50 ) (define-fun leak!2!high () Int 1 ) (define-fun leak!1!high () Int 2 ) (define-fun leak!2!low () Int 0 ) (define-fun leak!1!low () Int 0 ) )
+  Verification conditions are invalid. Model: (model (define-fun leak!2!high () Int 2) (define-fun leak!1!high () Int 3) (define-fun leak!2!low () Int 0) (define-fun leak!1!low () Int 0))
 
-real	0m0.188s
-user	0m0.158s
-sys	0m0.036s
+real	0m0.229s
+user	0m0.192s
+sys	0m0.032s

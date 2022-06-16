@@ -1,3 +1,4 @@
+Running backward relational analysis...
 
 *******************************************
 ****               ORHLE               ****
@@ -9,46 +10,23 @@
   unused[2] (exists)
 
 :: Universal Programs
-[ SSeq
-    [ SAsgn unused ! 1 ! ret (ALit 5)
-    , SAsgn unused ! 1 ! unused ! retVal (AVar unused ! 1 ! ret)
-    ]
-]
+    --------
+    unused!1!ret := 5;
+    unused!1!unused!retVal := unused!1!ret;
 
 :: Existential Programs
-[ SSeq
-    [ SAsgn unused ! 2 ! ret (ALit 5)
-    , SAsgn unused ! 2 ! unused ! retVal (AVar unused ! 2 ! ret)
-    ]
-]
-
-:: Universal Specifications
-fromList []
-
-:: Existential Specifications
-fromList []
+    --------
+    unused!2!ret := 5;
+    unused!2!unused!retVal := unused!2!ret;
 
 :: Precondition
-Not (Eq (Var unused ! 1 ! param) (Var unused ! 2 ! param))
+(not (= unused!1!param unused!2!param))
 
 :: Postcondition
-Eq (Var unused ! 1 ! ret) (Var unused ! 2 ! ret)
+(= unused!1!ret unused!2!ret)
 
-[send->] (set-option :print-success true )
-[<-recv] success
-[send->] (set-option :produce-models true )
-[<-recv] success
-[send->] (declare-const unused!1!param Int)
-[<-recv] success
-[send->] (declare-const unused!2!param Int)
-[<-recv] success
-[send->] (assert (not (=> (not (= unused!1!param unused!2!param)) (= 5 5))) )
-[<-recv] success
-[send->] (check-sat )
-[<-recv] unsat
-[send->] (exit )
 Valid.
 
-real	0m0.213s
-user	0m0.190s
-sys	0m0.021s
+real	0m0.207s
+user	0m0.172s
+sys	0m0.023s

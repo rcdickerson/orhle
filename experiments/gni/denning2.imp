@@ -23,6 +23,7 @@ fun denning(f1_L, f2_L, f3_H, f4_H) {
              (= denning!A!f1_L  denning!E!f1_L)
              (= denning!A!f2_L  denning!E!f2_L)
              (= denning!A!i     denning!E!i)) }
+    @var { (- 300 (+ denning!A!i denning!E!i)) }
     flag := f1_L;
     f2_L := flag;
     x := f3_H;

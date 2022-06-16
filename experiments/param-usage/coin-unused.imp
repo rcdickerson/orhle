@@ -32,6 +32,6 @@ especs:
   }
 
 fun unused(param1, param2) {
-  ret := call flip();
+  ret := flip();
   return ret;
 }

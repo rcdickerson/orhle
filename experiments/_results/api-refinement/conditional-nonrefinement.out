@@ -1,4 +1,3 @@
-Populating test states for loop invariant inference...
 Running backward relational analysis...
 
 *******************************************
@@ -11,155 +10,34 @@ Running backward relational analysis...
   original (exists)
 
 :: Universal Programs
-[ ImpSeq
-    [ SpecCall
-        { sc_callId = "refinement!flipCoin"
-        , sc_args = []
-        , sc_assignees = [ Name { nHandle = "refinement!r" , nId = 0 } ]
-        }
-    , ImpIf
-        (BEq (AVar Name { nHandle = "refinement!r" , nId = 0 }) (ALit 0))
-        ImpAsgn
-        Name { nHandle = "refinement!ret" , nId = 0 }
-        (ALit 10)
-        ImpAsgn
-        Name { nHandle = "refinement!ret" , nId = 0 }
-        (ALit 30)
-    , ImpAsgn
-        Name { nHandle = "refinement!refinement!retVal" , nId = 0 }
-        (AVar Name { nHandle = "refinement!ret" , nId = 0 })
-    ]
-]
+    --------
+    refinement!r := refinement!flipCoin();
+    if refinement!r == 0 then
+      refinement!ret := 10
+    else
+      refinement!ret := 30
+    endif;
+    refinement!refinement!retVal := refinement!ret;
 
 :: Existential Programs
-[ ImpSeq
-    [ SpecCall
-        { sc_callId = "original!flipCoin"
-        , sc_args = []
-        , sc_assignees = [ Name { nHandle = "original!r" , nId = 0 } ]
-        }
-    , ImpIf
-        (BEq (AVar Name { nHandle = "original!r" , nId = 0 }) (ALit 0))
-        ImpAsgn
-        Name { nHandle = "original!ret" , nId = 0 }
-        (ALit 10)
-        ImpAsgn
-        Name { nHandle = "original!ret" , nId = 0 }
-        (ALit 20)
-    , ImpAsgn
-        Name { nHandle = "original!original!retVal" , nId = 0 }
-        (AVar Name { nHandle = "original!ret" , nId = 0 })
-    ]
-]
-
-:: Universal Specifications
-fromList
-  [ ( "refinement!flipCoin"
-    , Specification
-        { spec_params = []
-        , spec_returnVars =
-            [ Name { nHandle = "refinement!ret!" , nId = 0 } ]
-        , spec_choiceVars = []
-        , spec_preCondition = ATrue
-        , spec_postCondition =
-            Or
-              [ Eq
-                  (Var
-                     TypedName
-                       { tnName = Name { nHandle = "refinement!ret!" , nId = 0 }
-                       , tnType = Int
-                       })
-                  (Num 0)
-              , Eq
-                  (Var
-                     TypedName
-                       { tnName = Name { nHandle = "refinement!ret!" , nId = 0 }
-                       , tnType = Int
-                       })
-                  (Num 1)
-              ]
-        }
-    )
-  ]
-
-:: Existential Specifications
-fromList
-  [ ( "original!flipCoin"
-    , Specification
-        { spec_params = []
-        , spec_returnVars =
-            [ Name { nHandle = "original!ret!" , nId = 0 } ]
-        , spec_choiceVars =
-            [ TypedName
-                { tnName = Name { nHandle = "original!n" , nId = 0 }
-                , tnType = Int
-                }
-            ]
-        , spec_preCondition =
-            Or
-              [ Eq
-                  (Var
-                     TypedName
-                       { tnName = Name { nHandle = "original!n" , nId = 0 }
-                       , tnType = Int
-                       })
-                  (Num 0)
-              , Eq
-                  (Var
-                     TypedName
-                       { tnName = Name { nHandle = "original!n" , nId = 0 }
-                       , tnType = Int
-                       })
-                  (Num 1)
-              ]
-        , spec_postCondition =
-            Eq
-              (Var
-                 TypedName
-                   { tnName = Name { nHandle = "original!ret!" , nId = 0 }
-                   , tnType = Int
-                   })
-              (Var
-                 TypedName
-                   { tnName = Name { nHandle = "original!n" , nId = 0 }
-                   , tnType = Int
-                   })
-        }
-    )
-  ]
+    --------
+    original!r := original!flipCoin();
+    if original!r == 0 then
+      original!ret := 10
+    else
+      original!ret := 20
+    endif;
+    original!original!retVal := original!ret;
 
 :: Precondition
-ATrue
+true
 
 :: Postcondition
-Eq
-  (Var
-     TypedName
-       { tnName = Name { nHandle = "original!ret" , nId = 0 }
-       , tnType = Int
-       })
-  (Var
-     TypedName
-       { tnName = Name { nHandle = "refinement!ret" , nId = 0 }
-       , tnType = Int
-       })
+(= original!ret refinement!ret)
 
-[send->] (set-option :print-success true )
-[<-recv] success
-[send->] (set-option :produce-models true )
-[<-recv] success
-[send->] (declare-const refinement!r Int)
-[<-recv] success
-[send->] (assert (not (=> true (and true (=> (or (= refinement!r 0) (= refinement!r 1)) (and (=> (= refinement!r 0) (exists ((original!n!4 Int)) (and (or (= original!n!4 0) (= original!n!4 1)) (exists ((original!r Int)) (= original!r original!n!4)) (forall ((original!r Int)) (=> (= original!r original!n!4) (and (=> (= original!r 0) (= 10 10)) (=> (not (= original!r 0)) (= 20 10)))))))) (=> (not (= refinement!r 0)) (exists ((original!n!4 Int)) (and (or (= original!n!4 0) (= original!n!4 1)) (exists ((original!r Int)) (= original!r original!n!4)) (forall ((original!r Int)) (=> (= original!r original!n!4) (and (=> (= original!r 0) (= 10 30)) (=> (not (= original!r 0)) (= 20 30))))))))))))) )
-[<-recv] success
-[send->] (check-sat )
-[<-recv] sat
-[send->] (get-model )
-[<-recv] (model (define-fun refinement!r () Int 1 ) )
-[send->] (exit )
 Failure:
-  Verification conditions are invalid. Model: (model (define-fun refinement!r () Int 1 ) )
+  Verification conditions are invalid. Model: (model)
 
-real	0m0.313s
-user	0m0.375s
-sys	0m0.027s
+real	0m0.211s
+user	0m0.216s
+sys	0m0.033s
