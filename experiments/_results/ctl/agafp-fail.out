@@ -33,6 +33,6 @@ true
 Failure:
   Verification conditions are invalid. Model: (model (define-fun body!x () Int 0))
 
-real	0m0.208s
-user	0m0.164s
-sys	0m0.032s
+real	0m0.209s
+user	0m0.184s
+sys	0m0.014s

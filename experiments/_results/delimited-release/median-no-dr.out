@@ -98,6 +98,6 @@ Running backward relational analysis...
 Failure:
   Verification conditions are invalid. Model: (model (define-fun median!2!b1 () Int (- 4)) (define-fun median!2!b2 () Int 0) (define-fun median!1!b1 () Int (- 1)) (define-fun median!2!a1 () Int (- 3)) (define-fun median!1!b2 () Int 0) (define-fun median!2!a2 () Int (- 2)) (define-fun median!1!a2 () Int (- 2)) (define-fun median!1!a1 () Int (- 3)))
 
-real	0m0.253s
-user	0m0.261s
-sys	0m0.061s
+real	0m0.232s
+user	0m0.283s
+sys	0m0.045s

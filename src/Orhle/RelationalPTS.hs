@@ -34,6 +34,8 @@ import Orhle.StepStrategy
 import Prettyprinter
 import System.Random ( randomRIO )
 
+import Debug.Trace
+
 data RelSpecImpPTSContext t e = RelSpecImpPTSContext { rsipc_specEnv          :: SpecImpEnv t e
                                                      , rsipc_loopHeadStates   :: LoopHeadStates t
                                                      , rsipc_programNames     :: Set Name
@@ -214,9 +216,11 @@ invarianceQuery stepStrategy ctx aloops eloops invariant = do
   let freshMeasures = substituteAll names frNames measures
   let measureConds = map (uncurry Lt) (zip measures freshMeasures)
                   ++ map (Num (embed 0) `Lte`) measures
+--  traceM $ "Measures: " ++ (show measureConds)
   wpInvar <- relBackwardPT stepStrategy ctx (map body aloops) (map body eloops) (aAnd $ invariant:measureConds)
   let frWpInvar = substituteAll names frNames wpInvar
   let frConds = substituteAll names frNames $ aAnd (invariant:conds)
+--  traceM $ "Invar Query: " ++ (show $ Imp frConds frWpInvar)
   pure $ (Imp frConds frWpInvar, QuerySubstitution frNames names)
 
 -- TODO: This is fragile.

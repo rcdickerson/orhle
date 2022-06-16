@@ -1,16 +1,43 @@
+Running backward relational analysis...
+[RelationalPTS] Invariant is not invariant on loop body or does not decrease measure
 
 *******************************************
 ****               ORHLE               ****
 ****     The Oracular RHLE Verifier    ****
 *******************************************
 
-Parse error: (line 41, column 2):
-unexpected end of input
-expecting end of input
-(line 14, column 18):
-unexpected "n"
-expecting operator or ";"
+:: Executions
+  body (exists)
 
-real	0m0.196s
-user	0m0.178s
-sys	0m0.021s
+:: Universal Programs
+    
+
+:: Existential Programs
+    --------
+    body!p := 0;
+    body!x := 5;
+    while body!x >= 0
+      body!x := body!x - 1
+    end;
+    while true
+      body!rho1 := body!nondet();
+      if body!rho1 > 0 then
+        body!p := 1
+      else
+        skip
+      endif;
+    end;
+    body!body!retVal := 0;
+
+:: Precondition
+true
+
+:: Postcondition
+(> body!p 0)
+
+Failure:
+  Verification conditions are invalid. Model: ()
+
+real	0m0.218s
+user	0m0.183s
+sys	0m0.022s

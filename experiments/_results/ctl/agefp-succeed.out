@@ -1,16 +1,39 @@
+Running backward relational analysis...
 
 *******************************************
 ****               ORHLE               ****
 ****     The Oracular RHLE Verifier    ****
 *******************************************
 
-Parse error: (line 37, column 2):
-unexpected end of input
-expecting end of input
-(line 9, column 17):
-unexpected "n"
-expecting operator or ";"
+:: Executions
+  body (exists)
 
-real	0m0.200s
-user	0m0.188s
-sys	0m0.008s
+:: Universal Programs
+    
+
+:: Existential Programs
+    --------
+    body!p := 0;
+    body!x := 5;
+    while body!x >= 0
+      body!rho := body!nondet();
+      if body!rho > 0 then
+        body!x := body!x - 1
+      else
+        skip
+      endif;
+    end;
+    body!p := 1;
+    body!body!retVal := 0;
+
+:: Precondition
+true
+
+:: Postcondition
+(> body!p 0)
+
+Valid.
+
+real	0m0.209s
+user	0m0.187s
+sys	0m0.017s

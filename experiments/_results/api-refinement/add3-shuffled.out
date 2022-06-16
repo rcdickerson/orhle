@@ -48,6 +48,6 @@ Running backward relational analysis...
 Failure:
   Verification conditions are invalid. Model: (model (define-fun refinement!list_1 () Int 0) (define-fun refinement!list_0 () Int (- 1)) (define-fun refinement!list_2 () Int 0) (define-fun original!list_2 () Int 0) (define-fun original!list_1 () Int 0) (define-fun original!list_0 () Int (- 1)))
 
-real	0m0.209s
-user	0m0.186s
-sys	0m0.026s
+real	0m0.210s
+user	0m0.188s
+sys	0m0.027s
