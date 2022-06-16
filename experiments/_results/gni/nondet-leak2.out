@@ -39,5 +39,5 @@ Failure:
   Verification conditions are invalid. Model: (model (define-fun run!2!high () Int 2) (define-fun run!1!high () Int 3) (define-fun run!2!low () Int 0) (define-fun run!1!low () Int 0))
 
 real	0m0.208s
-user	0m0.186s
-sys	0m0.017s
+user	0m0.177s
+sys	0m0.025s

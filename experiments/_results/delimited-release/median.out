@@ -94,6 +94,6 @@ Running backward relational analysis...
 
 Valid.
 
-real	0m0.230s
-user	0m0.269s
-sys	0m0.023s
+real	0m0.238s
+user	0m0.331s
+sys	0m0.037s

@@ -1,4 +1,5 @@
 Running backward relational analysis...
+[RelationalPTS] Invariant is insufficient to establish post
 
 *******************************************
 ****               ORHLE               ****
@@ -6,9 +7,12 @@ Running backward relational analysis...
 *******************************************
 
 :: Executions
-  body (forall)
+  body (exists)
 
 :: Universal Programs
+    
+
+:: Existential Programs
     --------
     body!p := 0;
     while body!y > 0
@@ -17,17 +21,15 @@ Running backward relational analysis...
     body!p := 1;
     body!body!retVal := 0;
 
-:: Existential Programs
-    
-
 :: Precondition
 true
 
 :: Postcondition
-(> body!p 0)
+(not (> body!p 0))
 
-Valid.
+Failure:
+  Verification conditions are invalid. Model: ()
 
-real	0m0.208s
-user	0m0.176s
-sys	0m0.021s
+real	0m0.212s
+user	0m0.183s
+sys	0m0.017s

@@ -62,5 +62,5 @@ Failure:
   Verification conditions are invalid. Model: (model (define-fun denning!E!f2_L () Int 0) (define-fun denning!A!f2_L () Int 0) (define-fun denning!E!f1_L () Int 0) (define-fun denning!A!f1_L () Int 0))
 
 real	0m0.219s
-user	0m0.186s
-sys	0m0.023s
+user	0m0.198s
+sys	0m0.013s

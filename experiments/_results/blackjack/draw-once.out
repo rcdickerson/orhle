@@ -26,6 +26,6 @@ Running backward relational analysis...
 Failure:
   Verification conditions are invalid. Model: (model (define-fun play!handValue () Int 2))
 
-real	0m0.211s
-user	0m0.175s
-sys	0m0.024s
+real	0m0.232s
+user	0m0.209s
+sys	0m0.012s

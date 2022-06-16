@@ -42,6 +42,6 @@ Running backward relational analysis...
 Failure:
   Verification conditions are invalid. Model: (model (define-fun parity!2!h () Int 0) (define-fun parity!1!h () Int 1) (define-fun parity!2!l () Int 0) (define-fun parity!1!l () Int 0))
 
-real	0m0.208s
-user	0m0.193s
-sys	0m0.020s
+real	0m0.212s
+user	0m0.180s
+sys	0m0.021s

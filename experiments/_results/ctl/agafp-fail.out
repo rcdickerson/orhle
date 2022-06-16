@@ -6,10 +6,14 @@ Running backward relational analysis...
 *******************************************
 
 :: Executions
-  body (forall)
+  body (exists)
 
 :: Universal Programs
+    
+
+:: Existential Programs
     --------
+    body!x := body!arbitrary();
     body!p := 0;
     if body!x > 0 then
       body!p := body!p + 1
@@ -21,18 +25,14 @@ Running backward relational analysis...
     endif;
     body!body!retVal := 0;
 
-:: Existential Programs
-    
-
 :: Precondition
 true
 
 :: Postcondition
-(> body!p 0)
+(not (> body!p 0))
 
-Failure:
-  Verification conditions are invalid. Model: (model (define-fun body!x () Int 0))
+Valid.
 
-real	0m0.209s
-user	0m0.184s
-sys	0m0.014s
+real	0m0.211s
+user	0m0.195s
+sys	0m0.013s

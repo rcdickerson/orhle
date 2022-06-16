@@ -48,6 +48,6 @@ Running backward relational analysis...
 Failure:
   Verification conditions are invalid. Model: (model (define-fun cond!2!h2 () Int (- 1)) (define-fun cond!2!h1 () Int 1) (define-fun cond!3!h1 () Int 0) (define-fun cond!3!l () Int 0) (define-fun cond!1!l () Int 0) (define-fun cond!2!l () Int 0) (define-fun cond!3!h2 () Int 0) (define-fun cond!1!h2 () Int 0) (define-fun cond!1!h1 () Int 0))
 
-real	0m0.208s
-user	0m0.182s
-sys	0m0.020s
+real	0m0.227s
+user	0m0.201s
+sys	0m0.021s

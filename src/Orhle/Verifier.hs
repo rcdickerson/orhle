@@ -28,6 +28,8 @@ import Orhle.StepStrategy
 import Orhle.Triple
 import System.Random
 
+import Debug.Trace
+
 data Failure  = Failure { failMessage :: String } deriving Show
 data Success  = Success { }
 
@@ -59,6 +61,7 @@ rhleVerifier iFunEnv triple = do
                                           namesNoRets
                                           lits
     wp <- relBackwardPT backwardWithFusion ptsContext aprogs eprogs post
+--    traceM $ "WP: " ++ show wp
     checkValid $ Imp pre wp
   case resultOrErr of
     Left msg  -> pure . Left . Failure $ msg
