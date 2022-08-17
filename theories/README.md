@@ -7,7 +7,7 @@ This directory contains a coq formalization of the program logics from the paper
 
 ## Key Definitions and Theorems
 
--The syntax (Figure 2, page 3), semantics (Figure 8, page 21), and
+- The syntax (Figure 2, page 3), semantics (Figure 8, page 21), and
 overapproximate executions (Figure9, page 22) of FunImp can be found
 in FunImp.v. The current semantics uses both an implementation and
 universal specification context. The ECall_forall rules require that
