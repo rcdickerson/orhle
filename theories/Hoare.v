@@ -6,8 +6,10 @@
 Require Import Coq.Program.Tactics
         Coq.Lists.List.
 
-Require Import Maps
-        Imp
+Require Import
+        Common
+        Maps
+        FunImp
         HoareCommon
         Fixpoints.
 
@@ -24,6 +26,8 @@ Section Hoare.
       Sigma |- {{ P }} SKIP {{P}}
   | H_Asgn : forall Q V a,
       Sigma |- {{Q[V |-> a]}} V ::= a {{Q}}
+  | H_Havoc : forall Q V,
+     Sigma |- {{fun st => forall (n : nat), Q[V |-> n] st}} (CHavoc V) {{Q}}
   | H_Seq  : forall P c Q d R,
       Sigma|- {{P}} c {{Q}} ->
       Sigma |- {{Q}} d {{R}} ->
@@ -43,7 +47,7 @@ Section Hoare.
 
   | H_Call : forall Q y f xs,
       Sigma |- {{fun st =>
-            (Sigma f).(pre) (aseval st xs) ->
+            (Sigma f).(pre) (aseval st xs) /\
             forall v, (Sigma f).(post) v (aseval st xs) ->
                  Q[y |-> v] st}} y :::= f $ xs {{Q}}
 
@@ -89,6 +93,8 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
     inversion HE; subst. eauto.
   - (* ::= *)
     inversion HE; subst. eauto.
+  - (* Havoc *)
+    inversion HE; subst; eapply HP.
   - (* ;; *)
     inversion HE; subst. eauto.
   - (* TEST *)
@@ -101,7 +107,7 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
     inversion HE; subst; firstorder.
     simpl in H4; rewrite apply_empty in H4; discriminate.
   Qed.
-
+  (*
   (* The weakest precondition for an assertion [Q] and command [c] is
      the set of initial states from which [c] always either fails to
      terminate, or ends in a final state satisfying [Q]. *)
@@ -144,10 +150,10 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
     match c with
     | CSkip => Q
     | CAss x a => Q [x |-> a]
+    | CHavoc x => fun st => forall n : nat, Q [x |-> n] st
     | CCall x f args =>
-      fun st => (forall v,
-                    (funSpecs f).(pre) (aseval st args) /\
-                    (funSpecs f).(post) v (aseval st args) ->
+      fun st => ((funSpecs f).(pre) (aseval st args) /\
+                 forall v, (funSpecs f).(post) v (aseval st args) ->
                            Q[x |-> v] st)
     | CSeq c1 c2 => wp_gen funSpecs c1 (wp_gen funSpecs c2 Q)
     | CIf b c1 c2 => fun st => (bassn b st -> wp_gen funSpecs c1 Q st)
@@ -175,10 +181,10 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
     match c with
     | CSkip => Q
     | CAss x a => Q [x |-> a]
+    | CHavoc x => fun st => forall n : nat, Q [x |-> n] st
     | CCall x f args =>
-      fun st => (forall v,
-                    (funSpecs f).(pre) (aseval st args) /\
-                    (funSpecs f).(post) v (aseval st args) ->
+      fun st => ((funSpecs f).(pre) (aseval st args) /\
+                 forall v, (funSpecs f).(post) v (aseval st args) ->
                            Q[x |-> v] st)
     | CSeq c1 c2 => wp_gen' funSpecs c1 (wp_gen' funSpecs c2 Q)
     | CIf b c1 c2 => fun st => (bassn b st -> wp_gen' funSpecs c1 Q st)
@@ -195,10 +201,10 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
     match c with
     | CSkip => Q
     | CAss x a => Q [x |-> a]
+    | CHavoc x => fun st => forall n : nat, Q [x |-> n] st
     | CCall x f args =>
-      fun st => (forall v,
-                    (funSpecs f).(pre) (aseval st args) /\
-                    (funSpecs f).(post) v (aseval st args) ->
+      fun st => ((funSpecs f).(pre) (aseval st args) /\
+                 forall v,(funSpecs f).(post) v (aseval st args) ->
                            Q[x |-> v] st)
     | CSeq c1 c2 => wp_gen' funSpecs c1 (wp_gen' funSpecs c2 Q)
     | CIf b c1 c2 => fun st => (bassn b st -> wp_gen' funSpecs c1 Q st)
@@ -214,8 +220,10 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
       (forall a0 : state, S a0 -> S' a0) -> wp_gen' Sigma c S a -> wp_gen' Sigma c S' a.
   Proof.
     induction c; simpl; intros; eauto.
+    - unfold assn_sub; eapply H.
+      eapply H0.
     - unfold assn_sub; eauto.
-    - unfold assn_sub in *; eauto.
+    - unfold assn_sub in *; intuition eauto.
     - intuition; eauto.
     - unfold gamma', GFP, FConsistent in *.
       destruct H0 as [S'' [? ?] ].
@@ -232,6 +240,8 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
     induction c; simpl; intros; eauto.
     - eapply H; eauto.
     - eapply H; firstorder eauto.
+    - unfold wp in *. intros; firstorder eauto.
+      eapply H; eauto.
     - unfold wp in *; intros; firstorder eauto.
     - firstorder eauto.
         unfold wp in *; eapply IHc2; intros.
@@ -268,6 +278,8 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
     - eapply H_Consequence with (Q := Q); simpl; eauto.
       + apply H_Call.
       + simpl; intros; eauto.
+        generalize
+
     - econstructor; eauto.
     - econstructor; eauto.
       + econstructor; firstorder eauto.
@@ -341,46 +353,39 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
       + constructor. firstorder eauto.
       + eauto.
       + firstorder with hoare.
-  Qed.
+  Qed. *)
 
   Theorem hoare_proof_link {Sigma : Env}
     : forall (P Q : Assertion) c,
-      safe_Env Sigma ->
-      (forall st, P st -> @Safe {| funSigs := @funSigs Sigma;
-                                   funSpecs := @funSpecs Sigma;
-                                   funDefs := empty |} c st) ->
+      compatible_env Sigma ->
       funSpecs |- {{P}} c {{Q}} ->
       Sigma |= {{P}} c {{Q}}.
   Proof.
     intros.
-    pose proof (hoare_proof_sound (@funSigs Sigma) _ _ _ _ H1).
-    eauto using safe_Env_refine, hoare_proof_sound.
+    pose proof (hoare_proof_sound (@funSigs Sigma) _ _ _ _ H0).
+    eauto using compatible_Env_refine, hoare_proof_sound.
   Qed.
 
-  Lemma safe_funDef_hoare :
+  Lemma compatible_funDef_hoare :
     forall (Sigma : Env) spec args body ret,
-      safe_Env Sigma ->
-      (forall args0,
-          pre spec args0 ->
-          Safe {| funSigs := funSigs; funSpecs := funSpecs; funDefs := empty |} body
-               (build_total_map (funArgs {| funArgs := args; funBody := body; funRet := ret |}) args0 0)) ->
+      compatible_env Sigma ->
       (forall orig_args,
           funSpecs |- {{ fun st => Forall2 (fun orig arg => st arg = orig)
                                         orig_args
                                         args -> pre spec orig_args }}
                      body
                      {{ fun st => post spec (aeval st ret) orig_args }})
-      -> safe_funDef Sigma spec {| funArgs := args; funBody := body; funRet := ret |}.
+      -> compatible_funDef Sigma spec {| funArgs := args; funBody := body; funRet := ret |}.
   Proof.
     intros.
-    unfold safe_funDef in *; intros.
-    specialize (H1 args0); eapply hoare_proof_sound in H1.
-    unfold hoare_triple in H1.
-    simpl; eapply H1; eauto.
-    eapply safe_Env_refine; eauto.
+    unfold compatible_funDef in *; intros.
+    specialize (H0 args0); eapply hoare_proof_sound in H0.
+    unfold hoare_triple in H0.
+    simpl; eapply H0; eauto.
+    eapply compatible_Env_refine; eauto.
   Qed.
 
-  Fixpoint build_safe_Env_hoare'
+  Fixpoint build_compatible_Env_hoare'
            (Sigs : total_map funSig)
            (Specs : total_map funSpec)
            (names : list funName)
@@ -396,22 +401,22 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
                                          (funArgs fd) -> pre (Specs f) orig_args }}
                    funBody fd
                    {{ fun st => post (Specs f) (aeval st (funRet fd)) orig_args }})
-      /\ (build_safe_Env_hoare' Sigs Specs names' Defs')
+      /\ (build_compatible_Env_hoare' Sigs Specs names' Defs')
   | _, _ => True
   end.
 
-  Definition build_safe_Env_hoare
+  Definition build_compatible_Env_hoare
              (names : list funName)
              (Sigs : list funSig)
              (Specs : list funSpec)
              (Defs : list funDef)
     : Prop :=
-    build_safe_Env_hoare'
+    build_compatible_Env_hoare'
       (build_funSigs names Sigs)
       (build_funSpecs names Specs)
       names Defs.
 
-  Lemma build_safe_Env_hoare_is_safe
+  Lemma build_compatible_Env_hoare_is_safe
     : forall (names : list funName)
              (Sigs : list funSig)
              (Specs : list funSpec)
@@ -422,16 +427,16 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
                                    pre ((build_funSpecs names Specs) (fst ffd)) args0 ->
                                    Safe {| funSigs := build_funSigs names Sigs;
                                            funSpecs := build_funSpecs names Specs;
-                                           funDefs := empty |} (Imp.funBody (snd ffd))
-                                        (build_total_map (Imp.funArgs (snd ffd)) args0 0)) * P)%type)
+                                           funDefs := empty |} (FunImp.funBody (snd ffd))
+                                        (build_total_map (FunImp.funArgs (snd ffd)) args0 0)) * P)%type)
                             unit
                             (combine names Defs))),
       NoDup names ->
       length names = length Defs ->
-      build_safe_Env_hoare names Sigs Specs Defs ->
-      safe_Env (build_Env names Sigs Specs Defs).
+      build_compatible_Env_hoare names Sigs Specs Defs ->
+      compatible_env (build_Env names Sigs Specs Defs).
   Proof.
-    unfold build_Env, build_safe_Env_hoare, build_safe_Env in *.
+    unfold build_Env, build_compatible_Env_hoare, build_compatible_env in *.
     intros ? ? ? ?.
     generalize
       Defs
@@ -439,7 +444,7 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
       (build_funSpecs names Specs); clear.
     induction names; destruct Defs; simpl in *; intros; try discriminate.
     intuition eauto.
-    eapply safe_Env_Extend with (Sigma := {| funSigs := _; funSpecs := _; funDefs := _ |});
+    eapply compatible_env_Extend with (Sigma := {| funSigs := _; funSpecs := _; funDefs := _ |});
       eauto.
     - inversion H; subst; eauto.
     - inversion H; subst.
@@ -454,11 +459,11 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
       intro; induction H2; destruct names; simpl; intros;
         try (compute in H; discriminate).
       apply update_inv in H0; intuition; subst; eauto.
-    - eapply safe_funDef_hoare; eauto.
+    - eapply compatible_funDef_hoare; eauto.
       inversion H; subst; eauto.
   Qed.
 
-  Corollary hoare_proof_link_safe_Env
+  Corollary hoare_proof_link_compatible_Env
     : forall (names : list funName)
              (Sigs : list funSig)
              (Specs : list funSpec)
@@ -469,8 +474,8 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
                                    pre ((build_funSpecs names Specs) (fst ffd)) args0 ->
                                    Safe {| funSigs := build_funSigs names Sigs;
                                            funSpecs := build_funSpecs names Specs;
-                                           funDefs := empty |} (Imp.funBody (snd ffd))
-                                        (build_total_map (Imp.funArgs (snd ffd)) args0 0)) * P)%type)
+                                           funDefs := empty |} (FunImp.funBody (snd ffd))
+                                        (build_total_map (FunImp.funArgs (snd ffd)) args0 0)) * P)%type)
                             unit
                             (combine names Defs)))
              (P Q : Assertion) c,
@@ -478,7 +483,7 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
       length names = length Sigs ->
       length names = length Specs ->
       length names = length Defs ->
-      build_safe_Env_hoare names Sigs Specs Defs ->
+      build_compatible_Env_hoare names Sigs Specs Defs ->
       (forall st,
           P st ->
           Safe {| funSigs := build_funSigs names Sigs;
@@ -489,7 +494,7 @@ where "Sigma |- {{ P }}  c  {{ Q }}" := (hoare_proof Sigma P c Q) : hoare_spec_s
   Proof.
     intros.
     eapply hoare_proof_link; eauto.
-    eapply build_safe_Env_hoare_is_safe; eauto.
+    eapply build_compatible_Env_hoare_is_safe; eauto.
   Qed.
 
 End Hoare.

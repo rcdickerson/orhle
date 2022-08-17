@@ -3,23 +3,6 @@
 (* Adapted from the Software Foundations series:
    https://softwarefoundations.cis.upenn.edu/ *)
 
-Ltac injections :=
-  repeat match goal with
-         | [ H : _ = _ |- _ ]
-           => injection H; intros; subst; clear H
-         end.
-
-Ltac find_if_inside :=
-  match goal with
-  | [ |- context[if ?X then _ else _] ] => destruct X
-  | [ H : context[if ?X then _ else _] |- _ ]=> destruct X
-  end.
-
-Ltac split_and :=
-  repeat match goal with
-           H : _ /\ _ |- _ => destruct H
-         end.
-
 Require Import
         Coq.Bool.Bool
         Coq.Strings.String
@@ -27,7 +10,9 @@ Require Import
         Coq.Sets.Ensembles.
 
 Import Nat.
-Require Import Maps.
+Require Import
+        Common
+        Maps.
 
 (* ================================================================= *)
 (** ** States *)
@@ -112,6 +97,7 @@ Notation "a '!->' x" := (t_update empty_st a x) (at level 100).
 Definition funName := string.
 
 Inductive com : Type :=
+  | CHavoc (x : string)
   | CSkip
   | CAss (x : string) (a : aexp)
   | CCall (x : string) (f : funName) (args : list aexp)
@@ -167,6 +153,8 @@ Inductive ceval (Sigma : Env) : com -> state -> state -> Prop :=
   | E_Ass  : forall st a1 n x,
       aeval st a1 = n ->
       Sigma |- st =[ x ::= a1 ]=> (x !-> n ; st)
+  | E_Havoc  : forall st n x,
+      Sigma |- st =[ CHavoc x ]=> (x !-> n ; st)
   | E_Seq : forall c1 c2 st st' st'',
       Sigma |- st  =[ c1 ]=> st'  ->
       Sigma |- st' =[ c2 ]=> st'' ->
@@ -193,6 +181,11 @@ Inductive ceval (Sigma : Env) : com -> state -> state -> Prop :=
       funDefs f = None ->
       (funSpecs f).(pre) (aseval st args) ->
       (funSpecs f).(post) n (aseval st args) ->
+      Sigma |- st =[ x :::= f $ args ]=> (x !-> n ; st)
+
+  | E_CallSpec2 : forall st args n x f,
+      funDefs f = None ->
+      ~ (funSpecs f).(pre) (aseval st args) ->
       Sigma |- st =[ x :::= f $ args ]=> (x !-> n ; st)
 
   | E_CallDef : forall st st' args fd x f,
@@ -227,7 +220,7 @@ Inductive AppearsIn (f : funName) : com -> Prop :=
 | AI_Call : forall args x,
     AppearsIn f (x :::= f $ args).
 
-Section safe_Execution.
+Section compatible_Execution.
 
   (* Formalizing when it is safe to use function definitions.  Safe
      here means that the composite program doesn't introduce any new
@@ -235,7 +228,7 @@ Section safe_Execution.
 
   (* A safe function definition is one that doesn't introduce any new
      behaviors outside those allowed by its specifiction. *)
-  Definition safe_funDef (Sigma : Env)
+  Definition compatible_funDef (Sigma : Env)
              (fs : funSpec)
              (fd : funDef) : Prop :=
     forall (args : list nat) st',
@@ -245,10 +238,10 @@ Section safe_Execution.
 
   (* An environment is safe if all of its function definitions are
      safe with respect to their specs.  *)
-  Definition safe_Env (Sigma : Env) : Prop :=
+  Definition compatible_env (Sigma : Env) : Prop :=
     forall f fd,
       funDefs f = Some fd ->
-      safe_funDef Sigma (funSpecs f) fd.
+      compatible_funDef Sigma (funSpecs f) fd.
 
   (* A safe initial state is one that guarantees the program will not crash / get stuck *)
   CoInductive Safe (Sigma : Env) : com -> state -> Prop :=
@@ -256,6 +249,8 @@ Section safe_Execution.
       Safe Sigma SKIP st
   | Safe_Ass  : forall st x a,
       Safe Sigma (x ::= a) st
+  | Safe_Havoc  : forall st x,
+      Safe Sigma (CHavoc x) st
   | Safe_Seq : forall c1 c2 st,
       Safe Sigma c1 st ->
       (forall st', Sigma |- st =[ c1 ]=> st' -> Safe Sigma c2 st') ->
@@ -285,35 +280,6 @@ Section safe_Execution.
       funDefs f = None ->
       (funSpecs f).(pre) (aseval st args) ->
       Safe Sigma (x :::= f $ args) st.
-
-  (* Key Safety Theorem: executing a program in a safe environment and
-  initial state will not produce any values that a 'pure'
-  specification environment (i.e. one without any function
-  definitions) would not. In other words, the composite program is a
-  /refinement/ of the specification-only program. *)
-  Theorem safe_Env_refine (Sigma : Env) :
-    forall (c : com) (st st' : state),
-      safe_Env Sigma ->
-      Safe {|
-          funSigs := funSigs;
-          funSpecs := funSpecs;
-          funDefs := empty |} c st ->
-      Sigma |- st =[ c ]=> st' ->
-      {| funSigs := funSigs;
-         funSpecs := funSpecs;
-         funDefs := empty |} |- st =[ c ]=> st'.
-  Proof.
-    induction 3; intros; try (solve [econstructor; eauto]).
-    - inversion H0; subst; try congruence; econstructor; eauto.
-    - inversion H0; subst; try congruence; econstructor; eauto.
-    - inversion H0; subst; eapply E_IfFalse; eauto; congruence.
-    - inversion H0; subst; try congruence; econstructor; eauto.
-    - inversion H0; subst; try congruence.
-      + simpl in *; rewrite apply_empty in H7; discriminate.
-      + eapply (E_CallSpec {| funSpecs := funSpecs; funDefs := empty |});
-          simpl in *; eauto.
-        eapply H; eauto.
-  Qed.
 
   (* Next, we prove how to actually *build* a Safe Environment from
   set of function definitions. *)
@@ -369,6 +335,9 @@ Section safe_Execution.
     - econstructor; eauto; simpl in *.
       unfold update, t_update; find_if_inside; subst; eauto.
       destruct H; eauto.
+    - eapply E_CallSpec2; eauto; simpl in *.
+      unfold update, t_update; find_if_inside; subst; eauto.
+      destruct H; eauto.
     - eapply E_CallDef; simpl; eauto.
       unfold update, t_update; find_if_inside; eauto.
       destruct H; subst; eauto.
@@ -395,6 +364,9 @@ Section safe_Execution.
     - econstructor; eauto; simpl in *.
       unfold update, t_update in *; find_if_inside; subst; eauto;
         discriminate.
+    - eapply E_CallSpec2; eauto; simpl in *.
+      unfold update, t_update in *; find_if_inside; subst; eauto;
+        discriminate.
     - eapply E_CallDef; simpl in *; eauto.
       + eapply update_inv in H1; destruct H1 as [[? ?] | [? ?]];
           subst; eauto.
@@ -403,26 +375,26 @@ Section safe_Execution.
         destruct H; subst; eauto.
   Qed.
 
-  Lemma safe_Env_Extend
+  Lemma compatible_env_Extend
     : forall (Sigma : Env)
              (f : funName)
              (fd : funDef),
-      safe_Env Sigma ->
+      compatible_env Sigma ->
       funDefs f = None ->
       (forall f' fd', funDefs f' = Some fd' ->
                       ~ AppearsIn f (funBody fd'))
       -> ~ AppearsIn f (funBody fd)
-      -> safe_funDef Sigma (funSpecs f) fd
-      -> safe_Env {| funSigs := funSigs;
+      -> compatible_funDef Sigma (funSpecs f) fd
+      -> compatible_env {| funSigs := funSigs;
                      funSpecs := funSpecs;
                      funDefs := f |-> fd; funDefs |}.
   Proof.
-    unfold safe_Env; simpl; intros.
+    unfold compatible_env; simpl; intros.
     unfold update, t_update in H4; find_if_inside; subst.
     - injections.
-      unfold safe_funDef; intros; eapply H3;
+      unfold compatible_funDef; intros; eapply H3;
         eauto using eval_Env_Strengthen.
-    - unfold safe_funDef; intros.
+    - unfold compatible_funDef; intros.
       eapply H; eauto using eval_Env_Strengthen.
   Qed.
 
@@ -461,7 +433,7 @@ Section safe_Execution.
        funSpecs := build_funSpecs names Specs;
        funDefs := build_funDefs names Defs |}.
 
-  Fixpoint build_safe_Env'
+  Fixpoint build_compatible_env'
            (Sigs : total_map funSig)
            (Specs : total_map funSpec)
            (names : list funName)
@@ -471,37 +443,37 @@ Section safe_Execution.
     | f :: names', fd :: Defs' =>
       Forall (fun fd' => ~ AppearsIn f (funBody fd')) Defs' /\
       ~ AppearsIn f (funBody fd) /\
-      safe_funDef
+      compatible_funDef
         {| funSigs := Sigs;
            funSpecs := Specs;
            funDefs := fold_right (fun ffd Sigma' => update Sigma' (fst ffd) (snd ffd))
                                  empty (combine names Defs) |}
         (Specs f) fd /\
-      (build_safe_Env' Sigs Specs names' Defs')
+      (build_compatible_env' Sigs Specs names' Defs')
     | _, _ => True
     end.
 
-  (* [build_safe_Env] defines a sufficient condition for the
-  environment built [build_env] to be safe. *)
-  Definition build_safe_Env
+  (* [build_compatible_env] defines a sufficient condition for the
+  environment built [build_env] to be compatible. *)
+  Definition build_compatible_env
              (names : list funName)
              (Sigs : list funSig)
              (Specs : list funSpec)
              (Defs : list funDef)
     : Prop :=
-    build_safe_Env' (build_funSigs names Sigs)
+    build_compatible_env' (build_funSigs names Sigs)
                     (build_funSpecs names Specs)
                     names Defs.
 
-  Lemma build_safe_Env_is_safe'
+  Lemma build_compatible_env_is_compatible'
     : forall (names : list funName)
              (Defs : list funDef)
              (funSpecs' : total_map funSpec)
              (funSigs' : total_map funSig),
       NoDup names ->
       length names = length Defs ->
-      build_safe_Env' funSigs' funSpecs' names Defs ->
-      safe_Env
+      build_compatible_env' funSigs' funSpecs' names Defs ->
+      compatible_env
         {|
           funSigs := funSigs';
           funSpecs := funSpecs';
@@ -510,16 +482,16 @@ Section safe_Execution.
                        (combine names Defs) |}.
   Proof.
     induction names; simpl; intros.
-    - unfold safe_Env; unfold build_Env; simpl; intros;
+    - unfold compatible_env; unfold build_Env; simpl; intros;
         compute in H1; discriminate.
     - destruct Defs; simpl in *;
         try discriminate; injections; split_and.
       inversion H; subst.
-      unfold safe_Env in *.
+      unfold compatible_env in *.
       simpl; intros ? ? e; eapply update_inv in e;
         destruct e as [ [? ?] | [? ?] ]; subst; eauto.
       specialize (IHnames _ _ _ H8 H2 H4 _ _ H6).
-      unfold safe_funDef in *; intros.
+      unfold compatible_funDef in *; intros.
       eapply IHnames; eauto.
       eapply eval_Env_Strengthen; eauto.
       + generalize Defs H1 H0 H6; clear; induction names; simpl; intros.
@@ -534,25 +506,47 @@ Section safe_Execution.
             inversion H0; subst; eauto.
   Qed.
 
-  (* Thankfully, [build_safe_Env] does guarantee safety! *)
-  Corollary build_safe_Env_is_safe
+  (* Thankfully, [build_compatible_env] does guarantee compatiblety! *)
+  Corollary build_compatible_env_is_compatible
     : forall (names : list funName)
              (Sigs : list funSig)
              (Specs : list funSpec)
              (Defs : list funDef),
       NoDup names ->
       length names = length Defs ->
-      build_safe_Env names Sigs Specs Defs ->
-      safe_Env (build_Env names Sigs Specs Defs).
+      build_compatible_env names Sigs Specs Defs ->
+      compatible_env (build_Env names Sigs Specs Defs).
   Proof.
-    intros; eapply build_safe_Env_is_safe'; eauto.
+    intros; eapply build_compatible_env_is_compatible'; eauto.
   Qed.
 
-  (* We can combining this [build_safe_Env_is_safe] with
-  [safe_Env_refine], to show that if [build_safe_Env] holds, it is
-  safe to execute the composite program built by 'linking' in the
-  enviroment built by [build_Env]. *)
-  Corollary build_safe_Env_refine :
+  (* A variant of the Safety Theorem which doesn't require the law of excluded middle. *)
+  Theorem compatible_env_safe_refine (Sigma : Env) :
+    forall (c : com) (st st' : state),
+      compatible_env Sigma ->
+      Safe {|
+          funSigs := funSigs;
+          funSpecs := funSpecs;
+          funDefs := empty |} c st ->
+      Sigma |- st =[ c ]=> st' ->
+      {| funSigs := funSigs;
+         funSpecs := funSpecs;
+         funDefs := empty |} |- st =[ c ]=> st'.
+  Proof.
+    induction 3; intros; try (solve [econstructor; eauto]).
+    - inversion H0; subst; try congruence; econstructor; eauto.
+    - inversion H0; subst; try congruence; econstructor; eauto.
+    - inversion H0; subst; eapply E_IfFalse; eauto; congruence.
+    - inversion H0; subst; try congruence; econstructor; eauto.
+    - inversion H0; subst; try congruence.
+      + simpl in *; rewrite apply_empty in H7; discriminate.
+      + eapply (E_CallSpec {| funSpecs := funSpecs; funDefs := empty |});
+          simpl in *; eauto.
+        eapply H; eauto.
+  Qed.
+
+
+  Corollary build_compatible_env_safe_refine :
     forall (c : com) (st st' : state)
            (names : list funName)
            (Sigs : list funSig)
@@ -560,7 +554,7 @@ Section safe_Execution.
            (Defs : list funDef),
       NoDup names ->
       length names = length Defs ->
-      build_safe_Env names Sigs Specs Defs ->
+      build_compatible_env names Sigs Specs Defs ->
       Safe {|
           funSigs := build_funSigs names Sigs;
           funSpecs := build_funSpecs names Specs;
@@ -571,8 +565,56 @@ Section safe_Execution.
                  funDefs := empty |} |- st =[ c ]=> st'.
   Proof.
     intros.
-    eapply safe_Env_refine in H3; simpl in H3;
-      eauto using build_safe_Env_is_safe.
+    eapply compatible_env_safe_refine in H3; simpl in H3;
+      eauto using build_compatible_env_is_compatible.
   Qed.
 
-End safe_Execution.
+  Require Import Coq.Logic.Classical_Prop.
+
+  (* Key Safety Theorem: executing a program in a safe environment and
+  initial state will not produce any values that a 'pure'
+  specification environment (i.e. one without any function
+  definitions) would not. In other words, the composite program is a
+  /refinement/ of the specification-only program. *)
+
+  Theorem compatible_Env_refine (Sigma : Env) :
+    forall (c : com) (st st' : state),
+      compatible_env Sigma ->
+      Sigma |- st =[ c ]=> st' ->
+      {| funSigs := funSigs;
+         funSpecs := funSpecs;
+         funDefs := empty |} |- st =[ c ]=> st'.
+  Proof.
+    induction 2; intros; try (solve [econstructor; eauto]).
+    - destruct (classic ((funSpecs f).(pre) (aseval st args))).
+      + pose proof (H _ _ H0 _ _ H2 H1).
+        eapply (E_CallSpec {| funSpecs := funSpecs; funDefs := empty |});
+          simpl in *; eauto.
+      + eapply E_CallSpec2; eauto.
+  Qed.
+
+  (* We can combining this [build_compatible_env_is_compatible] with
+  [compatible_env_refine], to show that if [build_compatible_env] holds, it is
+  compatible to execute the composite program built by 'linking' in the
+  enviroment built by [build_Env]. *)
+  Corollary build_compatible_env_refine :
+    forall (c : com) (st st' : state)
+           (names : list funName)
+           (Sigs : list funSig)
+           (Specs : list funSpec)
+           (Defs : list funDef),
+      NoDup names ->
+      length names = length Defs ->
+      build_compatible_env names Sigs Specs Defs ->
+      (build_Env names Sigs Specs Defs) |- st =[ c ]=> st' ->
+              {| funSigs := build_funSigs names Sigs;
+                 funSpecs := build_funSpecs names Specs;
+                 funDefs := empty |} |- st =[ c ]=> st'.
+  Proof.
+    intros.
+    eapply compatible_Env_refine in H2; simpl in H2;
+      eauto using build_compatible_env_is_compatible.
+
+  Qed.
+
+End compatible_Execution.

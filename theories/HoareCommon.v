@@ -2,7 +2,9 @@
    https://softwarefoundations.cis.upenn.edu/ *)
 
 Require Import Coq.Bool.Bool.
-Require Import Maps Imp.
+
+Require Import Maps
+        FunImp.
 
 Definition Assertion := state -> Prop.
 

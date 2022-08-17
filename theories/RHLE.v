@@ -4,9 +4,15 @@ Require Import
         Coq.micromega.Psatz
         Coq.Program.Tactics.
 
-Require Import Maps Imp.
+Require Import
+        Common
+        Maps
+        FunImp
+        HoareCommon
+        Hoare
+        Productive
+        HLE.
 
-Require Import HoareCommon Hoare EHoare.
 Require Import Coq.Vectors.Vector.
 
 Definition RelAssertion {n m} := Vector.t state n -> Vector.t state m -> Prop.
@@ -58,7 +64,7 @@ Section RHLE.
       rhle_proof Sigma ESigma P Uc' Ec Q ->
       rhle_proof Sigma ESigma P Uc Ec Q
 
-    | RHE_SkipIntroR : forall P Q Uc Ec Ec' i,
+  | RHE_SkipIntroR : forall P Q Uc Ec Ec' i,
       (forall i', i <> i' -> Vector.nth Ec i' = Vector.nth Ec' i') ->
       Vector.nth Ec' i = CSeq (Vector.nth Ec i) CSkip ->
       rhle_proof Sigma ESigma P Uc Ec' Q ->
@@ -84,7 +90,7 @@ Section RHLE.
         Vector.nth Ec i = CSeq c1 c2 ->
         Vector.nth Ec' i = c2 ->
         (forall Ast Est,
-            ehoare_proof ESigma (fun st =>
+            hle_proof ESigma (fun st =>
                                  Vector.nth Est i = st /\
                                  P Ast Est) c1
                         (fun st => R Ast (replace Est i st))) ->
@@ -92,234 +98,60 @@ Section RHLE.
         rhle_proof Sigma ESigma R Uc Ec' Q ->
         rhle_proof Sigma ESigma P Uc Ec Q
 
+(*  | RHE_StepIfL :
+      forall P Q Uc Ec Uct Uce i b ct ce c2,
+        (forall i', i <> i' -> Vector.nth Uc i' = Vector.nth Uce i') ->
+        (forall i', i <> i' -> Vector.nth Uc i' = Vector.nth Uct i') ->
+        Vector.nth Uc i = CSeq (CIf b ct ce) c2 ->
+        Vector.nth Uct i = CSeq ct c2 ->
+        Vector.nth Uce i = CSeq ce c2 ->
+        rhle_proof Sigma ESigma (fun Ast Est => P Ast Est /\ bassn b (Vector.nth Ast i)) Uct Ec Q ->
+        rhle_proof Sigma ESigma (fun Ast Est => P Ast Est /\ ~ bassn b (Vector.nth Ast i)) Uce Ec Q ->
+        rhle_proof Sigma ESigma P Uc Ec Q
+
+  | RHE_StepIfR :
+      forall P Q Uc Ec Ect Ece i b ct ce c2,
+        (forall i', i <> i' -> Vector.nth Ec i' = Vector.nth Ece i') ->
+        (forall i', i <> i' -> Vector.nth Ec i' = Vector.nth Ect i') ->
+        Vector.nth Ec i = CSeq (CIf b ct ce) c2 ->
+        Vector.nth Ect i = CSeq ct c2 ->
+        Vector.nth Ece i = CSeq ce c2 ->
+        rhle_proof Sigma ESigma (fun Ast Est => P Ast Est /\ bassn b (Vector.nth Est i)) Uc Ect Q ->
+        rhle_proof Sigma ESigma (fun Ast Est => P Ast Est /\ ~ bassn b (Vector.nth Est i)) Uc Ece Q ->
+        rhle_proof Sigma ESigma P Uc Ec Q
+
+  | RHE_StepAll :
+      forall P Q R Uc Ec Uc1 Uc2 Ec1 Ec2,
+        (forall i, Vector.nth Uc i = CSeq (Vector.nth Uc1 i) (Vector.nth Uc2 i)) ->
+        (forall i, Vector.nth Ec i = CSeq (Vector.nth Ec1 i) (Vector.nth Ec2 i)) ->
+        rhle_proof Sigma ESigma P Uc1 Ec1 R ->
+        rhle_proof Sigma ESigma R Uc2 Ec2 Q ->
+        rhle_proof Sigma ESigma P Uc Ec Q *)
+
+
   where "Sigma , ESigma |- {{ P }}  c1 ~# c2  {[ Q ]}" := (rhle_proof Sigma ESigma P c1 c2 Q) : hoare_spec_scope.
 
   Hint Resolve bassn_eval_true bassn_eval_false : hoare.
   Hint Constructors rhle_proof : hoare.
-  Hint Unfold rhle_triple hoare_triple ehoare_triple.
+  Hint Unfold rhle_triple hoare_triple hle_triple.
   Hint Constructors ceval.
 
-  (*Ltac apply_sound :=
-    match goal with
-    | H : context[_ |- {{_}} _ {{_}}] |- _ =>
-      eapply hoare_proof_sound in H
-    | H : context[_ |- {[_]} _ {[_]}#] |- _ =>
-      eapply ehoare_proof_sound in H
-    end. *)
-
-  Lemma vector_nth_replace {A} {k}:
-    forall (i : Fin.t k) (v : t A k) (a : A),
-      nth (replace v i a) i = a.
+  (*Lemma ceval_Ex_single_step :
+    forall Sigma i Ec c' (Est : Estate) Q,
+      (forall R, ceval_Ex Sigma (Vector.nth Ec i) (Vector.nth Est i) R ->
+                 ceval_Ex Sigma c' (Vector.nth Est i) R) ->
+      Relceval_Ex _ Sigma Est (Vector.replace Ec i c') Q ->
+      Relceval_Ex _ Sigma Est Ec Q.
   Proof.
-    induction i;
-      intros; pattern v; eapply caseS'; eauto; intros.
-    simpl; eauto.
-  Qed.
+    intros.
+    replace Ec with (replace (replace Ec i c') i (nth Ec i)).
+    - generalize (replace Ec i c') H0; clear H0; intros t H0.
+      revert H; induction H0.
+      + admit.
+      +
+  Admitted. *)
 
-  Lemma vector_nth_replace' {A} {k}:
-    forall (i i0 : Fin.t k) (v : t A k) (a : A),
-      i <> i0 ->
-      nth (replace v i a) i0 = nth v i0.
-  Proof.
-    induction i0;
-      intros; pattern v; eapply caseS'; eauto; intros.
-    - simpl; revert v a H h t.
-      pattern i; eapply Fin.caseS'; intros; eauto.
-      congruence.
-    - simpl; revert v a H h t.
-      pattern i; eapply Fin.caseS'; intros; eauto.
-      eapply IHi0; congruence.
-  Qed.
-
-  Lemma vector_replace_nth_id {A} {k}:
-    forall (i : Fin.t k) (v : t A k),
-      replace v i (nth v i) = v.
-  Proof.
-    induction i;
-      intros; pattern v; eapply caseS'; eauto; intros.
-    simpl; eauto.
-    rewrite IHi; reflexivity.
-  Qed.
-
-  Lemma vector_nth_exists {A} {k} (P : A -> Fin.t k -> Prop):
-    (forall (i : Fin.t k), exists (a : A), P a i) ->
-    exists (v : t A k), forall (i : Fin.t k), P (Vector.nth v i) i.
-  Proof.
-    induction k; intros.
-    - eexists (nil _); intros; inversion i.
-    - specialize (IHk (fun a i => P a (Fin.FS i)) (fun i => H (Fin.FS i))); destruct IHk.
-      destruct (H Fin.F1).
-      eexists (Vector.cons _ x0 _ x).
-      intros.
-      pattern i; eapply Fin.caseS'; intros; eauto.
-  Qed.
-
-  Theorem rhle_proof_sound Sigs Sigma ESigma
-          (Cons_Env : Consistent_Env {| AllEnv := {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |}; funExSpecs := ESigma |})
-    : forall P c1 c2 Q,
-      rhle_proof Sigma ESigma P c1 c2 Q ->
-      {| AllEnv := {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |};
-         funExSpecs := ESigma |} |= {{P}} c1 ~# c2 {[Q]}.
-  Proof.
-    intros ? ? ? ? pf.
-    unfold rhle_triple.
-    induction pf; intros Ust Ust' Est exe HP.
-    - eexists Est.
-      assert (Ust' = Ust).
-      { revert H exe; clear.
-        unfold Ustate in *; revert Ust Ust'.
-        induction Uc.
-        - intro; pattern Ust; eapply VectorDef.case0.
-          intro; pattern Ust'; eapply VectorDef.case0.
-          eauto.
-        - intro; pattern Ust; eapply VectorDef.caseS'.
-          intros h0 t Ust'; pattern Ust'; eapply VectorDef.caseS'.
-          intros; f_equal.
-          + specialize (H Fin.F1); specialize (exe Fin.F1); simpl in *.
-            subst; inversion exe; eauto.
-          + eapply IHUc; intros; eauto.
-            eapply (fun i => H (Fin.FS i)).
-            eapply (fun i => exe (Fin.FS i)).
-      }
-      assert (forall (i : Fin.t m), ceval {| funSigs := Sigs; funSpecs := Sigma; funDefs := @empty funDef |}  (nth Ec i) (nth Est i) (nth Est i)).
-      { revert H0; clear.
-        intros.
-        rewrite H0.
-        econstructor.
-      }
-      eexists _; subst; eauto.
-    - eapply IHpf; eauto.
-      intros.
-      destruct (Fin.eq_dec i i0); subst.
-      + rewrite H0; eauto.
-      + rewrite <- H by eauto.
-        eapply exe.
-    - edestruct IHpf as [Est' [exe' HQ]]; eauto.
-      assert (forall (i0 : Fin.t m), ceval {| funSigs := Sigs; funSpecs := Sigma; funDefs := @empty funDef |} (nth Ec i0) (nth Est i0)  (nth Est' i0) ).
-      { intros; destruct (Fin.eq_dec i i0); subst.
-        + specialize (exe' i0); rewrite H0 in exe'; simpl in *.
-          inversion exe'; subst.
-          inversion H6; subst.
-          eauto.
-        + rewrite H by eauto.
-          eapply exe'.
-      }
-      eauto.
-    - generalize (exe i); intros exe'.
-      rewrite H0 in exe'; inversion exe'; subst.
-      edestruct (IHpf (replace Ust i st') Ust'); eauto.
-      + intros; destruct (Fin.eq_dec i i0); subst.
-        * rewrite vector_nth_replace; eauto.
-        * rewrite vector_nth_replace', <- H; eauto.
-      + eapply (hoare_proof_sound _ _ _ _ _ (H2 Ust Est) _ _ H5); eauto.
-    - specialize (H2 Ust Est).
-      eapply (@ehoare_proof_link {| AllEnv := {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |}; funExSpecs := ESigma |}) in H2; eauto using productive_empty.
-      edestruct H2 as [? [? ?] ]; try tauto.
-      edestruct IHpf as [Est' [exe' HQ]]; eauto.
-      assert (forall (i0 : Fin.t m), ceval {| funSigs := Sigs; funSpecs := Sigma; funDefs := @empty funDef |}
-                                           (nth Ec i0)
-                                           (nth Est i0)
-                                           (nth Est' i0)); eauto.
-      intros; destruct (Fin.eq_dec i i0); subst.
-      + rewrite H0; econstructor; eauto.
-        specialize (exe' i0); rewrite vector_nth_replace in exe'; eauto.
-        admit.
-      + specialize (exe' i0); rewrite vector_nth_replace' in exe'; eauto.
-        rewrite H; eauto.
-        Grab Existential Variables.
-        admit.
-        intros; eauto.
-  Admitted.
-
-  Inductive RelProductive
-            (Sigma : ExEnv)
-    : Estate -> Eprogs -> Ensemble Estate -> Prop :=
-  | RelP_Finish : forall Est Ec,
-      (forall i, Vector.nth Ec i = CSkip)
-      -> RelProductive Sigma Est Ec (Singleton _ Est)
-
-    | RelP_SkipIntro : forall Est Q Ec Ec' i,
-      (forall i', i <> i' -> Vector.nth Ec i' = Vector.nth Ec' i') ->
-      Vector.nth Ec' i = CSeq (Vector.nth Ec i) CSkip ->
-      RelProductive Sigma Est Ec' Q ->
-      RelProductive Sigma Est Ec Q
-
-  | RelP_Step :
-      forall Est Q (R : Ensemble state) Ec Ec' i c1 c2,
-        (forall i', i <> i' -> Vector.nth Ec i' = Vector.nth Ec' i') ->
-        Vector.nth Ec i = CSeq c1 c2 ->
-        Vector.nth Ec' i = c2 ->
-        Productive Sigma c1 (nth Est i) R ->
-        (forall st,
-            R st ->
-            RelProductive Sigma (replace Est i st) Ec' Q) ->
-        RelProductive Sigma Est Ec Q
-
-  | RelP_Weaken :
-      forall Est Ec Q Q',
-        RelProductive Sigma Est Ec Q ->
-        Included _ Q Q' ->
-        RelProductive Sigma Est Ec Q'.
-
-  Theorem RelProductive_produces (Sigma : ExEnv)
-  : forall (Est : Estate)
-           (Ec : Eprogs)
-           (Q : Ensemble Estate),
-      RelProductive Sigma Est Ec Q ->
-      exists Est'
-             (exe : forall i, AllEnv |- (Vector.nth Est i) =[Vector.nth Ec i]=> (Vector.nth Est' i)),
-        Q Est'.
-  Proof.
-    induction 1.
-    - exists Est.
-      assert (forall i, AllEnv |- (Vector.nth Est i) =[Vector.nth Ec i]=> (Vector.nth Est i))
-        as exe
-        by (intros; rewrite H; eauto).
-      eexists exe; econstructor.
-    - destruct IHRelProductive as [Est' [exe QEst] ].
-      assert (forall (i' : Fin.t m), AllEnv |- nth Est i' =[ nth Ec i' ]=> nth Est' i')
-        as exe'.
-      { intros; destruct (Fin.eq_dec i i'); subst.
-        + specialize (exe i'); rewrite H0 in exe.
-          inversion exe; subst.
-          inversion H7; subst; eauto.
-        + rewrite H; eauto.
-      }
-      eauto.
-    - eapply productive_com_produces in H2; destruct H2 as [st' [exe' R_st'] ].
-      destruct (H4 _ R_st') as [Est' [exes' Q_exes'] ].
-      eexists Est'.
-      assert (forall (i' : Fin.t m), AllEnv |- nth Est i' =[ nth Ec i' ]=> nth Est' i'); eauto.
-      { intros; destruct (Fin.eq_dec i i'); subst.
-        + rewrite H0.
-          econstructor; eauto.
-          specialize (exes' i'); rewrite vector_nth_replace in exes'; eauto.
-        + rewrite H; eauto.
-          specialize (exes' i'); rewrite vector_nth_replace' in exes'; eauto.
-      }
-    - destruct IHRelProductive as [Est' [exes' Q_exes'] ].
-      eexists Est', exes'.
-      eapply H0; eauto.
-  Qed.
-
-  Theorem productive_Env_produces (Sigma : ExEnv)
-      : forall (Est : Estate)
-               (Ec : Eprogs)
-               (Q : Ensemble Estate),
-      productive_Env Sigma ->
-      RelProductive {| AllEnv := {|
-                                  funSigs := funSigs;
-                                  funSpecs := funSpecs;
-                                  funDefs := empty |};
-                       funExSpecs := funExSpecs |} Est Ec Q ->
-      RelProductive Sigma Est Ec Q.
-  Proof.
-    induction 2; intros; try (solve [econstructor; eauto]).
-    eapply RelP_Step; eauto using productive_Env_produces.
-  Qed.
-
-  Theorem rhle_proof_RelProductive Sigs Sigma ESigma
-          (Cons_Env : Consistent_Env {| AllEnv := {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |}; funExSpecs := ESigma |})
+  Theorem rhle_proof_Relceval_Ex Sigs Sigma ESigma
     : forall P Uc Ec Q,
       rhle_proof Sigma ESigma P Uc Ec Q ->
       forall (Ust Ust' : Ustate)
@@ -328,7 +160,7 @@ Section RHLE.
             {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |}
             |- Vector.nth Ust i =[ Vector.nth Uc i ]=> Vector.nth Ust' i) ->
         P Ust Est ->
-        RelProductive {| AllEnv := {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |}; funExSpecs := ESigma |} Est Ec (Q Ust').
+        Relceval_Ex _ {| AllEnv := {| funSigs := Sigs; funSpecs := Sigma; funDefs := empty |}; funExSpecs := ESigma |} Est Ec (Q Ust').
   Proof.
     intros ? ? ? ? pf.
     induction pf; intros Ust Ust' Est exe HP.
@@ -374,43 +206,102 @@ Section RHLE.
       + eapply (hoare_proof_sound _ _ _ _ _ (H2 Ust Est) _ _ H5); eauto.
     - assert (nth Est i = nth Est i /\ P Ust Est) as H3 by tauto.
       eapply RelP_Step; eauto.
-      eapply @ehoare_proof_produces with (Sigma := {| AllEnv := {| funSigs := _ |} |});
+      eapply @hle_proof_sound with (Sigma := {| AllEnv := {| funSigs := _ |} |});
         cbv beta; eauto using productive_empty.
       + simpl; eauto.
       + simpl; intros; eauto.
+    (*- destruct (beval (Vector.nth Ust i) b) eqn: ?.
+      + eapply IHpf1; eauto.
+        intros.
+        destruct (Fin.eq_dec i i0); subst.
+        * specialize (exe i0); rewrite H1 in exe;
+            inversion exe; subst.
+          inversion H6; subst; try congruence.
+          rewrite H2; eauto.
+        * rewrite <- H0 by eauto; eapply exe.
+      + eapply IHpf2; intuition eauto.
+        intros.
+        destruct (Fin.eq_dec i i0); subst.
+        * specialize (exe i0); rewrite H1 in exe;
+            inversion exe; subst.
+          inversion H6; subst; try congruence.
+          rewrite H3; eauto.
+        * rewrite <- H by eauto; eapply exe.
+        * rewrite bassn_eval_false in Heqb0; tauto.
+    - destruct (beval (Vector.nth Est i) b) eqn: ?.
+      + eapply ceval_Ex_single_step with (i := i) (c' := CSeq ct c2).
+        * rewrite H1. revert Heqb0.
+          clear.
+          remember ((TEST b THEN ct ELSE ce FI);; c2)%imp; intros.
+          revert b ct ce Heqb0 Heqc; induction H; intros; try discriminate.
+          -- injections.
+             econstructor; eauto.
+             revert H Heqb0; clear.
+             remember (TEST b THEN ct ELSE ce FI)%imp.
+             intro; revert b ct ce Heqc; induction H; try discriminate; intros.
+             ++ injections; eauto.
+             ++ congruence.
+             ++ econstructor; eauto.
+          -- eapply ceval_Ex_Weaken; eauto.
+        * replace ((replace Ec i (ct;; c2)%imp)) with Ect; eauto.
+          rewrite <- H2.
+          eapply eq_nth_iff.
+          intros; destruct (Fin.eq_dec i p1); subst.
+          -- rewrite vector_nth_replace; eauto.
+          -- rewrite vector_nth_replace'; eauto.
+             rewrite <- H0; eauto.
+      + eapply ceval_Ex_single_step with (i := i) (c' := CSeq ce c2).
+        * rewrite H1. revert Heqb0.
+          clear.
+          remember ((TEST b THEN ct ELSE ce FI);; c2)%imp; intros.
+          revert b ct ce Heqb0 Heqc; induction H; intros; try discriminate.
+          -- injections.
+             econstructor; eauto.
+             revert H Heqb0; clear.
+             remember (TEST b THEN ct ELSE ce FI)%imp.
+             intro; revert b ct ce Heqc; induction H; try discriminate; intros.
+             ++ congruence.
+             ++ injections; eauto.
+             ++ econstructor; eauto.
+          -- eapply ceval_Ex_Weaken; eauto.
+        * replace ((replace Ec i (ce;; c2)%imp)) with Ece; eauto.
+          eapply IHpf2; intuition eauto.
+          -- rewrite bassn_eval_false in Heqb0; tauto.
+          -- eapply eq_nth_iff.
+             intros; destruct (Fin.eq_dec i p1); subst.
+             ++ rewrite vector_nth_replace; eauto.
+             ++ rewrite vector_nth_replace'; eauto.
+                rewrite <- H; eauto.
+    - generalize P Q R Ec Uc1 Uc2 Ec1 Ec2 H H0 IHpf1 IHpf2 Ust Ust' Est exe HP; clear.
+      revert Uc.
+      unfold RelAssertion, Ustate, Estate.
+      induction n.
+      + intro; pattern Uc; eapply VectorDef.case0; intros.
+        admit.
+      + intro; pattern Uc; eapply VectorDef.caseS with (v := Uc); simpl; intros.*)
+
   Qed.
 
-  Theorem rhle_proof_link
+  Theorem rhle_proof_refine
           {Sigma : ExEnv}
+          (Complete_Env : forall f, exists fd,  @funDefs (@AllEnv Sigma) f = Some fd)
     : forall (P : RelAssertion)
              (Uc : Uprogs)
              (Ec : Eprogs)
              (Q : RelAssertion),
-      productive_Env Sigma ->
-      Consistent_Env Sigma ->
-      safe_Env (@AllEnv Sigma) ->
-      (forall i Ust Est, P Ust Est ->
-                       @Safe {| funSigs := @funSigs (@AllEnv Sigma);
-                                funSpecs := @funSpecs (@AllEnv Sigma);
-                                funDefs := empty |} (Vector.nth Uc i) (Vector.nth Ust i)) ->
+      ex_compatible_env Sigma ->
+      compatible_env (@AllEnv Sigma) ->
       rhle_proof (@funSpecs (@AllEnv Sigma)) funExSpecs P Uc Ec Q ->
       Sigma |= {{P}} Uc ~# Ec {[Q]}.
   Proof.
     unfold rhle_triple; intros.
-    eapply (rhle_proof_RelProductive funSigs _ _ H0 _ _ _ _ H3) in H5;
-      eauto using safe_Env_refine.
-    eapply productive_Env_produces in H5; eauto.
-    eapply RelProductive_produces in H5; eauto.
+    eapply (rhle_proof_Relceval_Ex funSigs _ _ _ _ _ _ H1) in H3;
+      eauto using compatible_Env_refine.
+    eapply Relceval_Ex_strong in H3; eauto.
+    eapply Relceval_Ex_sufficient in H3; eauto.
   Qed.
 
 End RHLE.
-
-(*Lemma existential_not_universal :
-    ~(forall Sigma P Q p, (~ (hoare_triple Sigma P p (fun st => ~ Q st)) ->
-        (ehoare_triple Sigma P p Q))).
-Proof.
-  unfold not; intros.
-  assert  *)
 
 Notation "Sigma |= {{ P }}  c1 ~# c2  {[ Q ]}" :=
   (rhle_triple Sigma P c1 c2 Q) (at level 90, c1 at next level, c2 at next level)
