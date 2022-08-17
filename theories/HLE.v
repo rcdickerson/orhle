@@ -74,12 +74,12 @@ Section HLE.
     (hle_triple ESigma P c Q) (at level 90, c at next level)
     : hoare_spec_scope.
 
-  Hint Resolve bassn_eval_true bassn_eval_false : hoare.
+  #[local] Hint Resolve bassn_eval_true bassn_eval_false : hoare.
   Hint Constructors hle_proof : hoare.
-  Hint Constructors ceval.
+  Hint Constructors ceval : core.
 
-  Local Hint Constructors ceval.
-  Local Hint Constructors AppearsIn.
+  #[local] Hint Constructors ceval : core.
+  #[local] Hint Constructors AppearsIn : core.
 
   Hint Constructors ceval_Ex : hoare.
 
@@ -126,9 +126,7 @@ Section HLE.
     - eapply ceval_Ex_Weaken; eauto.
     - destruct H0 as [i [ [inits [returns [? ?] ] ] ? ] ].
       eapply ceval_Ex_Weaken; eauto.
-      + (*specialize (consistent_Sigma f);
-          destruct consistent_Sigma as [pre_f post_f]. *)
-        eapply ceval_Ex_CallSpec; firstorder eauto.
+      + eapply ceval_Ex_CallSpec; firstorder eauto.
         * eapply vector_nth_replace.
       + unfold Included, Ensembles.In; intros.
         destruct H3 as [v0 [? [? [? [? ?] ] ] ] ].
@@ -188,7 +186,8 @@ Section HLE.
       simpl; intuition eauto.
   Qed.
 
-Section HLEPlus.
+  Section HLEPlus.
+    Declare Scope hoare_spec'_scope.
   (* Proof that the EH_SpecK' rule is admissible. *)
   Inductive hle_proof' (Sigma : total_map funExSpec)
     : Assertion -> com -> Assertion -> Prop :=

@@ -14,8 +14,7 @@ Require Import
 
 Section existential_Execution.
 
-  (* Formalizing existential executions.
-   *)
+  (* Formalizing existential executions. *)
 
   Structure funExSpec : Type :=
     { (* Number of traces involved in the relational specifications *)
@@ -70,8 +69,6 @@ Section existential_Execution.
         (funExSpecs f).(preEx) inits ->
         (funExSpecs f).(postEx) inits returns ->
         Vector.nth inits i = aseval st args ->
-        (*(funSpecs f).(pre) (aseval st args) ->
-        (f unSpecs f).(post) (Vector.nth returns i) (aseval st args) -> *)
         ceval_Ex Sigma (x :::= f $ args) st
                    (fun st' => exists inits returns, (funExSpecs f).(postEx) inits returns
                                                      /\ (funExSpecs f).(preEx) inits
@@ -169,7 +166,7 @@ Section existential_Execution.
         Relceval_Ex Sigma Est Ec Q'.
 
   Hint Resolve bassn_eval_true bassn_eval_false : hoare.
-  Hint Constructors ceval.
+  Hint Constructors ceval : core.
 
   Theorem Relceval_Ex_sufficient (Sigma : ExEnv)
           (Complete_Env : forall f, exists fd,  @funDefs (@AllEnv Sigma) f = Some fd)
@@ -368,8 +365,8 @@ Section existential_Execution.
   Qed.
 
 
-  Local Hint Constructors ceval.
-  Local Hint Constructors AppearsIn.
+  #[local] Hint Constructors ceval : core.
+  #[local] Hint Constructors AppearsIn : core.
 
   Lemma productive_Weaken :
     forall Sigma c st Q f fd,

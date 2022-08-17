@@ -14,6 +14,8 @@ Require Import
         Common
         Maps.
 
+Require Import Coq.Logic.Classical_Prop.
+
 (* ================================================================= *)
 (** ** States *)
 
@@ -46,6 +48,8 @@ Coercion ANum : nat >-> aexp.
 Definition bool_to_bexp (b : bool) : bexp :=
   if b then BTrue else BFalse.
 Coercion bool_to_bexp : bool >-> bexp.
+
+Declare Scope imp_scope.
 
 Bind Scope imp_scope with aexp.
 Bind Scope imp_scope with bexp.
@@ -284,8 +288,9 @@ Section compatible_Execution.
   (* Next, we prove how to actually *build* a Safe Environment from
   set of function definitions. *)
 
-  Local Hint Constructors ceval.
-  Local Hint Constructors AppearsIn.
+
+  #[local] Hint Constructors ceval : core.
+  #[local] Hint Constructors AppearsIn : core.
 
   Fixpoint unroll_loop (n : nat)
            (b : bexp)
@@ -568,8 +573,6 @@ Section compatible_Execution.
     eapply compatible_env_safe_refine in H3; simpl in H3;
       eauto using build_compatible_env_is_compatible.
   Qed.
-
-  Require Import Coq.Logic.Classical_Prop.
 
   (* Key Safety Theorem: executing a program in a safe environment and
   initial state will not produce any values that a 'pure'

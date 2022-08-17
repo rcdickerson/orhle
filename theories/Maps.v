@@ -75,10 +75,12 @@ Qed.
 
 Create HintDb maps discriminated.
 
+#[global]
 Hint Resolve
      t_apply_empty t_update_eq t_update_neq
      t_update_shadow t_update_same t_update_permute : maps.
 
+#[global]
 Hint Rewrite
      t_apply_empty t_update_eq t_update_neq
      t_update_shadow t_update_same : maps.

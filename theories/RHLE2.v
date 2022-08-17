@@ -123,10 +123,10 @@ Section RHLE.
 
   where "Sigma , ESigma |- {{ P }}  c1 ~# c2  {[ Q ]}" := (rhle_proof Sigma ESigma P c1 c2 Q) : hoare_spec_scope.
 
-  Hint Resolve bassn_eval_true bassn_eval_false : hoare.
+  #[local] Hint Resolve bassn_eval_true bassn_eval_false : hoare.
   Hint Constructors rhle_proof : hoare.
-  Hint Unfold rhle_triple hoare_triple hle_triple.
-  Hint Constructors ceval.
+  Hint Unfold rhle_triple hoare_triple hle_triple : hoare.
+  Hint Constructors ceval : core.
 
   Lemma ceval_Ex_single_step' :
     forall Sigma c' (Est : Productive.Estate 1) Q,
@@ -297,8 +297,6 @@ Section RHLE.
           unfold Included, Ensembles.In; intros Est' Inc_Est'; inversion Inc_Est'; subst; eauto.
           unfold Included in *.
           eapply (H0 (Vector.cons _ _ _ _)); unfold In; simpl; econstructor.
-          (*eapply FunctionalExtensionality.equal_f with (x := Vector.cons _ Est' _ (Vector.nil _)) in HeqP.
-          simpl in HeqP; rewrite <- HeqP; constructor.*)
         * intros; subst.
           assert  (ceval_Ex
                     {|

@@ -11,6 +11,8 @@ Definition Assertion := state -> Prop.
 Definition assert_implies (P Q : Assertion) : Prop :=
   forall st, P st -> Q st.
 
+Declare Scope hoare_spec_scope.
+
 Notation "P ->> Q" := (assert_implies P Q)
                       (at level 80) : hoare_spec_scope.
 
