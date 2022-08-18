@@ -22,6 +22,7 @@ RUN rm -rf ~/.stack
 # Flatten.
 FROM scratch
 COPY --from=build / /
+WORKDIR orhle
 
 # Set the entry point.
 ENTRYPOINT ["/root/.local/bin/orhle-exe"]
