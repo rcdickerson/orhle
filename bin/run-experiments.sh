@@ -13,7 +13,6 @@ groups=( \
 
 output_dir="$experiment_dir/_results"
 
-stack build
 mkdir -p "$output_dir"
 
 for group in "${groups[@]}"
