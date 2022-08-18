@@ -11,7 +11,7 @@ RUN apt-get install -y git
 # Fetch and build ORHLE.
 RUN git clone https://github.com/rcdickerson/orhle.git
 WORKDIR orhle
-RUN git checkout 85e26d6fd0c413e84d0f87d1d23ac5dfc37b17d8
+RUN git checkout aplas2022
 RUN stack install
 
 # Set the entry point.

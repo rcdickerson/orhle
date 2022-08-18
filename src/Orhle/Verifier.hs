@@ -28,8 +28,6 @@ import Orhle.StepStrategy
 import Orhle.Triple
 import System.Random
 
-import Debug.Trace
-
 data Failure  = Failure { failMessage :: String } deriving Show
 data Success  = Success { }
 
@@ -49,19 +47,13 @@ rhleVerifier iFunEnv triple = do
   solver <- mkSolver
   let env = mkEnv solver LogLevelDebug 2000 names
   resultOrErr <- runCeili env $ do
-    --log_i $ "Collecting loop head states for loop invariant inference..."
-    --aLoopHeads <- mapM (headStates 5 cFunEnv) aprogs
-    --eLoopHeads <- mapM (headStates 5 cFunEnv) eprogs
-    --let loopHeads = Map.unions $ (aLoopHeads ++ eLoopHeads)
-    -- log_d $ "Loop heads: " ++ show loopHeads
     log_i $ "Running backward relational analysis..."
     let namesNoRets = Set.filter (\(Name name _) -> not $ "!retVal" `isSuffixOf` name) names
     let ptsContext = RelSpecImpPTSContext cFunEnv
-                                          Map.empty --loopHeads
+                                          Map.empty
                                           namesNoRets
                                           lits
     wp <- relBackwardPT backwardWithFusion ptsContext aprogs eprogs post
---    traceM $ "WP: " ++ show wp
     checkValid $ Imp pre wp
   case resultOrErr of
     Left msg  -> pure . Left . Failure $ msg
@@ -84,8 +76,6 @@ headStates numRandomStates env prog = do
             , Map.fromList $ map (\n -> (n, Concrete 0))  names
             , Map.fromList $ map (\n -> (n, Concrete $ -1))  names
             ] ++ randomStates
-  --lhss <- collectLoopHeadStates ctx sts prog
-  --pure $ Map.map (Map.map $ Set.map optimizeState) lhss
   collectLoopHeadStates ctx sts prog
 
 randomState :: [Name] -> Ceili (ProgState CValue)

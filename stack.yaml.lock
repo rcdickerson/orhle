@@ -35,11 +35,11 @@ packages:
     git: https://github.com/rcdickerson/ceili
     pantry-tree:
       size: 4492
-      sha256: 7707c4b4d17ab24ecd8df00474cc324a7c4b8433fa6dd64ed114132d8fd2c3fa
-    commit: 56c68925531a16e3424fcbecc4b2583121c7e1af
+      sha256: 694b1bb2e353246d3d7bc8fa5c7aa8e508af55372f7e6b299e5b6f730910e0dc
+    commit: bef7d00e0e02ec992df9af3de0602a2bfda52bf1
   original:
     git: https://github.com/rcdickerson/ceili
-    commit: 56c68925531a16e3424fcbecc4b2583121c7e1af
+    commit: bef7d00e0e02ec992df9af3de0602a2bfda52bf1
 snapshots:
 - completed:
     size: 567037
