@@ -25,7 +25,7 @@ do
     bname=$(basename -- "$exfile")
     exname="${bname%.*}"
     start=$(($(date +%s%N)/1000000))
-    if (time stack exec orhle-exe $exfile) > "$group_output_dir/$exname".out 2>&1;
+    if (time /root/.local/bin/orhle-exe $exfile) > "$group_output_dir/$exname".out 2>&1;
     then
        echo -ne "\xE2\x9C\x94"
     else
