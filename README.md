@@ -57,7 +57,7 @@ script as described [below](#Getting Started Guide).
 
 ## Getting Started Guide
 
-This artifact is distributed as a [Docker]((https://www.docker.com/)
+This artifact is distributed as a [Docker](https://www.docker.com/)
 image; to use it, you will need to install the Docker Engine as
 described in the [official Docker installation
 instructions](https://docs.docker.com/engine/install/). The image was
