@@ -29,6 +29,17 @@ packages:
       sha256: 876e5a679244143e2a7e74357427c7522a8d61f68a4cc3ae265fe4960b75a2e2
   original:
     hackage: strings-1.1@sha256:0285dec4c8ab262359342b3e5ef1eb567074669461b9b38404f1cb870c881c5c,1617
+- completed:
+    name: ceili
+    version: 0.1.0.0
+    git: https://github.com/rcdickerson/ceili
+    pantry-tree:
+      size: 4492
+      sha256: 7707c4b4d17ab24ecd8df00474cc324a7c4b8433fa6dd64ed114132d8fd2c3fa
+    commit: 56c68925531a16e3424fcbecc4b2583121c7e1af
+  original:
+    git: https://github.com/rcdickerson/ceili
+    commit: 56c68925531a16e3424fcbecc4b2583121c7e1af
 snapshots:
 - completed:
     size: 567037

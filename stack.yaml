@@ -46,7 +46,8 @@ extra-deps:
 - git: https://github.com/rcdickerson/simple-smt
   commit: e462b960b2fb8b9ba803aa8ffc1342e64ba2260b
 - strings-1.1@sha256:0285dec4c8ab262359342b3e5ef1eb567074669461b9b38404f1cb870c881c5c,1617
-- ../ceili
+- git: https://github.com/rcdickerson/ceili
+  commit: 56c68925531a16e3424fcbecc4b2583121c7e1af
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
