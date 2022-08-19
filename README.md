@@ -6,7 +6,7 @@ ORHLE is an automatic verifier for relational Hoare logic with
 existentials (RHLE). It accepts programs written in the FunIMP
 language (detailed information on the input file format is given
 below) and attempts to verify relational pre- and post-conditions. The
-outcome of a ORHLE verification attempt is either success or failure
+outcome of an ORHLE verification attempt is either success or failure
 along with a falsifying model.
 
 ORHLE is written in Haskell and uses Z3 to discharge verification
@@ -70,7 +70,7 @@ image in one of the following ways:
 * If you have obtained the ORHLE Docker image as a tar archive, you
   can load it with: `# docker load < orhle.tar.gz`
 
-* If you do not have the image, you can pull it from Docker Hub:
+* You can pull the image from Docker Hub:
   `# docker pull rcdickerson/orhle:aplas2022`
 
 * You can obtain the ORHLE source code and build the Docker image
@@ -93,9 +93,10 @@ rcdickerson/orhle   aplas2022   07a6627f6f18   4 hours ago     545MB
 
 ### Running a Single Benchmark
 
-Benchmarks are located in the `examples` directory. For example,
-to run the average salaries benchmark in the delimited release
-benchmarks:
+The Docker image accepts a `.imp` file to verify. (This file format is
+described in more detail below.) Benchmarks evaluated in the paper are
+located in the `experiments` directory. To run, e.g., the average
+salaries benchmark in the delimited release benchmarks:
 
 ```bash
 # docker run \
