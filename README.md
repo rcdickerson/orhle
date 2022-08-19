@@ -68,10 +68,15 @@ Once Docker Engine is installed, you need to load the ORHLE
 image in one of the following ways:
 
 * If you have obtained the ORHLE Docker image as a tar archive, you
-  can load it with: `# docker load < orhle.tar.gz`
+  can load it directly:
+  ```bash
+  # docker load < orhle.tar.gz
+  ```
 
 * You can pull the image from Docker Hub:
-  `# docker pull rcdickerson/orhle:aplas2022`
+  ```bash
+  # docker pull rcdickerson/orhle:aplas2022
+  ```
 
 * You can obtain the ORHLE source code and build the Docker image
   yourself:
