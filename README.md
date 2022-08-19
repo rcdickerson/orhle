@@ -10,11 +10,11 @@ outcome of a ORHLE verification attempt is either success or failure
 along with a falsifying model.
 
 ORHLE is written in Haskell and uses Z3 to discharge verification
-conditions. Experiments were run on ORHLE compiled with GHC version
+conditions. We ran experiments on ORHLE compiled with GHC version
 8.10.4 and executed against Z3 version 4.8.7. The accompanying
 [Docker](https://www.docker.com/) image contains this version of Z3 as
-well as an ORHLE binary built with the appropriate GHC version. GHC
-itself is not included in the Docker image to reduce its size. The
+well as an ORHLE binary built with this GHC version. GHC itself is not
+included in the Docker image to reduce the size of the image. The
 image was built and tested with Docker version 20.10.17.
 
 
