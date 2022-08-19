@@ -165,7 +165,7 @@ $ stack exec orhle-exe <path-to-imp-file>
 
 Building ORHLE requires Z3 4.8.7 and its development headers. These
 packages are available:
-  * In many Debian-based Linux distributions as packages called `z3` and
+  * In many Linux distributions as packages called `z3` and
     `libz3-dev`, respectively.
   * As binaries from [the Z3 releases site](https://github.com/Z3Prover/z3/releases).
   * To build and install directly from [source](https://github.com/Z3Prover/z3).
