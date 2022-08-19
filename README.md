@@ -213,14 +213,14 @@ where
   as multiple executions, the execution ID should appear after
   the function name separated by `!`; for example, value `x`
   in `foo[A]` should be referred to as `foo!A!x`.
-+ `<aspec> ::= <funName>(<params>) { pre: <smtlib2>; post: <smtlib2>;
-  }` gives a universal specification for its `funName`. The `pre` and
++ `<aspec> ::= <string>(<params>) { pre: <smtlib2>; post: <smtlib2>;
+  }` gives a universal specification for some function. The `pre` and
   `post` specifications may reference any program state and the
   function parameters. Additionally, the postcondition can reference
   the special variable `ret!` to refer to the function's return value.
-+ `<espec> ::= <funName>(<params>) { choiceVars: <string>*; pre:
-  <smtlib2>; post: <smtlib2>; }` gives an existential specification for
-  its `funName`, where `choiceVars` is a list of choice variable
++ `<espec> ::= <string>(<params>) { choiceVars: <string>*; pre:
+  <smtlib2>; post: <smtlib2>; }` gives an existential specification
+  for some function, where `choiceVars` is a list of choice variable
   names that may be referenced in the `pre` and `post` conditions.
 + `<funDef> ::= fun <funName>(<params>) { <FunIMP> }` is a function
   definition. `<FunIMP>` is FunIMP syntax as given in Figure 2 of
