@@ -178,8 +178,8 @@ ORHLE input files are formatted as follows:
 ```
 expected: <expect>;
 
-forall: <funName>*
-exists: <funName>*
+forall: <execName>*
+exists: <execName>*
 
 pre: <smtlib2>
 post: <smtlib2>
@@ -196,7 +196,7 @@ where
   expected to verify. The `expected` tag is optional and entirely for
   bookkeeping purposes; it has no operational effect on the execution
   of ORHLE.
-+ `<funName> ::= <string>([<string>])?` is the name of a FunIMP
++ `<execName> ::= <string>([<string>])?` is the name of a FunIMP
   function defined later in the file optionally annotated with an
   execution identifier. The execution identifier distinguishes
   between different executions of the same function. For example,
@@ -222,7 +222,7 @@ where
   <smtlib2>; post: <smtlib2>; }` gives an existential specification
   for some function, where `choiceVars` is a list of choice variable
   names that may be referenced in the `pre` and `post` conditions.
-+ `<funDef> ::= fun <funName>(<params>) { <FunIMP> }` is a function
++ `<funDef> ::= fun <string>(<params>) { <FunIMP> }` is a function
   definition. `<FunIMP>` is FunIMP syntax as given in Figure 2 of
   the paper. At the time of writing, loops must be decorated
   with invariants given as `@inv { <smtlib2> }`. Loops in existential
