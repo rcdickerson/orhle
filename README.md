@@ -190,7 +190,8 @@ especs: <espec>*
 <funDef>*
 ```
 
-where:
+where
+
 + `<expect> ::= valid | invalid` indicates whether the file is
   expected to verify. The `expected` tag is optional and entirely for
   bookkeeping purposes; it has no operational effect on the execution
