@@ -171,7 +171,7 @@ packages are available:
   * To build and install directly from [source](https://github.com/Z3Prover/z3).
 
 
-### The ORHLE Input File Format
+### The .imp File Format
 
 ORHLE input files are formatted as follows:
 
