@@ -93,10 +93,11 @@ rcdickerson/orhle   aplas2022   07a6627f6f18   4 hours ago     545MB
 
 ### Running a Single Benchmark
 
-The Docker image accepts a `.imp` file to verify. (This file format is
-described in more detail below.) Benchmarks evaluated in the paper are
-located in the `experiments` directory. To run, e.g., the average
-salaries benchmark in the delimited release benchmarks:
+You can run ORHLE with `docker run`, providing a `.imp` file to
+verify. (This file format is described in more detail below.)
+Benchmark `.imp` files evaluated in the paper are located in the
+`experiments` directory. To run, e.g., the average salaries delimited
+release benchmark, execute:
 
 ```bash
 # docker run \
