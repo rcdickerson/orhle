@@ -2,13 +2,12 @@
 
 ## About the Archive
 
-ORHLE is an automatic existential relational Hoare logic (RHLE)
-verifier. It accepts programs written in the FunIMP language, a set of
-universal and existential function specifications, and relational pre-
-and post-conditions. (More detailed information on the input file
-format is given below. ORHLE attempts to verify the pre- and
-post-conditions on the given FunIMP code and reports either a) success
-or b) failure along with a falsifying model if one was found.
+ORHLE is an automatic verifier for relational Hoare logic with
+existentials (RHLE). It accepts programs written in the FunIMP
+language (detailed information on the input file format is given
+below) and attempts to verify relational pre- and post-conditions. The
+outcome of a ORHLE verification attempt is either success or failure
+along with a falsifying model.
 
 ORHLE is written in Haskell and uses Z3 to discharge verification
 conditions. Experiments were run on ORHLE compiled with GHC version
