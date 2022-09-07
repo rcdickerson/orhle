@@ -1,5 +1,5 @@
 Running backward relational analysis...
-[RelationalPTS] Invariant is not invariant on loop body or does not decrease measure
+[RelationalPTS] SMT solver returned unknown when determining invariance on loop body.
 
 *******************************************
 ****               ORHLE               ****
@@ -14,7 +14,7 @@ Running backward relational analysis...
     --------
     refinement!sum := 0;
     while refinement!sum <= 100
-      refinement!r := refinement!biggerRand();
+      refinement!r := refinement!randEven();
       refinement!sum := refinement!sum + refinement!r;
     end;
     refinement!refinement!retVal := refinement!sum;
@@ -37,6 +37,6 @@ true
 Failure:
   Verification conditions are invalid. Model: ()
 
-real	0m0.228s
-user	0m0.183s
-sys	0m0.033s
+real	0m1.366s
+user	0m0.237s
+sys	0m0.030s

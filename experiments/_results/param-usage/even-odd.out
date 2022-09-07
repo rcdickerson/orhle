@@ -1,0 +1,33 @@
+Running backward relational analysis...
+
+*******************************************
+****               ORHLE               ****
+****     The Oracular RHLE Verifier    ****
+*******************************************
+
+:: Executions
+  used[1] (forall)
+  used[2] (exists)
+
+:: Universal Programs
+    --------
+    used!1!ret := used!1!param % 2;
+    used!1!used!retVal := used!1!ret;
+
+:: Existential Programs
+    --------
+    used!2!ret := used!2!param % 2;
+    used!2!used!retVal := used!2!ret;
+
+:: Precondition
+(not (= used!1!param used!2!param))
+
+:: Postcondition
+(= used!1!ret used!2!ret)
+
+Failure:
+  Verification conditions are invalid. Model: (model (define-fun used!2!param () Int 1) (define-fun used!1!param () Int 0))
+
+real	0m0.243s
+user	0m0.183s
+sys	0m0.048s

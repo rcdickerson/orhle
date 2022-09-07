@@ -38,6 +38,6 @@ Running backward relational analysis...
 Failure:
   Verification conditions are invalid. Model: (model (define-fun buy!2!cost () Int 1) (define-fun buy!1!funds () Int 0) (define-fun buy!2!funds () Int 1) (define-fun buy!1!cost () Int 1) (define-fun buy!2!spent () Int 0) (define-fun buy!1!spent () Int 0))
 
-real	0m0.209s
-user	0m0.194s
-sys	0m0.008s
+real	0m0.216s
+user	0m0.196s
+sys	0m0.017s

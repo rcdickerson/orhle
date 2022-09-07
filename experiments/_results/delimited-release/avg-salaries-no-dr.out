@@ -47,6 +47,6 @@ Running backward relational analysis...
 Failure:
   Verification conditions are invalid. Model: (model (define-fun calc_avg!2!salary1 () Int 0) (define-fun calc_avg!3!salary1 () Int 0) (define-fun calc_avg!2!salary2 () Int 0) (define-fun calc_avg!2!salary3 () Int (- 3)) (define-fun calc_avg!3!salary3 () Int 0) (define-fun calc_avg!3!salary2 () Int 0) (define-fun calc_avg!1!salary3 () Int 0) (define-fun calc_avg!1!salary2 () Int 0) (define-fun calc_avg!1!salary1 () Int 0))
 
-real	0m0.210s
-user	0m0.191s
-sys	0m0.019s
+real	0m0.215s
+user	0m0.192s
+sys	0m0.021s

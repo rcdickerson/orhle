@@ -36,6 +36,6 @@ true
 Failure:
   Verification conditions are invalid. Model: (model (define-fun smith!1!secret () Int 0) (define-fun smith!2!secret () Int 3))
 
-real	0m0.209s
-user	0m0.163s
-sys	0m0.034s
+real	0m0.215s
+user	0m0.177s
+sys	0m0.027s

@@ -67,6 +67,6 @@ Running backward relational analysis...
 Failure:
   Verification conditions are invalid. Model: (model (define-fun denning!E!e_L () Int 0) (define-fun denning!A!e_L () Int 0) (define-fun denning!E!i_L () Int 0) (define-fun denning!A!i_L () Int 0))
 
-real	0m0.217s
-user	0m0.181s
-sys	0m0.031s
+real	0m0.226s
+user	0m0.185s
+sys	0m0.040s

@@ -38,6 +38,6 @@ true
 Failure:
   Verification conditions are invalid. Model: (model)
 
-real	0m0.211s
-user	0m0.184s
-sys	0m0.022s
+real	0m0.215s
+user	0m0.204s
+sys	0m0.008s

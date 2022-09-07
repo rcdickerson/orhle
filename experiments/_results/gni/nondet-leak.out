@@ -38,6 +38,6 @@ Running backward relational analysis...
 Failure:
   Verification conditions are invalid. Model: (model (define-fun leak!2!high () Int 2) (define-fun leak!1!high () Int 3) (define-fun leak!2!low () Int 0) (define-fun leak!1!low () Int 0))
 
-real	0m0.208s
-user	0m0.186s
-sys	0m0.017s
+real	0m0.222s
+user	0m0.197s
+sys	0m0.023s
