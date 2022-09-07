@@ -1,7 +1,7 @@
 // Example adapted from secure information flow lecture notes:
 // https://people.cs.vt.edu/~ryder/6304/lectures/10-Denning&Denning-InfoFlow-CACM7-97-KrishnanMurali.pdf
 
-expected: valid;
+expected: invalid;
 
 forall: denning[A];
 exists: denning[E];
