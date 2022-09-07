@@ -84,7 +84,7 @@ image in one of the following ways:
   $ git clone https://github.com/rcdickerson/orhle.git
   $ cd orhle
   $ git checkout aplas2022
-  # docker build --tag rcdickerson/orhle:aplas2022
+  # docker build --tag rcdickerson/orhle:aplas2022 .
   ```
 
 After loading the ORHLE image in one of these ways, you should
