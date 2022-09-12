@@ -136,19 +136,18 @@ Evaluation data in the paper were generated using the
 per-benchmark output is written to the `experiments/_results`
 directory.
 
-You can execute `run-experiments` inside the Docker container.
-Detailed execution logs are written to `experiments/_results`:
+You can execute `run-experiments` inside the Docker container:
 
 ```bash
 # docker run -it --entrypoint bash rcdickerson/orhle:aplas2022
 # bin/run-experiments.sh
-# cd experiments/_results
 ```
 
-You can also access results from any ORHLE image by mounting it as a
-[Docker volume](https://docs.docker.com/storage/volumes/). The ORHLE
-Docker image contains the experimental results presented in the paper
-in its `experiments/_results` directory.
+Detailed execution logs are written to `experiments/_results`. You can
+also access results from any ORHLE image by mounting it as a [Docker
+volume](https://docs.docker.com/storage/volumes/). The ORHLE Docker
+image contains the experimental results presented in the paper in its
+`experiments/_results` directory.
 
 
 ### Building ORHLE with Stack
