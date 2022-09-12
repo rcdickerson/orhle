@@ -144,7 +144,7 @@ You can execute `run-experiments` inside the Docker container:
 ```
 
 Detailed execution logs are written to `experiments/_results`. You can
-also access results from any ORHLE image by mounting it as a [Docker
+access results from any ORHLE image by mounting it as a [Docker
 volume](https://docs.docker.com/storage/volumes/). The ORHLE Docker
 image contains the experimental results presented in the paper in its
 `experiments/_results` directory.
