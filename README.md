@@ -146,7 +146,9 @@ Detailed execution logs are written to `experiments/_results`:
 ```
 
 You can also access results from any ORHLE image by mounting it as a
-[Docker volume](https://docs.docker.com/storage/volumes/).
+[Docker volume](https://docs.docker.com/storage/volumes/). The ORHLE
+Docker image contains the experimental results presented in the paper
+in its `experiments/_results` directory.
 
 
 ### Building ORHLE with Stack
@@ -230,7 +232,8 @@ where
 + `<params>` is a comma-separated list of strings giving function
   parameter names.
 
-See the `experiments` directory for a variety of example ORHLE input files.
+See the `experiments` directory for a variety of example ORHLE input
+files.
 
 
 ## Theory
