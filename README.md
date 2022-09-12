@@ -136,24 +136,17 @@ Evaluation data in the paper were generated using the
 per-benchmark output is written to the `experiments/_results`
 directory.
 
-You can execute `run-experiments` inside the Docker container by
-setting it to be the entry point:
-
-```bash
-# docker run --entrypoint bin/run-experiments.sh rcdickerson/orhle:aplas2022
-```
-
-When running the script, you should see a summary of the benchmark
-executions. Detailed execution logs are written to
-`experiments/_results`. You can view these logs by shelling in to the
-container:
+You can execute `run-experiments` inside the Docker container.
+Detailed execution logs are written to `experiments/_results`:
 
 ```bash
 # docker run -it --entrypoint bash rcdickerson/orhle:aplas2022
+# bin/run-experiments.sh
 # cd experiments/_results
 ```
 
-or mounting it as a [Docker volume](https://docs.docker.com/storage/volumes/).
+You can also access results from any ORHLE image by mounting it as a
+[Docker volume](https://docs.docker.com/storage/volumes/).
 
 
 ### Building ORHLE with Stack

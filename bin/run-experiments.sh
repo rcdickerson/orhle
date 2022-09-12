@@ -4,7 +4,6 @@ experiment_dir="./experiments"
 groups=( \
   "api-refinement" \
   "blackjack" \
-  "ctl" \
   "delimited-release" \
   "flaky-tests" \
   "gni" \
