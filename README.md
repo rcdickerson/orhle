@@ -266,7 +266,7 @@ version of Coq is present and you can build the theories directly
 within the image:
 
 ```bash
-# docker run -it --entrypoint bash rcdickerson/orhle:aplas2022
+# docker run -it --entrypoint bash rcdickerson/orhle:aplas2022-full
 # cd theories
 # eval $(opam env) && make
 ```
