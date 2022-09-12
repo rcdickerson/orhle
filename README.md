@@ -248,7 +248,7 @@ size of the image. However, a "full" version of the image is
 available on Dockerhub:
 
 ```bash
-# docker pull rcdickerson/orhle-full:aplas2022
+# docker pull rcdickerson/orhle:aplas2022-full
 ```
 
 You can also build the full image by using the `.full` version
@@ -258,7 +258,7 @@ of the Dockerfile:
 $ git clone https://github.com/rcdickerson/orhle.git
 $ cd orhle
 $ git checkout aplas2022
-# docker build -f Dockerfile.full --tag rcdickerson/orhle-full:aplas2022 .
+# docker build -f Dockerfile.full --tag rcdickerson/orhle:aplas2022-full .
 ```
 
 If you are using the "full" version of the ORHLE image, the correct
