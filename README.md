@@ -242,6 +242,26 @@ The `theories` directory contains a Coq formalization of the program
 logics from the paper. We executed these proof scripts using Coq
 8.15.2, but other versions may work as well.
 
+### Obtaining Coq
+
+The standard ORHLE Docker image does not contain Coq to reduce the
+size of the image. However, a "full" version of the image is
+available on Dockerhub:
+
+```bash
+# docker pull rcdickerson/orhle-full:aplas2022
+```
+
+You can also build the full image by using the `.full` version
+of the Dockerfile:
+
+```bash
+$ git clone https://github.com/rcdickerson/orhle.git
+$ cd orhle
+$ git checkout aplas2022
+# docker build -f Dockerfile.full --tag rcdickerson/orhle-full:aplas2022 .
+```
+
 If you are using the "full" version of the ORHLE image, the correct
 version of Coq is present and you can build the theories directly
 within the image:
@@ -257,11 +277,11 @@ will need to install it to build the theories. Instructions for
 installing Coq Platform with Coq 8.15.2 can be found in the
 [Coq Platform documentation](
 https://github.com/coq/platform/blob/main/doc/README~8.15~2022.04.md).
-After installing Coq, you can access the theories either via [Github](
-https://github.com/rcdickerson/orhle.git) or by mounting the ORHLE
-image as a [volume](https://docs.docker.com/storage/volumes/).
+After installing Coq, you can obtain the theory files either via
+[Github]( https://github.com/rcdickerson/orhle.git) or by mounting the
+ORHLE image as a [volume](https://docs.docker.com/storage/volumes/).
 
-The key definitions and theorems are as follows:
+### Key Definitions and Theorems
 
 - The syntax (Figure 2, page 3), semantics (Figure 8, page 21), and
   overapproximate executions (Figure 9, page 22) of FunImp can be found
