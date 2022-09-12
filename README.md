@@ -239,12 +239,24 @@ The `theories` directory contains a Coq formalization of the program
 logics from the paper. We executed these proof scripts using Coq
 8.15.2, but other versions may work as well.
 
-To build all theories, run `make` from the `theories` directory:
+If you are using the "full" version of the ORHLE image, the correct
+version of Coq is present and you can build the theories directly
+within the image:
 
 ```bash
-$ cd theories
-$ make
+# docker run -it --entrypoint bash rcdickerson/orhle:aplas2022
+# cd theories
+# eval $(opam env) && make
 ```
+
+If you are using the standard ORHLE image, Coq is not included and you
+will need to install it to build the theories. Instructions for
+installing Coq Platform with Coq 8.15.2 can be found in the
+[Coq Platform documentation](
+https://github.com/coq/platform/blob/main/doc/README~8.15~2022.04.md).
+After installing Coq, you can access the theories either via [Github](
+https://github.com/rcdickerson/orhle.git) or by mounting the ORHLE
+image as a [volume](https://docs.docker.com/storage/volumes/).
 
 The key definitions and theorems are as follows:
 

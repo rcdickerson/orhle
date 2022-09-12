@@ -1,4 +1,4 @@
-# Builds an ORHLE image without Coq.
+# Builds an ORHLE image with Coq.
 
 FROM ubuntu:focal as build
 RUN apt-get update
@@ -16,10 +16,17 @@ WORKDIR orhle
 RUN git checkout aplas2022
 RUN stack install
 
+# Install Coq.
+RUN apt-get install -y opam
+RUN opam init --disable-sandboxing -y
+RUN eval $(opam env) && opam pin add coq 8.15.2 -y
+
 # Cleanup.
 RUN stack clean --full
 RUN rm -rf .stack-work
 RUN rm -rf ~/.stack
+RUN eval $(opam env) && opam clean -acs --logs
+RUN rm -rf ~/.opam/repo
 RUN apt-get clean
 
 # Flatten.
