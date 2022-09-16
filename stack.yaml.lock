@@ -12,34 +12,12 @@ packages:
   original:
     hackage: smtLib-1.1@sha256:6e80aa14ae39adb238a12ec404c3034a8d54a8e6d1656075383fff5e6854b224
 - completed:
-    name: simple-smt
-    version: 0.9.7
-    git: https://github.com/rcdickerson/simple-smt
-    pantry-tree:
-      size: 357
-      sha256: d51b2d8281399a245fe213908f7ec2ad36413d96c07fb1ecf9ef9e8a23d16e95
-    commit: e462b960b2fb8b9ba803aa8ffc1342e64ba2260b
-  original:
-    git: https://github.com/rcdickerson/simple-smt
-    commit: e462b960b2fb8b9ba803aa8ffc1342e64ba2260b
-- completed:
     hackage: strings-1.1@sha256:0285dec4c8ab262359342b3e5ef1eb567074669461b9b38404f1cb870c881c5c,1617
     pantry-tree:
       size: 212
       sha256: 876e5a679244143e2a7e74357427c7522a8d61f68a4cc3ae265fe4960b75a2e2
   original:
     hackage: strings-1.1@sha256:0285dec4c8ab262359342b3e5ef1eb567074669461b9b38404f1cb870c881c5c,1617
-- completed:
-    name: ceili
-    version: 0.1.0.0
-    git: https://github.com/rcdickerson/ceili
-    pantry-tree:
-      size: 4492
-      sha256: 694b1bb2e353246d3d7bc8fa5c7aa8e508af55372f7e6b299e5b6f730910e0dc
-    commit: bef7d00e0e02ec992df9af3de0602a2bfda52bf1
-  original:
-    git: https://github.com/rcdickerson/ceili
-    commit: bef7d00e0e02ec992df9af3de0602a2bfda52bf1
 snapshots:
 - completed:
     size: 567037
