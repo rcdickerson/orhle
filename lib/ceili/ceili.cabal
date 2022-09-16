@@ -1,0 +1,155 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.4.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: c246e5200cdd7a13babd41c40c912a72dd1f97ef6b5c3f246e2c334eb40fa775
+
+name:           ceili
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/rcdickerson/ceili#readme>
+homepage:       https://github.com/rcdickerson/ceili#readme
+bug-reports:    https://github.com/rcdickerson/ceili/issues
+author:         Rob Dickerson
+maintainer:     rob@robd.io
+copyright:      2021 Rob Dickerson
+license:        MIT
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+
+source-repository head
+  type: git
+  location: https://github.com/rcdickerson/ceili
+
+library
+  exposed-modules:
+      Ceili
+      Ceili.Assertion
+      Ceili.Assertion.AssertionLanguage
+      Ceili.Assertion.AssertionParser
+      Ceili.CeiliEnv
+      Ceili.Embedding
+      Ceili.Evaluation
+      Ceili.FeatureLearning.CollectionUtil
+      Ceili.FeatureLearning.FeatureVector
+      Ceili.FeatureLearning.LinearInequalities
+      Ceili.FeatureLearning.PACBoolean
+      Ceili.FeatureLearning.Pie
+      Ceili.FeatureLearning.Separator
+      Ceili.InvariantInference.Houdini
+      Ceili.InvariantInference.LoopInvGen
+      Ceili.Language.AExp
+      Ceili.Language.AExpParser
+      Ceili.Language.BExp
+      Ceili.Language.BExpParser
+      Ceili.Language.Compose
+      Ceili.Language.FunImp
+      Ceili.Language.FunImpParser
+      Ceili.Language.Imp
+      Ceili.Language.ImpParser
+      Ceili.Literal
+      Ceili.Name
+      Ceili.ProgState
+      Ceili.PTS
+      Ceili.SMT
+      Ceili.SMTString
+      Ceili.StatePredicate
+  other-modules:
+      Paths_ceili
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <5
+    , bytestring
+    , containers
+    , fast-logger
+    , filepath
+    , mtl
+    , parsec
+    , prettyprinter
+    , simple-smt
+    , split
+    , text
+    , transformers
+    , unbounded-delays
+    , uuid
+    , vector
+  default-language: Haskell2010
+
+test-suite ceili-test
+  type: exitcode-stdio-1.0
+  main-is: TestMain.hs
+  other-modules:
+      Ceili.AssertionTest
+      Ceili.FeatureLearning.CollectionUtilTest
+      Ceili.FeatureLearning.FeatureVectorTest
+      Ceili.FeatureLearning.LinearInequalitiesTest
+      Ceili.FeatureLearning.PACBooleanTest
+      Ceili.FeatureLearning.PieTest
+      Ceili.FeatureLearning.SeparatorTest
+      Ceili.Language.AExpParserTest
+      Ceili.Language.AExpTest
+      Ceili.Language.BExpTest
+      Ceili.Language.FunImpParserTest
+      Ceili.Language.FunImpTest
+      Ceili.Language.ImpParserTest
+      Ceili.Language.ImpTest
+      Ceili.NameTest
+      Ceili.TestUtil
+      Paths_ceili
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      HTF
+    , base >=4.7 && <5
+    , bytestring
+    , ceili
+    , containers
+    , fast-logger
+    , filepath
+    , mtl
+    , parsec
+    , prettyprinter
+    , simple-smt
+    , split
+    , text
+    , transformers
+    , unbounded-delays
+    , uuid
+    , vector
+  default-language: Haskell2010
+
+test-suite ceili-verification-test
+  type: exitcode-stdio-1.0
+  main-is: VerificationTestMain.hs
+  other-modules:
+      Ceili.FunImpVerificationTests
+      Ceili.ImpVerificationTests
+      Ceili.InvariantInference.PieVerificationTests
+      Paths_ceili
+  hs-source-dirs:
+      verification-test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -main-is VerificationTestMain
+  build-depends:
+      HTF
+    , base >=4.7 && <5
+    , bytestring
+    , ceili
+    , containers
+    , fast-logger
+    , filepath
+    , mtl
+    , parsec
+    , prettyprinter
+    , simple-smt
+    , split
+    , text
+    , transformers
+    , unbounded-delays
+    , uuid
+    , vector
+  default-language: Haskell2010
