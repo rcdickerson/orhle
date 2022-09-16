@@ -1,0 +1,8 @@
+fun main() {
+  x := 0;
+  x := addOne(x);
+}
+
+fun addOne(x) {
+  return x + 1;
+}

@@ -1,0 +1,13 @@
+fun main() {
+  x := 0;
+  y := 0;
+
+  while (x < 10) do
+    y := addOne(y);
+    x := addOne(x);
+  end
+}
+
+fun addOne(x) {
+  return x + 1;
+}

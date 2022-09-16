@@ -1,0 +1,63 @@
+name:                ceili
+version:             0.1.0.0
+github:              "rcdickerson/ceili"
+license:             MIT
+author:              "Rob Dickerson"
+maintainer:          "rob@robd.io"
+copyright:           "2021 Rob Dickerson"
+
+extra-source-files:
+- README.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/rcdickerson/ceili#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- bytestring
+- containers
+- fast-logger
+- filepath
+- mtl
+- parsec
+- prettyprinter
+- simple-smt
+- split
+- text
+- transformers
+- unbounded-delays
+- uuid
+- vector
+
+library:
+  source-dirs: src
+
+tests:
+  ceili-test:
+    main:                TestMain.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - ceili
+    - HTF
+
+  ceili-verification-test:
+    main:                VerificationTestMain.hs
+    source-dirs:         verification-test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -main-is VerificationTestMain
+    dependencies:
+    - ceili
+    - HTF
