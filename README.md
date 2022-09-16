@@ -143,6 +143,14 @@ You can execute `run-experiments` inside the Docker container:
 # bin/run-experiments.sh
 ```
 
+At the top of each benchmark file is an `expected` line indicating
+whether the property expressed in the benchmark is expected to be
+valid or invalid. (If this line is not present, the default is to
+expect the property to be valid.) For each benchmark, the
+`run-experiments` script will indicate whether ORHLE returned a result
+which matches this expectation by printing a checkmark (✓), or
+contradicts the expectation by printing a cross mark (✗).
+
 Detailed execution logs are written to `experiments/_results`. You can
 access results from any ORHLE image by mounting it as a [Docker
 volume](https://docs.docker.com/storage/volumes/). The ORHLE Docker
